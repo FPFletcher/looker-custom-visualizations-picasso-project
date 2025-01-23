@@ -9,7 +9,7 @@ visualization: {
 
 visualization: {
   id: "my_new_vis"
-  label: "My new vis"
+  label: "My new vis - Guillaume"
   file: "my_new_vis.js"
 
   dependencies: [
