@@ -1,80 +1,74 @@
 looker.plugins.visualizations.add({
-  id: "single-value-with-trend",
-  label: "Single Value with Trend",
-  options: {
-    primary_color: {
-      type: "string",
-      label: "Primary Color",
-      default: "#007bff",
-    },
-    trend_color: {
-      type: "string",
-      label: "Trend Line Color",
-      default: "#d3d3d3",
-    },
-  },
+  // Required: Called once when the visualization is initialized
   create: function (element, config) {
-    element.innerHTML = `
-      <div id="chart-container" style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
-        <div id="single-value" style="font-size: 48px; font-weight: bold; margin-bottom: 10px;"></div>
-        <canvas id="trend-chart" style="width: 100%; height: 70%;"></canvas>
-      </div>
-    `;
+    // Add a container for the visualization
+    this.container = element.appendChild(document.createElement("div"));
+    this.container.className = "custom-vis";
   },
-  updateAsync: function (data, element, config, queryResponse, details, done) {
-    if (!queryResponse.fields.dimensions.length || !queryResponse.fields.measures.length) {
-      this.addError({ title: "Missing Data", message: "This visualization requires a dimension and a measure." });
+
+  // Required: Called whenever the visualization is updated (data or settings change)
+  updateAsync: function (data, element, config, queryResponse, details, doneRendering) {
+    // Clear any errors from previous render
+    this.clearErrors();
+
+    // Validate that the visualization has the required data structure
+    if (queryResponse.fields.dimensions.length === 0) {
+      this.addError({
+        title: "No Dimensions Found",
+        message: "This visualization requires at least one dimension.",
+      });
+      doneRendering();
       return;
     }
 
-    const dimension = queryResponse.fields.dimensions[0];
-    const measure = queryResponse.fields.measures[0];
+    // Retrieve the first dimension's name
+    const dimension = queryResponse.fields.dimensions[0].name;
 
-    // Extract data
-    const labels = data.map((row) => row[dimension.name].value);
-    const values = data.map((row) => row[measure.name].value);
-
-    // Set single value
-    const singleValueElement = element.querySelector("#single-value");
-    const latestValue = values[values.length - 1] || 0;
-    singleValueElement.innerText = `${latestValue}`;
-
-    // Render trend chart
-    const ctx = element.querySelector("#trend-chart").getContext("2d");
-    if (this.chart) this.chart.destroy(); // Cleanup previous chart instance
-
-    this.chart = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: measure.label_short || measure.label,
-            data: values,
-            fill: true,
-            backgroundColor: config.trend_color + "33", // Slight transparency
-            borderColor: config.primary_color,
-            borderWidth: 2,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-        },
-        scales: {
-          x: {
-            display: false, // Hide X-axis labels
-          },
-          y: {
-            display: false, // Hide Y-axis labels
-          },
-        },
-      },
+    // Generate HTML content from the data
+    let html = `<table>`;
+    data.forEach((row) => {
+      const cell = row[dimension];
+      html += `<tr><td>${LookerCharts.Utils.htmlForCell(cell)}</td></tr>`;
     });
+    html += `</table>`;
 
-    done();
+    // Update the container with the new content
+    this.container.innerHTML = html;
+
+    // Notify Looker that rendering is complete
+    doneRendering();
+  },
+
+  // Optional: Configuration options exposed in the UI
+  options: {
+    color: {
+      type: "string",
+      label: "Text Color",
+      display: "color",
+      default: "#000000",
+    },
+    font_size: {
+      type: "number",
+      label: "Font Size",
+      default: 12,
+      display: "range",
+      min: 8,
+      max: 48,
+    },
+  },
+
+  // Optional: Dynamically register additional options (Looker 5.24+)
+  registerOptions: function (queryResponse) {
+    const options = {};
+    queryResponse.fields.measure_like.forEach((field) => {
+      options[`color_${field.name}`] = {
+        label: `${field.label_short} Color`,
+        default: "#FF0000",
+        section: "Style",
+        type: "string",
+        display: "color",
+      };
+    });
+    this.trigger("registerOptions", options);
   },
 });
