@@ -94,8 +94,14 @@ looker.plugins.visualizations.add({
             legend: { display: false },
           },
           scales: {
-            x: { title: { display: true, text: "Month" } },
-            y: { title: { display: true, text: "Orders Count" } },
+            x: {
+              grid: { display: false }, // Remove gridlines for x-axis
+              ticks: { display: false }, // Remove x-axis ticks
+            },
+            y: {
+              grid: { display: false }, // Remove gridlines for y-axis
+              ticks: { display: false }, // Remove y-axis ticks
+            },
           },
         },
       });
