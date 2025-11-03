@@ -91,6 +91,18 @@ looker.plugins.visualizations.add({
       default: true,
       section: "Percentage"
     },
+    percentage_calculation: {
+      type: "string",
+      label: "Percentage Calculation",
+      display: "select",
+      values: [
+        {"Secondary / Primary": "secondary_over_primary"},
+        {"Use 3rd Measure": "use_third_measure"},
+        {"(Secondary / Primary) * 100": "secondary_over_primary_times_100"}
+      ],
+      default: "secondary_over_primary",
+      section: "Percentage"
+    },
     percentage_color: {
       type: "string",
       label: "Percentage Color",
@@ -322,22 +334,36 @@ looker.plugins.visualizations.add({
     let secondaryValue = row[secondaryField].value;
     let percentageValue;
 
-    // Calculate or get percentage
-    if (percentageField) {
+    // Get percentage calculation method
+    const percentageCalc = config.percentage_calculation || "secondary_over_primary";
+
+    // Calculate or get percentage based on configuration
+    if (percentageCalc === "use_third_measure" && percentageField) {
+      // Use the third measure directly
       percentageValue = row[percentageField].value;
+    } else if (percentageCalc === "secondary_over_primary_times_100") {
+      // Calculate (secondary / primary) * 100 - for when you want the percentage as a number
+      percentageValue = primaryValue !== 0 ? ((secondaryValue / primaryValue) * 100) : 0;
     } else {
-      // Auto-calculate percentage from the two values
+      // Default: secondary / primary (will be multiplied by 100 in formatting)
       percentageValue = primaryValue !== 0 ? (secondaryValue / primaryValue) : 0;
     }
 
     // Format values
     const primaryFormatted = this.formatValue(primaryValue);
     const secondaryFormatted = this.formatValue(secondaryValue);
-    const percentageFormatted = this.formatPercentage(percentageValue, config.percentage_decimals || 1);
+    const percentageFormatted = this.formatPercentage(percentageValue, config.percentage_decimals || 1, percentageCalc);
 
     // Get labels
     const primaryLabel = config.primary_label || measures[0].label_short || measures[0].label || "Primary Value";
     const secondaryLabel = config.secondary_label || measures[1].label_short || measures[1].label || "Secondary Value";
+
+    // Debug logging (will appear in browser console)
+    console.log('Water Drop Debug Info:');
+    console.log('Primary Value:', primaryValue, '→', primaryFormatted);
+    console.log('Secondary Value:', secondaryValue, '→', secondaryFormatted);
+    console.log('Percentage Value:', percentageValue, '→', percentageFormatted);
+    console.log('Calculation Method:', percentageCalc);
 
     // Draw visualization
     this.drawWaterDrops(
@@ -385,9 +411,21 @@ looker.plugins.visualizations.add({
 
   /**
    * Format percentage values
+   * Handles both decimal (0.4693) and percentage (46.93) formats
    */
-  formatPercentage: function(value, decimals) {
-    const percentage = value * 100;
+  formatPercentage: function(value, decimals, calculationMethod) {
+    let percentage;
+
+    // Determine if value is already in percentage format or decimal format
+    if (calculationMethod === "secondary_over_primary_times_100" || calculationMethod === "use_third_measure") {
+      // Value is already a percentage number (e.g., 46.93 or -46.93)
+      percentage = value;
+    } else {
+      // Value is a decimal (e.g., 0.4693 or -0.4693), convert to percentage
+      percentage = value * 100;
+    }
+
+    // Add sign for display
     const sign = percentage > 0 ? '+' : '';
     return sign + percentage.toFixed(decimals) + '%';
   },
