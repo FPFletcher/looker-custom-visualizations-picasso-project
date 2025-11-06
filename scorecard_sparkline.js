@@ -329,35 +329,114 @@ looker.plugins.visualizations.add({
     // Get the primary measure for the main value
     const primaryMeasure = measures[0].name;
 
-    // CRITICAL FIX: Check if totals_data is available (true total regardless of row limit)
+    // ============================================
+    // ENHANCED TOTALS DETECTION
+    // ============================================
     let totalValue = 0;
     let usingTotals = false;
+    let totalsMethod = 'none';
 
-    if (details && details.totals_data && Object.keys(details.totals_data).length > 0) {
-      // Use the totals data - this is the TRUE total
-      if (details.totals_data[primaryMeasure] && details.totals_data[primaryMeasure].value !== undefined) {
-        totalValue = details.totals_data[primaryMeasure].value;
-        usingTotals = true;
-        console.log('Using totals_data for accurate total:', totalValue);
+    // Enhanced debugging - log everything about details
+    console.log('=== TOTALS DEBUG INFO ===');
+    console.log('Details object:', details);
+    console.log('Details type:', typeof details);
+    console.log('Has totals_data?', details && 'totals_data' in details);
+
+    if (details) {
+      console.log('Details keys:', Object.keys(details));
+      if (details.totals_data) {
+        console.log('Totals data:', details.totals_data);
+        console.log('Totals data type:', typeof details.totals_data);
+        console.log('Totals data keys:', Object.keys(details.totals_data));
       }
     }
 
-    // Fallback: Calculate from visible rows if totals not available
+    // METHOD 1: Check details.totals_data (most reliable when totals are enabled)
+    if (details && details.totals_data) {
+      console.log('Checking totals_data for measure:', primaryMeasure);
+
+      // Try to get the total value from totals_data
+      if (details.totals_data[primaryMeasure]) {
+        console.log('Found measure in totals_data:', details.totals_data[primaryMeasure]);
+
+        // The value might be directly available or in a nested structure
+        if (typeof details.totals_data[primaryMeasure] === 'object') {
+          if (details.totals_data[primaryMeasure].value !== undefined) {
+            totalValue = details.totals_data[primaryMeasure].value;
+            usingTotals = true;
+            totalsMethod = 'totals_data.value';
+          } else if (details.totals_data[primaryMeasure].rendered !== undefined) {
+            // Sometimes only rendered value is available - try to parse it
+            totalValue = this.parseRenderedValue(details.totals_data[primaryMeasure].rendered);
+            usingTotals = true;
+            totalsMethod = 'totals_data.rendered';
+          }
+        } else if (typeof details.totals_data[primaryMeasure] === 'number') {
+          // Sometimes it's just a direct number
+          totalValue = details.totals_data[primaryMeasure];
+          usingTotals = true;
+          totalsMethod = 'totals_data.direct';
+        }
+      }
+    }
+
+    // METHOD 2: Check if query_response has totals (alternative structure)
+    if (!usingTotals && queryResponse && queryResponse.totals_data) {
+      console.log('Checking queryResponse.totals_data');
+      if (queryResponse.totals_data[primaryMeasure]) {
+        if (typeof queryResponse.totals_data[primaryMeasure] === 'object') {
+          totalValue = queryResponse.totals_data[primaryMeasure].value || 0;
+        } else {
+          totalValue = queryResponse.totals_data[primaryMeasure];
+        }
+        usingTotals = true;
+        totalsMethod = 'queryResponse.totals_data';
+      }
+    }
+
+    // METHOD 3: Check data object for totals row (some Looker versions add a totals row)
+    if (!usingTotals && data && data.length > 0) {
+      const lastRow = data[data.length - 1];
+      console.log('Checking last row for totals marker:', lastRow);
+
+      // Check if last row is a totals row (Looker sometimes adds this)
+      if (lastRow.$$$_row_total_$$$ ||
+          (dimensions.length > 0 && lastRow[dimensions[0].name]?.value === 'Totals')) {
+        console.log('Found totals row in data');
+        totalValue = lastRow[primaryMeasure]?.value || 0;
+        usingTotals = true;
+        totalsMethod = 'data.totals_row';
+        // Remove the totals row from sparkline data
+        data = data.slice(0, -1);
+      }
+    }
+
+    // FALLBACK: Calculate from visible rows if totals not available
     if (!usingTotals) {
+      console.log('No totals found, calculating from visible rows');
       data.forEach(row => {
-        totalValue += (row[primaryMeasure].value || 0);
+        const value = row[primaryMeasure]?.value || 0;
+        totalValue += value;
       });
+      totalsMethod = 'calculated_from_rows';
 
       // Show warning if row limit might be affecting results
       if (data.length >= 500) {
-        this.showWarning('Row limit reached. Enable "Totals" in your query for accurate results.');
+        this.showWarning('⚠️ Row limit reached. Click "Totals" in the Data menu for accurate results.');
+      } else if (data.length >= 100) {
+        this.showWarning('⚠️ Showing sum of visible rows. Enable "Totals" for accurate aggregate.');
       }
-
-      console.log('Calculated from visible rows:', totalValue, '(', data.length, 'rows)');
     } else {
       // Hide warning if we have totals
       this.hideWarning();
     }
+
+    console.log('=== FINAL TOTALS RESULT ===');
+    console.log('Using Totals:', usingTotals);
+    console.log('Totals Method:', totalsMethod);
+    console.log('Total Value:', totalValue);
+    console.log('Row Count:', data.length);
+    console.log('========================');
 
     // For sparkline, we use the row-level data (trend over time)
     const sparklineData = [];
@@ -395,13 +474,6 @@ looker.plugins.visualizations.add({
     } else {
       this._sparklineContainer.style.display = 'none';
     }
-
-    // Debug logging
-    console.log('Scorecard Debug Info:');
-    console.log('Using Totals:', usingTotals);
-    console.log('Total Value:', totalValue, '→', formattedValue);
-    console.log('Sparkline Data Points:', sparklineData.length);
-    console.log('Row Count:', data.length);
 
     done();
   },
@@ -442,7 +514,7 @@ looker.plugins.visualizations.add({
    * Show warning message
    */
   showWarning: function(message) {
-    this._warning.textContent = '⚠️ ' + message;
+    this._warning.textContent = message;
     this._warning.className = 'warning-message';
     this._warning.style.display = 'block';
   },
@@ -463,6 +535,35 @@ looker.plugins.visualizations.add({
         ${message}
       </div>
     `;
+  },
+
+  /**
+   * Parse a rendered value string to extract numeric value
+   * Handles formats like "105.2K", "$1,234.56", "42.5%", etc.
+   */
+  parseRenderedValue: function(renderedString) {
+    if (!renderedString) return 0;
+
+    // Remove currency symbols, commas, and spaces
+    let cleanString = renderedString.toString()
+      .replace(/[$£€¥,\s]/g, '')
+      .replace(/%$/, ''); // Remove trailing %
+
+    // Handle K, M, B suffixes
+    let multiplier = 1;
+    if (cleanString.endsWith('K')) {
+      multiplier = 1000;
+      cleanString = cleanString.slice(0, -1);
+    } else if (cleanString.endsWith('M')) {
+      multiplier = 1000000;
+      cleanString = cleanString.slice(0, -1);
+    } else if (cleanString.endsWith('B')) {
+      multiplier = 1000000000;
+      cleanString = cleanString.slice(0, -1);
+    }
+
+    const numValue = parseFloat(cleanString);
+    return isNaN(numValue) ? 0 : numValue * multiplier;
   },
 
   /**
