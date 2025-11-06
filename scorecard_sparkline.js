@@ -83,7 +83,7 @@ looker.plugins.visualizations.add({
         {"Sum Visible Rows Only": "sum_visible_rows"}
       ],
       default: "use_totals",
-      section: "Content"
+      section: "Content",
       order: 1
     },
     calculation_mode_help: {
