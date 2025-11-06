@@ -89,7 +89,7 @@ looker.plugins.visualizations.add({
     calculation_mode_help: {
       type: "string",
       label: "ℹ️ Use Totals: Accurate across all data (requires Totals enabled in Data menu). May have minor rounding with large datasets. Note: Sparkline always shows visible rows trend only.",
-      display: "text",
+      display: "divider",
       section: "Content",
       default: "",
       order: 2
