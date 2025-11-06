@@ -485,7 +485,6 @@ looker.plugins.visualizations.add({
       }
     } else {
         this.hideWarning();
-      }
     }
 
     console.log('=== FINAL TOTALS RESULT ===');
