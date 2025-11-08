@@ -571,7 +571,7 @@ looker.plugins.visualizations.add({
     }
 
     const result = [];
-    const horizontal = width >= height;
+    const horizontal = true; // Always horizontal layout like Studio
     let current = 0;
     let remaining = items.slice();
 
@@ -628,7 +628,7 @@ looker.plugins.visualizations.add({
   worstAspectRatio: function(items, width, height, total) {
     const rowValue = items.reduce((sum, item) => sum + item.value, 0);
     const rowRatio = rowValue / total;
-    const horizontal = width >= height;
+    const horizontal = true; // Always horizontal layout
     const size = horizontal ? width * rowRatio : height * rowRatio;
     const perp = horizontal ? height : width;
 
