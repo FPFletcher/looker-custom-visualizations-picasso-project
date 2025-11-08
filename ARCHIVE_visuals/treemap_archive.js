@@ -145,6 +145,7 @@ looker.plugins.visualizations.add({
   create: function(element, config) {
     const style = document.createElement('style');
     style.innerHTML = `
+
       .treemap-container {
         width: 100%;
         height: 100%;
@@ -158,28 +159,34 @@ looker.plugins.visualizations.add({
         padding: 0;
         margin: 0;
       }
+
       .treemap-svg {
         width: 100%;
         height: 100%;
       }
+
       .treemap-rect {
         cursor: pointer;
         transition: opacity 0.2s ease, stroke-width 0.2s ease;
       }
+
       .treemap-rect:hover {
         opacity: 0.85;
         stroke-width: 3px !important;
       }
+
       .treemap-label {
         pointer-events: none;
         user-select: none;
         font-weight: 600;
       }
+
       .treemap-value {
         pointer-events: none;
         user-select: none;
         font-weight: 400;
       }
+
       .treemap-breadcrumb {
         position: absolute;
         top: 10px;
@@ -192,18 +199,22 @@ looker.plugins.visualizations.add({
         z-index: 100;
         display: none;
       }
+
       .breadcrumb-item {
         cursor: pointer;
         color: #1A73E8;
         text-decoration: none;
       }
+
       .breadcrumb-item:hover {
         text-decoration: underline;
       }
+
       .breadcrumb-separator {
         margin: 0 6px;
         color: #666;
       }
+
       .treemap-tooltip {
         position: absolute;
         background: rgba(0, 0, 0, 0.85);
@@ -451,13 +462,13 @@ looker.plugins.visualizations.add({
     const showBothLabels = availableHeight >= (labelFontSize + valueFontSize + 8);
 
     let yOffset = showBothLabels ?
-      centerY - (labelFontSize + valueFontSize) / 2 :
-      centerY;
+    centerY - (labelFontSize + valueFontSize) / 2 :
+    centerY;
 
     // Label
     if (config.show_labels !== false && showBothLabels) {
       const wrappedLabel = config.wrap_labels !== false ?
-        this.wrapText(labelText, availableWidth, labelFontSize) : [labelText];
+      this.wrapText(labelText, availableWidth, labelFontSize) : [labelText];
 
       wrappedLabel.slice(0, 2).forEach((line, idx) => { // Max 2 lines for small tiles
         const label = document.createElementNS(svgNS, 'text');
@@ -556,12 +567,7 @@ looker.plugins.visualizations.add({
   squarifyRecursive: function(items, x, y, width, height, total) {
     if (items.length === 0) return [];
     if (items.length === 1) {
-      return [{...items[0],
-        x,
-        y,
-        width,
-        height
-      }];
+      return [{...items[0], x, y, width, height}];
     }
 
     const result = [];
@@ -624,16 +630,16 @@ looker.plugins.visualizations.add({
     }
 
     return result;
-  },
+    },
 
-  findBestRow: function(items, width, height, total) {
-    if (items.length === 0) return [];
+    findBestRow: function(items, width, height, total) {
+      if (items.length === 0) return [];
 
-    const horizontal = width >= height;
-    const fixedSize = horizontal ? height : width;
-    const variableSize = horizontal ? width : height;
+      const horizontal = width >= height;
+      const fixedSize = horizontal ? height : width;
+      const variableSize = horizontal ? width : height;
 
-    let bestRow = [items[0]];
+      let bestRow = [items[0]];
     let bestRatio = Infinity;
 
     for (let i = 1; i <= items.length; i++) {
@@ -657,6 +663,61 @@ looker.plugins.visualizations.add({
     }
 
     return bestRow;
+    },
+
+    const result = [];
+    const horizontal = true; // Always horizontal layout like Studio
+    let current = 0;
+    let remaining = items.slice();
+
+    while (remaining.length > 0) {
+      const row = [remaining.shift()];
+      let rowValue = row[0].value;
+
+      while (remaining.length > 0 && this.worstAspectRatio(row, width, height, total) >=
+             this.worstAspectRatio([...row, remaining[0]], width, height, total)) {
+        row.push(remaining.shift());
+        rowValue += row[row.length - 1].value;
+      }
+
+      const ratio = rowValue / total;
+
+      if (horizontal) {
+        const rowWidth = width * ratio;
+        row.forEach((item, i) => {
+          const itemRatio = item.value / rowValue;
+          const itemHeight = height * itemRatio;
+          result.push({
+            ...item,
+            x: x + current,
+            y: y + (i === 0 ? 0 : row.slice(0, i).reduce((sum, r) => sum + (height * r.value / rowValue), 0)),
+            width: rowWidth,
+            height: itemHeight
+          });
+        });
+        current += rowWidth;
+        width -= rowWidth;
+      } else {
+        const rowHeight = height * ratio;
+        row.forEach((item, i) => {
+          const itemRatio = item.value / rowValue;
+          const itemWidth = width * itemRatio;
+          result.push({
+            ...item,
+            x: x + (i === 0 ? 0 : row.slice(0, i).reduce((sum, r) => sum + (width * r.value / rowValue), 0)),
+            y: y + current,
+            width: itemWidth,
+            height: rowHeight
+          });
+        });
+        current += rowHeight;
+        height -= rowHeight;
+      }
+
+      total -= rowValue;
+    }
+
+    return result;
   },
 
   worstAspectRatio: function(items, width, height, total) {
