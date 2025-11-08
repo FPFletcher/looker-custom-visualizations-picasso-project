@@ -295,6 +295,24 @@ looker.plugins.visualizations.add({
       this._lastOthersThreshold = config.others_threshold;
     }
 
+    // Reset drill if color settings changed
+const colorChanged = this._lastColorBy !== config.color_by ||
+                    this._lastColorPalette !== config.color_palette ||
+                    this._lastUseGradient !== config.use_gradient ||
+                    this._lastReversePalette !== config.reverse_palette ||
+                    this._lastGradientStart !== config.gradient_start_color ||
+                    this._lastGradientEnd !== config.gradient_end_color;
+
+    if (colorChanged) {
+      this._drillStack = [];
+      this._lastColorBy = config.color_by;
+      this._lastColorPalette = config.color_palette;
+      this._lastUseGradient = config.use_gradient;
+      this._lastReversePalette = config.reverse_palette;
+      this._lastGradientStart = config.gradient_start_color;
+      this._lastGradientEnd = config.gradient_end_color;
+    }
+
     // Reset drill if dimensions changed
     if (this._lastDimensionCount !== dimensions.length) {
       this._drillStack = [];
