@@ -271,6 +271,7 @@ looker.plugins.visualizations.add({
     this._queryResponse = queryResponse;
     this._config = config;
     this._allData = data;
+    this._globalColorRange = null; // Reset color range on data change
 
     // Reset drill if Others toggle or threshold changed
     const othersChanged = this._lastOthersToggle !== config.others_toggle ||
@@ -406,11 +407,24 @@ looker.plugins.visualizations.add({
     this._svg.style.height = `calc(100% - ${breadcrumbHeight}px)`;
     this._svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
-    // CRITICAL FIX: Calculate colors from CURRENT data, not this._allData
+    // CRITICAL FIX: Calculate colors from current data
     const colors = this.getColors(data, config);
     const total = data.reduce((sum, d) => sum + d.value, 0);
 
-    // Simple squarified layout
+    // CRITICAL FIX: Store global min/max on first render for consistent colors across drills
+    if (!this._globalColorRange) {
+      const dimensions = this._queryResponse.fields.dimension_like;
+      const measures = this._queryResponse.fields.measure_like;
+      const measure = measures[0].name;
+
+      // Get ALL unique items across ALL dimensions
+      const allValues = this._allData.map(row => Math.max(0, row[measure].value || 0));
+      this._globalColorRange = {
+        min: Math.min(...allValues),
+        max: Math.max(...allValues)
+      };
+    }
+
     const layout = this.squarify(data, 0, 0, width, height, total);
 
     layout.forEach((item, i) => {
@@ -422,12 +436,11 @@ looker.plugins.visualizations.add({
       rect.setAttribute('width', Math.max(1, Math.round(item.width)));
       rect.setAttribute('height', Math.max(1, Math.round(item.height)));
 
-      // CRITICAL FIX: Use colors calculated from CURRENT data
+      // CRITICAL FIX: Use GLOBAL min/max for gradient, not local
       let fillColor;
       if (config.color_by === 'metric' && config.use_gradient) {
-        const allValues = data.map(d => d.value);
-        const min = Math.min(...allValues);
-        const max = Math.max(...allValues);
+        const min = this._globalColorRange.min;
+        const max = this._globalColorRange.max;
         const ratio = (max === min) ? 0.5 : (item.value - min) / (max - min);
 
         let startColor = config.gradient_start_color || '#F1F8E9';
@@ -457,15 +470,14 @@ looker.plugins.visualizations.add({
             const dimensions = this._queryResponse.fields.dimension_like;
             if (currentLevel < dimensions.length) {
               childData = this.buildHierarchicalData(
-                childData,
-                dimensions,
-                this._queryResponse.fields.measure_like[0].name,
-                currentLevel
+              childData,
+              dimensions,
+              this._queryResponse.fields.measure_like[0].name,
+              currentLevel
               );
             }
           }
 
-          // CRITICAL: Pass childData, not this._allData
           this.drawTreemap(childData, this._config, this._queryResponse);
         });
       }
@@ -473,9 +485,9 @@ looker.plugins.visualizations.add({
       rect.addEventListener('mouseenter', () => {
         const pct = ((item.value / total) * 100).toFixed(1);
         this._tooltip.innerHTML = `
-          <div style="font-weight:600">${item.name}</div>
-          <div>${this.formatValue(item.rawValue)} (${pct}%)</div>
-          ${item.children && item.children.length > 0 ? '<div style="font-size:10px">(Click to drill)</div>' : ''}
+        <div style="font-weight:600">${item.name}</div>
+        <div>${this.formatValue(item.rawValue)} (${pct}%)</div>
+        ${item.children && item.children.length > 0 ? '<div style="font-size:10px">(Click to drill)</div>' : ''}
         `;
         this._tooltip.style.display = 'block';
       });
