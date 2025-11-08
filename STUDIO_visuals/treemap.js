@@ -568,7 +568,102 @@ looker.plugins.visualizations.add({
     if (items.length === 0) return [];
     if (items.length === 1) {
       return [{...items[0], x, y, width, height}];
-    }
+}
+
+const result = [];
+let remaining = [...items];
+
+while (remaining.length > 0) {
+  // Find best row
+  const row = this.findBestRow(remaining, width, height, total);
+
+  // Calculate row dimensions
+  const rowValue = row.reduce((sum, item) => sum + item.value, 0);
+  const ratio = rowValue / total;
+
+  // Choose orientation that gives better aspect ratios
+  const horizontal = width >= height;
+
+  if (horizontal) {
+    const rowWidth = width * ratio;
+    let currentY = y;
+
+    row.forEach(item => {
+      const itemRatio = item.value / rowValue;
+      const itemHeight = height * itemRatio;
+      result.push({
+        ...item,
+        x: x,
+        y: currentY,
+        width: rowWidth,
+        height: itemHeight
+      });
+      currentY += itemHeight;
+    });
+
+    x += rowWidth;
+    width -= rowWidth;
+  } else {
+    const rowHeight = height * ratio;
+    let currentX = x;
+
+    row.forEach(item => {
+      const itemRatio = item.value / rowValue;
+      const itemWidth = width * itemRatio;
+      result.push({
+        ...item,
+        x: currentX,
+        y: y,
+        width: itemWidth,
+        height: rowHeight
+      });
+      currentX += itemWidth;
+    });
+
+    y += rowHeight;
+    height -= rowHeight;
+  }
+
+  // Remove processed items
+  remaining = remaining.filter(item => !row.includes(item));
+  total -= rowValue;
+}
+
+return result;
+},
+
+findBestRow: function(items, width, height, total) {
+  if (items.length === 0) return [];
+
+  const horizontal = width >= height;
+  const fixedSize = horizontal ? height : width;
+  const variableSize = horizontal ? width : height;
+
+  let bestRow = [items[0]];
+let bestRatio = Infinity;
+
+for (let i = 1; i <= items.length; i++) {
+  const row = items.slice(0, i);
+  const rowValue = row.reduce((sum, item) => sum + item.value, 0);
+  const rowSize = (rowValue / total) * variableSize;
+
+  let maxRatio = 0;
+  row.forEach(item => {
+    const itemSize = (item.value / rowValue) * fixedSize;
+    const ratio = Math.max(rowSize / itemSize, itemSize / rowSize);
+    maxRatio = Math.max(maxRatio, ratio);
+  });
+
+  if (maxRatio < bestRatio) {
+    bestRatio = maxRatio;
+    bestRow = row;
+  } else {
+    break; // Adding more items makes it worse
+  }
+}
+
+return bestRow;
+},
 
     const result = [];
     const horizontal = true; // Always horizontal layout like Studio
@@ -628,7 +723,7 @@ looker.plugins.visualizations.add({
   worstAspectRatio: function(items, width, height, total) {
     const rowValue = items.reduce((sum, item) => sum + item.value, 0);
     const rowRatio = rowValue / total;
-    const horizontal = true; // Always horizontal layout
+    const horizontal = width >= height;
     const size = horizontal ? width * rowRatio : height * rowRatio;
     const perp = horizontal ? height : width;
 
