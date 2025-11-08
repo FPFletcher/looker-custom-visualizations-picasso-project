@@ -1,8 +1,7 @@
-
 /**
  * Treemap Visualization for Looker
  * Studio-inspired hierarchical treemap with drill-down and multi-dimension support
- * Fixed: No vertical text, 100% space utilization.
+ * Features: Robust layout (no gaps), horizontal-only labels, "Others" grouping.
  */
 
 looker.plugins.visualizations.add({
@@ -34,6 +33,15 @@ looker.plugins.visualizations.add({
       type: "boolean",
       label: "Enable Drill Down",
       default: true,
+      section: "Plot"
+    },
+    others_threshold: {
+      type: "number",
+      label: "Others Grouping Threshold (0-1)",
+      default: 0.02, // Groups items under 2%
+      min: 0,
+      max: 1,
+      step: 0.01,
       section: "Plot"
     },
 
@@ -84,12 +92,6 @@ looker.plugins.visualizations.add({
       display: "color",
       section: "Series"
     },
-    series_title: {
-      type: "string",
-      label: "Series Title Override",
-      placeholder: "Leave blank to use measure name",
-      section: "Series"
-    },
 
     // ========== VALUES SECTION ==========
     show_labels: {
@@ -107,7 +109,7 @@ looker.plugins.visualizations.add({
     label_threshold: {
       type: "number",
       label: "Min % to Show Label",
-      default: 0.01, // Slightly higher default to avoid clutter
+      default: 0.01,
       section: "Values"
     },
     wrap_labels: {
@@ -168,7 +170,7 @@ looker.plugins.visualizations.add({
       .treemap-rect {
         cursor: pointer;
         transition: opacity 0.1s ease;
-        shape-rendering: crispEdges; /* Helps with neat borders */
+        shape-rendering: crispEdges;
       }
       .treemap-rect:hover {
         opacity: 0.9;
@@ -286,27 +288,62 @@ looker.plugins.visualizations.add({
     const measure = measures[0].name;
 
     let treemapData;
-    // If we have multiple dimensions and haven't reached the last one, group data
     if (dimensions.length > 1 && currentLevel < dimensions.length) {
       treemapData = this.buildHierarchicalData(data, dimensions, measure, currentLevel);
     } else {
-      // Flat data for the lowest level
       treemapData = data.map(row => ({
         name: row[dimension].value,
-        // Ensure no negative values for squarify, keep raw for display
         value: Math.max(0, row[measure].value || 0),
         rawValue: row[measure].value || 0,
         dimension: dimension,
         level: currentLevel,
         children: null
-      })).filter(d => d.value > 0); // Treemaps can't show 0 or negative size
+      })).filter(d => d.value > 0);
     }
 
-    // Sort descending for the algorithm
+    // --- NEW: Group small items into "Others" ---
+    const threshold = config.others_threshold || 0;
+    if (threshold > 0 && treemapData.length > 2) {
+       treemapData = this.groupSmallItems(treemapData, threshold);
+    }
+
+    // Sort descending for squarify
     treemapData.sort((a, b) => b.value - a.value);
 
     this.updateBreadcrumb();
     this.renderTreemap(treemapData, config);
+  },
+
+  // --- NEW GROUPING FUNCTION ---
+  groupSmallItems: function(data, threshold) {
+      const total = data.reduce((sum, d) => sum + d.value, 0);
+      const visible = [];
+      const others = [];
+
+      data.forEach(d => {
+          // If it's ALREADY an "Others" node (from a previous drill-up), keep it visible
+          if (d.isOthers || (d.value / total) >= threshold) {
+              visible.push(d);
+          } else {
+              others.push(d);
+          }
+      });
+
+      // Only group if we have enough items to make it worthwhile
+      if (others.length > 1) {
+          const othersNode = {
+              name: "Others",
+              value: others.reduce((s, d) => s + d.value, 0),
+              rawValue: others.reduce((s, d) => s + d.rawValue, 0),
+              children: others, // This enables the drill-down!
+              isOthers: true,   // Flag for coloring
+              level: others[0].level
+          };
+          visible.push(othersNode);
+          return visible;
+      }
+
+      return data;
   },
 
   buildHierarchicalData: function(data, dimensions, measure, currentLevel) {
@@ -315,7 +352,6 @@ looker.plugins.visualizations.add({
 
     data.forEach(row => {
       const key = row[dimension].value;
-      // Use a safe key to avoid collisions with Object prototype
       const safeKey = "k_" + key;
       if (!grouped[safeKey]) {
         grouped[safeKey] = {
@@ -342,9 +378,7 @@ looker.plugins.visualizations.add({
     const svgNS = "http://www.w3.org/2000/svg";
     this._svg.innerHTML = '';
 
-    // Get exact container size
     const rect = this._container.getBoundingClientRect();
-    // Account for breadcrumb if visible
     const breadcrumbHeight = this._drillStack.length > 0 ? 36 : 0;
     const width = rect.width;
     const height = rect.height - breadcrumbHeight;
@@ -355,13 +389,9 @@ looker.plugins.visualizations.add({
     this._svg.style.height = `calc(100% - ${breadcrumbHeight}px)`;
     this._svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
-    // --- CORE LAYOUT CALL ---
-    // We normalize the data total to match the area (width * height)
-    // This ensures 100% fill.
     const totalValue = data.reduce((sum, d) => sum + d.value, 0);
     const rootArea = width * height;
 
-    // normalize data values to areas
     const nodes = data.map(d => ({
       ...d,
       area: (d.value / totalValue) * rootArea
@@ -376,18 +406,17 @@ looker.plugins.visualizations.add({
 
       rect.setAttribute('x', item.x);
       rect.setAttribute('y', item.y);
-      // Math.max(0, ...) prevents tiny negative scientific notation errors
       rect.setAttribute('width', Math.max(0, item.width));
       rect.setAttribute('height', Math.max(0, item.height));
 
-      // --- COLOR LOGIC ---
+      // --- UPDATED COLOR LOGIC FOR OTHERS ---
       let fillColor;
-      if (config.color_by === 'metric' && config.use_gradient) {
-         // Recalculate min/max from ORIGINAL data for correct gradient across all tiles
-         const allValues = data.map(d => d.value);
+      if (item.isOthers) {
+          fillColor = "#E0E0E0"; // Distinct grey for "Others"
+      } else if (config.color_by === 'metric' && config.use_gradient) {
+         const allValues = data.filter(d => !d.isOthers).map(d => d.value);
          const min = Math.min(...allValues);
          const max = Math.max(...allValues);
-         // Avoid divide by zero if all values are same
          const ratio = (max === min) ? 0.5 : (item.value - min) / (max - min);
          fillColor = this.interpolateColor(
            config.gradient_start_color, config.gradient_end_color, ratio
@@ -401,6 +430,7 @@ looker.plugins.visualizations.add({
       rect.setAttribute('stroke-width', config.border_width);
       rect.setAttribute('class', 'treemap-rect');
 
+      // Drill down works for "Others" too because it has children!
       if (config.enable_drill_down && item.children && item.children.length > 0) {
         rect.addEventListener('click', () => {
           this._drillStack.push(item.name);
@@ -410,16 +440,15 @@ looker.plugins.visualizations.add({
 
       // Tooltips
       rect.addEventListener('mouseenter', () => {
-         // Opacity hover effect handled by CSS
          const pct = ((item.value / totalValue) * 100).toFixed(1);
          this._tooltip.innerHTML = `
            <div style="font-weight:600; margin-bottom:2px">${item.name}</div>
            <div>${this.formatValue(item.rawValue)} (${pct}%)</div>
+           ${item.isOthers ? '<div style="font-size:10px; opacity:0.8">(Click to expand)</div>' : ''}
          `;
          this._tooltip.style.display = 'block';
       });
       rect.addEventListener('mousemove', (e) => {
-         // Keep tooltip on screen
          const tooltipRect = this._tooltip.getBoundingClientRect();
          let left = e.pageX + 12;
          let top = e.pageY + 12;
@@ -434,8 +463,6 @@ looker.plugins.visualizations.add({
 
       g.appendChild(rect);
 
-      // --- LABEL RENDERING ---
-      // Only render if it takes up a decent % of the chart (threshold)
       if ((item.value / totalValue) * 100 >= (config.label_threshold || 0)) {
          this.addLabels(g, item, config, svgNS);
       }
@@ -444,9 +471,6 @@ looker.plugins.visualizations.add({
     });
   },
 
-  // =================================================================
-  // NEW ROBUST SQUARIFY ALGORITHM (NO GREY SPACE)
-  // =================================================================
   squarify: function(nodes, x, y, width, height) {
     const results = [];
     if (nodes.length === 0) return results;
@@ -455,53 +479,36 @@ looker.plugins.visualizations.add({
     let container = { x, y, width, height };
 
     let currentRow = [];
-    // Start the loop
     while (remainingNodes.length > 0) {
       const nextNode = remainingNodes[0];
-
-      // Try adding next node to current row
       if (this.improvesRatio(currentRow, nextNode, container)) {
          currentRow.push(remainingNodes.shift());
       } else {
-         // Current row is optimal, layout it out and start new row
          this.layoutRow(currentRow, container, results);
-         // Update container for the rest
-         // The layoutRow function MUST update the container object in place
          currentRow = [];
       }
     }
-    // Layout whatever is left in the final row
     if (currentRow.length > 0) {
-       // Force the last row to take ALL remaining space to avoid gaps
        this.layoutLastRow(currentRow, container, results);
     }
-
     return results;
   },
 
   improvesRatio: function(currentRow, nextNode, container) {
     if (currentRow.length === 0) return true;
     const newRow = currentRow.concat(nextNode);
-
     const currentWorst = this.calculateWorstRatio(currentRow, container);
     const nextWorst = this.calculateWorstRatio(newRow, container);
-
-    // We want to minimize the worst aspect ratio (closer to 1 is better)
     return nextWorst <= currentWorst;
   },
 
   calculateWorstRatio: function(row, container) {
      if (row.length === 0) return Infinity;
-     // Deciding orientation based on shortest side of container
      const sideLength = Math.min(container.width, container.height);
      const totalArea = row.reduce((sum, node) => sum + node.area, 0);
-
-     // The width (thickness) of this row if we laid it out now
-     const rowThickness = totalArea / sideLength; // Avoid div by zero? usually area > 0
-
+     const rowThickness = totalArea / sideLength;
      let maxRatio = 0;
      for (let i = 0; i < row.length; i++) {
-        // The length of this item along the row
         const itemLength = row[i].area / rowThickness;
         const ratio = Math.max(rowThickness / itemLength, itemLength / rowThickness);
         if (ratio > maxRatio) maxRatio = ratio;
@@ -509,74 +516,66 @@ looker.plugins.visualizations.add({
      return maxRatio;
   },
 
+  // --- ROBUST LAYOUT (No Grey Space) ---
   layoutRow: function(row, container, results) {
      const totalArea = row.reduce((sum, node) => sum + node.area, 0);
-     const horizontal = container.width >= container.height; //Lay out ALONG the longest side? Standard is shortest.
-     // Actually standard squarified lays out against the SHORTEST side.
-     // Let's stick to standard:
-     const againstShortestSide = container.width < container.height; // if True, we stack horizontally (row goes up/down)
-
-     // Wait, Studio prefers Horizontal rows (stacking vertically).
-     // Let's try forcing horizontal rows if possible, or just stick to standard squarified.
-     // Standard squarified uses shortest side to optimize squares.
      const useWidth = container.width < container.height;
 
      if (useWidth) {
-        // Container is taller than wide. We make a horizontal cut.
-        // The "row" runs horizontally, stacked vertically.
         const rowHeight = totalArea / container.width;
         let runningX = container.x;
-        row.forEach(node => {
-           const nodeWidth = node.area / rowHeight;
+        row.forEach((node, i) => {
+           let nodeWidth;
+           if (i === row.length - 1) {
+              nodeWidth = Math.max(0, (container.x + container.width) - runningX);
+           } else {
+              nodeWidth = node.area / rowHeight;
+           }
            results.push({ ...node, x: runningX, y: container.y, width: nodeWidth, height: rowHeight });
            runningX += nodeWidth;
         });
-        // Update container
         container.y += rowHeight;
         container.height -= rowHeight;
      } else {
-        // Container is wider than tall. We make a vertical cut.
-        // The "row" runs vertically, stacked horizontally.
         const rowWidth = totalArea / container.height;
         let runningY = container.y;
-        row.forEach(node => {
-           const nodeHeight = node.area / rowWidth;
+        row.forEach((node, i) => {
+           let nodeHeight;
+           if (i === row.length - 1) {
+             nodeHeight = Math.max(0, (container.y + container.height) - runningY);
+           } else {
+             nodeHeight = node.area / rowWidth;
+           }
            results.push({ ...node, x: container.x, y: runningY, width: rowWidth, height: nodeHeight });
            runningY += nodeHeight;
         });
-        // Update container
         container.x += rowWidth;
         container.width -= rowWidth;
      }
   },
 
   layoutLastRow: function(row, container, results) {
-     // This function forces the row to fill the container EXACTLY.
      const useWidth = container.width < container.height;
      if (useWidth) {
-        // Fill remaining height
         let runningX = container.x;
         const totalArea = row.reduce((sum,n) => sum + n.area, 0);
         row.forEach((node, i) => {
-           // For the LAST item in the row, use all remaining width to avoid rounding errors
            let nodeWidth;
            if (i === row.length - 1) {
-              nodeWidth = container.x + container.width - runningX;
+              nodeWidth = Math.max(0, (container.x + container.width) - runningX);
            } else {
-              // Distribute width based on relative area within this row
               nodeWidth = (node.area / totalArea) * container.width;
            }
            results.push({ ...node, x: runningX, y: container.y, width: nodeWidth, height: container.height });
            runningX += nodeWidth;
         });
      } else {
-        // Fill remaining width
         let runningY = container.y;
         const totalArea = row.reduce((sum,n) => sum + n.area, 0);
         row.forEach((node, i) => {
            let nodeHeight;
            if (i === row.length - 1) {
-               nodeHeight = container.y + container.height - runningY;
+               nodeHeight = Math.max(0, (container.y + container.height) - runningY);
            } else {
                nodeHeight = (node.area / totalArea) * container.height;
            }
@@ -586,99 +585,66 @@ looker.plugins.visualizations.add({
      }
   },
 
-  // =================================================================
-  // IMPROVED LABELS (HORIZONTAL ONLY)
-  // =================================================================
   addLabels: function(g, item, config, svgNS) {
     const labelFontSize = config.label_font_size || 12;
     const valueFontSize = config.value_font_size || 12;
     const padding = 4;
 
-    if (item.width < 20 || item.height < 15) return; // Too small for anything
+    if (item.width < 20 || item.height < 15) return;
 
-    // Calculate available space
     const maxWidth = item.width - (padding * 2);
     const maxHeight = item.height - (padding * 2);
 
-    // Determine what fits
     const showLabel = config.show_labels && (maxWidth >= 30) && (maxHeight >= labelFontSize + 4);
     const showValue = config.show_values && (maxWidth >= 30) && (maxHeight >= valueFontSize + 4);
 
-    // If neither fits comfortably, bail out early to keep it clean
     if (!showLabel && !showValue) return;
 
     const labelText = item.name;
     const valueText = this.formatValue(item.rawValue);
-
-    // Try to fit both stacked
     const canFitStacked = showLabel && showValue && (maxHeight >= (labelFontSize + valueFontSize + 8));
+    let currentY = item.y + (item.height / 2);
 
-    let currentY = item.y + (item.height / 2); // default vertically centered
+    if (canFitStacked) currentY -= 2;
 
-    if (canFitStacked) {
-       // Shift up to make room for both
-       currentY -= 2; // slight optical adjustment
-    }
-
-    // --- RENDER LABEL ---
     if (showLabel) {
        const labelEl = document.createElementNS(svgNS, 'text');
        labelEl.setAttribute('x', item.x + (item.width / 2));
-       // If stacked, move label up. If only label, keep it centered.
        labelEl.setAttribute('y', canFitStacked ? currentY - (valueFontSize / 2) : currentY + (labelFontSize/3));
        labelEl.setAttribute('text-anchor', 'middle');
-       labelEl.setAttribute('fill', config.label_color);
+       // Force black labels for "Others" node for readability against grey background
+       labelEl.setAttribute('fill', item.isOthers ? '#000000' : config.label_color);
        labelEl.setAttribute('font-size', labelFontSize);
        labelEl.setAttribute('class', 'treemap-label');
 
-       // Simple truncation if it doesn't fit horizontally
-       // (Rotation removed as requested)
        let finalLabel = labelText;
        if (this.estimateTextWidth(labelText, labelFontSize) > maxWidth) {
-          // Try wrapping if enabled
-          if (config.wrap_labels) {
-             // Simplified wrap: just take first 2 words or truncate
-             // For a truly robust wrap we need complex measureText which is slow here.
-             // Let's just ellipsize for cleaner look on small tiles.
-             finalLabel = this.ellipsize(labelText, maxWidth, labelFontSize);
-          } else {
-             finalLabel = this.ellipsize(labelText, maxWidth, labelFontSize);
-          }
+          finalLabel = this.ellipsize(labelText, maxWidth, labelFontSize);
        }
        labelEl.textContent = finalLabel;
        g.appendChild(labelEl);
     }
 
-    // --- RENDER VALUE ---
     if (showValue) {
-       // If we are stacking, we might need to hide value if label took too much space,
-       // but we already checked canFitStacked.
-       if (!canFitStacked && showLabel) {
-          // If we can't fit both stacked, prioritizing label.
-          // If you prefer value, swap this logic.
-          return;
-       }
+       if (!canFitStacked && showLabel) return;
 
        const valEl = document.createElementNS(svgNS, 'text');
        valEl.setAttribute('x', item.x + (item.width / 2));
        valEl.setAttribute('y', canFitStacked ? currentY + valueFontSize + 2 : currentY + (valueFontSize/3));
        valEl.setAttribute('text-anchor', 'middle');
-       valEl.setAttribute('fill', config.value_color);
+       valEl.setAttribute('fill', item.isOthers ? '#000000' : config.value_color);
        valEl.setAttribute('font-size', valueFontSize);
        valEl.setAttribute('class', 'treemap-value');
        valEl.textContent = valueText;
 
-       // Ensure value fits horizontally too
        if (this.estimateTextWidth(valueText, valueFontSize) > maxWidth) {
-          // If value doesn't fit, it's better to hide it than show "..." for a number usually
-          g.removeChild(valEl); // actually just don't append it
+          g.removeChild(valEl);
        } else {
           g.appendChild(valEl);
        }
     }
   },
 
-  // Helper to cut text short with "..."
   ellipsize: function(text, maxWidth, fontSize) {
      const estimatedCharWidth = fontSize * 0.6;
      const maxChars = Math.floor(maxWidth / estimatedCharWidth);
@@ -712,7 +678,6 @@ looker.plugins.visualizations.add({
   },
 
   getColors: function(data, config) {
-    // Simple palette fallback
     const palettes = {
       green_scale: ['#F1F8E9', '#C5E1A5', '#9CCC65', '#7CB342', '#558B2F', '#33691E'],
       blue_scale: ['#E3F2FD', '#90CAF9', '#42A5F5', '#1E88E5', '#1565C0', '#0D47A1'],
