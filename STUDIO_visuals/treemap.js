@@ -35,14 +35,22 @@ looker.plugins.visualizations.add({
       default: true,
       section: "Plot"
     },
+    others_toggle: {
+      type: "boolean",
+      label: "Group Small Items into 'Others'",
+      default: true,
+      section: "Plot",
+      order: 5
+    },
     others_threshold: {
       type: "number",
-      label: "Others Grouping Threshold (0-1)",
-      default: 0.02, // Groups items under 2%
-      min: 0,
-      max: 1,
-      step: 0.01,
-      section: "Plot"
+      label: "Others Threshold % (0.1 - 10)",
+      default: 0.5, // Much smaller default (0.5%)
+      min: 0.1,
+      max: 10,
+      step: 0.1,
+      section: "Plot",
+      order: 6
     },
 
     // ========== SERIES SECTION ==========
@@ -288,6 +296,7 @@ looker.plugins.visualizations.add({
     const measure = measures[0].name;
 
     let treemapData;
+    // Build hierarchical or flat data based on drill level
     if (dimensions.length > 1 && currentLevel < dimensions.length) {
       treemapData = this.buildHierarchicalData(data, dimensions, measure, currentLevel);
     } else {
@@ -301,14 +310,22 @@ looker.plugins.visualizations.add({
       })).filter(d => d.value > 0);
     }
 
-    // --- NEW: Group small items into "Others" ---
-    const threshold = config.others_threshold || 0;
-    if (threshold > 0 && treemapData.length > 2) {
-       treemapData = this.groupSmallItems(treemapData, threshold);
+    // --- GROUPING LOGIC ---
+    // Only group if toggle is ON and there are enough items to justify it
+    if (config.others_toggle && treemapData.length > 5) {
+      // Convert percentage input (e.g., 0.5) to decimal (0.005)
+      const threshold = (config.others_threshold || 0.5) / 100;
+      treemapData = this.groupSmallItems(treemapData, threshold);
     }
 
-    // Sort descending for squarify
-    treemapData.sort((a, b) => b.value - a.value);
+    // --- SORTING LOGIC ---
+    // Sort descending (b.value - a.value) so largest items are top-left.
+    // Explicitly force the "Others" node to the end of the list so it renders bottom-right.
+    treemapData.sort((a, b) => {
+      if (a.isOthers) return 1;  // 'a' is Others, push it to the end
+      if (b.isOthers) return -1; // 'b' is Others, keep it at the end
+      return b.value - a.value;  // Standard descending sort for the rest
+    });
 
     this.updateBreadcrumb();
     this.renderTreemap(treemapData, config);
