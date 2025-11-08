@@ -397,38 +397,23 @@ looker.plugins.visualizations.add({
     this._svg.style.height = `calc(100% - ${breadcrumbHeight}px)`;
     this._svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
-    // Simple horizontal strip layout - GUARANTEED no gaps
-    const total = data.reduce((sum, d) => sum + d.value, 0);
-    const layout = [];
-    let currentX = 0;
-
-    data.forEach((item, i) => {
-      const itemWidth = (i === data.length - 1)
-        ? (width - currentX) // Last item fills exactly to edge
-        : Math.floor((item.value / total) * width);
-
-      layout.push({
-        ...item,
-        x: currentX,
-        y: 0,
-        width: itemWidth,
-        height: height
-      });
-
-      currentX += itemWidth;
-    });
-
+    // CRITICAL FIX: Calculate colors from CURRENT data, not this._allData
     const colors = this.getColors(data, config);
+    const total = data.reduce((sum, d) => sum + d.value, 0);
+
+    // Simple squarified layout
+    const layout = this.squarify(data, 0, 0, width, height, total);
 
     layout.forEach((item, i) => {
       const g = document.createElementNS(svgNS, 'g');
       const rect = document.createElementNS(svgNS, 'rect');
 
-      rect.setAttribute('x', item.x);
-      rect.setAttribute('y', item.y);
-      rect.setAttribute('width', item.width);
-      rect.setAttribute('height', item.height);
+      rect.setAttribute('x', Math.round(item.x));
+      rect.setAttribute('y', Math.round(item.y));
+      rect.setAttribute('width', Math.max(1, Math.round(item.width)));
+      rect.setAttribute('height', Math.max(1, Math.round(item.height)));
 
+      // CRITICAL FIX: Use colors calculated from CURRENT data
       let fillColor;
       if (config.color_by === 'metric' && config.use_gradient) {
         const allValues = data.map(d => d.value);
@@ -471,14 +456,13 @@ looker.plugins.visualizations.add({
             }
           }
 
+          // CRITICAL: Pass childData, not this._allData
           this.drawTreemap(childData, this._config, this._queryResponse);
         });
       }
 
-      const totalValue = data.reduce((sum, d) => sum + d.value, 0);
-
       rect.addEventListener('mouseenter', () => {
-        const pct = ((item.value / totalValue) * 100).toFixed(1);
+        const pct = ((item.value / total) * 100).toFixed(1);
         this._tooltip.innerHTML = `
           <div style="font-weight:600">${item.name}</div>
           <div>${this.formatValue(item.rawValue)} (${pct}%)</div>
@@ -498,12 +482,71 @@ looker.plugins.visualizations.add({
 
       g.appendChild(rect);
 
-      if ((item.value / totalValue) * 100 >= (config.label_threshold || 0)) {
+      if ((item.value / total) * 100 >= (config.label_threshold || 0)) {
         this.addLabels(g, item, config, svgNS);
       }
 
       this._svg.appendChild(g);
     });
+  },
+
+  squarify: function(data, x, y, width, height, total) {
+    const result = [];
+    if (data.length === 0) return result;
+
+    const items = data.slice();
+    let currentX = x;
+    let currentY = y;
+    let remainingWidth = width;
+    let remainingHeight = height;
+
+    while (items.length > 0) {
+      const horizontal = remainingWidth >= remainingHeight;
+
+      if (items.length === 1) {
+        // Last item fills exactly
+        result.push({
+          ...items[0],
+          x: currentX,
+          y: currentY,
+          width: remainingWidth,
+          height: remainingHeight
+        });
+        break;
+      }
+
+      // Take first item
+      const item = items.shift();
+      const ratio = item.value / total;
+
+      if (horizontal) {
+        const itemWidth = remainingWidth * ratio;
+        result.push({
+          ...item,
+          x: currentX,
+          y: currentY,
+          width: itemWidth,
+          height: remainingHeight
+        });
+        currentX += itemWidth;
+        remainingWidth -= itemWidth;
+      } else {
+        const itemHeight = remainingHeight * ratio;
+        result.push({
+          ...item,
+          x: currentX,
+          y: currentY,
+          width: remainingWidth,
+          height: itemHeight
+        });
+        currentY += itemHeight;
+        remainingHeight -= itemHeight;
+      }
+
+      total -= item.value;
+    }
+
+    return result;
   },
 
   addLabels: function(g, item, config, svgNS) {
