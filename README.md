@@ -7,7 +7,7 @@ List of free Javascript visuals you can import within your own Looker instance
 
 This is an extension or plugin for Looker that integrates LLM's hosted on Vertex AI into a streaming dashboard summarization experience powered by Websockets.
 
-![Treemap visualization](~/Downloads/gif_new_treemap_try2.gif)
+![STUDIO Treemap visualization](./09_GIF_images/STUDIO_treemap.gif)
 
 # Description
 
