@@ -67,6 +67,15 @@ looker.plugins.visualizations.add({
       order: 5
     },
 
+    default_color: {
+      type: "string",
+      label: "Default Color (No Rule Match)",
+      default: "#9AA0A6",
+      display: "color",
+      section: "Plot",
+      order: 6
+    },
+
     // FORMATTING SUBSECTION IN PLOT
     conditional_formatting_enabled: {
       type: "boolean",
@@ -256,14 +265,6 @@ looker.plugins.visualizations.add({
       order: 36
     },
 
-    default_color: {
-      type: "string",
-      label: "Default Color (No Rule Match)",
-      default: "#9AA0A6",
-      display: "color",
-      section: "Plot",
-      order: 40
-    },
 
     // ========== SERIES SECTION ==========
     color_collection: {
@@ -595,7 +596,14 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
-    element.innerHTML = '<div id="chart-container" style="width:100%; height:100%;"></div>';
+    // 1. Explicitly style the container to fill Looker's iframe
+    element.innerHTML = `
+    <style>
+    .highcharts-container { width: 100% !important; height: 100% !important; }
+    </style>
+    <div id="chart-container" style="width:100%; height:100%; position:absolute; top:0; left:0;"></div>
+    `;
+    this._chartContainer = element.querySelector('#chart-container');
     this.chart = null;
   },
 
@@ -913,9 +921,11 @@ looker.plugins.visualizations.add({
 
     // Create or update chart
     if (!this.chart) {
-      this.chart = Highcharts.chart('chart-container', chartOptions);
+      // Pass the DOM element directly, not the ID string 'chart-container'
+      this.chart = Highcharts.chart(this._chartContainer, chartOptions);
     } else {
-      this.chart.update(chartOptions, true);
+      this.chart.update(chartOptions, true, true); // Add true, true for redraw and one-to-one animation
+      this.chart.reflow(); // FORCE a reflow immediately after update
     }
 
     done();
