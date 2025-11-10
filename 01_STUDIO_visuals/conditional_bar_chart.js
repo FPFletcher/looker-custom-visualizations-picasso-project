@@ -596,16 +596,26 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
-    // 1. Explicitly style the container to fill Looker's iframe
     element.innerHTML = `
     <style>
-    .highcharts-container { width: 100% !important; height: 100% !important; }
-    </style>
-    <div id="chart-container" style="width:100%; height:100%; position:absolute; top:0; left:0;"></div>
-    `;
-    this._chartContainer = element.querySelector('#chart-container');
-    this.chart = null;
-  },
+    .highcharts-container {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    #chart-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: hidden; /* Prevents scrollbars from hiding axes */
+  }
+  </style>
+  <div id="chart-container"></div>
+  `;
+  this._chartContainer = element.querySelector('#chart-container');
+  this.chart = null;
+},
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
@@ -800,9 +810,15 @@ looker.plugins.visualizations.add({
       yAxis: {
         visible: config.show_y_axis !== false,
         title: { text: config.y_axis_label || null },
-        min: config.y_axis_min,
-        max: config.y_axis_max,
-        type: config.y_axis_scale === 'logarithmic' ? 'logarithmic' : 'linear',
+        // Auto-scale by default (null), unless user overrides exist
+        min: config.y_axis_min !== undefined ? config.y_axis_min : null,
+        max: config.y_axis_max !== undefined ? config.y_axis_max : null,
+        // These settings ensure the axis scales tightly to your data range
+        startOnTick: false,
+        endOnTick: false,
+        // Reduced padding ensures bars don't get squashed if tile is short
+        maxPadding: 0.02,
+        minPadding: 0.02,
         gridLineWidth: config.show_y_gridlines !== false ? 1 : 0,
         plotLines: config.ref_line_enabled ? [{
           value: refValue,
@@ -921,13 +937,12 @@ looker.plugins.visualizations.add({
 
     // Create or update chart
     if (!this.chart) {
-      // Pass the DOM element directly, not the ID string 'chart-container'
       this.chart = Highcharts.chart(this._chartContainer, chartOptions);
     } else {
-      this.chart.update(chartOptions, true, true); // Add true, true for redraw and one-to-one animation
-      this.chart.reflow(); // FORCE a reflow immediately after update
+      this.chart.update(chartOptions, true, true);
+      // CRITICAL: Tell Highcharts the container size changed
+      this.chart.reflow();
     }
-
     done();
   },
 
