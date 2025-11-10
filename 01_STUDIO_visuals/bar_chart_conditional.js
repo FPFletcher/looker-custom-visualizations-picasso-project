@@ -14,7 +14,6 @@ looker.plugins.visualizations.add({
       display: "select",
       values: [
         {"Column": "column"},
-        {"Bar": "bar"},
         {"Area": "area"},
         {"Line": "line"}
       ],
@@ -459,23 +458,12 @@ looker.plugins.visualizations.add({
       display: "select",
       values: [
         {"Default": "default"},
-        {"Data Granularity": "data_granularity"},
         {"Compact": "compact"},
-        {"Comfortable": "comfortable"},
-        {"Custom": "custom"}
+        {"Comfortable": "comfortable"}
       ],
       default: "default",
       section: "X",
       order: 8
-    },
-    x_axis_tick_count: {
-      type: "number",
-      label: "Tick Count (if Custom)",
-      default: 10,
-      min: 2,
-      max: 500,
-      section: "X",
-      order: 9
     },
 
     // ========== Y AXIS SECTION ==========
@@ -672,7 +660,6 @@ looker.plugins.visualizations.add({
     this._chartContainer = element.querySelector('#chart-container');
     this.chart = null;
 
-    // Add resize observer
     this._resizeObserver = new ResizeObserver(() => {
       if (this.chart) {
         this.chart.reflow();
@@ -694,14 +681,11 @@ looker.plugins.visualizations.add({
     }
 
     const dimension = queryResponse.fields.dimensions[0].name;
-    const dimensionLabel = queryResponse.fields.dimensions[0].label_short || queryResponse.fields.dimensions[0].label;
     const measures = queryResponse.fields.measures.map(m => m.name);
     const categories = data.map(row => row[dimension].value);
 
-    // Handle pivots
     const hasPivot = queryResponse.fields.pivots && queryResponse.fields.pivots.length > 0;
 
-    // Color palettes
     const palettes = {
       google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC'],
       looker: ['#7FCDAE', '#7ED09C', '#7DD389', '#85D67C', '#9AD97B', '#B1DB7A'],
@@ -715,10 +699,8 @@ looker.plugins.visualizations.add({
       cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B']
     };
 
-    // Parse custom series labels
     const customLabels = config.series_labels ? config.series_labels.split(',').map(l => l.trim()) : null;
 
-    // Build series data with drill links
     let seriesData = [];
     const palette = palettes[config.color_collection] || palettes.google;
     const customColors = config.series_colors ? config.series_colors.split(',').map(c => c.trim()) : null;
@@ -800,7 +782,10 @@ looker.plugins.visualizations.add({
       else if (config.ref_line_type === 'max') refValue = Math.max(...valuesToConsider);
     }
 
-    // Determine X axis formatting
+    // Format reference value
+    const formattedRefValue = this.formatValue(refValue, config);
+
+    // X axis formatting
     let xAxisType = 'category';
     let xAxisLabelsFormat = null;
 
@@ -846,21 +831,17 @@ looker.plugins.visualizations.add({
       }
     }
 
-    // Calculate tick step
+    // Tick step
     let tickStep = undefined;
     if (xAxisType === 'category') {
-      if (config.x_axis_tick_density === 'data_granularity') {
-        tickStep = 1;
-      } else if (config.x_axis_tick_density === 'compact') {
+      if (config.x_axis_tick_density === 'compact') {
         tickStep = Math.max(1, Math.ceil(categories.length / 10));
       } else if (config.x_axis_tick_density === 'comfortable') {
         tickStep = Math.max(1, Math.ceil(categories.length / 20));
-      } else if (config.x_axis_tick_density === 'custom') {
-        tickStep = Math.max(1, Math.ceil(categories.length / (config.x_axis_tick_count || 10)));
       }
     }
 
-    // Determine stacking
+    // Stacking
     let stackingMode = undefined;
     if (config.series_positioning === 'stacked') {
       stackingMode = 'normal';
@@ -868,15 +849,14 @@ looker.plugins.visualizations.add({
       stackingMode = 'percent';
     }
 
-    // Convert padding - maximize width when 0
+    // Padding
     const groupPadding = config.group_padding === 0 ? 0 : (config.group_padding || 10) / 100;
     const pointPadding = config.group_padding === 0 ? 0.01 : (config.point_padding || 10) / 100;
 
-    // Determine chart type
-    const isBar = config.chart_type === 'bar';
+    // Chart type
     const isArea = config.chart_type === 'area';
     const isLine = config.chart_type === 'line';
-    const baseType = isBar ? 'bar' : isArea ? 'area' : isLine ? 'line' : 'column';
+    const baseType = isArea ? 'area' : isLine ? 'line' : 'column';
 
     // Chart options
     const chartOptions = {
@@ -894,7 +874,7 @@ looker.plugins.visualizations.add({
         visible: config.show_x_axis !== false,
         title: { text: config.x_axis_label || null },
         labels: {
-          rotation: isBar ? 0 : (config.x_axis_label_rotation !== undefined ? config.x_axis_label_rotation : -45),
+          rotation: config.x_axis_label_rotation !== undefined ? config.x_axis_label_rotation : -45,
           step: tickStep,
           format: xAxisLabelsFormat,
           style: { fontSize: '11px' }
@@ -915,6 +895,30 @@ looker.plugins.visualizations.add({
         gridLineWidth: config.show_y_gridlines !== false ? 1 : 0,
         endOnTick: false,
         maxPadding: 0.05,
+        stackLabels: {
+          enabled: config.show_total_labels && stackingMode,
+          style: {
+            color: config.total_label_color || '#000000',
+            fontWeight: 'bold',
+            textOutline: 'none',
+            fontSize: '11px'
+          },
+          formatter: function() {
+            const value = this.total;
+            const format = config.value_format || 'auto';
+
+            if (format === 'currency') return '$' + (value >= 1000 ? (value/1000).toFixed(1) + 'K' : value.toFixed(0));
+            if (format === 'percent') return (value * 100).toFixed(1) + '%';
+            if (format === 'decimal1') return value.toFixed(1);
+            if (format === 'decimal2') return value.toFixed(2);
+            if (format === 'number') return value.toFixed(0);
+
+            if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
+            if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+            if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+            return value.toFixed(0);
+          }
+        },
         plotLines: config.ref_line_enabled ? [{
           value: refValue,
           color: config.ref_line_color || '#EA4335',
@@ -922,17 +926,18 @@ looker.plugins.visualizations.add({
           dashStyle: 'Dash',
           zIndex: 5,
           label: {
-            text: config.ref_line_label || 'Reference',
-            align: isBar ? 'right' : 'left',
-            verticalAlign: isBar ? 'bottom' : 'top',
-            rotation: isBar ? -90 : 0,
-            x: isBar ? -5 : 10,
-            y: isBar ? 10 : -5,
+            text: `${config.ref_line_label || 'Reference'}: ${formattedRefValue}`,
+            align: 'left',
+            verticalAlign: 'top',
+            x: 10,
+            y: -5,
             style: {
               color: config.ref_line_color || '#EA4335',
               fontWeight: 'bold',
               backgroundColor: config.ref_line_label_bg || '#FFFFFF',
-              padding: '3px'
+              padding: '4px',
+              border: `1px solid ${config.ref_line_color || '#EA4335'}`,
+              borderRadius: '3px'
             }
           }
         }] : []
@@ -961,54 +966,6 @@ looker.plugins.visualizations.add({
                    config.label_position === 'inside' ? 'center' : 'center',
             verticalAlign: config.label_position === 'outside' ? null :
                             config.label_position === 'inside' ? 'top' : 'middle',
-            inside: config.label_position === 'inside' || config.label_position === 'center',
-            rotation: config.label_rotation || 0,
-            style: {
-              fontSize: (config.label_font_size || 11) + 'px',
-              color: config.label_color || '#000000',
-              fontWeight: 'normal',
-              textOutline: 'none'
-            },
-            formatter: function() {
-              const value = this.y;
-              if (value === undefined || value === null || isNaN(value)) return '';
-
-              const format = config.value_format || 'auto';
-              if (format === 'currency') return '$' + (value >= 1000 ? (value/1000).toFixed(1) + 'K' : value.toFixed(0));
-              if (format === 'percent') return (value * 100).toFixed(1) + '%';
-              if (format === 'decimal1') return value.toFixed(1);
-              if (format === 'decimal2') return value.toFixed(2);
-              if (format === 'number') return value.toFixed(0);
-
-              if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
-              if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
-              if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
-              return value.toFixed(0);
-            }
-          }
-        },
-        bar: {
-          stacking: stackingMode,
-          groupPadding: groupPadding,
-          pointPadding: pointPadding,
-          cursor: 'pointer',
-          point: {
-            events: {
-              click: function(e) {
-                if (this.drillLinks && this.drillLinks.length > 0) {
-                  LookerCharts.Utils.openDrillMenu({
-                    links: this.drillLinks,
-                    event: e
-                  });
-                }
-              }
-            }
-          },
-          dataLabels: {
-            enabled: config.show_labels !== false,
-            align: config.label_position === 'outside' ? 'left' :
-                   config.label_position === 'inside' ? 'center' : 'center',
-            verticalAlign: 'middle',
             inside: config.label_position === 'inside' || config.label_position === 'center',
             rotation: config.label_rotation || 0,
             style: {
@@ -1120,35 +1077,7 @@ looker.plugins.visualizations.add({
         },
         series: {
           animation: false,
-          turboThreshold: 10000,
-          dataLabels: {
-            enabled: config.show_total_labels && stackingMode,
-            formatter: function() {
-              if (this.point.stackTotal !== undefined && this.point.stackTotal !== null) {
-                const value = this.point.stackTotal;
-                const format = config.value_format || 'auto';
-
-                if (format === 'currency') return '$' + (value >= 1000 ? (value/1000).toFixed(1) + 'K' : value.toFixed(0));
-                if (format === 'percent') return (value * 100).toFixed(1) + '%';
-                if (format === 'decimal1') return value.toFixed(1);
-                if (format === 'decimal2') return value.toFixed(2);
-                if (format === 'number') return value.toFixed(0);
-
-                if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
-                if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
-                if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
-                return value.toFixed(0);
-              }
-              return '';
-            },
-            style: {
-              color: config.total_label_color || '#000000',
-              fontWeight: 'bold',
-              textOutline: 'none'
-            },
-            verticalAlign: 'top',
-            y: -5
-          }
+          turboThreshold: 10000
         }
       },
       legend: {
@@ -1186,9 +1115,8 @@ looker.plugins.visualizations.add({
       let firstSeriesData;
 
       if (config.trend_line_apply_to === 'all') {
-        valuesToTrend = seriesData.flatMap(s => s.data.map(d => typeof d === 'object' ? d.y : d));
-        const avgPerPoint = [];
         const pointCount = seriesData[0].data.length;
+        const avgPerPoint = [];
         for (let i = 0; i < pointCount; i++) {
           const sum = seriesData.reduce((acc, s) => {
             const val = typeof s.data[i] === 'object' ? s.data[i].y : s.data[i];
@@ -1250,31 +1178,43 @@ looker.plugins.visualizations.add({
         });
       }
 
-      // Calculate average value for label
-      const trendAvg = trendData.reduce((sum, d) => sum + (typeof d === 'object' ? d.y : d), 0) / trendData.length;
-      const formattedTrendValue = this.formatValue(trendAvg, config);
-
       chartOptions.series.push({
         type: 'line',
-        name: `${config.trend_line_label || 'Trend'} (${formattedTrendValue})`,
+        name: config.trend_line_label || 'Trend',
         data: trendData,
         color: config.trend_line_color || '#4285F4',
         marker: { enabled: false },
         enableMouseTracking: true,
         dashStyle: 'Dash',
         lineWidth: 2,
-        zIndex: 10
+        zIndex: 10,
+        dataLabels: {
+          enabled: true,
+          formatter: function() {
+            if (this.point.index === Math.floor(trendData.length / 2)) {
+              return config.trend_line_label || 'Trend';
+            }
+            return '';
+          },
+          style: {
+            color: config.trend_line_color || '#4285F4',
+            fontWeight: 'bold',
+            backgroundColor: config.trend_line_label_bg || '#FFFFFF',
+            padding: '4px',
+            border: `1px solid ${config.trend_line_color || '#4285F4'}`,
+            borderRadius: '3px',
+            textOutline: 'none'
+          }
+        }
       });
     }
 
-    // Create or update chart
     if (!this.chart) {
       this.chart = Highcharts.chart(this._chartContainer, chartOptions);
     } else {
       this.chart.update(chartOptions, true, true);
     }
 
-    // Force reflow
     setTimeout(() => {
       if (this.chart) {
         this.chart.reflow();
@@ -1307,7 +1247,6 @@ looker.plugins.visualizations.add({
       return values.map((v, i) => palette[i % palette.length]);
     }
 
-    // Handle gradient rules first
     if (config.rule1_enabled && config.rule1_type === 'gradient') {
       const min = Math.min(...values);
       const max = Math.max(...values);
@@ -1347,7 +1286,6 @@ looker.plugins.visualizations.add({
       });
     }
 
-    // Apply other rules in priority
     return values.map(v => {
       if (config.rule1_enabled && this.checkRule(v, values, config, 1)) {
         return config.rule1_color;
