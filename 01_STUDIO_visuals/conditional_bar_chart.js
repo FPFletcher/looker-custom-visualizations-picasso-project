@@ -442,7 +442,7 @@ looker.plugins.visualizations.add({
       label: "Value Prefix",
       placeholder: "$",
       section: "Y",
-      order: '
+      order: 4
     },
     y_axis_suffix: {
       type: "string",
