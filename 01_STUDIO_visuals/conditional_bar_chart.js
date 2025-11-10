@@ -64,61 +64,61 @@ looker.plugins.visualizations.add({
     },
 
     // Rule 1
-    rule1_enabled: {
-      type: "boolean",
-      label: "Rule 1: Enabled",
-      default: false,
-      section: "Plot",
-      order: 11
-    },
-    rule1_type: {
-      type: "string",
-      label: "Rule 1: Type",
-      display: "select",
-      values: [
-        {"Greater Than": "gt"},
-        {"Less Than": "lt"},
-        {"Equal To": "eq"},
-        {"Between": "between"},
-        {"Top N": "topn"},
-        {"Bottom N": "bottomn"},
-        {"Color Gradient": "gradient"}
-      ],
-      default: "gt",
-      section: "Plot",
-      order: 12
-    },
-    rule1_value: {
-      type: "number",
-      label: "Rule 1: Value / N",
-      default: 0,
-      section: "Plot",
-      order: 13
-    },
-    rule1_color: {
-      type: "string",
-      label: "Rule 1: Color",
-      default: "#EA4335",
-      display: "color",
-      section: "Plot",
-      order: 15
-    },
-    rule1_gradient_start: {
-      type: "string",
-      label: "Rule 1: Gradient Start",
-      default: "#F1F8E9",
-      display: "color",
-      section: "Plot",
-      order: 14
-    },
-    rule1_gradient_end: {
-      type: "string",
-      label: "Rule 1: Gradient End",
-      default: "#33691E",
-      display: "color",
-      section: "Plot",
-      order: 15
-    },
+      rule1_enabled: {
+        type: "boolean",
+        label: "Rule 1: Enabled",
+        default: false,
+        section: "Plot",
+        order: 11
+      },
+      rule1_type: {
+        type: "string",
+        label: "Type",  // ← REMOVED "Rule 1:"
+        display: "select",
+        values: [
+          {"Greater Than": "gt"},
+          {"Less Than": "lt"},
+          {"Equal To": "eq"},
+          {"Between": "between"},
+          {"Top N": "topn"},
+          {"Bottom N": "bottomn"},
+          {"Color Gradient": "gradient"}
+        ],
+        default: "gt",
+        section: "Plot",
+        order: 12
+      },
+      rule1_value: {
+        type: "number",
+        label: "Value 1",  // ← SIMPLIFIED
+        placeholder: "Enter value or N",
+        default: 0,
+        section: "Plot",
+        order: 13
+      },
+      rule1_value2: {
+        type: "number",
+        label: "Value 2 (Between only)",  // ← SIMPLIFIED
+        default: 100,
+        section: "Plot",
+        order: 14
+      },
+      rule1_color: {
+        type: "string",
+        label: "Color (or Gradient Start)",  // ← SIMPLIFIED
+        default: "#EA4335",
+        display: "color",
+        section: "Plot",
+        order: 15
+      },
+      rule1_color2: {
+        type: "string",
+        label: "Gradient End Color",  // ← SIMPLIFIED
+        default: "#34A853",
+        display: "color",
+        section: "Plot",
+        order: 16
+      },
 
     // Rule 2
     rule2_enabled: {
@@ -332,12 +332,25 @@ looker.plugins.visualizations.add({
       section: "X",
       order: 1
     },
+    x_axis_scale_type: {
+      type: "string",
+      label: "Scale Type",
+      display: "select",
+      values: [
+        {"Automatic": "auto"},
+        {"Time": "time"},
+        {"Categorical": "categorical"}
+      ],
+      default: "auto",
+      section: "X",
+      order: 2
+    },
     x_axis_label: {
       type: "string",
       label: "Axis Title",
       placeholder: "Category",
       section: "X",
-      order: 2
+      order: 3
     },
     x_axis_label_rotation: {
       type: "number",
@@ -347,7 +360,7 @@ looker.plugins.visualizations.add({
       max: 90,
       step: 15,
       section: "X",
-      order: 3
+      order: 4
     },
     x_axis_values_format: {
       type: "string",
@@ -361,14 +374,37 @@ looker.plugins.visualizations.add({
       ],
       default: "auto",
       section: "X",
-      order: 10
+      order: 5
     },
     show_x_gridlines: {
       type: "boolean",
       label: "Show Gridlines",
       default: false,
       section: "X",
-      order: 4
+      order: 6
+    },
+    x_axis_tick_density: {
+      type: "string",
+      label: "Tick Density",
+      display: "select",
+      values: [
+        {"Default": "default"},
+        {"Compact": "compact"},
+        {"Comfortable": "comfortable"},
+        {"Custom": "custom"}
+      ],
+      default: "default",
+      section: "X",
+      order: 7
+    },
+    x_axis_tick_count: {
+      type: "number",
+      label: "Tick Count (if Custom)",
+      default: 10,
+      min: 2,
+      max: 50,
+      section: "X",
+      order: 8
     },
 
     // ========== Y AXIS SECTION ==========
@@ -399,42 +435,42 @@ looker.plugins.visualizations.add({
       ],
       default: "auto",
       section: "Y",
-      order: 30
+      order: 3
     },
     y_axis_prefix: {
       type: "string",
       label: "Value Prefix",
       placeholder: "$",
       section: "Y",
-      order: 31
+      order: '
     },
     y_axis_suffix: {
       type: "string",
       label: "Value Suffix",
       placeholder: "%",
       section: "Y",
-      order: 32
+      order: 5
     },
     y_axis_min: {
       type: "number",
       label: "Min Value",
       placeholder: "auto",
       section: "Y",
-      order: 3
+      order: 6
     },
     y_axis_max: {
       type: "number",
       label: "Max Value",
       placeholder: "auto",
       section: "Y",
-      order: 4
+      order: 7
     },
     show_y_gridlines: {
       type: "boolean",
       label: "Show Gridlines",
       default: true,
       section: "Y",
-      order: 5
+      order: 8
     },
     y_axis_scale: {
       type: "string",
@@ -446,7 +482,7 @@ looker.plugins.visualizations.add({
       ],
       default: "linear",
       section: "Y",
-      order: 6
+      order: 9
     },
 
     // Reference Lines
@@ -582,21 +618,34 @@ looker.plugins.visualizations.add({
         return values.map((v, i) => palette[i % palette.length]);
       }
 
-      // Check for gradient rule first
+      // Handle gradient separately
       if (config.rule1_enabled && config.rule1_type === 'gradient') {
         const min = Math.min(...values);
         const max = Math.max(...values);
         return values.map(v => {
           const ratio = (max === min) ? 0.5 : (v - min) / (max - min);
           return this.interpolateColor(
-            config.rule1_gradient_start || '#F1F8E9',
-            config.rule1_gradient_end || '#33691E',
+            config.rule1_color || '#F1F8E9',
+            config.rule1_color2 || '#33691E',
             ratio
           );
         });
       }
 
-      // Apply rules in priority
+      if (config.rule2_enabled && config.rule2_type === 'gradient') {
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        return values.map(v => {
+          const ratio = (max === min) ? 0.5 : (v - min) / (max - min);
+          return this.interpolateColor(
+            config.rule2_color || '#FBBC04',
+            config.rule2_color2 || '#4285F4',
+            ratio
+          );
+        });
+      }
+
+      // Apply other rules in priority
       return values.map(v => {
         if (config.rule1_enabled && this.checkRule(v, values, config, 1)) {
           return config.rule1_color;
@@ -638,8 +687,15 @@ looker.plugins.visualizations.add({
         categories: categories,
         visible: config.show_x_axis !== false,
         title: { text: config.x_axis_label || null },
-        labels: { rotation: config.x_axis_label_rotation || 0 },
-        gridLineWidth: config.show_x_gridlines ? 1 : 0
+        labels: {
+          rotation: config.x_axis_label_rotation || 0,
+          step: config.x_axis_tick_density === 'compact' ? Math.ceil(categories.length / 10) :
+          config.x_axis_tick_density === 'comfortable' ? Math.ceil(categories.length / 20) :
+          config.x_axis_tick_density === 'custom' ? Math.ceil(categories.length / (config.x_axis_tick_count || 10)) :
+          undefined
+        },
+        gridLineWidth: config.show_x_gridlines ? 1 : 0,
+        type: config.x_axis_scale_type === 'time' ? 'datetime' : 'category'
       },
       yAxis: {
         visible: config.show_y_axis !== false,
@@ -668,6 +724,11 @@ looker.plugins.visualizations.add({
           colorByPoint: true,
           dataLabels: {
             enabled: config.show_labels !== false,
+            align: config.label_position === 'center' ? 'center' :
+            config.label_position === 'inside' ? 'center' : 'center',
+            verticalAlign: config.label_position === 'center' ? 'middle' :
+            config.label_position === 'inside' ? 'top' : null,
+            inside: config.label_position === 'inside' || config.label_position === 'center',
             rotation: config.label_rotation || 0,
             style: {
               fontSize: (config.label_font_size || 11) + 'px',
@@ -699,6 +760,11 @@ looker.plugins.visualizations.add({
           colorByPoint: true,
           dataLabels: {
             enabled: config.show_labels !== false,
+            align: config.label_position === 'center' ? 'center' :
+            config.label_position === 'inside' ? 'center' : 'center',
+            verticalAlign: config.label_position === 'center' ? 'middle' :
+            config.label_position === 'inside' ? 'top' : null,
+            inside: config.label_position === 'inside' || config.label_position === 'center',
             rotation: config.label_rotation || 0,
             style: {
               fontSize: (config.label_font_size || 11) + 'px',
@@ -794,37 +860,34 @@ looker.plugins.visualizations.add({
     done();
   },
 
-  checkRule: function(value, allValues, config, ruleNum) {
-    const type = config[`rule${ruleNum}_type`];
-    const val1 = config[`rule${ruleNum}_value`] || 0;
-    const val2 = config[`rule${ruleNum}_value2`] || 100;
+    checkRule: function(value, allValues, config, ruleNum) {
+      const type = config[`rule${ruleNum}_type`];
+      const val1 = config[`rule${ruleNum}_value`] || 0;
+      const val2 = config[`rule${ruleNum}_value2`] || 100;
 
-    if (type === 'gt') return value > val1;
-    if (type === 'lt') return value < val1;
-    if (type === 'eq') return value === val1;
-    if (type === 'between') return value >= val1 && value <= val2;
+      if (type === 'gt') return value > val1;
+      if (type === 'lt') return value < val1;
+      if (type === 'eq') return value === val1;
+      if (type === 'between') return value >= val1 && value <= val2;
 
-    if (type === 'topn') {
-      const n = val1;
-      const sorted = [...allValues].sort((a, b) => b - a);
-      const threshold = sorted[Math.min(n - 1, sorted.length - 1)];
-      return value >= threshold;
-    }
+      if (type === 'topn') {
+        const n = Math.floor(val1);  // ← USE val1 as N
+        if (n <= 0) return false;
+        const sorted = [...allValues].sort((a, b) => b - a);
+        const threshold = sorted[Math.min(n - 1, sorted.length - 1)];
+        return value >= threshold;
+      }
 
-    if (type === 'bottomn') {
-      const n = val1;
-      const sorted = [...allValues].sort((a, b) => a - b);
-      const threshold = sorted[Math.min(n - 1, sorted.length - 1)];
-      return value <= threshold;
-    }
+      if (type === 'bottomn') {
+        const n = Math.floor(val1);  // ← USE val1 as N
+        if (n <= 0) return false;
+        const sorted = [...allValues].sort((a, b) => a - b);
+        const threshold = sorted[Math.min(n - 1, sorted.length - 1)];
+        return value <= threshold;
+      }
 
-    if (type === 'gradient') {
-      // Handled separately
       return false;
-    }
-
-    return false;
-  },
+    },
 
   formatValue: function(value, config) {
       if (value === undefined || value === null || isNaN(value)) {
