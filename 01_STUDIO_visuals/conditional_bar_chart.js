@@ -216,41 +216,12 @@ looker.plugins.visualizations.add({
       section: "_Format",
       order: 8
     },
-    rule1_operator: {
+    formatting_rules: {
       type: "string",
-      label: "Rule 1: Operator",
-      display: "select",
-      values: [
-        {"Greater Than": "gt"},
-        {"Less Than": "lt"},
-        {"Equal To": "eq"},
-        {"Between": "between"}
-      ],
-      default: "gt",
-      section: "_Format",
-      order: 9
-    },
-    rule1_value: {
-      type: "number",
-      label: "Rule 1: Value",
-      default: 0,
-      section: "_Format",
+      label: "Rules (JSON format)",
+      placeholder: '[{"operator":"gt","value":1000,"color":"#34A853"},{"operator":"lt","value":0,"color":"#EA4335"}]',
+      section: "Format",
       order: 10
-    },
-    rule1_value2: {
-      type: "number",
-      label: "Rule 1: Value 2",
-      default: 100,
-      section: "_Format",
-      order: 11
-    },
-    rule1_color: {
-      type: "string",
-      label: "Rule 1: Color",
-      default: "#EA4335",
-      display: "color",
-      section: "_Format",
-      order: 12
     },
     background_enabled: {
       type: "boolean",
@@ -515,6 +486,22 @@ looker.plugins.visualizations.add({
     this._container = element.querySelector('.conditional-chart-container');
     this._svg = element.querySelector('.chart-svg');
     this._tooltip = element.querySelector('.chart-tooltip');
+
+    element.innerHTML = `
+    <div class="conditional-chart-container">
+      <svg class="chart-svg"></svg>
+      <div class="chart-tooltip"></div>
+    </div>
+    `;
+
+    this._container = element.querySelector('.conditional-chart-container');
+    this._svg = element.querySelector('.chart-svg');
+    this._tooltip = element.querySelector('.chart-tooltip');
+
+    // Add rule management
+    this._ruleCount = 0;
+    this._rules = [];
+
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
@@ -826,18 +813,24 @@ looker.plugins.visualizations.add({
       const threshold = sorted[Math.min(n - 1, sorted.length - 1)];
       return values.map(v => v <= threshold ? (config.bottomn_color || '#EA4335') : (config.other_color || '#9AA0A6'));
     } else if (type === 'rules') {
+      let rules = [];
+      try {
+        rules = JSON.parse(config.formatting_rules || '[]');
+      } catch(e) {
+        rules = [];
+      }
+
       return values.map(v => {
-        const op = config.rule1_operator;
-        const val1 = config.rule1_value || 0;
-        const val2 = config.rule1_value2 || 100;
+        for (let rule of rules) {
+          let match = false;
+          if (rule.operator === 'gt') match = v > rule.value;
+          else if (rule.operator === 'lt') match = v < rule.value;
+          else if (rule.operator === 'eq') match = v === rule.value;
+          else if (rule.operator === 'between') match = v >= rule.value && v <= rule.value2;
 
-        let match = false;
-        if (op === 'gt') match = v > val1;
-        else if (op === 'lt') match = v < val1;
-        else if (op === 'eq') match = v === val1;
-        else if (op === 'between') match = v >= val1 && v <= val2;
-
-        return match ? (config.rule1_color || '#EA4335') : (config.other_color || '#9AA0A6');
+          if (match) return rule.color;
+        }
+        return config.other_color || '#9AA0A6';
       });
     }
 
