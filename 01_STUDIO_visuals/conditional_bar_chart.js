@@ -90,17 +90,10 @@ looker.plugins.visualizations.add({
     },
     rule1_value: {
       type: "number",
-      label: "Rule 1: Value",
+      label: "Rule 1: Value / N",
       default: 0,
       section: "Plot",
       order: 13
-    },
-    rule1_value2: {
-      type: "number",
-      label: "Rule 1: Value 2 (Between/N)",
-      default: 100,
-      section: "Plot",
-      order: 14
     },
     rule1_color: {
       type: "string",
@@ -110,13 +103,21 @@ looker.plugins.visualizations.add({
       section: "Plot",
       order: 15
     },
-    rule1_color2: {
+    rule1_gradient_start: {
       type: "string",
-      label: "Rule 1: End Color (Gradient)",
-      default: "#34A853",
+      label: "Rule 1: Gradient Start",
+      default: "#F1F8E9",
       display: "color",
       section: "Plot",
-      order: 16
+      order: 14
+    },
+    rule1_gradient_end: {
+      type: "string",
+      label: "Rule 1: Gradient End",
+      default: "#33691E",
+      display: "color",
+      section: "Plot",
+      order: 15
     },
 
     // Rule 2
@@ -348,6 +349,20 @@ looker.plugins.visualizations.add({
       section: "X",
       order: 3
     },
+    x_axis_values_format: {
+      type: "string",
+      label: "Values Format",
+      display: "select",
+      values: [
+        {"Auto": "auto"},
+        {"Number": "number"},
+        {"Compact": "compact"},
+        {"Custom": "custom"}
+      ],
+      default: "auto",
+      section: "X",
+      order: 10
+    },
     show_x_gridlines: {
       type: "boolean",
       label: "Show Gridlines",
@@ -370,6 +385,35 @@ looker.plugins.visualizations.add({
       placeholder: "Value",
       section: "Y",
       order: 2
+    },
+    y_axis_values_format: {
+      type: "string",
+      label: "Values Format",
+      display: "select",
+      values: [
+        {"Auto": "auto"},
+        {"Number": "number"},
+        {"Currency": "currency"},
+        {"Percent": "percent"},
+        {"Compact": "compact"}
+      ],
+      default: "auto",
+      section: "Y",
+      order: 30
+    },
+    y_axis_prefix: {
+      type: "string",
+      label: "Value Prefix",
+      placeholder: "$",
+      section: "Y",
+      order: 31
+    },
+    y_axis_suffix: {
+      type: "string",
+      label: "Value Suffix",
+      placeholder: "%",
+      section: "Y",
+      order: 32
     },
     y_axis_min: {
       type: "number",
@@ -529,32 +573,43 @@ looker.plugins.visualizations.add({
 
     // Get colors with rule priority
     const getColors = () => {
-      if (!config.conditional_formatting_enabled) {
-        const palette = palettes[config.color_collection] || palettes.google;
-        if (config.series_colors) {
-          const custom = config.series_colors.split(',').map(c => c.trim());
-          return values.map((v, i) => custom[i % custom.length]);
-        }
-        return values.map((v, i) => palette[i % palette.length]);
-      }
+  if (!config.conditional_formatting_enabled) {
+    const palette = palettes[config.color_collection] || palettes.google;
+    if (config.series_colors) {
+      const custom = config.series_colors.split(',').map(c => c.trim());
+      return values.map((v, i) => custom[i % custom.length]);
+    }
+    return values.map((v, i) => palette[i % palette.length]);
+  }
 
-      // Apply rules in priority order (1, 2, 3)
-      return values.map(v => {
-        // Rule 1
-        if (config.rule1_enabled && this.checkRule(v, values, config, 1)) {
-          return config.rule1_color;
-        }
-        // Rule 2
-        if (config.rule2_enabled && this.checkRule(v, values, config, 2)) {
-          return config.rule2_color;
-        }
-        // Rule 3
-        if (config.rule3_enabled && this.checkRule(v, values, config, 3)) {
-          return config.rule3_color;
-        }
-        return config.default_color || '#9AA0A6';
-      });
-    };
+  // Check for gradient rule first
+  if (config.rule1_enabled && config.rule1_type === 'gradient') {
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    return values.map(v => {
+      const ratio = (max === min) ? 0.5 : (v - min) / (max - min);
+      return this.interpolateColor(
+        config.rule1_gradient_start || '#F1F8E9',
+        config.rule1_gradient_end || '#33691E',
+        ratio
+      );
+    });
+  }
+
+  // Apply rules in priority
+  return values.map(v => {
+    if (config.rule1_enabled && this.checkRule(v, values, config, 1)) {
+      return config.rule1_color;
+    }
+    if (config.rule2_enabled && this.checkRule(v, values, config, 2)) {
+      return config.rule2_color;
+    }
+    if (config.rule3_enabled && this.checkRule(v, values, config, 3)) {
+      return config.rule3_color;
+    }
+    return config.default_color || '#9AA0A6';
+  });
+};
 
     const colors = getColors();
     const seriesData = values.map((v, i) => ({ y: v, color: colors[i] }));
@@ -616,13 +671,27 @@ looker.plugins.visualizations.add({
             rotation: config.label_rotation || 0,
             style: {
               fontSize: (config.label_font_size || 11) + 'px',
-              color: config.label_color || '#000000'
+              color: config.label_color || '#000000',
+              fontWeight: 'normal'
             },
             formatter: function() {
-              return this.formatValue(this.y, config);
-            }.bind(this)
-          }
-        },
+              // FIX: Use formatValue directly, not this.formatValue
+              const format = config.value_format || 'auto';
+              const value = this.y;
+              if (!value && value !== 0) return '';
+
+              if (format === 'currency') return '$' + (value >= 1000 ? (value/1000).toFixed(1) + 'K' : value.toFixed(0));
+              if (format === 'percent') return (value * 100).toFixed(1) + '%';
+              if (format === 'decimal1') return value.toFixed(1);
+              if (format === 'decimal2') return value.toFixed(2);
+              if (format === 'number') return value.toFixed(0);
+
+              if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
+              if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+              if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+              return value.toFixed(0);
+            }
+          },
         bar: {
           stacking: config.stacking === 'none' ? undefined : config.stacking,
           groupPadding: config.group_padding || 0.1,
@@ -633,13 +702,27 @@ looker.plugins.visualizations.add({
             rotation: config.label_rotation || 0,
             style: {
               fontSize: (config.label_font_size || 11) + 'px',
-              color: config.label_color || '#000000'
+              color: config.label_color || '#000000',
+              fontWeight: 'normal'
             },
             formatter: function() {
-              return this.formatValue(this.y, config);
-            }.bind(this)
+              // FIX: Use formatValue directly, not this.formatValue
+              const format = config.value_format || 'auto';
+              const value = this.y;
+              if (!value && value !== 0) return '';
+
+              if (format === 'currency') return '$' + (value >= 1000 ? (value/1000).toFixed(1) + 'K' : value.toFixed(0));
+              if (format === 'percent') return (value * 100).toFixed(1) + '%';
+              if (format === 'decimal1') return value.toFixed(1);
+              if (format === 'decimal2') return value.toFixed(2);
+              if (format === 'number') return value.toFixed(0);
+
+              if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
+              if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+              if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+              return value.toFixed(0);
+            }
           }
-        }
       },
       legend: { enabled: false },
       tooltip: {
@@ -695,6 +778,22 @@ looker.plugins.visualizations.add({
 
     done();
   },
+
+  interpolateColor: function(color1, color2, ratio) {
+      const hex = (c) => {
+        c = c.replace('#', '');
+        return {
+          r: parseInt(c.substring(0, 2), 16),
+          g: parseInt(c.substring(2, 4), 16),
+          b: parseInt(c.substring(4, 6), 16)
+        };
+      };
+      const c1 = hex(color1), c2 = hex(color2);
+      const r = Math.round(c1.r + (c2.r - c1.r) * ratio);
+      const g = Math.round(c1.g + (c2.g - c1.g) * ratio);
+      const b = Math.round(c1.b + (c2.b - c1.b) * ratio);
+      return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    }
 
   checkRule: function(value, allValues, config, ruleNum) {
     const type = config[`rule${ruleNum}_type`];
