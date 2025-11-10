@@ -1330,21 +1330,26 @@ looker.plugins.visualizations.add({
   },
 
   formatValue: function(value, config) {
-    if (value === undefined || value === null || isNaN(value)) {
+    // Ensure value is a valid number.
+    // parseFloat handles strings like "123.45" but returns NaN for non-numbers.
+    const numValue = parseFloat(value);
+
+    // Check if it's a valid finite number. invalid or infinite numbers return empty string.
+    if (!Number.isFinite(numValue)) {
       return '';
     }
 
     const format = config.value_format || 'auto';
-    if (format === 'currency') return '$' + (value >= 1000 ? (value/1000).toFixed(1) + 'K' : value.toFixed(0));
-    if (format === 'percent') return (value * 100).toFixed(1) + '%';
-    if (format === 'decimal1') return value.toFixed(1);
-    if (format === 'decimal2') return value.toFixed(2);
-    if (format === 'number') return value.toFixed(0);
+    if (format === 'currency') return '$' + (numValue >= 1000 ? (numValue/1000).toFixed(1) + 'K' : numValue.toFixed(0));
+    if (format === 'percent') return (numValue * 100).toFixed(1) + '%';
+    if (format === 'decimal1') return numValue.toFixed(1);
+    if (format === 'decimal2') return numValue.toFixed(2);
+    if (format === 'number') return numValue.toFixed(0);
 
-    if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
-    if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
-    if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
-    return value.toFixed(0);
+    if (numValue >= 1e9) return (numValue / 1e9).toFixed(1) + 'B';
+    if (numValue >= 1e6) return (numValue / 1e6).toFixed(1) + 'M';
+    if (numValue >= 1e3) return (numValue / 1e3).toFixed(1) + 'K';
+    return numValue.toFixed(0);
   },
 
   interpolateColor: function(color1, color2, ratio) {
