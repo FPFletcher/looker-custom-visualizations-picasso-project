@@ -265,6 +265,7 @@ looker.plugins.visualizations.add({
       order: 36
     },
 
+
     // ========== SERIES SECTION ==========
     color_collection: {
       type: "string",
@@ -595,25 +596,24 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
-    element.innerHTML = `
-      <style>
-        .highcharts-container {
-           width: 100% !important;
-           height: 100% !important;
-        }
-        #chart-container {
-           width: 100%;
-           height: 100%;
-           position: absolute;
-           top: 0;
-           left: 0;
-           overflow: hidden;
-        }
-      </style>
-      <div id="chart-container"></div>
-    `;
+    // Remove absolute positioning and use flexbox instead
+    element.style.height = '100%';
+    element.style.width = '100%';
+    element.style.position = 'relative';
+    element.style.overflow = 'hidden';
+
+    element.innerHTML = '<div id="chart-container" style="width:100%; height:100%;"></div>';
+
     this._chartContainer = element.querySelector('#chart-container');
     this.chart = null;
+
+    // Add resize observer for responsiveness
+    this._resizeObserver = new ResizeObserver(() => {
+      if (this.chart) {
+        this.chart.reflow();
+      }
+    });
+    this._resizeObserver.observe(element);
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
@@ -646,7 +646,7 @@ looker.plugins.visualizations.add({
       orange_scale: ['#FFF3E0', '#FFE0B2', '#FFCC80', '#FFB74D', '#FFA726', '#FF9800', '#FB8C00', '#F57C00'],
       viridis: ['#440154', '#414487', '#2A788E', '#22A884', '#7AD151', '#FDE725'],
       warm: ['#FFF5EB', '#FDD0A2', '#FD8D3C', '#E6550D', '#A63603'],
-      cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B']
+      cool: ['#F0F9FF', '#9ECAE1', '#4292C6', '#08519C', '#08306B']
     };
 
     // Build series data
@@ -655,16 +655,18 @@ looker.plugins.visualizations.add({
     const customColors = config.series_colors ? config.series_colors.split(',').map(c => c.trim()) : null;
 
     if (hasPivot) {
+      // Handle pivoted data
       const pivotValues = queryResponse.pivots;
       pivotValues.forEach((pivotValue, pivotIndex) => {
         measures.forEach((measure, measureIndex) => {
+          const fieldKey = `${measure}.${pivotValue.key}`;
           const values = data.map(row => {
             const cell = row[measure][pivotValue.key];
             return cell ? cell.value : 0;
           });
 
           const color = customColors ? customColors[(pivotIndex * measures.length + measureIndex) % customColors.length]
-                                      : palette[(pivotIndex * measures.length + measureIndex) % palette.length];
+                                     : palette[(pivotIndex * measures.length + measureIndex) % palette.length];
 
           seriesData.push({
             name: `${queryResponse.fields.measures[measureIndex].label} - ${pivotValue.key}`,
@@ -674,9 +676,11 @@ looker.plugins.visualizations.add({
         });
       });
     } else {
+      // Handle non-pivoted data
       measures.forEach((measure, index) => {
         const values = data.map(row => row[measure] ? row[measure].value || 0 : 0);
 
+        // Apply conditional formatting to first measure only
         let colors;
         if (index === 0 && config.conditional_formatting_enabled) {
           colors = this.getColors(values, config);
@@ -712,9 +716,64 @@ looker.plugins.visualizations.add({
 
     if (config.x_axis_scale_type === 'datetime') {
       xAxisType = 'datetime';
-      // ... (keep existing date format detection logic if desired, but force 'category' below for safety)
+
+      // Auto-detect date format
+      if (config.x_axis_datetime_format === 'auto') {
+        const firstCat = String(categories[0]);
+        if (firstCat.match(/^\d{4}$/)) xAxisDateFormat = '{value:%Y}';
+        else if (firstCat.match(/^\d{4}-\d{2}$/)) xAxisDateFormat = '{value:%b %Y}';
+        else if (firstCat.match(/^\d{4}-\d{2}-\d{2}$/)) xAxisDateFormat = '{value:%d %b}';
+        else xAxisDateFormat = '{value:%b %Y}';
+      } else if (config.x_axis_datetime_format === 'custom') {
+        xAxisDateFormat = `{value:${config.x_axis_custom_format || '%Y-%m-%d'}}`;
+      } else if (config.x_axis_datetime_format !== 'auto') {
+        xAxisDateFormat = `{value:${config.x_axis_datetime_format}}`;
+      }
+
+      // Convert categories to timestamps if needed
+      if (xAxisType === 'datetime') {
+        // Try to parse dates
+        const parsedCategories = categories.map(cat => {
+          const date = new Date(cat);
+          return isNaN(date.getTime()) ? cat : date.getTime();
+        });
+
+        // Update series data to use x values
+        seriesData = seriesData.map(series => ({
+          ...series,
+          data: series.data.map((point, i) => {
+            const yValue = typeof point === 'object' ? point.y : point;
+            const color = typeof point === 'object' ? point.color : undefined;
+            return {
+              x: parsedCategories[i],
+              y: yValue,
+              color: color
+            };
+          })
+        }));
+      }
+    } else if (config.x_axis_scale_type === 'auto') {
+      // Try to detect if categories are dates
+      const firstCat = String(categories[0]);
+      if (firstCat.match(/^\d{4}/) && !isNaN(Date.parse(firstCat))) {
+        xAxisType = 'datetime';
+        if (firstCat.match(/^\d{4}$/)) xAxisDateFormat = '{value:%Y}';
+        else if (firstCat.match(/^\d{4}-\d{2}$/)) xAxisDateFormat = '{value:%b %Y}';
+        else xAxisDateFormat = '{value:%b %Y}';
+      }
     }
 
+    // Calculate tick step for better x-axis display
+    let tickStep = undefined;
+    if (config.x_axis_tick_density === 'compact') {
+      tickStep = Math.ceil(categories.length / 10);
+    } else if (config.x_axis_tick_density === 'comfortable') {
+      tickStep = Math.ceil(categories.length / 20);
+    } else if (config.x_axis_tick_density === 'custom') {
+      tickStep = Math.ceil(categories.length / (config.x_axis_tick_count || 10));
+    }
+
+    // Determine stacking based on series_positioning
     let stackingMode = undefined;
     if (config.series_positioning === 'stacked') {
       stackingMode = 'normal';
@@ -727,35 +786,39 @@ looker.plugins.visualizations.add({
       chart: {
         type: config.chart_type === 'bar' ? 'bar' : 'column',
         backgroundColor: null,
-        reflow: true,
-        height: '100%',
-        spacingTop: 10,
-        spacingBottom: 10,
-        spacingLeft: 10,
-        spacingRight: 10
+        animation: false,
+        spacing: [10, 10, 10, 10]
       },
       title: { text: null },
-      xAxis: {
-        categories: categories,
-        // FORCE 'category' for Looker string dates to avoid bunching at 0
-        type: 'category',
-        tickmarkPlacement: 'on',
-        visible: config.show_x_axis !== false,
-        title: { text: config.x_axis_label || null },
-        labels: {
-          rotation: config.x_axis_label_rotation !== undefined ? config.x_axis_label_rotation : -45,
+         xAxis: {
+          // ALWAYS pass categories. Highcharts ignores them if type is datetime anyway.
+          categories: categories,
+          // FORCE 'category' type by default. Only use 'datetime' if strictly configured.
+          // Auto-detection often fails with Looker's pre-formatted date strings.
+          type: config.x_axis_scale_type === 'datetime' ? 'datetime' : 'category',
+          visible: config.show_x_axis !== false,
+          title: { text: config.x_axis_label || null },
+          labels: {
+            rotation: config.x_axis_label_rotation !== undefined ? config.x_axis_label_rotation : -45,
+          },
+          gridLineWidth: config.show_x_gridlines ? 1 : 0,
+          // Critical for proper spacing
+          min: 0,
+          max: categories.length - 1
         },
-        gridLineWidth: config.show_x_gridlines ? 1 : 0
-      },
       yAxis: {
         visible: config.show_y_axis !== false,
         title: { text: config.y_axis_label || null },
+        // Auto-scale by default (null), unless user overrides exist
         min: config.y_axis_min !== undefined ? config.y_axis_min : null,
         max: config.y_axis_max !== undefined ? config.y_axis_max : null,
-        type: config.y_axis_scale === 'logarithmic' ? 'logarithmic' : 'linear',
-        gridLineWidth: config.show_y_gridlines !== false ? 1 : 0,
+        // These settings ensure the axis scales tightly to your data range
+        startOnTick: false,
         endOnTick: false,
-        maxPadding: 0.05,
+        // Reduced padding ensures bars don't get squashed if tile is short
+        maxPadding: 0.02,
+        minPadding: 0.02,
+        gridLineWidth: config.show_y_gridlines !== false ? 1 : 0,
         plotLines: config.ref_line_enabled ? [{
           value: refValue,
           color: config.ref_line_color || '#EA4335',
@@ -775,24 +838,46 @@ looker.plugins.visualizations.add({
           pointPadding: config.point_padding || 0.1,
           dataLabels: {
             enabled: config.show_labels !== false,
-            // ... (simplified dataLabels for brevity, add back your full config if needed)
-             formatter: function() {
-               // Need to bind 'this' correctly if using external helper, or just inline:
-               return Highcharts.numberFormat(this.y, -1); // Simple fallback
-             }
+            align: config.label_position === 'center' ? 'center' :
+                   config.label_position === 'inside' ? 'center' : 'center',
+            verticalAlign: config.label_position === 'center' ? 'middle' :
+                            config.label_position === 'inside' ? 'top' : null,
+            inside: config.label_position === 'inside' || config.label_position === 'center',
+            rotation: config.label_rotation || 0,
+            style: {
+              fontSize: (config.label_font_size || 11) + 'px',
+              color: config.label_color || '#000000',
+              fontWeight: 'normal'
+            },
+            formatter: function() {
+              return this.formatValue(this.y, config);
+            }.bind(this)
           }
         },
         bar: {
           stacking: stackingMode,
           groupPadding: config.group_padding || 0.1,
           pointPadding: config.point_padding || 0.1,
-           dataLabels: {
-            enabled: config.show_labels !== false
+          dataLabels: {
+            enabled: config.show_labels !== false,
+            align: config.label_position === 'center' ? 'center' :
+                   config.label_position === 'inside' ? 'center' : 'center',
+            verticalAlign: config.label_position === 'center' ? 'middle' :
+                            config.label_position === 'inside' ? 'top' : null,
+            inside: config.label_position === 'inside' || config.label_position === 'center',
+            rotation: config.label_rotation || 0,
+            style: {
+              fontSize: (config.label_font_size || 11) + 'px',
+              color: config.label_color || '#000000',
+              fontWeight: 'normal'
+            },
+            formatter: function() {
+              return this.formatValue(this.y, config);
+            }.bind(this)
           }
         },
         series: {
-          animation: false,
-          turboThreshold: 10000
+          animation: false
         }
       },
       legend: {
@@ -801,45 +886,217 @@ looker.plugins.visualizations.add({
         verticalAlign: 'bottom'
       },
       tooltip: {
-        // Simplified tooltip for validation
-        pointFormat: '<b>{series.name}</b>: {point.y}<br/>'
+        formatter: function() {
+          const value = this.y;
+          let formattedValue = this.formatValue(value, config);
+
+          return `<b>${this.series.name}</b><br/>${this.x}: ${formattedValue}`;
+        }.bind(this)
       },
       series: seriesData,
       credits: { enabled: false }
     };
 
-    // Add trend line (kept simple for validation)
+    // Add trend line
     if (config.trend_line_enabled && seriesData.length > 0) {
-       // ... (keep existing trend line logic if it works, or comment out to isolate issues)
+      const firstSeriesValues = seriesData[0].data.map(d => typeof d === 'object' ? d.y : d);
+      let trendData = [];
+
+      if (config.trend_line_type === 'linear') {
+        const n = firstSeriesValues.length;
+        const sumX = firstSeriesValues.reduce((sum, v, i) => sum + i, 0);
+        const sumY = firstSeriesValues.reduce((sum, v) => sum + v, 0);
+        const sumXY = firstSeriesValues.reduce((sum, v, i) => sum + i * v, 0);
+        const sumX2 = firstSeriesValues.reduce((sum, v, i) => sum + i * i, 0);
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / n;
+        trendData = firstSeriesValues.map((v, i) => slope * i + intercept);
+      } else if (config.trend_line_type === 'moving_avg') {
+        const period = config.trend_line_period || 3;
+        trendData = firstSeriesValues.map((v, i) => {
+          const start = Math.max(0, i - period + 1);
+          const subset = firstSeriesValues.slice(start, i + 1);
+          return subset.reduce((a, b) => a + b, 0) / subset.length;
+        });
+      } else if (config.trend_line_type === 'average') {
+        const avg = firstSeriesValues.reduce((a, b) => a + b, 0) / firstSeriesValues.length;
+        trendData = firstSeriesValues.map(() => avg);
+      }
+
+      chartOptions.series.push({
+        type: 'line',
+        name: 'Trend',
+        data: trendData,
+        color: config.trend_line_color || '#4285F4',
+        marker: { enabled: false },
+        enableMouseTracking: false,
+        dashStyle: 'Dash'
+      });
     }
 
+    // Create or update chart
     if (!this.chart) {
       this.chart = Highcharts.chart(this._chartContainer, chartOptions);
     } else {
       this.chart.update(chartOptions, true, true);
-      this.chart.reflow();
     }
+
+    // Force reflow to ensure proper sizing
+    setTimeout(() => {
+      if (this.chart) {
+        this.chart.reflow();
+      }
+    }, 100);
 
     done();
   },
 
+  destroy: function() {
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+    }
+    if (this.chart) {
+      this.chart.destroy();
+    }
+  },
+
   getColors: function(values, config) {
-    // ... (Your existing getColors implementation)
-    return values.map(() => '#9AA0A6'); // Placeholder return to guarantee valid JS if function body had issues
+    const palettes = {
+      google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC'],
+      looker: ['#7FCDAE', '#7ED09C', '#7DD389', '#85D67C', '#9AD97B', '#B1DB7A'],
+      green_scale: ['#F1F8E9', '#C5E1A5', '#9CCC65', '#7CB342', '#558B2F', '#33691E'],
+      blue_scale: ['#E3F2FD', '#90CAF9', '#42A5F5', '#1E88E5', '#1565C0', '#0D47A1'],
+      red_scale: ['#FFEBEE', '#FFCDD2', '#EF9A9A', '#E57373', '#EF5350', '#F44336'],
+      purple_scale: ['#F3E5F5', '#CE93D8', '#AB47BC', '#8E24AA', '#6A1B9A'],
+      orange_scale: ['#FFF3E0', '#FFE0B2', '#FFCC80', '#FFB74D', '#FFA726'],
+      viridis: ['#440154', '#414487', '#2A788E', '#22A884', '#7AD151', '#FDE725'],
+      warm: ['#FFF5EB', '#FDD0A2', '#FD8D3C', '#E6550D', '#A63603'],
+      cool: ['#F0F9FF', '#9ECAE1', '#4292C6', '#08519C', '#08306B']
+    };
+
+    if (!config.conditional_formatting_enabled) {
+      const palette = palettes[config.color_collection] || palettes.google;
+      if (config.series_colors) {
+        const custom = config.series_colors.split(',').map(c => c.trim());
+        return values.map((v, i) => custom[i % custom.length]);
+      }
+      return values.map((v, i) => palette[i % palette.length]);
+    }
+
+    // Handle gradient rules first
+    if (config.rule1_enabled && config.rule1_type === 'gradient') {
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      return values.map(v => {
+        const ratio = (max === min) ? 0.5 : (v - min) / (max - min);
+        return this.interpolateColor(
+          config.rule1_color || '#F1F8E9',
+          config.rule1_color2 || '#33691E',
+          ratio
+        );
+      });
+    }
+
+    if (config.rule2_enabled && config.rule2_type === 'gradient') {
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      return values.map(v => {
+        const ratio = (max === min) ? 0.5 : (v - min) / (max - min);
+        return this.interpolateColor(
+          config.rule2_color || '#FBBC04',
+          config.rule2_color2 || '#4285F4',
+          ratio
+        );
+      });
+    }
+
+    if (config.rule3_enabled && config.rule3_type === 'gradient') {
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      return values.map(v => {
+        const ratio = (max === min) ? 0.5 : (v - min) / (max - min);
+        return this.interpolateColor(
+          config.rule3_color || '#4285F4',
+          config.rule3_color2 || '#34A853',
+          ratio
+        );
+      });
+    }
+
+    // Apply other rules in priority
+    return values.map(v => {
+      if (config.rule1_enabled && this.checkRule(v, values, config, 1)) {
+        return config.rule1_color;
+      }
+      if (config.rule2_enabled && this.checkRule(v, values, config, 2)) {
+        return config.rule2_color;
+      }
+      if (config.rule3_enabled && this.checkRule(v, values, config, 3)) {
+        return config.rule3_color;
+      }
+      return config.default_color || '#9AA0A6';
+    });
   },
 
   checkRule: function(value, allValues, config, ruleNum) {
-     // ... (Your existing checkRule implementation)
-     return false;
+    const type = config[`rule${ruleNum}_type`];
+    const val1 = config[`rule${ruleNum}_value`] || 0;
+    const val2 = config[`rule${ruleNum}_value2`] || 100;
+
+    if (type === 'gt') return value > val1;
+    if (type === 'lt') return value < val1;
+    if (type === 'eq') return value === val1;
+    if (type === 'between') return value >= val1 && value <= val2;
+
+    if (type === 'topn') {
+      const n = Math.floor(val1);
+      if (n <= 0) return false;
+      const sorted = [...allValues].sort((a, b) => b - a);
+      const threshold = sorted[Math.min(n - 1, sorted.length - 1)];
+      return value >= threshold;
+    }
+
+    if (type === 'bottomn') {
+      const n = Math.floor(val1);
+      if (n <= 0) return false;
+      const sorted = [...allValues].sort((a, b) => a - b);
+      const threshold = sorted[Math.min(n - 1, sorted.length - 1)];
+      return value <= threshold;
+    }
+
+    return false;
   },
 
-  formatValue: function(value, config) {
-     // ... (Your existing formatValue implementation)
-     return value;
+   formatValue: function(value, config) {
+    if (value === undefined || value === null || isNaN(value)) {
+      return '';
+    }
+    const format = config.value_format || 'auto';
+    if (format === 'currency') return '$' + (value >= 1000 ? (value/1000).toFixed(1) + 'K' : value.toFixed(0));
+    if (format === 'percent') return (value * 100).toFixed(1) + '%';
+    if (format === 'decimal1') return value.toFixed(1);
+    if (format === 'decimal2') return value.toFixed(2);
+    if (format === 'number') return value.toFixed(0);
+
+    if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
+    if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+    if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+    return value.toFixed(0);
   },
 
   interpolateColor: function(color1, color2, ratio) {
-    // ... (Your existing interpolateColor implementation)
-    return color1; // Placeholder
+    const hex = (c) => {
+      c = c.replace('#', '');
+      return {
+        r: parseInt(c.substring(0, 2), 16),
+        g: parseInt(c.substring(2, 4), 16),
+        b: parseInt(c.substring(4, 6), 16)
+      };
+    };
+    const c1 = hex(color1), c2 = hex(color2);
+    const r = Math.round(c1.r + (c2.r - c1.r) * ratio);
+    const g = Math.round(c1.g + (c2.g - c1.g) * ratio);
+    const b = Math.round(c1.b + (c2.b - c1.b) * ratio);
+    return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
   }
 });
