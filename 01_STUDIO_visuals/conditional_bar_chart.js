@@ -731,7 +731,7 @@ looker.plugins.visualizations.add({
         }.bind(this)
       },
       series: [{ name: queryResponse.fields.measures[0].label || measure, data: seriesData }]
-    };
+    },
 
     // Add trend line
     if (config.trend_line_enabled) {
