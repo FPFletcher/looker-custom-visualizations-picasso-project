@@ -17,7 +17,7 @@ looker.plugins.visualizations.add({
         {"Bar": "bar"}
       ],
       default: "column",
-      section: "Plot",
+      section: " Plot",
       order: 1
     },
     stacking: {
@@ -30,7 +30,7 @@ looker.plugins.visualizations.add({
         {"Percent": "percent"}
       ],
       default: "none",
-      section: "Plot",
+      section: " Plot",
       order: 2
     },
     group_padding: {
@@ -40,7 +40,7 @@ looker.plugins.visualizations.add({
       min: 0,
       max: 0.5,
       step: 0.05,
-      section: "Plot",
+      section: " Plot",
       order: 3
     },
     point_padding: {
@@ -50,7 +50,7 @@ looker.plugins.visualizations.add({
       min: 0,
       max: 0.5,
       step: 0.05,
-      section: "Plot",
+      section: " Plot",
       order: 4
     },
 
@@ -150,7 +150,7 @@ looker.plugins.visualizations.add({
       type: "boolean",
       label: "Enable Conditional Formatting",
       default: false,
-      section: "Formatting",
+      section: "Format",
       order: 1
     },
     conditional_type: {
@@ -164,7 +164,7 @@ looker.plugins.visualizations.add({
         {"Bottom N": "bottomn"}
       ],
       default: "gradient",
-      section: "Formatting",
+      section: "Format",
       order: 2
     },
     gradient_start_color: {
@@ -172,7 +172,7 @@ looker.plugins.visualizations.add({
       label: "Gradient Start Color",
       default: "#F1F8E9",
       display: "color",
-      section: "Formatting",
+      section: "Format",
       order: 3
     },
     gradient_end_color: {
@@ -180,7 +180,7 @@ looker.plugins.visualizations.add({
       label: "Gradient End Color",
       default: "#33691E",
       display: "color",
-      section: "Formatting",
+      section: "Format",
       order: 4
     },
     topbottom_n: {
@@ -189,7 +189,7 @@ looker.plugins.visualizations.add({
       default: 5,
       min: 1,
       max: 50,
-      section: "Formatting",
+      section: "Format",
       order: 5
     },
     topn_color: {
@@ -197,7 +197,7 @@ looker.plugins.visualizations.add({
       label: "Top N Color",
       default: "#34A853",
       display: "color",
-      section: "Formatting",
+      section: "Format",
       order: 6
     },
     bottomn_color: {
@@ -205,7 +205,7 @@ looker.plugins.visualizations.add({
       label: "Bottom N Color",
       default: "#EA4335",
       display: "color",
-      section: "Formatting",
+      section: "Format",
       order: 7
     },
     other_color: {
@@ -213,7 +213,7 @@ looker.plugins.visualizations.add({
       label: "Other Values Color",
       default: "#9AA0A6",
       display: "color",
-      section: "Formatting",
+      section: "Format",
       order: 8
     },
     rule1_operator: {
@@ -227,21 +227,21 @@ looker.plugins.visualizations.add({
         {"Between": "between"}
       ],
       default: "gt",
-      section: "Formatting",
+      section: "Format",
       order: 9
     },
     rule1_value: {
       type: "number",
       label: "Rule 1: Value",
       default: 0,
-      section: "Formatting",
+      section: "Format",
       order: 10
     },
     rule1_value2: {
       type: "number",
       label: "Rule 1: Value 2",
       default: 100,
-      section: "Formatting",
+      section: "Format",
       order: 11
     },
     rule1_color: {
@@ -249,14 +249,14 @@ looker.plugins.visualizations.add({
       label: "Rule 1: Color",
       default: "#EA4335",
       display: "color",
-      section: "Formatting",
+      section: "Format",
       order: 12
     },
     background_enabled: {
       type: "boolean",
       label: "Enable Background",
       default: false,
-      section: "Formatting",
+      section: "Format",
       order: 20
     },
     background_color: {
@@ -270,7 +270,7 @@ looker.plugins.visualizations.add({
       type: "boolean",
       label: "Enable Border",
       default: false,
-      section: "Formatting",
+      section: "Format",
       order: 22
     },
     border_color: {
@@ -278,7 +278,7 @@ looker.plugins.visualizations.add({
       label: "Border Color",
       default: "#E0E0E0",
       display: "color",
-      section: "Formatting",
+      section: "Format",
       order: 23
     },
     border_width: {
