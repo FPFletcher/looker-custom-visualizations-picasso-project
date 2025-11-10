@@ -14,10 +14,10 @@ looker.plugins.visualizations.add({
       display: "select",
       values: [
         {"Column": "column"},
+        {"Bar": "bar"},
         {"Area": "area"},
         {"Line": "line"}
       ],
-      //{"Bar": "bar"},
       default: "column",
       section: "Plot",
       order: 1
