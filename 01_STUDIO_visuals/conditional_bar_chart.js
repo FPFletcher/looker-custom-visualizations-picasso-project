@@ -79,7 +79,7 @@ looker.plugins.visualizations.add({
     conditional_formatting_help: {
       type: "string",
       label: "ℹ️ Top/Bottom N use Value 1 as N, Between uses both, Gradient uses both colors",
-      display: "text",
+      display: "divider",
       section: "Plot",
       default: "",
       order: 10
@@ -774,16 +774,20 @@ looker.plugins.visualizations.add({
       },
       title: { text: null },
       xAxis: {
-        categories: xAxisType === 'category' ? categories : undefined,
-        type: xAxisType,
+        categories: categories,
+        // Force 'category' if not explicitly explicitly set to 'datetime' AND proven valid.
+        // For Looker month strings like "2019-02", 'category' works best.
+        type: 'category',
         visible: config.show_x_axis !== false,
         title: { text: config.x_axis_label || null },
         labels: {
           rotation: config.x_axis_label_rotation !== undefined ? config.x_axis_label_rotation : -45,
-          step: tickStep,
-          format: xAxisDateFormat
+          // Don't try to format Looker's pre-formatted date strings with Highcharts date formats if using 'category'
+          format: undefined
         },
-        gridLineWidth: config.show_x_gridlines ? 1 : 0
+        gridLineWidth: config.show_x_gridlines ? 1 : 0,
+        min: 0,
+        max: categories.length - 1
       },
       yAxis: {
         visible: config.show_y_axis !== false,
