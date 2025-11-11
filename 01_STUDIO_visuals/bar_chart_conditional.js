@@ -4,6 +4,7 @@
  * FINAL VERSION - All bugs fixed
  */
 
+
 looker.plugins.visualizations.add({
   id: "conditional_bar_chart",
   label: "Bar Chart (Conditional)",
