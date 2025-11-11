@@ -1,3 +1,4 @@
+![Project_Picasso_banner](./99_ASSETS/Project_Picasso_banner/png)
 # looker-custom-visualizations
 List of free Javascript visuals you can import within your own Looker instance
 
@@ -7,7 +8,7 @@ List of free Javascript visuals you can import within your own Looker instance
 
 This is an extension or plugin for Looker that integrates LLM's hosted on Vertex AI into a streaming dashboard summarization experience powered by Websockets.
 
-![STUDIO Treemap visualization](./09_GIF_images/STUDIO_treemap.gif)
+![STUDIO Treemap visualization](./99_ASSETS/STUDIO_treemap.gif)
 
 # Description
 
