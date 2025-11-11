@@ -1,12 +1,5 @@
 project_name: "custom_viz_artefact_demo"
 
-visualization: {
-  id: "table_vis"
-  label: "Test"
-  file: "table-viz.js"
-  # Define the visualization parameters
-}
-
 
 ########################################################################################
 # 01. STUDIO visuals
@@ -37,6 +30,7 @@ visualization: {
   ]
 }
 
+
 ########################################################################################
 # 04. CUSTOM visuals
 ########################################################################################
@@ -48,5 +42,42 @@ visualization: {
 
   dependencies: [
   ]
-  #"https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"
+}
+
+visualization: {
+  id: "table_vis"
+  label: "Test"
+  file: "table-viz.js"
+  # Define the visualization parameters
+}
+
+
+########################################################################################
+# 10. APPLICATIONS Dashboard or AI focus
+########################################################################################
+
+application: dashboard_tabs {
+  label: "Dashboard Tabs"
+  url: "https://cdn.lkr.dev/apps/dashboard-tabs/latest/bundle.js"
+  entitlements: {
+    core_api_methods: [
+      "me",
+      "dashboard",
+      "search_dashboards",
+      "folder_dashboards",
+      "board",
+      "search_boards",
+      "folder",
+      "search_folders",
+      "create_board",
+      "create_board_section",
+      "create_board_item",
+      "create_content_favorite"
+    ]
+    navigation: yes
+    use_embeds: yes
+    use_iframes: yes
+    new_window: yes
+    use_form_submit: yes
+  }
 }
