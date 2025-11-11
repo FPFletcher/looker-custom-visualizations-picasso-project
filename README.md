@@ -1,4 +1,4 @@
-![Project_Picasso_banner](./99_ASSETS/Project_Picasso_banner/png)
+![Project_Picasso_banner](./99_ASSETS/Project_Picasso_Edited_banner.png)
 # looker-custom-visualizations
 List of free Javascript visuals you can import within your own Looker instance
 
