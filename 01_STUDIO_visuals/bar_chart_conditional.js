@@ -1,7 +1,7 @@
 /**
  * Conditional Bar Chart for Looker
  * Highcharts implementation with enhanced features
- * FINAL VERSION with all fixes
+ * FINAL VERSION - All bugs fixed
  */
 
 looker.plugins.visualizations.add({
@@ -580,9 +580,9 @@ looker.plugins.visualizations.add({
       section: "Y",
       order: 13
     },
-    ref_line_label: {
+    ref_line_title: {
       type: "string",
-      label: "Reference Label",
+      label: "Reference Title",
       placeholder: "Target",
       section: "Y",
       order: 14
@@ -595,9 +595,9 @@ looker.plugins.visualizations.add({
       section: "Y",
       order: 15
     },
-    ref_line_label_bg: {
+    ref_line_title_bg: {
       type: "string",
-      label: "Label Background Color",
+      label: "Title Background Color",
       default: "#FFFFFF",
       display: "color",
       section: "Y",
@@ -655,21 +655,29 @@ looker.plugins.visualizations.add({
       section: "Y",
       order: 24
     },
-    trend_line_label: {
+    trend_line_label_color: {
       type: "string",
-      label: "Trend Line Label",
-      placeholder: "Trend",
-      default: "Trend",
+      label: "Label Color",
+      default: "#4285F4",
+      display: "color",
       section: "Y",
       order: 25
     },
-    trend_line_label_bg: {
+    trend_line_title: {
       type: "string",
-      label: "Label Background Color",
+      label: "Trend Line Title",
+      placeholder: "Trend",
+      default: "Trend",
+      section: "Y",
+      order: 26
+    },
+    trend_line_title_bg: {
+      type: "string",
+      label: "Title Background Color",
       default: "#FFFFFF",
       display: "color",
       section: "Y",
-      order: 26
+      order: 27
     }
   },
 
@@ -743,23 +751,24 @@ looker.plugins.visualizations.add({
         });
 
         const applyFormatting = config.conditional_formatting_enabled && (config.conditional_formatting_apply_to === 'all' || index === 0);
+        const baseColor = customColors ? customColors[index % customColors.length] : palette[index % palette.length];
+
         let colors = [];
         if (applyFormatting) {
           const rawValues = values.map(v => v.y);
           colors = this.getColors(rawValues, config);
         }
 
-        const baseColor = customColors ? customColors[index % customColors.length] : palette[index % palette.length];
-
         seriesData.push({
           name: customLabels && customLabels[index] ? customLabels[index] : queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label,
-          data: values.map((v, i) => applyFormatting ? { ...v, color: colors[i] } : v),
-          color: !applyFormatting ? baseColor : undefined
+          data: applyFormatting ? values.map((v, i) => ({ ...v, color: colors[i] })) : values,
+          color: !applyFormatting ? baseColor : undefined,
+          colorByPoint: applyFormatting
         });
       });
     }
 
-    // Calculate stacked totals for each category
+    // Calculate stacked totals
     const stackedTotals = categories.map((cat, i) => {
       return seriesData.reduce((sum, series) => {
         const val = series.data[i] && typeof series.data[i].y === 'number' ? series.data[i].y : 0;
@@ -856,16 +865,16 @@ looker.plugins.visualizations.add({
           zIndex: 5,
           dashStyle: 'Dash',
           label: {
-            text: `${config.ref_line_label || 'Reference'}: ${formattedRefValue}`,
+            text: `${config.ref_line_title || 'Reference'}: ${formattedRefValue}`,
             align: isBar ? 'left' : 'right',
             verticalAlign: isBar ? 'middle' : 'bottom',
-            rotation: isBar ? 0 : 0,
+            rotation: 0,
             y: isBar ? 0 : -5,
             x: isBar ? 10 : -10,
             style: {
               color: config.ref_line_color || '#EA4335',
               fontWeight: 'bold',
-              backgroundColor: config.ref_line_label_bg || '#FFFFFF',
+              backgroundColor: config.ref_line_title_bg || '#FFFFFF',
               padding: '4px',
               border: `1px solid ${config.ref_line_color || '#EA4335'}`,
               borderRadius: '3px',
@@ -886,7 +895,7 @@ looker.plugins.visualizations.add({
             }
           },
           dataLabels: {
-            enabled: config.show_labels,
+            enabled: config.show_labels !== false,
             align: config.label_position === 'outside' ? 'center' :
                    config.label_position === 'inside' ? 'center' : 'center',
             verticalAlign: config.label_position === 'outside' ? null :
@@ -971,27 +980,39 @@ looker.plugins.visualizations.add({
         }
       }
 
+      // Find the last non-null point for label
+      let lastValidIndex = -1;
+      for (let i = trendSeriesData.length - 1; i >= 0; i--) {
+        if (trendSeriesData[i] !== null && trendSeriesData[i] !== undefined) {
+          lastValidIndex = i;
+          break;
+        }
+      }
+
       const finalTrendData = trendSeriesData.map((y, i) => {
-        if (i === categories.length - 1 && y !== null) {
+        if (i === lastValidIndex && y !== null) {
           return {
             y: y,
             dataLabels: {
               enabled: true,
-              align: isBar ? 'left' : 'left',
-              x: isBar ? 10 : 5,
-              y: isBar ? 0 : 0,
-              verticalAlign: isBar ? 'middle' : 'middle',
-              rotation: isBar ? 0 : 0,
+              useHTML: true,
+              align: 'right',
+              x: isBar ? 10 : -35,
+              y: 0,
+              verticalAlign: 'middle',
+              rotation: 0,
               overflow: 'allow',
               crop: false,
-              formatter: () => config.trend_line_label || 'Trend',
+              formatter: function() {
+                return `<span style="background-color: ${config.trend_line_title_bg || '#FFFFFF'};
+                               color: ${config.trend_line_label_color || config.trend_line_color || '#4285F4'};
+                               padding: 4px;
+                               border: 1px solid ${config.trend_line_color || '#4285F4'};
+                               border-radius: 3px;
+                               font-weight: bold;
+                               white-space: nowrap;">${config.trend_line_title || 'Trend'}</span>`;
+              },
               style: {
-                color: config.trend_line_color || '#4285F4',
-                fontWeight: 'bold',
-                backgroundColor: config.trend_line_label_bg || '#FFFFFF',
-                padding: '4px',
-                border: `1px solid ${config.trend_line_color || '#4285F4'}`,
-                borderRadius: '3px',
                 textOutline: 'none'
               }
             }
@@ -1002,7 +1023,7 @@ looker.plugins.visualizations.add({
 
       chartOptions.series.push({
         type: 'line',
-        name: config.trend_line_label || 'Trend',
+        name: config.trend_line_title || 'Trend',
         data: finalTrendData,
         color: config.trend_line_color || '#4285F4',
         dashStyle: 'ShortDash',
@@ -1038,7 +1059,8 @@ looker.plugins.visualizations.add({
 
     if (!config.conditional_formatting_enabled) {
       const palette = palettes[config.color_collection] || palettes.google;
-      return values.map((v, i) => palette[i % palette.length]);
+      const customColors = config.series_colors ? String(config.series_colors).split(',').map(c => c.trim()) : null;
+      return values.map((v, i) => customColors ? customColors[i % customColors.length] : palette[i % palette.length]);
     }
 
     const check = (val, ruleNum, allVals) => {
