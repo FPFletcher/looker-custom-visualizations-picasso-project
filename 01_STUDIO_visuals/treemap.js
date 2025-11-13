@@ -506,7 +506,7 @@ const colorChanged = this._lastColorBy !== config.color_by ||
 
       // SIMPLIFIED DRILL TEST - Show drill menu on ANY click
 
-      if (config.enable_drill_down && (item.isDrillable || item.isOthers)) {
+      if (this._config.enable_drill_down && (item.isDrillable || item.isOthers)) {
         rect.addEventListener('click', (e) => {
           console.log('=== TREEMAP CLICK DEBUG ===');
           console.log('Item clicked:', item.name);
@@ -515,7 +515,7 @@ const colorChanged = this._lastColorBy !== config.color_by ||
           e.stopPropagation();
 
           // Check if we're at the last drill level
-          const dimensions = queryResponse.fields.dimension_like;
+          const dimensions = this._queryResponse.fields.dimension_like;
           const currentLevel = this._drillStack.length;
           const isLastLevel = currentLevel >= dimensions.length - 1 && !item.isOthers;
 
