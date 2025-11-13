@@ -383,12 +383,12 @@ const colorChanged = this._lastColorBy !== config.color_by ||
     });
 
     if (others.length > 1) {
-      // FIX: Ensure children maintain full hierarchical structure
       const othersNode = {
         name: "Others",
         value: others.reduce((s, d) => s + d.value, 0),
         rawValue: others.reduce((s, d) => s + d.rawValue, 0),
-        children: others.map(o => ({...o})), // Clone children properly
+        rawData: others.flatMap(o => o.rawData || o.children || []),  // FIX THIS
+        children: others.flatMap(o => o.rawData || o.children || []),
         isOthers: true,
         level: others[0].level,
         dimension: others[0].dimension
@@ -450,9 +450,9 @@ const colorChanged = this._lastColorBy !== config.color_by ||
       area: (d.value / totalValue) * rootArea,
       drillLinks: (d.children && d.children.length > 0 && dimension && d.children[0][dimension])
         ? (d.children[0][dimension].links || [])
-        : []
+        : [],
+      rawData: d.children || []  // ADD THIS - store children for drill
     }));
-
     let layout = this.squarify(nodes, 0, 0, width, height);
 
     // CRITICAL FIX: Force last item to fill to edges
@@ -506,23 +506,27 @@ const colorChanged = this._lastColorBy !== config.color_by ||
 
       if (config.enable_drill_down && (item.isDrillable || item.isOthers)) {
         rect.addEventListener('click', (e) => {
+          e.stopPropagation();  // ADD THIS - prevent event bubbling
+
           // Check if we're at the last drill level
           const dimensions = queryResponse.fields.dimension_like;
           const currentLevel = this._drillStack.length;
           const isLastLevel = currentLevel >= dimensions.length - 1 && !item.isOthers;
 
           // At last level: Show LookML drill menu
-          if (isLastLevel && LookerCharts && LookerCharts.Utils && item.drillLinks && item.drillLinks.length > 0) {
-            LookerCharts.Utils.openDrillMenu({
-              links: item.drillLinks,
-              event: e
-            });
-            return;
+          if (isLastLevel && item.drillLinks && item.drillLinks.length > 0) {
+            if (LookerCharts && LookerCharts.Utils) {
+              LookerCharts.Utils.openDrillMenu({
+                links: item.drillLinks,
+                event: e
+              });
+            }
+            return false;  // IMPORTANT - stop execution here
           }
 
           // Otherwise: Normal drill-down behavior
           if (item.isOthers) {
-            this.drawTreemap(item.children, config, queryResponse);
+            this.drawTreemap(item.rawData, config, queryResponse);
           } else {
             this._drillStack.push(item.name);
             this.drawTreemap(null, config, queryResponse);
