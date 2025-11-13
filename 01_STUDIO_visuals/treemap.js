@@ -504,63 +504,53 @@ const colorChanged = this._lastColorBy !== config.color_by ||
       rect.setAttribute('stroke-width', config.border_width);
       rect.setAttribute('class', 'treemap-rect');
 
-      if (config.enable_drill_down && (item.isDrillable || item.isOthers)) {
-        rect.addEventListener('click', (e) => {
-          console.log('=== TREEMAP CLICK DEBUG ===');
-          console.log('Item clicked:', item.name);
-          console.log('Item isDrillable:', item.isDrillable);
-          console.log('Item isOthers:', item.isOthers);
-          console.log('Item drillLinks:', item.drillLinks);
-          console.log('Item drillLinks length:', item.drillLinks ? item.drillLinks.length : 0);
+      // SIMPLIFIED DRILL TEST - Show drill menu on ANY click
+rect.addEventListener('click', (e) => {
+  console.log('=== SIMPLE CLICK TEST ===');
+  console.log('Item clicked:', item.name);
+  console.log('Item full data:', item);
+  console.log('Item rawData:', item.rawData);
+  console.log('Item rawData length:', item.rawData ? item.rawData.length : 0);
 
-          e.stopPropagation();
+  // Try to get drill links from rawData
+  let drillLinks = [];
+  if (item.rawData && item.rawData.length > 0) {
+    const firstRow = item.rawData[0];
+    console.log('First row:', firstRow);
+    console.log('First row keys:', Object.keys(firstRow));
 
-          // Check if we're at the last drill level
-          const dimensions = queryResponse.fields.dimension_like;
-          const currentLevel = this._drillStack.length;
-          const isLastLevel = currentLevel >= dimensions.length - 1 && !item.isOthers;
-
-          console.log('Current drill level:', currentLevel);
-          console.log('Total dimensions:', dimensions.length);
-          console.log('Is last level?', isLastLevel);
-          console.log('LookerCharts exists?', typeof LookerCharts !== 'undefined');
-          console.log('LookerCharts.Utils exists?', LookerCharts && typeof LookerCharts.Utils !== 'undefined');
-
-          // At last level: Show LookML drill menu
-          if (isLastLevel && item.drillLinks && item.drillLinks.length > 0) {
-            console.log('✓ ATTEMPTING TO OPEN DRILL MENU');
-            if (LookerCharts && LookerCharts.Utils) {
-              console.log('✓ Calling openDrillMenu with links:', item.drillLinks);
-              try {
-                LookerCharts.Utils.openDrillMenu({
-                  links: item.drillLinks,
-                  event: e
-                });
-                console.log('✓ openDrillMenu called successfully');
-              } catch (error) {
-                console.error('✗ Error calling openDrillMenu:', error);
-              }
-            } else {
-              console.log('✗ LookerCharts.Utils not available');
-            }
-            return false;
-          } else {
-            console.log('✗ NOT at last level or no drill links');
-            console.log('  - isLastLevel:', isLastLevel);
-            console.log('  - has drillLinks:', item.drillLinks && item.drillLinks.length > 0);
-          }
-
-          // Otherwise: Normal drill-down behavior
-          if (item.isOthers) {
-            console.log('→ Drilling into Others group');
-            this.drawTreemap(item.rawData, this._config, this._queryResponse);  // Use stored refs
-          } else {
-          console.log('→ Drilling down to next level:', item.name);
-          this._drillStack.push(item.name);
-          this.drawTreemap(null, this._config, this._queryResponse);  // Use stored refs
-          }
-        });
+    // Check each field in the row for links
+    Object.keys(firstRow).forEach(key => {
+      if (firstRow[key] && firstRow[key].links) {
+        console.log(`Found links in field "${key}":`, firstRow[key].links);
+        drillLinks = firstRow[key].links;
       }
+    });
+  }
+
+  console.log('Final drillLinks:', drillLinks);
+  console.log('LookerCharts available?', typeof LookerCharts !== 'undefined');
+  console.log('LookerCharts.Utils available?', LookerCharts && typeof LookerCharts.Utils !== 'undefined');
+
+  if (drillLinks && drillLinks.length > 0) {
+    console.log('✓ ATTEMPTING TO OPEN DRILL MENU');
+    if (LookerCharts && LookerCharts.Utils) {
+      try {
+        LookerCharts.Utils.openDrillMenu({
+          links: drillLinks,
+          event: e
+        });
+        console.log('✓ Drill menu opened successfully');
+      } catch (error) {
+        console.error('✗ Error opening drill menu:', error);
+      }
+    }
+  } else {
+    console.log('✗ No drill links found');
+  }
+
+  e.stopPropagation();
+});
 
       rect.addEventListener('mouseenter', () => {
         const pct = ((item.value / totalValue) * 100).toFixed(1);
