@@ -504,93 +504,71 @@ const colorChanged = this._lastColorBy !== config.color_by ||
       rect.setAttribute('stroke-width', config.border_width);
       rect.setAttribute('class', 'treemap-rect');
 
+      // SIMPLIFIED DRILL TEST - Show drill menu on ANY click
+
       if (config.enable_drill_down && (item.isDrillable || item.isOthers)) {
-      rect.addEventListener('click', (e) => {
-        console.log('=== TREEMAP CLICK DEBUG ===');
-        console.log('Item clicked:', item.name);
-        console.log('Current drill stack:', this._drillStack);
+        rect.addEventListener('click', (e) => {
+          console.log('=== TREEMAP CLICK DEBUG ===');
+          console.log('Item clicked:', item.name);
+          console.log('Current drill stack:', this._drillStack);
 
-        e.stopPropagation();
+          e.stopPropagation();
 
-        // Check if we're at the last drill level
-        const dimensions = queryResponse.fields.dimension_like;
-        const currentLevel = this._drillStack.length;
-        const isLastLevel = currentLevel >= dimensions.length - 1 && !item.isOthers;
+          // Check if we're at the last drill level
+          const dimensions = queryResponse.fields.dimension_like;
+          const currentLevel = this._drillStack.length;
+          const isLastLevel = currentLevel >= dimensions.length - 1 && !item.isOthers;
 
-        console.log('Current level:', currentLevel, '/ Total dimensions:', dimensions.length);
-        console.log('Is last level?', isLastLevel);
-        console.log('Is Others?', item.isOthers);
+          console.log('Current level:', currentLevel, '/ Total dimensions:', dimensions.length);
+          console.log('Is last level?', isLastLevel);
+          console.log('Is Others?', item.isOthers);
 
-        // At last level: Show LookML drill menu
-        if (isLastLevel) {
-          console.log('✓ AT LAST LEVEL - Looking for drill links');
+          // At last level: Show LookML drill menu
+          if (isLastLevel) {
+            console.log('✓ AT LAST LEVEL - Looking for drill links');
 
-          // Extract drill links from rawData
-          let drillLinks = [];
-          if (item.rawData && item.rawData.length > 0) {
-            const firstRow = item.rawData[0];
-            // Find the measure field (it will have links)
-            Object.keys(firstRow).forEach(key => {
-              if (firstRow[key] && firstRow[key].links && firstRow[key].links.length > 0) {
-                drillLinks = firstRow[key].links;
-              }
-            });
-          }
-
-          console.log('Found drill links:', drillLinks);
-
-          if (drillLinks.length > 0 && LookerCharts && LookerCharts.Utils) {
-            console.log('✓ Opening LookML drill menu');
-            try {
-              LookerCharts.Utils.openDrillMenu({
-                links: drillLinks,
-                event: e
+            // Extract drill links from rawData
+            let drillLinks = [];
+            if (item.rawData && item.rawData.length > 0) {
+              const firstRow = item.rawData[0];
+              // Find the measure field (it will have links)
+              Object.keys(firstRow).forEach(key => {
+                if (firstRow[key] && firstRow[key].links && firstRow[key].links.length > 0) {
+                  drillLinks = firstRow[key].links;
+                }
               });
-              console.log('✓ Drill menu opened successfully');
-            } catch (error) {
-              console.error('✗ Error opening drill menu:', error);
             }
-            return false; // Stop here - don't drill down further
-          } else {
-            console.log('✗ No drill links available');
+
+            console.log('Found drill links:', drillLinks);
+
+            if (drillLinks.length > 0 && LookerCharts && LookerCharts.Utils) {
+              console.log('✓ Opening LookML drill menu');
+              try {
+                LookerCharts.Utils.openDrillMenu({
+                  links: drillLinks,
+                  event: e
+                });
+                console.log('✓ Drill menu opened successfully');
+              } catch (error) {
+                console.error('✗ Error opening drill menu:', error);
+              }
+              return false; // Stop here - don't drill down further
+            } else {
+              console.log('✗ No drill links available');
+            }
           }
-        }
 
-        // Not at last level: Normal drill-down behavior
-        if (item.isOthers) {
-          console.log('→ Drilling into Others group');
-          this.drawTreemap(item.rawData, this._config, this._queryResponse);
-        } else {
-          console.log('→ Drilling down to next level:', item.name);
-          this._drillStack.push(item.name);
-          this.drawTreemap(null, this._config, this._queryResponse);
-        }
-      });
-    }
-
-  console.log('Final drillLinks:', drillLinks);
-  console.log('LookerCharts available?', typeof LookerCharts !== 'undefined');
-  console.log('LookerCharts.Utils available?', LookerCharts && typeof LookerCharts.Utils !== 'undefined');
-
-  if (drillLinks && drillLinks.length > 0) {
-    console.log('✓ ATTEMPTING TO OPEN DRILL MENU');
-    if (LookerCharts && LookerCharts.Utils) {
-      try {
-        LookerCharts.Utils.openDrillMenu({
-          links: drillLinks,
-          event: e
+          // Not at last level: Normal drill-down behavior
+          if (item.isOthers) {
+            console.log('→ Drilling into Others group');
+            this.drawTreemap(item.rawData, this._config, this._queryResponse);
+          } else {
+            console.log('→ Drilling down to next level:', item.name);
+            this._drillStack.push(item.name);
+            this.drawTreemap(null, this._config, this._queryResponse);
+          }
         });
-        console.log('✓ Drill menu opened successfully');
-      } catch (error) {
-        console.error('✗ Error opening drill menu:', error);
       }
-    }
-  } else {
-    console.log('✗ No drill links found');
-  }
-
-  e.stopPropagation();
-});
 
       rect.addEventListener('mouseenter', () => {
         const pct = ((item.value / totalValue) * 100).toFixed(1);
