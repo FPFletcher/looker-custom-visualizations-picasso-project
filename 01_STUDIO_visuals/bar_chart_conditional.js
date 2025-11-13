@@ -70,7 +70,8 @@ looker.plugins.visualizations.add({
       display: "select",
       values: [
         {"First Measure Only": "first"},
-        {"All Measures": "all"}
+        {"All Measures": "all"},
+        {"Stacked Measures": "stacked"}  // ← ADD THIS
       ],
       default: "first",
       section: "Plot",
@@ -710,7 +711,7 @@ looker.plugins.visualizations.add({
           return { y: cell && cell.value !== null ? Number(cell.value) : null, drillLinks: cell ? cell.links : [], categoryIndex: i };
         });
 
-        // CRITICAL FIX: Only apply formatting to the correct measure(s)
+
         const shouldApplyFormatting = config.conditional_formatting_enabled &&
                                       (config.conditional_formatting_apply_to === 'all' || index === 0);
 
@@ -786,17 +787,127 @@ looker.plugins.visualizations.add({
 
     // Build legend items for rules
     const ruleLegendItems = [];
+    // Apply conditional formatting
     if (config.conditional_formatting_enabled) {
-      [1, 2, 3].forEach(ruleNum => {
-        if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_type`] !== 'gradient') {
-          ruleLegendItems.push({
-            name: config[`rule${ruleNum}_legend_label`] || `Rule ${ruleNum}`,
-            color: config[`rule${ruleNum}_color`],
-            type: 'dummy'
-          });
+  const applyTo = config.conditional_formatting_apply_to || 'first';
+
+  seriesData.forEach((series, seriesIndex) => {
+    // Determine if we should apply formatting to this series
+    const shouldApply = applyTo === 'all' ||
+                       (applyTo === 'first' && seriesIndex === 0) ||
+                       (applyTo === 'stacked');
+
+    if (!shouldApply && applyTo !== 'stacked') return;
+
+    series.data = series.data.map((point, pointIndex) => {
+      if (typeof point !== 'object') {
+        point = { y: point };
+      }
+
+      // Calculate the value to check against rules
+      let valueToCheck = point.y;
+
+      // For "stacked" mode, sum all visible series values for this point
+      if (applyTo === 'stacked') {
+        valueToCheck = 0;
+        seriesData.forEach(s => {
+          if (s.visible !== false) {
+            const dataPoint = s.data[pointIndex];
+            const yValue = typeof dataPoint === 'object' ? dataPoint.y : dataPoint;
+            valueToCheck += (yValue || 0);
+          }
+        });
+      }
+
+      // Check rules in order (1, 2, 3)
+      for (let i = 1; i <= 3; i++) {
+        if (!config[`rule${i}_enabled`]) continue;
+
+        const ruleType = config[`rule${i}_type`];
+        const value1 = parseFloat(config[`rule${i}_value`]) || 0;
+        const value2 = parseFloat(config[`rule${i}_value2`]) || 0;
+        const color1 = config[`rule${i}_color`] || '#EA4335';
+        const color2 = config[`rule${i}_color2`] || '#34A853';
+
+        let matchesRule = false;
+        let finalColor = color1;
+
+        // Rule matching logic
+        if (ruleType === 'gt' && valueToCheck > value1) matchesRule = true;
+        else if (ruleType === 'lt' && valueToCheck < value1) matchesRule = true;
+        else if (ruleType === 'eq' && valueToCheck === value1) matchesRule = true;
+        else if (ruleType === 'between' && valueToCheck >= value1 && valueToCheck <= value2) matchesRule = true;
+        else if (ruleType === 'topn' || ruleType === 'bottomn') {
+          // Get all values for ranking
+          const allValues = seriesData[applyTo === 'stacked' ? 0 : seriesIndex].data
+            .map(d => typeof d === 'object' ? d.y : d)
+            .filter(v => v != null);
+
+          if (applyTo === 'stacked') {
+            // For stacked, calculate sums
+            const stackedValues = allValues.map((_, idx) => {
+              let sum = 0;
+              seriesData.forEach(s => {
+                if (s.visible !== false) {
+                  const dp = s.data[idx];
+                  sum += typeof dp === 'object' ? (dp.y || 0) : (dp || 0);
+                }
+              });
+              return sum;
+            });
+            const sorted = [...stackedValues].sort((a, b) => ruleType === 'topn' ? b - a : a - b);
+            const threshold = sorted[Math.min(value1 - 1, sorted.length - 1)];
+            matchesRule = ruleType === 'topn' ? valueToCheck >= threshold : valueToCheck <= threshold;
+          } else {
+            const sorted = [...allValues].sort((a, b) => ruleType === 'topn' ? b - a : a - b);
+            const threshold = sorted[Math.min(value1 - 1, sorted.length - 1)];
+            matchesRule = ruleType === 'topn' ? valueToCheck >= threshold : valueToCheck <= threshold;
+          }
         }
-      });
-    }
+        else if (ruleType === 'gradient') {
+          const allValues = seriesData[applyTo === 'stacked' ? 0 : seriesIndex].data
+            .map(d => typeof d === 'object' ? d.y : d)
+            .filter(v => v != null);
+
+          if (applyTo === 'stacked') {
+            const stackedValues = allValues.map((_, idx) => {
+              let sum = 0;
+              seriesData.forEach(s => {
+                if (s.visible !== false) {
+                  const dp = s.data[idx];
+                  sum += typeof dp === 'object' ? (dp.y || 0) : (dp || 0);
+                }
+              });
+              return sum;
+            });
+            const min = Math.min(...stackedValues);
+            const max = Math.max(...stackedValues);
+            const ratio = max > min ? (valueToCheck - min) / (max - min) : 0;
+            finalColor = this.interpolateColor(color1, color2, ratio);
+          } else {
+            const min = Math.min(...allValues);
+            const max = Math.max(...allValues);
+            const ratio = max > min ? (valueToCheck - min) / (max - min) : 0;
+            finalColor = this.interpolateColor(color1, color2, ratio);
+          }
+          matchesRule = true;
+        }
+
+        if (matchesRule) {
+          point.color = finalColor;
+          break; // Stop checking rules once one matches
+        }
+      }
+
+      // If no rules matched and formatting is enabled, use default color
+      if (!point.color && config.conditional_formatting_enabled) {
+        point.color = config.default_color || '#9AA0A6';
+      }
+
+      return point;
+    });
+  });
+}
 
     const chartOptions = {
       chart: { type: baseType, backgroundColor: 'transparent', spacing: [10, 10, 10, 10] },
@@ -965,19 +1076,19 @@ looker.plugins.visualizations.add({
 
     // TRENDLINE
     if (config.trend_line_enabled) {
-  console.log('=== TRENDLINE ENABLED ===');
-  console.log('seriesData length:', seriesData.length);
-  console.log('seriesData[0]:', seriesData[0]);
+      //console.log('=== TRENDLINE ENABLED ===');
+      //console.log('seriesData length:', seriesData.length);
+      //console.log('seriesData[0]:', seriesData[0]);
 
   if (seriesData.length > 0) {
     let trendSourceData;
 
     try {
       if (config.trend_line_apply_to === 'stacked') {
-        console.log('Using stacked totals for trend');
+        //console.log('Using stacked totals for trend');
         trendSourceData = stackedTotals;
       } else if (config.trend_line_apply_to === 'all') {
-        console.log('Using all measures average for trend');
+        //console.log('Using all measures average for trend');
         trendSourceData = [];
         for (let i = 0; i < categories.length; i++) {
           let sum = 0, count = 0;
@@ -990,20 +1101,20 @@ looker.plugins.visualizations.add({
           trendSourceData.push(count > 0 ? sum / count : null);
         }
       } else {
-        console.log('Using first measure for trend');
+        //console.log('Using first measure for trend');
         trendSourceData = seriesData[0].data.map(d => d && d.y !== undefined ? d.y : null);
       }
 
-      console.log('trendSourceData:', trendSourceData);
+      //console.log('trendSourceData:', trendSourceData);
 
       let trendSeriesData = [];
       const validPoints = trendSourceData.map((y, x) => ({ x, y })).filter(p => typeof p.y === 'number');
 
-      console.log('validPoints:', validPoints);
+      //console.log('validPoints:', validPoints);
 
       if (validPoints.length > 1) {
         if (config.trend_line_type === 'linear') {
-          console.log('Calculating linear trend');
+          //console.log('Calculating linear trend');
           const n = validPoints.length;
           const sumX = validPoints.reduce((a, p) => a + p.x, 0);
           const sumY = validPoints.reduce((a, p) => a + p.y, 0);
@@ -1013,7 +1124,7 @@ looker.plugins.visualizations.add({
           const intercept = (sumY - slope * sumX) / n;
           trendSeriesData = categories.map((_, x) => slope * x + intercept);
         } else if (config.trend_line_type === 'moving_avg') {
-          console.log('Calculating moving average trend');
+          //console.log('Calculating moving average trend');
           const period = config.trend_line_period || 3;
           trendSeriesData = trendSourceData.map((val, i, arr) => {
             if (i < period - 1) return null;
@@ -1022,7 +1133,7 @@ looker.plugins.visualizations.add({
           });
         }
 
-        console.log('trendSeriesData calculated:', trendSeriesData);
+        //console.log('trendSeriesData calculated:', trendSeriesData);
 
         // Find last valid point
         let lastValidIndex = -1;
@@ -1033,7 +1144,7 @@ looker.plugins.visualizations.add({
           }
         }
 
-        console.log('lastValidIndex:', lastValidIndex);
+        //console.log('lastValidIndex:', lastValidIndex);
 
         const finalTrendData = trendSeriesData.map((y, i) => {
           const point = { y: y };
@@ -1044,8 +1155,8 @@ looker.plugins.visualizations.add({
               enabled: true,
               useHTML: true,
               align: 'right',  // RIGHT align
-              x: isBar ? -10 : -10,  // NEGATIVE value to go LEFT
-              y: isBar ? 0 : -10,
+              x: isBar ? 5 : -10,  // NEGATIVE value to go LEFT
+              y: isBar ? 0 : -5,
               verticalAlign: isBar ? 'middle' : 'bottom',
               rotation: 0,
               overflow: 'allow',
@@ -1071,7 +1182,7 @@ looker.plugins.visualizations.add({
           return point;
         });
 
-        console.log('finalTrendData:', finalTrendData);
+        //console.log('finalTrendData:', finalTrendData);
 
         const trendSeries = {
           type: 'line',
@@ -1138,17 +1249,17 @@ looker.plugins.visualizations.add({
           }
         };
 
-        console.log('Pushing trend series:', trendSeries);
+        //console.log('Pushing trend series:', trendSeries);
         chartOptions.series.push(trendSeries);
 
       } else {
-        console.log('Not enough valid points for trendline');
+        //console.log('Not enough valid points for trendline');
       }
     } catch (error) {
       console.error('Error calculating trendline:', error);
     }
   } else {
-    console.log('No series data available for trendline');
+    //console.log('No series data available for trendline');
   }
 }
 
