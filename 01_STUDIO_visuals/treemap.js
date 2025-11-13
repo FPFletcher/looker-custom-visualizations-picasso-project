@@ -504,6 +504,7 @@ const colorChanged = this._lastColorBy !== config.color_by ||
       rect.setAttribute('stroke-width', config.border_width);
       rect.setAttribute('class', 'treemap-rect');
 
+
       // SIMPLIFIED DRILL TEST - Show drill menu on ANY click
 
       if (this._config.enable_drill_down && (item.isDrillable || item.isOthers)) {
