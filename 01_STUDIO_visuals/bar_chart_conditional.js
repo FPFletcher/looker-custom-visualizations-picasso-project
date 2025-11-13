@@ -531,7 +531,8 @@ looker.plugins.visualizations.add({
     ref_line_title: {
       type: "string",
       label: "Reference Title",
-      placeholder: "Target",
+      placeholder: "Auto (based on type)",
+      default: "",  // empty string (will be calculated dynamically)
       section: "Y",
       order: 14
     },
@@ -613,8 +614,8 @@ looker.plugins.visualizations.add({
     trend_line_title: {
       type: "string",
       label: "Trend Line Title",
-      placeholder: "Trend",
-      default: "Trend",
+      placeholder: "Auto (based on type)",  // placeholder
+      default: "",  // empty string (will be calculated dynamically)
       section: "Y",
       order: 26
     },
@@ -845,30 +846,45 @@ looker.plugins.visualizations.add({
           zIndex: 5,
           dashStyle: 'Dash',
           label: {
-          useHTML: true,
-          text: (() => {
-          const num = refValue;
-          const format = config.value_format || 'auto';
-          let formatted = '';
-          if (format === 'currency') formatted = '$' + (num >= 1000 ? (num / 1000).toFixed(1) + 'K' : num.toFixed(0));
-          else if (format === 'percent') formatted = (num * 100).toFixed(1) + '%';
-          else if (format === 'decimal1') formatted = num.toFixed(1);
-          else if (format === 'decimal2') formatted = num.toFixed(2);
-          else if (format === 'number') formatted = num.toLocaleString();
-          else if (num >= 1e9) formatted = (num / 1e9).toFixed(1) + 'B';
-          else if (num >= 1e6) formatted = (num / 1e6).toFixed(1) + 'M';
-          else if (num >= 1e3) formatted = (num / 1e3).toFixed(1) + 'K';
-          else formatted = num.toLocaleString();
-          return `<span style="background-color: ${config.ref_line_title_bg || '#FFFFFF'}; color: ${config.ref_line_color || '#EA4335'}; padding: 4px; border: 1px solid ${config.ref_line_color || '#EA4335'}; border-radius: 3px; font-weight: bold; white-space: nowrap;">${config.ref_line_title || 'Reference'}: ${formatted}</span>`;
-          })(),
-          align: isBar ? 'left' : 'right',
-          verticalAlign: isBar ? 'middle' : 'bottom',
-          rotation: 0,
-          y: isBar ? 0 : -5,
-          x: isBar ? 10 : -10,
-          style: { textOutline: 'none' }
+            useHTML: true,
+            text: (() => {
+              const num = refValue;
+              const format = config.value_format || 'auto';
+              let formatted = '';
+              if (format === 'currency') formatted = '$' + (num >= 1000 ? (num / 1000).toFixed(1) + 'K' : num.toFixed(0));
+              else if (format === 'percent') formatted = (num * 100).toFixed(1) + '%';
+              else if (format === 'decimal1') formatted = num.toFixed(1);
+              else if (format === 'decimal2') formatted = num.toFixed(2);
+              else if (format === 'number') formatted = num.toLocaleString();
+              else if (num >= 1e9) formatted = (num / 1e9).toFixed(1) + 'B';
+              else if (num >= 1e6) formatted = (num / 1e6).toFixed(1) + 'M';
+              else if (num >= 1e3) formatted = (num / 1e3).toFixed(1) + 'K';
+              else formatted = num.toLocaleString();
+
+              // CALCULATE DEFAULT TITLE BASED ON TYPE
+              let refTitle = config.ref_line_title;
+              if (!refTitle || refTitle.trim() === '') {
+                // Auto-generate title based on type
+                const typeMap = {
+                  'custom': 'Reference',
+                  'average': 'Average',
+                  'median': 'Median',
+                  'min': 'Minimum',
+                  'max': 'Maximum'
+                };
+                refTitle = typeMap[config.ref_line_type] || 'Reference';
+              }
+
+              return `<span style="background-color: ${config.ref_line_title_bg || '#FFFFFF'}; color: ${config.ref_line_color || '#EA4335'}; padding: 4px; border: 1px solid ${config.ref_line_color || '#EA4335'}; border-radius: 3px; font-weight: bold; white-space: nowrap;">${refTitle}: ${formatted}</span>`;
+            })(),
+            align: isBar ? 'left' : 'right',
+            verticalAlign: isBar ? 'middle' : 'bottom',
+            rotation: 0,
+            y: isBar ? 0 : -5,
+            x: isBar ? 10 : -10,
+            style: { textOutline: 'none' }
           }
-          }] : []
+        }] : []
       },
       plotOptions: {
         series: {
@@ -1027,15 +1043,26 @@ looker.plugins.visualizations.add({
             point.dataLabels = {
               enabled: true,
               useHTML: true,
-              align: isBar ? 'left' : 'left',  // CHANGED to 'left' for better positioning
-              x: isBar ? 10 : -50,  // CHANGED: More space from the edge
-              y: isBar ? 0 : -10,  // CHANGED: Slightly above the line
-              verticalAlign: isBar ? 'middle' : 'bottom',  // CHANGED to 'bottom'
+              align: 'right',  // RIGHT align
+              x: isBar ? -10 : -10,  // NEGATIVE value to go LEFT
+              y: isBar ? 0 : -10,
+              verticalAlign: isBar ? 'middle' : 'bottom',
               rotation: 0,
               overflow: 'allow',
               crop: false,
               formatter: function() {
-                return `<span style="background-color: ${config.trend_line_title_bg || '#FFFFFF'}; color: ${config.trend_line_label_color || config.trend_line_color || '#4285F4'}; padding: 4px; border: 1px solid ${config.trend_line_color || '#4285F4'}; border-radius: 3px; font-weight: bold; white-space: nowrap;">${config.trend_line_title || 'Trend'}</span>`;
+                // CALCULATE DEFAULT TITLE BASED ON TYPE
+                let trendTitle = config.trend_line_title;
+                if (!trendTitle || trendTitle.trim() === '') {
+                  // Auto-generate title based on type
+                  const typeMap = {
+                    'linear': 'Linear Trend',
+                    'moving_avg': `Moving Avg (${config.trend_line_period || 3})`
+                  };
+                  trendTitle = typeMap[config.trend_line_type] || 'Trend';
+                }
+
+                return `<span style="background-color: ${config.trend_line_title_bg || '#FFFFFF'}; color: ${config.trend_line_label_color || config.trend_line_color || '#4285F4'}; padding: 4px; border: 1px solid ${config.trend_line_color || '#4285F4'}; border-radius: 3px; font-weight: bold; white-space: nowrap;">${trendTitle}</span>`;
               },
               style: { textOutline: 'none' }
             };
@@ -1048,7 +1075,17 @@ looker.plugins.visualizations.add({
 
         const trendSeries = {
           type: 'line',
-          name: config.trend_line_title || 'Trend',
+          name: (() => {
+            let trendTitle = config.trend_line_title;
+            if (!trendTitle || trendTitle.trim() === '') {
+              const typeMap = {
+                'linear': 'Linear Trend',
+                'moving_avg': `Moving Avg (${config.trend_line_period || 3})`
+              };
+              trendTitle = typeMap[config.trend_line_type] || 'Trend';
+            }
+            return trendTitle;
+          })(),
           data: finalTrendData,
           color: config.trend_line_color || '#4285F4',
           dashStyle: 'ShortDash',
