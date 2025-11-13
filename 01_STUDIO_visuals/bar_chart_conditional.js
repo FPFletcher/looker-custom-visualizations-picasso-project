@@ -992,7 +992,7 @@ looker.plugins.visualizations.add({
             verticalAlign: isBar ? 'middle' : 'bottom',
             rotation: 0,
             y: isBar ? 0 : -5,
-            x: isBar ? 10 : -10,
+            x: isBar ? 10 : -20,
             style: { textOutline: 'none' }
           }
         }] : []
