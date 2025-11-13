@@ -1144,17 +1144,17 @@ looker.plugins.visualizations.add({
           }
         }
 
-        console.log('TREND DEBUG - Apply to mode:', config.trend_line_apply_to);
-        console.log('TREND DEBUG - trendSeriesData length:', trendSeriesData.length);
-        console.log('TREND DEBUG - lastValidIndex:', lastValidIndex);
-        console.log('TREND DEBUG - trendSeriesData:', trendSeriesData);
+        //console.log('TREND DEBUG - Apply to mode:', config.trend_line_apply_to);
+        //console.log('TREND DEBUG - trendSeriesData length:', trendSeriesData.length);
+        //console.log('TREND DEBUG - lastValidIndex:', lastValidIndex);
+        //console.log('TREND DEBUG - trendSeriesData:', trendSeriesData);
 
         const finalTrendData = trendSeriesData.map((y, i) => {
           const point = { y: y };
 
           // Only add title label on last valid point
           if (i === lastValidIndex && y !== null && y !== undefined && typeof y === 'number') {
-            console.log('TREND DEBUG - Adding label at index:', i, 'with value:', y);
+            //console.log('TREND DEBUG - Adding label at index:', i, 'with value:', y);
 
             point.dataLabels = {
               enabled: true,
@@ -1167,6 +1167,7 @@ looker.plugins.visualizations.add({
               overflow: 'allow',
               crop: false,
               inside: false,
+              zIndex: 1000,
               formatter: function() {
                 // CALCULATE DEFAULT TITLE BASED ON TYPE
                 let trendTitle = config.trend_line_title;
@@ -1188,7 +1189,7 @@ looker.plugins.visualizations.add({
           return point;
         });
 
-        console.log('TREND DEBUG - finalTrendData:', finalTrendData);
+        //console.log('TREND DEBUG - finalTrendData:', finalTrendData);
 
         //console.log('finalTrendData:', finalTrendData);
 
@@ -1212,8 +1213,25 @@ looker.plugins.visualizations.add({
           enableMouseTracking: true,
           zIndex: 10,
           showInLegend: false,
-          stacking: undefined,  // ADD THIS - Explicitly disable stacking
-          stack: null,          // ADD THIS - Ensure no stack assignment
+          stacking: undefined,  // Explicitly disable stacking
+          stack: null,          // Ensure no stack assignment
+
+          events: {
+            afterAnimate: function() {
+              // Force re-render the data labels after animation
+              if (this.chart && this.chart.series) {
+                const trendLine = this.chart.get('trend-line-series');
+                if (trendLine && trendLine.points && trendLine.points.length > 0) {
+                  const lastPoint = trendLine.points[trendLine.points.length - 1];
+                  if (lastPoint && lastPoint.dataLabel) {
+                    lastPoint.dataLabel.show();
+                    lastPoint.dataLabel.attr({ zIndex: 1000 }); // Force to top
+                  }
+                }
+              }
+            }
+          },
+
           dataLabels: {
             enabled: config.trend_line_show_label === true,
             formatter: function() {
