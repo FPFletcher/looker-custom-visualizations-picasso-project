@@ -507,7 +507,6 @@ const colorChanged = this._lastColorBy !== config.color_by ||
 
       // SIMPLIFIED DRILL TEST - Show drill menu on ANY click
 
-      if (this._config.enable_drill_down && (item.isDrillable || item.isOthers)) {
       rect.addEventListener('click', (e) => {
         e.stopPropagation();
 
@@ -553,7 +552,6 @@ const colorChanged = this._lastColorBy !== config.color_by ||
           }
         }
       });
-      }
 
       rect.addEventListener('mouseenter', () => {
         const pct = ((item.value / totalValue) * 100).toFixed(1);
