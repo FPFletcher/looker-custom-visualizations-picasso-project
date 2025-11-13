@@ -1125,8 +1125,7 @@ looker.plugins.visualizations.add({
   },
 
 
-  // REPLACE THE ENTIRE getColors FUNCTION (around line 1000-1080):
-getColors: function(values, config, baseColor) {
+  getColors: function(values, config, baseColor) {
   const palettes = {
     google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC'],
     looker: ['#7FCDAE', '#7ED09C', '#7DD389', '#85D67C', '#9AD97B', '#B1DB7A'],
@@ -1151,40 +1150,11 @@ getColors: function(values, config, baseColor) {
     return values.map(() => baseColor);
   }
 
-  // CHECK FOR GRADIENT IN ANY RULE (priority: rule1 > rule2 > rule3)
-  let gradientRule = null;
-  if (config.rule1_enabled && config.rule1_type === 'gradient') {
-    gradientRule = 1;
-  } else if (config.rule2_enabled && config.rule2_type === 'gradient') {
-    gradientRule = 2;
-  } else if (config.rule3_enabled && config.rule3_type === 'gradient') {
-    gradientRule = 3;
-  }
-
-  // If gradient is enabled on any rule, apply it
-  if (gradientRule) {
-    const numericValues = values.filter(v => typeof v === 'number');
-    if (numericValues.length === 0) {
-      return values.map(() => baseColor);
-    }
-
-    const min = Math.min(...numericValues);
-    const max = Math.max(...numericValues);
-    const startColor = config[`rule${gradientRule}_color`] || '#F1F8E9';
-    const endColor = config[`rule${gradientRule}_color2`] || '#33691E';
-
-    return values.map(v => {
-      if (typeof v !== 'number') return baseColor;
-      const ratio = (max === min) ? 0.5 : (v - min) / (max - min);
-      return this.interpolateColor(startColor, endColor, ratio);
-    });
-  }
-
-  // No gradient - check discrete rules
-  const check = (val, ruleNum, allVals) => {
+  // Helper function to check discrete rules (non-gradient)
+  const checkDiscrete = (val, ruleNum, allVals) => {
     if (!config[`rule${ruleNum}_enabled`]) return false;
     const type = config[`rule${ruleNum}_type`];
-    if (type === 'gradient') return false; // Already handled above
+    if (type === 'gradient') return false; // Skip gradients in discrete check
 
     const v1 = config[`rule${ruleNum}_value`];
     const v2 = config[`rule${ruleNum}_value2`];
@@ -1203,12 +1173,75 @@ getColors: function(values, config, baseColor) {
     return false;
   };
 
-  // Apply discrete rules in priority order
-  return values.map(val => {
+  // Helper function to apply gradient for a specific rule
+  const applyGradient = (values, ruleNum, baseColor) => {
+    const numericValues = values.filter(v => typeof v === 'number');
+    if (numericValues.length === 0) {
+      return values.map(() => baseColor);
+    }
+
+    const min = Math.min(...numericValues);
+    const max = Math.max(...numericValues);
+    const startColor = config[`rule${ruleNum}_color`] || '#F1F8E9';
+    const endColor = config[`rule${ruleNum}_color2`] || '#33691E';
+
+    return values.map(v => {
+      if (typeof v !== 'number') return baseColor;
+      const ratio = (max === min) ? 0.5 : (v - min) / (max - min);
+      return this.interpolateColor(startColor, endColor, ratio);
+    });
+  };
+
+  // Apply rules in priority order: Rule 1 > Rule 2 > Rule 3
+  return values.map((val, index) => {
     if (typeof val !== 'number') return baseColor;
-    if (check(val, 1, values)) return config.rule1_color;
-    if (check(val, 2, values)) return config.rule2_color;
-    if (check(val, 3, values)) return config.rule3_color;
+
+    // RULE 1 - Highest Priority
+    if (config.rule1_enabled) {
+      if (config.rule1_type === 'gradient') {
+        // If Rule 1 is gradient, calculate gradient color
+        const numericValues = values.filter(v => typeof v === 'number');
+        const min = Math.min(...numericValues);
+        const max = Math.max(...numericValues);
+        const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
+        return this.interpolateColor(config.rule1_color || '#F1F8E9', config.rule1_color2 || '#33691E', ratio);
+      } else if (checkDiscrete(val, 1, values)) {
+        // Rule 1 discrete match
+        return config.rule1_color;
+      }
+    }
+
+    // RULE 2 - Medium Priority (only if Rule 1 didn't match)
+    if (config.rule2_enabled) {
+      if (config.rule2_type === 'gradient') {
+        // If Rule 2 is gradient, calculate gradient color
+        const numericValues = values.filter(v => typeof v === 'number');
+        const min = Math.min(...numericValues);
+        const max = Math.max(...numericValues);
+        const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
+        return this.interpolateColor(config.rule2_color || '#F1F8E9', config.rule2_color2 || '#33691E', ratio);
+      } else if (checkDiscrete(val, 2, values)) {
+        // Rule 2 discrete match
+        return config.rule2_color;
+      }
+    }
+
+    // RULE 3 - Lowest Priority (only if Rules 1 & 2 didn't match)
+    if (config.rule3_enabled) {
+      if (config.rule3_type === 'gradient') {
+        // If Rule 3 is gradient, calculate gradient color
+        const numericValues = values.filter(v => typeof v === 'number');
+        const min = Math.min(...numericValues);
+        const max = Math.max(...numericValues);
+        const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
+        return this.interpolateColor(config.rule3_color || '#F1F8E9', config.rule3_color2 || '#33691E', ratio);
+      } else if (checkDiscrete(val, 3, values)) {
+        // Rule 3 discrete match
+        return config.rule3_color;
+      }
+    }
+
+    // No rule matched - use base series color
     return baseColor;
   });
 },
