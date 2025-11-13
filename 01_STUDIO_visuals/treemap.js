@@ -553,11 +553,11 @@ const colorChanged = this._lastColorBy !== config.color_by ||
           // Otherwise: Normal drill-down behavior
           if (item.isOthers) {
             console.log('→ Drilling into Others group');
-            this.drawTreemap(item.rawData, config, queryResponse);
+            this.drawTreemap(item.rawData, this._config, this._queryResponse);  // Use stored refs
           } else {
-            console.log('→ Drilling down to next level:', item.name);
-            this._drillStack.push(item.name);
-            this.drawTreemap(null, config, queryResponse);
+          console.log('→ Drilling down to next level:', item.name);
+          this._drillStack.push(item.name);
+          this.drawTreemap(null, this._config, this._queryResponse);  // Use stored refs
           }
         });
       }
