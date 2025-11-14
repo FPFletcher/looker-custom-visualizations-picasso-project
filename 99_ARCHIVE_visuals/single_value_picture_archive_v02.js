@@ -502,8 +502,9 @@ looker.plugins.visualizations.add({
       percentage = value * 100;
     }
 
-    // Format without sign prefix
-    return percentage.toFixed(decimals) + '%';
+    // Add sign for display
+    const sign = percentage > 0 ? '+' : '';
+    return sign + percentage.toFixed(decimals) + '%';
   },
 
   /**
