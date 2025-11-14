@@ -715,27 +715,9 @@ looker.plugins.visualizations.add({
     element.style.overflow = 'hidden';
     element.innerHTML = `
       <style>
-        /* Hide scrollbars completely */
-        ::-webkit-scrollbar {
-          display: none;
-          width: 0 !important;
-          height: 0 !important;
-        }
-        * {
-          scrollbar-width: none; /* Firefox */
-          -ms-overflow-style: none; /* IE/Edge */
-        }
-        .highcharts-container {
-          width: 100% !important;
-          height: 100% !important;
-          overflow: hidden !important;
-        }
-        .highcharts-root {
-          width: 100% !important;
-          height: 100% !important;
-        }
+        .highcharts-container { width: 100% !important; height: 100% !important; }
       </style>
-      <div id="chart-container" style="width:100%; height:100%; position:absolute; overflow:hidden;"></div>
+      <div id="chart-container" style="width:100%; height:100%; position:absolute;"></div>
     `;
     this._chartContainer = element.querySelector('#chart-container');
     this.chart = null;
@@ -772,19 +754,10 @@ looker.plugins.visualizations.add({
       cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B']
     };
 
-    // Handle series_labels - can be:
-    // 1. A string from manual input: "Label1,Label2,Label3"
-    // 2. An object from Looker UI: {"measure.name": "Custom Label"}
-    let customLabels = null;
-    if (config.series_labels) {
-      if (typeof config.series_labels === 'string') {
-        // Manual comma-separated input
-        customLabels = config.series_labels.split(',').map(l => l.trim());
-      } else if (typeof config.series_labels === 'object') {
-        // Looker's built-in series_labels object
-        customLabels = config.series_labels;
-      }
-    }
+    // Handle series_labels - Looker passes it as an object like {"measure.name": "Custom Label"}
+    const customLabels = config.series_labels && typeof config.series_labels === 'object'
+      ? config.series_labels
+      : null;
     const palette = palettes[config.color_collection] || palettes.google;
     const customColors = config.series_colors ? String(config.series_colors).split(',').map(c => c.trim()) : null;
 
@@ -800,42 +773,13 @@ looker.plugins.visualizations.add({
           const seriesIndex = pivotIndex * measures.length + measureIndex;
           const measureName = measure;
           const defaultName = `${queryResponse.fields.measures[measureIndex].label_short || queryResponse.fields.measures[measureIndex].label} - ${pivotValue.key}`;
+          const seriesName = (customLabels && customLabels[measureName]) || defaultName;
 
-          let seriesName = defaultName;
-          if (customLabels) {
-            if (Array.isArray(customLabels)) {
-              // Array format: use index
-              seriesName = customLabels[seriesIndex] || defaultName;
-            } else {
-              // Object format: use measure name as key
-              seriesName = customLabels[measureName] || defaultName;
-            }
-          }
-
-          const baseColor = customColors ? customColors[seriesIndex % customColors.length] : palette[seriesIndex % palette.length];
-
-          // Apply conditional formatting to pivots (but not in stacked mode - that's done later)
-          const shouldApplyFormatting = config.conditional_formatting_enabled &&
-                                        config.conditional_formatting_apply_to !== 'stacked' &&
-                                        (config.conditional_formatting_apply_to === 'all' || seriesIndex === 0);
-
-          if (shouldApplyFormatting) {
-            const rawValues = values.map(v => v.y);
-            const colors = this.getColors(rawValues, config, baseColor);
-
-            seriesData.push({
-              name: seriesName,
-              data: values.map((v, i) => ({ ...v, color: colors[i] })),
-              showInLegend: true
-            });
-          } else {
-            seriesData.push({
-              name: seriesName,
-              data: values,
-              color: baseColor,
-              showInLegend: true
-            });
-          }
+          seriesData.push({
+            name: seriesName,
+            data: values,
+            color: customColors ? customColors[seriesIndex % customColors.length] : palette[seriesIndex % palette.length]
+          });
         });
       });
     } else {
@@ -847,24 +791,13 @@ looker.plugins.visualizations.add({
 
 
         const shouldApplyFormatting = config.conditional_formatting_enabled &&
-                                      config.conditional_formatting_apply_to !== 'stacked' &&
                                       (config.conditional_formatting_apply_to === 'all' || index === 0);
 
         const baseColor = customColors ? customColors[index % customColors.length] : palette[index % palette.length];
 
         const measureName = measure;
         const defaultName = queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label;
-
-        let seriesName = defaultName;
-        if (customLabels) {
-          if (Array.isArray(customLabels)) {
-            // Array format: use index
-            seriesName = customLabels[index] || defaultName;
-          } else {
-            // Object format: use measure name as key
-            seriesName = customLabels[measureName] || defaultName;
-          }
-        }
+        const seriesName = (customLabels && customLabels[measureName]) || defaultName;
 
         if (shouldApplyFormatting) {
           // Apply conditional formatting
@@ -896,23 +829,6 @@ looker.plugins.visualizations.add({
         return sum + val;
       }, 0);
     });
-
-    // Apply conditional formatting for stacked measures mode
-    if (config.conditional_formatting_enabled && config.conditional_formatting_apply_to === 'stacked') {
-      // Calculate colors based on stacked totals
-      const stackedColors = this.getColors(stackedTotals, config, palette[0]);
-
-      // Apply the same color to ALL series at each category position
-      seriesData.forEach(series => {
-        series.data = series.data.map((point, i) => {
-          if (typeof point === 'object') {
-            return { ...point, color: stackedColors[i] };
-          } else {
-            return { y: point, color: stackedColors[i] };
-          }
-        });
-      });
-    }
 
     // Calculate reference value
     let refValue = config.ref_line_value || 0;
@@ -968,12 +884,7 @@ looker.plugins.visualizations.add({
 
     // Apply conditional formatting
     const chartOptions = {
-      chart: {
-        type: baseType,
-        backgroundColor: 'transparent',
-        spacing: [10, 10, 10, 10],
-        reflow: false  // Prevent auto-reflow that causes width issues
-      },
+      chart: { type: baseType, backgroundColor: 'transparent', spacing: [10, 10, 10, 10] },
       title: { text: null },
       credits: { enabled: false },
       xAxis: {
