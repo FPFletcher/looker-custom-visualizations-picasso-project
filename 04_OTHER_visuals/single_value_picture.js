@@ -14,13 +14,15 @@ looker.plugins.visualizations.add({
       label: "Background Color",
       default: "#5C6BC0",
       display: "color",
-      section: "Plot"
+      section: "Plot",
+      order: 1
     },
     background_image_url: {
       type: "string",
       label: "Background Image URL (optional)",
       placeholder: "https://example.com/background.jpg",
-      section: "Plot"
+      section: "Plot",
+      order: 2
     },
     background_image_opacity: {
       type: "number",
@@ -30,66 +32,30 @@ looker.plugins.visualizations.add({
       min: 0,
       max: 1,
       step: 0.1,
-      section: "Plot"
-    },
-    primary_x_position: {
-      type: "number",
-      label: "Primary Picture X Position",
-      default: 280,
-      section: "Plot"
-    },
-    primary_y_position: {
-      type: "number",
-      label: "Primary Picture Y Position",
-      default: 350,
-      section: "Plot"
-    },
-    secondary_x_position: {
-      type: "number",
-      label: "Secondary Picture X Position",
-      default: 520,
-      section: "Plot"
-    },
-    secondary_y_position: {
-      type: "number",
-      label: "Secondary Picture Y Position",
-      default: 250,
-      section: "Plot"
+      section: "Plot",
+      order: 3
     },
 
-    // Images subsection (under Plot)
+
+    // Primary Image subsection (under Plot)
 
     primary_image_url_00_divider: {
       type: "string",
-      label: "─────────────────────────────────────",
+      label: "─────────────────────────────",
       display: "divider",
       section: "Plot",
       default: "",
-      //order: 5
+      order: 11
     },
 
     primary_image_url: {
       type: "string",
       label: "Primary Picture Image URL",
       default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png",
-      section: "Plot"
-    },
-
-    secondary_image_url_00_divider: {
-      type: "string",
-      label: "─────────────────────────────────────",
-      display: "divider",
       section: "Plot",
-      default: "",
-      //order: 5
+      order: 12
     },
 
-    secondary_image_url: {
-      type: "string",
-      label: "Secondary Picture Image URL",
-      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png",
-      section: "Plot"
-    },
     primary_image_opacity: {
       type: "number",
       label: "Primary Picture Image Opacity",
@@ -98,7 +64,42 @@ looker.plugins.visualizations.add({
       min: 0,
       max: 1,
       step: 0.1,
-      section: "Plot"
+      section: "Plot",
+      order: 13
+    },
+
+    primary_x_position: {
+      type: "number",
+      label: "Primary Picture X Position",
+      default: 280,
+      section: "Plot",
+      order: 14
+    },
+    primary_y_position: {
+      type: "number",
+      label: "Primary Picture Y Position",
+      default: 350,
+      section: "Plot",
+      order: 15
+    },
+
+    // Secondary Image subsection (under Plot)
+
+    secondary_image_url_00_divider: {
+      type: "string",
+      label: "─────────────────────────────",
+      display: "divider",
+      section: "Plot",
+      default: "",
+      order:21
+    },
+
+    secondary_image_url: {
+      type: "string",
+      label: "Secondary Picture Image URL",
+      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png",
+      section: "Plot",
+      order:22
     },
     secondary_image_opacity: {
       type: "number",
@@ -108,7 +109,22 @@ looker.plugins.visualizations.add({
       min: 0,
       max: 1,
       step: 0.1,
-      section: "Plot"
+      section: "Plot",
+      order:23
+    },
+    secondary_x_position: {
+      type: "number",
+      label: "Secondary Picture X Position",
+      default: 520,
+      section: "Plot",
+      order:24
+    },
+    secondary_y_position: {
+      type: "number",
+      label: "Secondary Picture Y Position",
+      default: 250,
+      section: "Plot",
+      order:25
     },
 
     // ========== FONT SECTION ==========
