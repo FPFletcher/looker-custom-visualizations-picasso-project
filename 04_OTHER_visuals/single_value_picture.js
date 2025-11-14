@@ -578,14 +578,48 @@ looker.plugins.visualizations.add({
       svg.appendChild(percentageText);
     }
 
-    // Secondary value text
+    // Secondary value text (with drill functionality)
     const secondaryValueText = document.createElementNS(svgNS, 'text');
     secondaryValueText.setAttribute('x', secondaryX);
     secondaryValueText.setAttribute('y', secondaryY - 5);
     secondaryValueText.setAttribute('class', 'drop-value');
     secondaryValueText.setAttribute('fill', config.secondary_text_color || '#E53935');
     secondaryValueText.setAttribute('font-size', config.font_size_secondary_value || '44');
+    secondaryValueText.setAttribute('cursor', 'pointer');
     secondaryValueText.textContent = secondaryValue;
+
+    // ADD DRILL FUNCTIONALITY - Get secondary measure field name
+    const measures = data[0] ? Object.keys(data[0]).filter(key =>
+      data[0][key] && typeof data[0][key].value === 'number'
+    ) : [];
+    const secondaryField = measures[1]; // Second measure
+
+    const secondaryMeasureLinks = data && data[0] && secondaryField && data[0][secondaryField]
+      ? (data[0][secondaryField].links || [])
+      : [];
+
+    console.log('Secondary field:', secondaryField);
+    console.log('Secondary measure links:', secondaryMeasureLinks);
+
+    if (secondaryMeasureLinks.length > 0) {
+      secondaryValueText.addEventListener('click', (e) => {
+        console.log('Secondary value clicked - opening drill menu');
+        if (LookerCharts && LookerCharts.Utils) {
+          try {
+            LookerCharts.Utils.openDrillMenu({
+              links: secondaryMeasureLinks,
+              event: e
+            });
+            console.log('✓ Drill menu opened');
+          } catch (error) {
+            console.error('✗ Error opening drill menu:', error);
+          }
+        }
+      });
+    } else {
+      console.log('✗ No drill links available for secondary value');
+    }
+
     svg.appendChild(secondaryValueText);
 
     // Secondary label text
