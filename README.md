@@ -2,14 +2,14 @@
 
 # Introduction
 
-**The objective of this repository is to provide the combined Javascript code of custom visualizations** to improve Looker's 40-visual portfolio available natively or within its marketplace.
+**The objective of this repository is to provide the combined Javascript code of custom visualizations** to improve Looker's 40-visual native portfolio/ marketplace.
 
 For context, the end goal is to enable any Looker customers to benefit from most of **the visual capabilities of Studio/ PowerBI/ Tableau or any other BI providers directly within Looker** by leveraging its extensive API endpoints (more info [here](https://github.com/looker-open-source/custom_visualizations_v2/blob/master/docs/api_reference.md)) with a list of production ready visualizations which can be imported within a few clicks!! 💎  
 
 In terms of process used, a detailed guide can be found in our community platform [here](https://discuss.google.dev/t/create-a-custom-visualization-without-development-skills-using-generative-ai/163652).
 
 **To help us do better,**  
-- _[Fill this form](https://docs.google.com/forms/d/1JL2mMq-hGUeVc_rmASJu6MCviJQ-F8ToU_x84jI29Xc/edit?resourcekey=0-MNibdyKXv4NcHX3w3N6e4A)_ to let the Google team know if you have a **true need for a visual you can't find** in this repository or in our native offering.  
+- _[Fill this form](https://docs.google.com/forms/d/1JL2mMq-hGUeVc_rmASJu6MCviJQ-F8ToU_x84jI29Xc/edit?resourcekey=0-MNibdyKXv4NcHX3w3N6e4A)_ to let the Google team know if you have a **true need for a visual you can't find** in this repository or in our Looker native portfolio/ marketplace..  
 - _[Fill this form](https://docs.google.com/forms/d/1JL2mMq-hGUeVc_rmASJu6MCviJQ-F8ToU_x84jI29Xc/edit?resourcekey=0-MNibdyKXv4NcHX3w3N6e4A)_ to confirm that this project is useful to you and your team so we can gather more internal resources to work on it.
 
 ---
