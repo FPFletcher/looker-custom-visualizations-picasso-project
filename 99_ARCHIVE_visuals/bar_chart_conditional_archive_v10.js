@@ -722,20 +722,16 @@ looker.plugins.visualizations.add({
           const rawValues = values.map(v => v.y);
           const colors = this.getColors(rawValues, config, baseColor);  // PASS baseColor
 
-          const seriesName = customLabels && customLabels[index] ? customLabels[index] : queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label;
-
           seriesData.push({
-            name: seriesName,
+            name: customLabels && customLabels[index] ? customLabels[index] : queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label,
             data: values.map((v, i) => ({ ...v, color: colors[i] })),
             // DON'T set a series-level color when using conditional formatting
             showInLegend: true
           });
         } else {
           // No conditional formatting - use normal series color
-          const seriesName = customLabels && customLabels[index] ? customLabels[index] : queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label;
-
           seriesData.push({
-            name: seriesName,
+            name: customLabels && customLabels[index] ? customLabels[index] : queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label,
             data: values,
             color: baseColor,
             showInLegend: true
@@ -791,19 +787,6 @@ looker.plugins.visualizations.add({
 
     // Build legend items for rules
     const ruleLegendItems = [];
-
-    // Add legend items for each enabled rule with a legend label
-    if (config.conditional_formatting_enabled) {
-      for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
-        if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_legend_label`] && config[`rule${ruleNum}_legend_label`].trim() !== '') {
-          ruleLegendItems.push({
-            name: config[`rule${ruleNum}_legend_label`],
-            color: config[`rule${ruleNum}_color`] || '#EA4335'
-          });
-        }
-      }
-    }
-
     // Apply conditional formatting
     if (config.conditional_formatting_enabled) {
   const applyTo = config.conditional_formatting_apply_to || 'first';
