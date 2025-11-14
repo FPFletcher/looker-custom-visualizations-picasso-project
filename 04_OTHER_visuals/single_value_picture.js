@@ -1,12 +1,12 @@
 /**
- * Water Drop Visualization for Looker
+ * Water Picture Visualization for Looker
  * Combined JavaScript file with embedded HTML and CSS
- * Displays two values in water drop images with a percentage indicator
+ * Displays two values in water Picture images with a percentage indicator
  */
 
 looker.plugins.visualizations.add({
-  id: "water_drop_viz",
-  label: "Water Drop Visualization",
+  id: "single_value_picture_background",
+  label: "Single Value (Picture)",
   options: {
     // ========== PLOT SECTION ==========
     background_color: {
@@ -34,25 +34,25 @@ looker.plugins.visualizations.add({
     },
     primary_x_position: {
       type: "number",
-      label: "Primary Drop X Position",
+      label: "Primary Picture X Position",
       default: 280,
       section: "Plot"
     },
     primary_y_position: {
       type: "number",
-      label: "Primary Drop Y Position",
+      label: "Primary Picture Y Position",
       default: 350,
       section: "Plot"
     },
     secondary_x_position: {
       type: "number",
-      label: "Secondary Drop X Position",
+      label: "Secondary Picture X Position",
       default: 520,
       section: "Plot"
     },
     secondary_y_position: {
       type: "number",
-      label: "Secondary Drop Y Position",
+      label: "Secondary Picture Y Position",
       default: 250,
       section: "Plot"
     },
@@ -60,19 +60,19 @@ looker.plugins.visualizations.add({
     // Images subsection (under Plot)
     primary_image_url: {
       type: "string",
-      label: "Primary Drop Image URL",
-      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png",
+      label: "Primary Picture Image URL",
+      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png",
       section: "Plot"
     },
     secondary_image_url: {
       type: "string",
-      label: "Secondary Drop Image URL",
-      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png",
+      label: "Secondary Picture Image URL",
+      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png",
       section: "Plot"
     },
     primary_image_opacity: {
       type: "number",
-      label: "Primary Drop Image Opacity",
+      label: "Primary Picture Image Opacity",
       default: 1.0,
       display: "range",
       min: 0,
@@ -82,7 +82,7 @@ looker.plugins.visualizations.add({
     },
     secondary_image_opacity: {
       type: "number",
-      label: "Secondary Drop Image Opacity",
+      label: "Secondary Picture Image Opacity",
       default: 0.9,
       display: "range",
       min: 0,
@@ -126,7 +126,7 @@ looker.plugins.visualizations.add({
     // ========== PRIMARY SECTION ==========
     primary_label: {
       type: "string",
-      label: "Primary Drop Label",
+      label: "Primary Picture Label",
       default: "",
       section: "Primary"
     },
@@ -137,9 +137,9 @@ looker.plugins.visualizations.add({
       display: "color",
       section: "Primary"
     },
-    primary_drop_size: {
+    primary_Picture_size: {
       type: "number",
-      label: "Primary Drop Size",
+      label: "Primary Picture Size",
       default: 240,
       section: "Primary"
     },
@@ -147,7 +147,7 @@ looker.plugins.visualizations.add({
     // ========== SECONDARY SECTION ==========
     secondary_label: {
       type: "string",
-      label: "Secondary Drop Label",
+      label: "Secondary Picture Label",
       default: "",
       section: "Secondary"
     },
@@ -158,9 +158,9 @@ looker.plugins.visualizations.add({
       display: "color",
       section: "Secondary"
     },
-    secondary_drop_size: {
+    secondary_Picture_size: {
       type: "number",
-      label: "Secondary Drop Size",
+      label: "Secondary Picture Size",
       default: 190,
       section: "Secondary"
     },
@@ -206,7 +206,7 @@ looker.plugins.visualizations.add({
     // Inject CSS styles
     const style = document.createElement('style');
     style.innerHTML = `
-      .water-drop-container {
+      .water-Picture-container {
         width: 100%;
         height: 100%;
         display: flex;
@@ -220,7 +220,7 @@ looker.plugins.visualizations.add({
         background-repeat: no-repeat;
       }
 
-      .water-drop-svg {
+      .water-Picture-svg {
         width: 100%;
         height: 100%;
         max-width: 800px;
@@ -238,7 +238,7 @@ looker.plugins.visualizations.add({
         z-index: 0;
       }
 
-      .drop-value {
+      .Picture-value {
         font-weight: 700;
         text-anchor: middle;
         dominant-baseline: middle;
@@ -246,7 +246,7 @@ looker.plugins.visualizations.add({
         text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.15);
       }
 
-      .drop-label {
+      .Picture-label {
         font-weight: 400;
         text-anchor: middle;
         dominant-baseline: middle;
@@ -262,13 +262,13 @@ looker.plugins.visualizations.add({
         text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
       }
 
-      .water-drop-image {
-        filter: drop-shadow(0px 4px 12px rgba(0, 0, 0, 0.25));
+      .water-Picture-image {
+        filter: Picture-shadow(0px 4px 12px rgba(0, 0, 0, 0.25));
         transition: all 0.3s ease;
       }
 
-      .water-drop-image:hover {
-        filter: drop-shadow(0px 6px 16px rgba(0, 0, 0, 0.35));
+      .water-Picture-image:hover {
+        filter: Picture-shadow(0px 6px 16px rgba(0, 0, 0, 0.35));
       }
 
       .error-message {
@@ -293,28 +293,28 @@ looker.plugins.visualizations.add({
         }
       }
 
-      .water-drop-image {
+      .water-Picture-image {
         animation: fadeIn 0.5s ease-out;
       }
     `;
 
     // Append style to document head
-    if (!document.getElementById('water-drop-viz-styles')) {
-      style.id = 'water-drop-viz-styles';
+    if (!document.getElementById('water-Picture-viz-styles')) {
+      style.id = 'water-Picture-viz-styles';
       document.head.appendChild(style);
     }
 
     // Create HTML structure
     element.innerHTML = `
-      <div class="water-drop-container" id="water-drop-container-${Date.now()}">
-        <svg class="water-drop-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
+      <div class="water-Picture-container" id="water-Picture-container-${Date.now()}">
+        <svg class="water-Picture-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
         </svg>
       </div>
     `;
 
     // Store references
-    this._container = element.querySelector('.water-drop-container');
-    this._svg = element.querySelector('.water-drop-svg');
+    this._container = element.querySelector('.water-Picture-container');
+    this._svg = element.querySelector('.water-Picture-svg');
   },
 
   /**
@@ -391,14 +391,14 @@ looker.plugins.visualizations.add({
     const secondaryLabel = config.secondary_label || measures[1].label_short || measures[1].label || "Secondary Value";
 
     // Debug logging (will appear in browser console)
-    console.log('Water Drop Debug Info:');
+    console.log('Water Picture Debug Info:');
     console.log('Primary Value:', primaryValue, '→', primaryFormatted);
     console.log('Secondary Value:', secondaryValue, '→', secondaryFormatted);
     console.log('Percentage Value:', percentageValue, '→', percentageFormatted);
     console.log('Calculation Method:', percentageCalc);
 
     // Draw visualization
-    this.drawWaterDrops(
+    this.drawWaterPictures(
       primaryFormatted,
       secondaryFormatted,
       percentageFormatted,
@@ -465,9 +465,9 @@ looker.plugins.visualizations.add({
   },
 
   /**
-   * Draw the water drop images and text
+   * Draw the water Picture images and text
    */
-  drawWaterDrops: function(primaryValue, secondaryValue, percentage, primaryLabel, secondaryLabel, config, data, primaryField) {
+  drawWaterPictures: function(primaryValue, secondaryValue, percentage, primaryLabel, secondaryLabel, config, data, primaryField) {
     const svg = this._svg;
     const svgNS = "http://www.w3.org/2000/svg";
 
@@ -477,11 +477,11 @@ looker.plugins.visualizations.add({
     const secondaryX = config.secondary_x_position || 520;
     const secondaryY = config.secondary_y_position || 250;
 
-    const primarySize = config.primary_drop_size || 240;
-    const secondarySize = config.secondary_drop_size || 190;
+    const primarySize = config.primary_Picture_size || 240;
+    const secondarySize = config.secondary_Picture_size || 190;
 
-    const primaryImageUrl = config.primary_image_url || "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png";
-    const secondaryImageUrl = config.secondary_image_url || "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png";
+    const primaryImageUrl = config.primary_image_url || "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png";
+    const secondaryImageUrl = config.secondary_image_url || "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png";
 
     const primaryOpacity = config.primary_image_opacity !== undefined ? config.primary_image_opacity : 1.0;
     const secondaryOpacity = config.secondary_image_opacity !== undefined ? config.secondary_image_opacity : 0.9;
@@ -490,14 +490,14 @@ looker.plugins.visualizations.add({
     const defs = document.createElementNS(svgNS, 'defs');
     svg.appendChild(defs);
 
-    // PRIMARY DROP IMAGE (larger, bottom-left)
+    // PRIMARY Picture IMAGE (larger, bottom-left)
     const primaryImage = document.createElementNS(svgNS, 'image');
     primaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', primaryImageUrl);
     primaryImage.setAttribute('x', primaryX - primarySize / 2);
     primaryImage.setAttribute('y', primaryY - primarySize / 2);
     primaryImage.setAttribute('width', primarySize);
     primaryImage.setAttribute('height', primarySize);
-    primaryImage.setAttribute('class', 'water-drop-image');
+    primaryImage.setAttribute('class', 'water-Picture-image');
     primaryImage.setAttribute('opacity', primaryOpacity);
     primaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     primaryImage.style.pointerEvents = 'none';
@@ -507,7 +507,7 @@ looker.plugins.visualizations.add({
     const primaryValueText = document.createElementNS(svgNS, 'text');
     primaryValueText.setAttribute('x', primaryX);
     primaryValueText.setAttribute('y', primaryY - 10);
-    primaryValueText.setAttribute('class', 'drop-value');
+    primaryValueText.setAttribute('class', 'Picture-value');
     primaryValueText.setAttribute('fill', config.primary_text_color || '#FFFFFF');
     primaryValueText.setAttribute('font-size', config.font_size_primary_value || '52');
     primaryValueText.setAttribute('cursor', 'pointer');
@@ -546,27 +546,27 @@ looker.plugins.visualizations.add({
     const primaryLabelText = document.createElementNS(svgNS, 'text');
     primaryLabelText.setAttribute('x', primaryX);
     primaryLabelText.setAttribute('y', primaryY + 50);
-    primaryLabelText.setAttribute('class', 'drop-label');
+    primaryLabelText.setAttribute('class', 'Picture-label');
     primaryLabelText.setAttribute('fill', config.primary_text_color || '#FFFFFF');
     primaryLabelText.setAttribute('font-size', config.font_size_primary_label || '18');
     primaryLabelText.setAttribute('opacity', '0.95');
     primaryLabelText.textContent = primaryLabel;
     svg.appendChild(primaryLabelText);
 
-    // SECONDARY DROP IMAGE (smaller, top-right)
+    // SECONDARY Picture IMAGE (smaller, top-right)
     const secondaryImage = document.createElementNS(svgNS, 'image');
     secondaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', secondaryImageUrl);
     secondaryImage.setAttribute('x', secondaryX - secondarySize / 2);
     secondaryImage.setAttribute('y', secondaryY - secondarySize / 2);
     secondaryImage.setAttribute('width', secondarySize);
     secondaryImage.setAttribute('height', secondarySize);
-    secondaryImage.setAttribute('class', 'water-drop-image');
+    secondaryImage.setAttribute('class', 'water-Picture-image');
     secondaryImage.setAttribute('opacity', secondaryOpacity);
     secondaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     secondaryImage.style.pointerEvents = 'none';
     svg.appendChild(secondaryImage);
 
-    // Percentage indicator (at top of secondary drop)
+    // Percentage indicator (at top of secondary Picture)
     if (config.show_percentage !== false) {
       const percentageText = document.createElementNS(svgNS, 'text');
       percentageText.setAttribute('x', secondaryX);
@@ -582,7 +582,7 @@ looker.plugins.visualizations.add({
     const secondaryValueText = document.createElementNS(svgNS, 'text');
     secondaryValueText.setAttribute('x', secondaryX);
     secondaryValueText.setAttribute('y', secondaryY - 5);
-    secondaryValueText.setAttribute('class', 'drop-value');
+    secondaryValueText.setAttribute('class', 'Picture-value');
     secondaryValueText.setAttribute('fill', config.secondary_text_color || '#E53935');
     secondaryValueText.setAttribute('font-size', config.font_size_secondary_value || '44');
     secondaryValueText.setAttribute('cursor', 'pointer');
@@ -626,7 +626,7 @@ looker.plugins.visualizations.add({
     const secondaryLabelText = document.createElementNS(svgNS, 'text');
     secondaryLabelText.setAttribute('x', secondaryX);
     secondaryLabelText.setAttribute('y', secondaryY + 45);
-    secondaryLabelText.setAttribute('class', 'drop-label');
+    secondaryLabelText.setAttribute('class', 'Picture-label');
     secondaryLabelText.setAttribute('fill', config.secondary_text_color || '#666666');
     secondaryLabelText.setAttribute('font-size', config.font_size_secondary_label || '16');
     secondaryLabelText.setAttribute('opacity', '0.9');
