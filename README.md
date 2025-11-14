@@ -90,7 +90,8 @@ visualization: {
 # }
 ```
 
-**To disable a visualization:** Comment out its entire block using `#` at the start of each line.
+**To disable a visualization:** Comment out its entire block using `#` at the start of each line.  
+CTRL + / should be the keyboard shortcut to comment out a block of code.
 
 ---
 
