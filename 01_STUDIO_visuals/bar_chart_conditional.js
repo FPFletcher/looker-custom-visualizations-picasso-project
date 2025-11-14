@@ -923,58 +923,91 @@ looker.plugins.visualizations.add({
     if (config.conditional_formatting_enabled && config.conditional_formatting_apply_to === 'stacked') {
       console.log('[STACKED MODE] Applying conditional formatting based on stacked totals');
 
-      // For each category position, check if any rule matches the stacked total
-      // If yes, apply that color to ALL series at that position
-      // If no, DON'T apply any color (let series keep their original colors)
-
-      stackedTotals.forEach((total, categoryIndex) => {
-        let matchedColor = null;
-
-        // Check each rule
-        for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
-          if (!config[`rule${ruleNum}_enabled`]) continue;
-
-          const ruleType = config[`rule${ruleNum}_type`];
-          const value1 = parseFloat(config[`rule${ruleNum}_value`]) || 0;
-          const value2 = parseFloat(config[`rule${ruleNum}_value2`]) || 0;
-          const color1 = config[`rule${ruleNum}_color`] || '#EA4335';
-
-          // Check if this rule matches
-          let matches = false;
-          if (ruleType === 'gt') matches = total > value1;
-          else if (ruleType === 'lt') matches = total < value1;
-          else if (ruleType === 'eq') matches = total === value1;
-          else if (ruleType === 'between') matches = total >= value1 && total <= value2;
-          else if (ruleType === 'topn' || ruleType === 'bottomn') {
-            const n = Math.max(1, Math.floor(value1 || 5));
-            const sorted = [...stackedTotals].sort((a, b) => ruleType === 'topn' ? b - a : a - b);
-            const threshold = sorted[Math.min(n - 1, sorted.length - 1)];
-            matches = ruleType === 'topn' ? total >= threshold : total <= threshold;
-          }
-
-          if (matches) {
-            matchedColor = color1;
-            console.log(`[STACKED MODE] Category ${categoryIndex}: total=${total} matched rule ${ruleNum}, color=${matchedColor}`);
-            break; // Use first matching rule
-          }
+      // Check if any rule is a gradient type
+      let gradientRule = null;
+      for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
+        if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_type`] === 'gradient') {
+          gradientRule = ruleNum;
+          break;
         }
+      }
 
-        // Only apply color if a rule matched
-        if (matchedColor) {
+      // If gradient rule exists, calculate colors for all values at once
+      if (gradientRule) {
+        console.log(`[STACKED MODE] Using gradient rule ${gradientRule}`);
+        const min = Math.min(...stackedTotals);
+        const max = Math.max(...stackedTotals);
+        const startColor = config[`rule${gradientRule}_color`] || '#F1F8E9';
+        const endColor = config[`rule${gradientRule}_color2`] || '#33691E';
+
+        stackedTotals.forEach((total, categoryIndex) => {
+          const ratio = (max === min) ? 0.5 : (total - min) / (max - min);
+          const gradientColor = this.interpolateColor(startColor, endColor, ratio);
+          console.log(`[STACKED MODE] Category ${categoryIndex}: total=${total}, ratio=${ratio.toFixed(2)}, color=${gradientColor}`);
+
+          // Apply gradient color to all series at this position
           seriesData.forEach(series => {
             if (series.data[categoryIndex]) {
               const point = series.data[categoryIndex];
               if (typeof point === 'object') {
-                series.data[categoryIndex] = { ...point, color: matchedColor };
+                series.data[categoryIndex] = { ...point, color: gradientColor };
               } else {
-                series.data[categoryIndex] = { y: point, color: matchedColor };
+                series.data[categoryIndex] = { y: point, color: gradientColor };
               }
             }
           });
-        } else {
-          console.log(`[STACKED MODE] Category ${categoryIndex}: total=${total} - no rule matched, preserving series colors`);
-        }
-      });
+        });
+      } else {
+        // For non-gradient rules (discrete rules like Top N, Greater Than, etc.)
+        stackedTotals.forEach((total, categoryIndex) => {
+          let matchedColor = null;
+
+          // Check each rule
+          for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
+            if (!config[`rule${ruleNum}_enabled`]) continue;
+
+            const ruleType = config[`rule${ruleNum}_type`];
+            const value1 = parseFloat(config[`rule${ruleNum}_value`]) || 0;
+            const value2 = parseFloat(config[`rule${ruleNum}_value2`]) || 0;
+            const color1 = config[`rule${ruleNum}_color`] || '#EA4335';
+
+            // Check if this rule matches
+            let matches = false;
+            if (ruleType === 'gt') matches = total > value1;
+            else if (ruleType === 'lt') matches = total < value1;
+            else if (ruleType === 'eq') matches = total === value1;
+            else if (ruleType === 'between') matches = total >= value1 && total <= value2;
+            else if (ruleType === 'topn' || ruleType === 'bottomn') {
+              const n = Math.max(1, Math.floor(value1 || 5));
+              const sorted = [...stackedTotals].sort((a, b) => ruleType === 'topn' ? b - a : a - b);
+              const threshold = sorted[Math.min(n - 1, sorted.length - 1)];
+              matches = ruleType === 'topn' ? total >= threshold : total <= threshold;
+            }
+
+            if (matches) {
+              matchedColor = color1;
+              console.log(`[STACKED MODE] Category ${categoryIndex}: total=${total} matched rule ${ruleNum}, color=${matchedColor}`);
+              break; // Use first matching rule
+            }
+          }
+
+          // Only apply color if a rule matched
+          if (matchedColor) {
+            seriesData.forEach(series => {
+              if (series.data[categoryIndex]) {
+                const point = series.data[categoryIndex];
+                if (typeof point === 'object') {
+                  series.data[categoryIndex] = { ...point, color: matchedColor };
+                } else {
+                  series.data[categoryIndex] = { y: point, color: matchedColor };
+                }
+              }
+            });
+          } else {
+            console.log(`[STACKED MODE] Category ${categoryIndex}: total=${total} - no rule matched, preserving series colors`);
+          }
+        });
+      }
     }
 
     // Calculate reference value
