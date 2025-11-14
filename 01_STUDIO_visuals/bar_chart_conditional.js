@@ -814,14 +814,22 @@ looker.plugins.visualizations.add({
 
           const baseColor = customColors ? customColors[seriesIndex % customColors.length] : palette[seriesIndex % palette.length];
 
+          console.log(`=== PIVOT Series ${seriesIndex}: ${defaultName} ===`);
+          console.log(`  pivotIndex: ${pivotIndex}, measureIndex: ${measureIndex}`);
+          console.log(`  baseColor: ${baseColor}`);
+          console.log(`  palette:`, palette);
+          console.log(`  customColors:`, customColors);
+
           // Apply conditional formatting to pivots (but not in stacked mode - that's done later)
           const shouldApplyFormatting = config.conditional_formatting_enabled &&
                                         config.conditional_formatting_apply_to !== 'stacked' &&
                                         (config.conditional_formatting_apply_to === 'all' || seriesIndex === 0);
 
+          console.log(`  shouldApplyFormatting: ${shouldApplyFormatting}`);
+
           if (shouldApplyFormatting) {
             const rawValues = values.map(v => v.y);
-            const colors = this.getColors(rawValues, config, baseColor);
+            const colors = this.getColors(rawValues, config, baseColor, `pivot-series-${seriesIndex}`);
 
             seriesData.push({
               name: seriesName,
@@ -876,7 +884,7 @@ looker.plugins.visualizations.add({
         if (shouldApplyFormatting) {
           // Apply conditional formatting
           const rawValues = values.map(v => v.y);
-          const colors = this.getColors(rawValues, config, baseColor);  // PASS baseColor
+          const colors = this.getColors(rawValues, config, baseColor, `series-${index}-${measureName}`);  // PASS baseColor
 
           console.log(`  First 5 raw values:`, rawValues.slice(0, 5));
           console.log(`  First 5 colors returned:`, colors.slice(0, 5));
@@ -913,18 +921,59 @@ looker.plugins.visualizations.add({
 
     // Apply conditional formatting for stacked measures mode
     if (config.conditional_formatting_enabled && config.conditional_formatting_apply_to === 'stacked') {
-      // Calculate colors based on stacked totals
-      const stackedColors = this.getColors(stackedTotals, config, palette[0]);
+      console.log('[STACKED MODE] Applying conditional formatting based on stacked totals');
 
-      // Apply the same color to ALL series at each category position
-      seriesData.forEach(series => {
-        series.data = series.data.map((point, i) => {
-          if (typeof point === 'object') {
-            return { ...point, color: stackedColors[i] };
-          } else {
-            return { y: point, color: stackedColors[i] };
+      // For each category position, check if any rule matches the stacked total
+      // If yes, apply that color to ALL series at that position
+      // If no, DON'T apply any color (let series keep their original colors)
+
+      stackedTotals.forEach((total, categoryIndex) => {
+        let matchedColor = null;
+
+        // Check each rule
+        for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
+          if (!config[`rule${ruleNum}_enabled`]) continue;
+
+          const ruleType = config[`rule${ruleNum}_type`];
+          const value1 = parseFloat(config[`rule${ruleNum}_value`]) || 0;
+          const value2 = parseFloat(config[`rule${ruleNum}_value2`]) || 0;
+          const color1 = config[`rule${ruleNum}_color`] || '#EA4335';
+
+          // Check if this rule matches
+          let matches = false;
+          if (ruleType === 'gt') matches = total > value1;
+          else if (ruleType === 'lt') matches = total < value1;
+          else if (ruleType === 'eq') matches = total === value1;
+          else if (ruleType === 'between') matches = total >= value1 && total <= value2;
+          else if (ruleType === 'topn' || ruleType === 'bottomn') {
+            const n = Math.max(1, Math.floor(value1 || 5));
+            const sorted = [...stackedTotals].sort((a, b) => ruleType === 'topn' ? b - a : a - b);
+            const threshold = sorted[Math.min(n - 1, sorted.length - 1)];
+            matches = ruleType === 'topn' ? total >= threshold : total <= threshold;
           }
-        });
+
+          if (matches) {
+            matchedColor = color1;
+            console.log(`[STACKED MODE] Category ${categoryIndex}: total=${total} matched rule ${ruleNum}, color=${matchedColor}`);
+            break; // Use first matching rule
+          }
+        }
+
+        // Only apply color if a rule matched
+        if (matchedColor) {
+          seriesData.forEach(series => {
+            if (series.data[categoryIndex]) {
+              const point = series.data[categoryIndex];
+              if (typeof point === 'object') {
+                series.data[categoryIndex] = { ...point, color: matchedColor };
+              } else {
+                series.data[categoryIndex] = { y: point, color: matchedColor };
+              }
+            }
+          });
+        } else {
+          console.log(`[STACKED MODE] Category ${categoryIndex}: total=${total} - no rule matched, preserving series colors`);
+        }
       });
     }
 
@@ -1395,8 +1444,8 @@ looker.plugins.visualizations.add({
   },
 
 
-  getColors: function(values, config, baseColor) {
-  console.log(`[getColors] Called with baseColor: ${baseColor}`);
+  getColors: function(values, config, baseColor, callerInfo = 'unknown') {
+  console.log(`[getColors] Called from: ${callerInfo}, baseColor: ${baseColor}`);
   const palettes = {
     google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC'],
     looker: ['#7FCDAE', '#7ED09C', '#7DD389', '#85D67C', '#9AD97B', '#B1DB7A'],
