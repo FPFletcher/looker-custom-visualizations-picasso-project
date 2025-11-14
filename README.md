@@ -56,7 +56,7 @@ In terms of process used, a detailed guide can be found in our community platfor
 3. **Configure `manifest.lkml`**
    - Edit the manifest to **disable visualizations as needed** by commenting them out using `#` (shortcut: `Ctrl + /`)
 
-4. **Network Requirements**
+4. **Network Requirements** *(Optional)*
    
    > <details>
    > <summary>⚠️ Only a few visualizations have external dependencies which may require <b>external libraries to be whitelisted</b> <i>(private IP, self-hosted, and restricted environments)</i></summary>
@@ -71,8 +71,7 @@ In terms of process used, a detailed guide can be found in our community platfor
    > </details>
 
 5. **Deploy and Use**
-   - Commit changes in Looker's IDE
-   - Deploy to production
+   - Commit changes in Looker's IDE and deploy to production
    - Access visualizations via the visualization picker (chart icon) in any Explore or Dashboard
    
 ---
