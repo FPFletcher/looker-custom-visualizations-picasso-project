@@ -8,13 +8,13 @@ For context, the end goal is to enable any Looker customers to benefit from most
 
 In terms of process used, a detailed guide can be found in our community platform [here](https://discuss.google.dev/t/create-a-custom-visualization-without-development-skills-using-generative-ai/163652).
 
-**To help us do better,**  
-- _[Fill this form](https://forms.gle/5XfUnQsxpyVnBbBo8)_ to let the Google team know if you have a **true need for a visual you can't find** in this repository or in our Looker native portfolio/ marketplace..  
-- _[Fill this form](https://forms.gle/RNjQvsHpTsp9pUn38)_ to let the Google team know if **this project is particularly useful to you and your team** so we can gather more internal resources to work on it.
-
 ---
 
 # Set Up
+
+<details>
+<summary><b>⚙️ Complete Setup Guide (Click to expand)</b></summary>
+<br>
 
 ## Step 1: Fork or Clone the Repository
 
@@ -124,7 +124,8 @@ CTRL + / should be the keyboard shortcut to comment out a block of code.
    - Opening the visualization picker (chart icon)
    - Scrolling to find your custom visualizations
    - Selecting the desired visualization
-
+   
+</details>
 ---
 
 # 01. STUDIO Visuals
@@ -255,15 +256,19 @@ We welcome contributions! If you've built a custom visualization that could bene
 - Documentation of unique features and configuration options
 - Update to this README with your visualization details
 
+**📢 Have a visualization request?** [Fill this form](https://forms.gle/5XfUnQsxpyVnBbBo8) to let the Google team know if you have a **true need for a visual you can't find** in this repository or in our Looker native portfolio/marketplace.
+
 ---
 
 # Support
 
-For questions, issues, or feature requests:
-- 🐛 Open an issue on this GitHub repository
+**For questions, issues, or feature requests:**
+- 🐛 [Open an issue](https://github.com/FPFletcher/looker-custom-visualizations-picasso-project/issues) on this GitHub repository
 - 💬 Visit the [Looker Community](https://community.looker.com/)
 - 📚 Check the [Custom Visualizations API documentation](https://github.com/looker-open-source/custom_visualizations_v2/blob/master/docs/api_reference.md)
 - 📝 Review the [step-by-step guide](https://discuss.google.dev/t/create-a-custom-visualization-without-development-skills-using-generative-ai/163652) for creating custom visualizations
+
+**💡 Finding this project useful?** [Fill this form](https://forms.gle/RNjQvsHpTsp9pUn38) to let the Google team know **this project is particularly useful to you and your team** so we can gather more internal resources to work on it.
 
 ---
 
