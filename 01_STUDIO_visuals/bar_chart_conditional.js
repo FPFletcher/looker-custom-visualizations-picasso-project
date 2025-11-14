@@ -882,7 +882,7 @@ looker.plugins.visualizations.add({
           // No conditional formatting - use normal series color
           seriesData.push({
             name: seriesName,
-            data: values,
+            data: values.map(v => ({ y: v.y, drillLinks: v.drillLinks, categoryIndex: v.categoryIndex })),  // Don't carry over any color property
             color: baseColor,
             showInLegend: true
           });
