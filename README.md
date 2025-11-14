@@ -8,10 +8,9 @@ In terms of process used, a detailed guide can be found in our community platfor
 
 **To help us do better,**  
 - _[Fill this form](https://docs.google.com/forms/d/1JL2mMq-hGUeVc_rmASJu6MCviJQ-F8ToU_x84jI29Xc/edit?resourcekey=0-MNibdyKXv4NcHX3w3N6e4A)_ to let the Google team know if you have a **true need for a visual you can't find** in this repository or in our native offering.  
-- _[Fill this form](https://docs.google.com/forms/d/1JL2mMq-hGUeVc_rmASJu6MCviJQ-F8ToU_x84jI29Xc/edit?resourcekey=0-MNibdyKXv4NcHX3w3N6e4A)_ to confirm that this projet is useful to you and your team so we can gather more internal ressources to work on it.
-
-
-
+- _[Fill this form](https://docs.google.com/forms/d/1JL2mMq-hGUeVc_rmASJu6MCviJQ-F8ToU_x84jI29Xc/edit?resourcekey=0-MNibdyKXv4NcHX3w3N6e4A)_ to confirm that this projet is useful to you and your team so we can gather more internal ressources to work on it.  
+  
+  
 # 01. STUDIO Visuals
 
 ## Scorecard
