@@ -105,6 +105,14 @@ looker.plugins.visualizations.add({
       order: 12
     },
 
+    hide_legend_with_formatting: {
+      type: "boolean",
+      label: "Hide Series Legend (useful with gradients)",
+      default: false,
+      section: "Plot",
+      order: 12.5
+    },
+
     // Rule 1
     rule1_enabled: {
       type: "boolean",
@@ -1219,7 +1227,7 @@ looker.plugins.visualizations.add({
         line: { marker: { enabled: true, radius: 3 } }
       },
       legend: {
-        enabled: seriesData.length > 1 || ruleLegendItems.length > 0,
+        enabled: config.hide_legend_with_formatting ? false : (seriesData.length > 1 || ruleLegendItems.length > 0),
         align: 'center',
         verticalAlign: 'bottom'
       },
@@ -1549,49 +1557,53 @@ looker.plugins.visualizations.add({
   return values.map((val, index) => {
     if (typeof val !== 'number') return baseColor;
 
-    // RULE 1 - Highest Priority
+    // RULE 1 - Highest Priority (check discrete FIRST, then gradient)
     if (config.rule1_enabled) {
-      if (config.rule1_type === 'gradient') {
-        // If Rule 1 is gradient, calculate gradient color
-        const numericValues = values.filter(v => typeof v === 'number');
-        const min = Math.min(...numericValues);
-        const max = Math.max(...numericValues);
-        const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
-        return this.interpolateColor(config.rule1_color || '#F1F8E9', config.rule1_color2 || '#33691E', ratio);
-      } else if (checkDiscrete(val, 1, values)) {
-        // Rule 1 discrete match
+      if (config.rule1_type !== 'gradient' && checkDiscrete(val, 1, values)) {
+        // Rule 1 discrete match - highest priority
         return config.rule1_color;
       }
     }
 
-    // RULE 2 - Medium Priority (only if Rule 1 didn't match)
+    // RULE 2 - Medium Priority (check discrete FIRST, then gradient)
     if (config.rule2_enabled) {
-      if (config.rule2_type === 'gradient') {
-        // If Rule 2 is gradient, calculate gradient color
-        const numericValues = values.filter(v => typeof v === 'number');
-        const min = Math.min(...numericValues);
-        const max = Math.max(...numericValues);
-        const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
-        return this.interpolateColor(config.rule2_color || '#F1F8E9', config.rule2_color2 || '#33691E', ratio);
-      } else if (checkDiscrete(val, 2, values)) {
+      if (config.rule2_type !== 'gradient' && checkDiscrete(val, 2, values)) {
         // Rule 2 discrete match
         return config.rule2_color;
       }
     }
 
-    // RULE 3 - Lowest Priority (only if Rules 1 & 2 didn't match)
+    // RULE 3 - Check discrete before gradient
     if (config.rule3_enabled) {
-      if (config.rule3_type === 'gradient') {
-        // If Rule 3 is gradient, calculate gradient color
-        const numericValues = values.filter(v => typeof v === 'number');
-        const min = Math.min(...numericValues);
-        const max = Math.max(...numericValues);
-        const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
-        return this.interpolateColor(config.rule3_color || '#F1F8E9', config.rule3_color2 || '#33691E', ratio);
-      } else if (checkDiscrete(val, 3, values)) {
+      if (config.rule3_type !== 'gradient' && checkDiscrete(val, 3, values)) {
         // Rule 3 discrete match
         return config.rule3_color;
       }
+    }
+
+    // Now apply gradients in priority order (only if no discrete rule matched)
+    if (config.rule1_enabled && config.rule1_type === 'gradient') {
+      const numericValues = values.filter(v => typeof v === 'number');
+      const min = Math.min(...numericValues);
+      const max = Math.max(...numericValues);
+      const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
+      return this.interpolateColor(config.rule1_color || '#F1F8E9', config.rule1_color2 || '#33691E', ratio);
+    }
+
+    if (config.rule2_enabled && config.rule2_type === 'gradient') {
+      const numericValues = values.filter(v => typeof v === 'number');
+      const min = Math.min(...numericValues);
+      const max = Math.max(...numericValues);
+      const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
+      return this.interpolateColor(config.rule2_color || '#F1F8E9', config.rule2_color2 || '#33691E', ratio);
+    }
+
+    if (config.rule3_enabled && config.rule3_type === 'gradient') {
+      const numericValues = values.filter(v => typeof v === 'number');
+      const min = Math.min(...numericValues);
+      const max = Math.max(...numericValues);
+      const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
+      return this.interpolateColor(config.rule3_color || '#F1F8E9', config.rule3_color2 || '#33691E', ratio);
     }
 
     // No rule matched - use base series color
