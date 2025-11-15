@@ -390,6 +390,13 @@ looker.plugins.visualizations.add({
       section: "Series",
       order: 1
     },
+    reverse_colors: {
+      type: "boolean",
+      label: "Reverse Colors",
+      default: false,
+      section: "Series",
+      order: 1.5
+    },
     series_colors: {
       type: "string",
       label: "Custom Colors (comma-separated)",
@@ -1031,6 +1038,7 @@ looker.plugins.visualizations.add({
     };
 
     const palette = palettes[config.color_collection] || palettes.google;
+    const finalPalette = config.reverse_colors ? [...palette].reverse() : palette;
     const customColors = config.series_colors ? String(config.series_colors).split(',').map(c => c.trim()) : null;
 
     let seriesData = [];
@@ -1055,7 +1063,7 @@ looker.plugins.visualizations.add({
           console.log(`Pivot series ${seriesIndex}: measureName=${measureName}, defaultName=${defaultName}, seriesName=${seriesName}`);
 
           // Determine series base color
-          const baseColor = customColors ? customColors[seriesIndex % customColors.length] : palette[seriesIndex % palette.length];
+          const baseColor = customColors ? customColors[seriesIndex % customColors.length] : finalPalette[seriesIndex % finalPalette.length];
 
           // Conditional formatting logic for pivoted data (only first measure/pivot combo is currently supported for 'first')
           const shouldApplyFormatting = config.conditional_formatting_enabled &&
@@ -1098,7 +1106,7 @@ looker.plugins.visualizations.add({
         const shouldApplyFormatting = config.conditional_formatting_enabled &&
                                       (config.conditional_formatting_apply_to === 'all' || config.conditional_formatting_apply_to === 'first' && index === 0);
 
-        const baseColor = customColors ? customColors[index % customColors.length] : palette[index % palette.length];
+        const baseColor = customColors ? customColors[index % customColors.length] : finalPalette[index % finalPalette.length];
 
         const measureName = measure;
         const defaultName = queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label;
@@ -1166,7 +1174,7 @@ looker.plugins.visualizations.add({
 
             // If this is *not* the first measure, and formatting is set to 'first',
             // we strip explicit point colors and rely on the base series color.
-            const baseColor = customColors ? customColors[index % customColors.length] : palette[index % palette.length];
+            const baseColor = customColors ? customColors[index % customColors.length] : finalPalette[index % finalPalette.length];
 
             return {
                 ...series,
