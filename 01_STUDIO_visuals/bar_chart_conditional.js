@@ -794,21 +794,18 @@ looker.plugins.visualizations.add({
 
     // Helper function to format values using LookML formats or custom
     const formatValue = (value, formatType, customFormat, field) => {
-      if (value === null || value === undefined || isNaN(value)) return '';
+      if (value === null || value === undefined) return '';
 
-      // AUTO: Use LookML's native format from the field
-      if (formatType === 'auto' && field && field.value_format) {
-        return LookerCharts.Utils.textForCell({ value: value, rendered: field.value_format });
-      }
-
-      // CUSTOM: User-provided format string
-      if (formatType === 'custom' && customFormat) {
-        // For dates
+      // PRIORITY 1: Custom format overrides everything
+      if (customFormat && customFormat.trim() !== '') {
+        // For dates - support strftime-style formats
         if (customFormat.includes('%')) {
           try {
             const date = new Date(value);
+            if (isNaN(date.getTime())) return String(value);
             return customFormat
               .replace(/%Y/g, date.getFullYear())
+              .replace(/%y/g, String(date.getFullYear()).slice(-2))
               .replace(/%m/g, String(date.getMonth() + 1).padStart(2, '0'))
               .replace(/%d/g, String(date.getDate()).padStart(2, '0'))
               .replace(/%b/g, date.toLocaleString('default', { month: 'short' }))
@@ -817,11 +814,26 @@ looker.plugins.visualizations.add({
             return String(value);
           }
         }
-        // For numbers - basic support
-        return String(value);
+        // For numbers - basic support (user provides literal format)
+        return customFormat.replace(/0+/g, value.toLocaleString());
       }
 
-      // Preset formats
+      if (isNaN(value)) return String(value);
+
+      // PRIORITY 2: AUTO uses LookML's native rendered value
+      if (formatType === 'auto' && field) {
+        // Try to get the rendered value from the field
+        try {
+          if (field.value_format) {
+            // Use Looker's built-in formatting
+            return LookerCharts.Utils.textForCell({ value: value, field: field });
+          }
+        } catch (e) {
+          // Fall through to default
+        }
+      }
+
+      // PRIORITY 3: Preset formats
       if (formatType === 'currency') return '$' + (value >= 1000 ? (value / 1000).toFixed(1) + 'K' : value.toFixed(0));
       if (formatType === 'percent') return (value * 100).toFixed(1) + '%';
       if (formatType === 'decimal1') return value.toFixed(1);
@@ -835,7 +847,7 @@ looker.plugins.visualizations.add({
       if (formatType === 'date_ym') return new Date(value).toISOString().slice(0, 7);
       if (formatType === 'date_y') return new Date(value).getFullYear();
 
-      // Auto fallback - smart number formatting
+      // PRIORITY 4: Auto fallback - smart number formatting
       if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
       if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
       if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
@@ -843,8 +855,10 @@ looker.plugins.visualizations.add({
     };
 
     const dimension = queryResponse.fields.dimensions[0].name;
+    const dimensionField = queryResponse.fields.dimensions[0];
     const categories = data.map(row => LookerCharts.Utils.textForCell(row[dimension]));
     const measures = queryResponse.fields.measures.map(m => m.name);
+    const measureFields = queryResponse.fields.measures;
     const hasPivot = queryResponse.fields.pivots && queryResponse.fields.pivots.length > 0;
 
     const palettes = {
@@ -1000,7 +1014,16 @@ looker.plugins.visualizations.add({
         categories: categories,
         type: 'category',
         title: { text: config.x_axis_label || null },
-        labels: { rotation: isBar ? 0 : (config.x_axis_label_rotation || -45) },
+        labels: {
+          rotation: isBar ? 0 : (config.x_axis_label_rotation || -45),
+          formatter: function() {
+            // For X axis, categories are already text so only apply custom format if provided
+            if (config.x_axis_value_format_custom && config.x_axis_value_format_custom.trim() !== '') {
+              return formatValue(this.value, 'custom', config.x_axis_value_format_custom, dimensionField);
+            }
+            return this.value;
+          }
+        },
         tickInterval: tickInterval,
         gridLineWidth: config.show_x_gridlines ? 1 : 0,
         tickmarkPlacement: 'on'
@@ -1010,6 +1033,11 @@ looker.plugins.visualizations.add({
         min: config.y_axis_min !== undefined ? config.y_axis_min : null,
         max: config.y_axis_max !== undefined ? config.y_axis_max : null,
         gridLineWidth: config.show_y_gridlines !== false ? 1 : 0,
+        labels: {
+          formatter: function() {
+            return formatValue(this.value, config.y_axis_value_format || 'auto', config.y_axis_value_format_custom, measureFields[0]);
+          }
+        },
         stackLabels: {
           enabled: config.show_total_labels === true && !!stackingMode,
           style: {
@@ -1019,18 +1047,9 @@ looker.plugins.visualizations.add({
           },
           formatter: function() {
             const num = this.total;
-            if (num === undefined || num === null || isNaN(num)) return '';
-
-            const format = config.value_format || 'auto';
-            if (format === 'currency') return '$' + (num >= 1000 ? (num / 1000).toFixed(1) + 'K' : num.toFixed(0));
-            if (format === 'percent') return (num * 100).toFixed(1) + '%';
-            if (format === 'decimal1') return num.toFixed(1);
-            if (format === 'decimal2') return num.toFixed(2);
-            if (format === 'number') return num.toLocaleString();
-            if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
-            if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
-            if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
-            return num.toLocaleString();
+            if (num === undefined || num === null) return '';
+            // Use first measure's field for formatting
+            return formatValue(num, config.value_format || 'auto', config.value_format_custom, measureFields[0]);
           }
         },
         plotLines: config.ref_line_enabled ? [{
@@ -1042,18 +1061,7 @@ looker.plugins.visualizations.add({
           label: {
             useHTML: true,
             text: (() => {
-              const num = refValue;
-              const format = config.value_format || 'auto';
-              let formatted = '';
-              if (format === 'currency') formatted = '$' + (num >= 1000 ? (num / 1000).toFixed(1) + 'K' : num.toFixed(0));
-              else if (format === 'percent') formatted = (num * 100).toFixed(1) + '%';
-              else if (format === 'decimal1') formatted = num.toFixed(1);
-              else if (format === 'decimal2') formatted = num.toFixed(2);
-              else if (format === 'number') formatted = num.toLocaleString();
-              else if (num >= 1e9) formatted = (num / 1e9).toFixed(1) + 'B';
-              else if (num >= 1e6) formatted = (num / 1e6).toFixed(1) + 'M';
-              else if (num >= 1e3) formatted = (num / 1e3).toFixed(1) + 'K';
-              else formatted = num.toLocaleString();
+              const formatted = formatValue(refValue, config.y_axis_value_format || config.value_format || 'auto', config.y_axis_value_format_custom || config.value_format_custom, measureFields[0]);
 
               // CALCULATE DEFAULT TITLE BASED ON TYPE
               let refTitle = config.ref_line_title;
@@ -1107,17 +1115,22 @@ looker.plugins.visualizations.add({
             },
             formatter: function() {
               const num = this.y;
-              if (num === undefined || num === null || isNaN(num)) return '';
-              const format = config.value_format || 'auto';
-              if (format === 'currency') return '$' + (num >= 1000 ? (num / 1000).toFixed(1) + 'K' : num.toFixed(0));
-              if (format === 'percent') return (num * 100).toFixed(1) + '%';
-              if (format === 'decimal1') return num.toFixed(1);
-              if (format === 'decimal2') return num.toFixed(2);
-              if (format === 'number') return num.toLocaleString();
-              if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
-              if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
-              if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
-              return num.toLocaleString();
+              if (num === undefined || num === null) return '';
+              // Try to determine which measure this point belongs to
+              const seriesIndex = this.series.index;
+              const measureField = measureFields[seriesIndex % measureFields.length];
+              return formatValue(num, config.value_format || 'auto', config.value_format_custom, measureField);
+            }
+          },
+          tooltip: {
+            pointFormatter: function() {
+              const num = this.y;
+              if (num === undefined || num === null) return '';
+              // Determine which measure field this point belongs to
+              const seriesIndex = this.series.index;
+              const measureField = measureFields[seriesIndex % measureFields.length];
+              const formatted = formatValue(num, config.value_format || 'auto', config.value_format_custom, measureField);
+              return `<span style="color:${this.color}">●</span> ${this.series.name}: <b>${formatted}</b><br/>`;
             }
           }
         },
@@ -1242,10 +1255,10 @@ looker.plugins.visualizations.add({
             point.dataLabels = {
               enabled: true,
               useHTML: true,
-              align: 'right',
-              x: isBar ? 5 : -5,
-              y: 0,
-              verticalAlign: 'middle',
+              align: isBar ? 'left' : 'right',  // Match reference line
+              x: isBar ? 10 : -20,  // Match reference line positioning
+              y: isBar ? 0 : -5,  // Match reference line
+              verticalAlign: isBar ? 'middle' : 'bottom',  // Match reference line
               rotation: 0,
               overflow: 'allow',
               crop: false,
@@ -1318,19 +1331,7 @@ looker.plugins.visualizations.add({
           dataLabels: {
             enabled: config.trend_line_show_label === true,
             formatter: function() {
-              const num = this.y;
-              const format = config.value_format || 'auto';
-              let formatted = '';
-              if (format === 'currency') formatted = '$' + (num >= 1000 ? (num / 1000).toFixed(1) + 'K' : num.toFixed(0));
-              else if (format === 'percent') formatted = (num * 100).toFixed(1) + '%';
-              else if (format === 'decimal1') formatted = num.toFixed(1);
-              else if (format === 'decimal2') formatted = num.toFixed(2);
-              else if (format === 'number') formatted = num.toLocaleString();
-              else if (num >= 1e9) formatted = (num / 1e9).toFixed(1) + 'B';
-              else if (num >= 1e6) formatted = (num / 1e6).toFixed(1) + 'M';
-              else if (num >= 1e3) formatted = (num / 1e3).toFixed(1) + 'K';
-              else formatted = num.toLocaleString();
-              return formatted;
+              return formatValue(this.y, config.value_format || 'auto', config.value_format_custom, measureFields[0]);
             },
             style: {
               color: config.trend_line_label_color || config.trend_line_color || '#4285F4',
@@ -1341,18 +1342,7 @@ looker.plugins.visualizations.add({
           },
           tooltip: {
             pointFormatter: function() {
-              const num = this.y;
-              const format = config.value_format || 'auto';
-              let formatted = '';
-              if (format === 'currency') formatted = '$' + (num >= 1000 ? (num / 1000).toFixed(1) + 'K' : num.toFixed(0));
-              else if (format === 'percent') formatted = (num * 100).toFixed(1) + '%';
-              else if (format === 'decimal1') formatted = num.toFixed(1);
-              else if (format === 'decimal2') formatted = num.toFixed(2);
-              else if (format === 'number') formatted = num.toLocaleString();
-              else if (num >= 1e9) formatted = (num / 1e9).toFixed(1) + 'B';
-              else if (num >= 1e6) formatted = (num / 1e6).toFixed(1) + 'M';
-              else if (num >= 1e3) formatted = (num / 1e3).toFixed(1) + 'K';
-              else formatted = num.toLocaleString();
+              const formatted = formatValue(this.y, config.value_format || 'auto', config.value_format_custom, measureFields[0]);
               return `<b>${config.trend_line_title || 'Trend'}</b>: ${formatted}`;
             }
           }
