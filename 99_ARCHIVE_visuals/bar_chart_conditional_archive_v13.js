@@ -331,54 +331,14 @@ looker.plugins.visualizations.add({
       values: [
         {"Google": "google"},
         {"Looker Classic": "looker"},
-        {"Categorical - Shoreline": "shoreline"},
-        {"Categorical - Boardwalk": "boardwalk"},
-        {"Categorical - Breeze": "breeze"},
-        {"Categorical - Vivid": "vivid"},
-        {"Categorical - Springfield": "springfield"},
-        {"Categorical - Cowells": "cowells"},
-        {"Categorical - Organic": "organic"},
-        {"Categorical - Lighthouse": "lighthouse"},
-        {"Categorical - Taos": "taos"},
-        {"Categorical - Sonoma": "sonoma"},
-        {"Categorical - Casual": "casual"},
-        {"Categorical - Sunset": "sunset"},
-        {"Categorical - Ashland": "ashland"},
-        {"Categorical - Oasis": "oasis"},
-        {"Categorical - Dalton": "dalton"},
-        {"Categorical - Legacy": "legacy"},
-        {"Sequential - Shoreline": "seq_shoreline"},
-        {"Sequential - Boardwalk": "seq_boardwalk"},
-        {"Sequential - Breeze": "seq_breeze"},
-        {"Sequential - Vivid": "seq_vivid"},
-        {"Sequential - Springfield": "seq_springfield"},
-        {"Sequential - Cowells": "seq_cowells"},
-        {"Sequential - Organic": "seq_organic"},
-        {"Sequential - Lighthouse": "seq_lighthouse"},
-        {"Sequential - Taos": "seq_taos"},
-        {"Sequential - Sonoma": "seq_sonoma"},
-        {"Sequential - Casual": "seq_casual"},
-        {"Sequential - Sunset": "seq_sunset"},
-        {"Sequential - Ashland": "seq_ashland"},
-        {"Sequential - Oasis": "seq_oasis"},
-        {"Sequential - Dalton": "seq_dalton"},
-        {"Sequential - Legacy": "seq_legacy"},
-        {"Diverging - Shoreline": "div_shoreline"},
-        {"Diverging - Boardwalk": "div_boardwalk"},
-        {"Diverging - Breeze": "div_breeze"},
-        {"Diverging - Vivid": "div_vivid"},
-        {"Diverging - Springfield": "div_springfield"},
-        {"Diverging - Cowells": "div_cowells"},
-        {"Diverging - Organic": "div_organic"},
-        {"Diverging - Lighthouse": "div_lighthouse"},
-        {"Diverging - Taos": "div_taos"},
-        {"Diverging - Sonoma": "div_sonoma"},
-        {"Diverging - Casual": "div_casual"},
-        {"Diverging - Sunset": "div_sunset"},
-        {"Diverging - Ashland": "div_ashland"},
-        {"Diverging - Oasis": "div_oasis"},
-        {"Diverging - Dalton": "div_dalton"},
-        {"Diverging - Legacy": "div_legacy"}
+        {"Green Scale": "green_scale"},
+        {"Blue Scale": "blue_scale"},
+        {"Red Scale": "red_scale"},
+        {"Purple Scale": "purple_scale"},
+        {"Orange Scale": "orange_scale"},
+        {"Viridis": "viridis"},
+        {"Warm": "warm"},
+        {"Cool": "cool"}
       ],
       default: "google",
       section: "Series",
@@ -503,22 +463,6 @@ looker.plugins.visualizations.add({
       section: "X",
       order: 2
     },
-    x_axis_value_format: {
-      type: "string",
-      label: "Value Format",
-      display: "select",
-      values: [
-        {"Auto": "auto"},
-        {"Number": "number"},
-        {"Currency": "currency"},
-        {"Percent": "percent"},
-        {"Decimal (1)": "decimal1"},
-        {"Decimal (2)": "decimal2"}
-      ],
-      default: "auto",
-      section: "X",
-      order: 2.5
-    },
     x_axis_label_rotation: {
       type: "number",
       label: "Label Rotation",
@@ -564,22 +508,6 @@ looker.plugins.visualizations.add({
       placeholder: "Value",
       section: "Y",
       order: 2
-    },
-    y_axis_value_format: {
-      type: "string",
-      label: "Value Format",
-      display: "select",
-      values: [
-        {"Auto": "auto"},
-        {"Number": "number"},
-        {"Currency": "currency"},
-        {"Percent": "percent"},
-        {"Decimal (1)": "decimal1"},
-        {"Decimal (2)": "decimal2"}
-      ],
-      default: "auto",
-      section: "Y",
-      order: 2.5
     },
     y_axis_min: {
       type: "number",
@@ -842,57 +770,14 @@ looker.plugins.visualizations.add({
     const palettes = {
       google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC'],
       looker: ['#7FCDAE', '#7ED09C', '#7DD389', '#85D67C', '#9AD97B', '#B1DB7A'],
-      // Categorical palettes
-      shoreline: ['#2D7CC3', '#EA4335', '#F4B400', '#34A853', '#FF6D00', '#9334E6', '#46BDC6', '#AB47BC'],
-      boardwalk: ['#2F4B7C', '#D45087', '#FF7C43', '#F95D6A', '#FFA600', '#A05195', '#665191', '#003F5C'],
-      breeze: ['#FDD835', '#F06292', '#4DD0E1', '#AED581', '#FFB74D', '#9575CD', '#4FC3F7', '#DCE775'],
-      vivid: ['#7B1FA2', '#00897B', '#F57C00', '#C62828', '#1976D2', '#00ACC1', '#43A047', '#FBC02D'],
-      springfield: ['#F4A582', '#92C5DE', '#D1E5F0', '#F7F7F7', '#FDDBC7', '#B2ABD2', '#5E3C99', '#E66101'],
-      cowells: ['#543005', '#8C510A', '#BF812D', '#DFC27D', '#F6E8C3', '#C7EAE5', '#80CDC1', '#35978F'],
-      organic: ['#66C2A5', '#FC8D62', '#8DA0CB', '#E78AC3', '#A6D854', '#FFD92F', '#E5C494', '#B3B3B3'],
-      lighthouse: ['#8DD3C7', '#FFFFB3', '#BEBADA', '#FB8072', '#80B1D3', '#FDB462', '#B3DE69', '#FCCDE5'],
-      taos: ['#E41A1C', '#FF7F00', '#984EA3', '#4DAF4A', '#377EB8', '#FFFF33', '#A65628', '#F781BF'],
-      sonoma: ['#FBB4AE', '#B3CDE3', '#CCEBC5', '#DECBE4', '#FED9A6', '#FFFFCC', '#E5D8BD', '#FDDAEC'],
-      casual: ['#1B9E77', '#D95F02', '#7570B3', '#E7298A', '#66A61E', '#E6AB02', '#A6761D', '#666666'],
-      sunset: ['#8E0152', '#C51B7D', '#DE77AE', '#F1B6DA', '#FDE0EF', '#E6F5D0', '#B8E186', '#7FBC41'],
-      ashland: ['#003C30', '#01665E', '#35978F', '#80CDC1', '#C7EAE5', '#DFC27D', '#BF812D', '#8C510A'],
-      oasis: ['#2166AC', '#4393C3', '#92C5DE', '#D1E5F0', '#F7F7F7', '#FDDBC7', '#F4A582', '#D6604D'],
-      dalton: ['#40004B', '#762A83', '#9970AB', '#C2A5CF', '#E7D4E8', '#D9F0D3', '#A6DBA0', '#5AAE61'],
-      legacy: ['#E41A1C', '#377EB8', '#4DAF4A', '#984EA3', '#FF7F00', '#FFFF33', '#A65628', '#F781BF'],
-      // Sequential palettes
-      seq_shoreline: ['#E8F4F8', '#CCE7F2', '#99D5E9', '#66C2E0', '#2D7CC3', '#1C5BA8', '#0D3A8C', '#041970'],
-      seq_boardwalk: ['#FFF5F0', '#FEE0D2', '#FCBBA1', '#FC9272', '#FB6A4A', '#EF3B2C', '#CB181D', '#99000D'],
-      seq_breeze: ['#FFF7BC', '#FEE391', '#FEC44F', '#FE9929', '#EC7014', '#CC4C02', '#993404', '#662506'],
-      seq_vivid: ['#F7FCF5', '#E5F5E0', '#C7E9C0', '#A1D99B', '#74C476', '#41AB5D', '#238B45', '#005A32'],
-      seq_springfield: ['#FCFBFD', '#EFEDF5', '#DADAEB', '#BCBDDC', '#9E9AC8', '#807DBA', '#6A51A3', '#4A1486'],
-      seq_cowells: ['#FFF5EB', '#FEE6CE', '#FDD0A2', '#FDAE6B', '#FD8D3C', '#F16913', '#D94801', '#8C2D04'],
-      seq_organic: ['#F7FCF0', '#E0F3DB', '#CCEBC5', '#A8DDB5', '#7BCCC4', '#4EB3D3', '#2B8CBE', '#08589E'],
-      seq_lighthouse: ['#FFFFE5', '#F7FCB9', '#D9F0A3', '#ADDD8E', '#78C679', '#41AB5D', '#238443', '#005A32'],
-      seq_taos: ['#FFF7EC', '#FEE8C8', '#FDD49E', '#FDBB84', '#FC8D59', '#EF6548', '#D7301F', '#990000'],
-      seq_sonoma: ['#FFF7FB', '#ECE7F2', '#D0D1E6', '#A6BDDB', '#74A9CF', '#3690C0', '#0570B0', '#034E7B'],
-      seq_casual: ['#F7FCF5', '#E5F5E0', '#C7E9C0', '#A1D99B', '#74C476', '#41AB5D', '#238B45', '#005A32'],
-      seq_sunset: ['#FCFBFD', '#EFEDF5', '#DADAEB', '#BCBDDC', '#9E9AC8', '#807DBA', '#6A51A3', '#4A1486'],
-      seq_ashland: ['#F7FCF0', '#E0F3DB', '#CCEBC5', '#A8DDB5', '#7BCCC4', '#4EB3D3', '#2B8CBE', '#08589E'],
-      seq_oasis: ['#FFF5F0', '#FEE0D2', '#FCBBA1', '#FC9272', '#FB6A4A', '#EF3B2C', '#CB181D', '#99000D'],
-      seq_dalton: ['#F7FCF5', '#E5F5E0', '#C7E9C0', '#A1D99B', '#74C476', '#41AB5D', '#238B45', '#005A32'],
-      seq_legacy: ['#FFF7EC', '#FEE8C8', '#FDD49E', '#FDBB84', '#FC8D59', '#EF6548', '#D7301F', '#990000'],
-      // Diverging palettes
-      div_shoreline: ['#D73027', '#F46D43', '#FDAE61', '#FEE090', '#E0F3F8', '#ABD9E9', '#74ADD1', '#4575B4'],
-      div_boardwalk: ['#8C510A', '#BF812D', '#DFC27D', '#F6E8C3', '#C7EAE5', '#80CDC1', '#35978F', '#01665E'],
-      div_breeze: ['#C51B7D', '#DE77AE', '#F1B6DA', '#FDE0EF', '#E6F5D0', '#B8E186', '#7FBC41', '#4D9221'],
-      div_vivid: ['#D7191C', '#FDAE61', '#FFFFBF', '#ABD9E9', '#2C7BB6'],
-      div_springfield: ['#762A83', '#9970AB', '#C2A5CF', '#E7D4E8', '#D9F0D3', '#A6DBA0', '#5AAE61', '#1B7837'],
-      div_cowells: ['#A50026', '#D73027', '#F46D43', '#FDAE61', '#FEE090', '#E0F3F8', '#ABD9E9', '#74ADD1'],
-      div_organic: ['#40004B', '#762A83', '#9970AB', '#C2A5CF', '#E7D4E8', '#D9F0D3', '#A6DBA0', '#5AAE61'],
-      div_lighthouse: ['#8C510A', '#BF812D', '#DFC27D', '#F6E8C3', '#C7EAE5', '#80CDC1', '#35978F', '#01665E'],
-      div_taos: ['#D73027', '#F46D43', '#FDAE61', '#FEE08B', '#D9EF8B', '#A6D96A', '#66BD63', '#1A9850'],
-      div_sonoma: ['#762A83', '#9970AB', '#C2A5CF', '#E7D4E8', '#D9F0D3', '#A6DBA0', '#5AAE61', '#1B7837'],
-      div_casual: ['#D7191C', '#FDAE61', '#FFFFBF', '#ABD9E9', '#2C7BB6'],
-      div_sunset: ['#C51B7D', '#DE77AE', '#F1B6DA', '#FDE0EF', '#E6F5D0', '#B8E186', '#7FBC41', '#4D9221'],
-      div_ashland: ['#01665E', '#35978F', '#80CDC1', '#C7EAE5', '#F6E8C3', '#DFC27D', '#BF812D', '#8C510A'],
-      div_oasis: ['#2166AC', '#4393C3', '#92C5DE', '#D1E5F0', '#FDDBC7', '#F4A582', '#D6604D', '#B2182B'],
-      div_dalton: ['#40004B', '#762A83', '#9970AB', '#C2A5CF', '#E7D4E8', '#D9F0D3', '#A6DBA0', '#5AAE61'],
-      div_legacy: ['#A50026', '#D73027', '#F46D43', '#FDAE61', '#FEE090', '#E0F3F8', '#ABD9E9', '#74ADD1']
+      green_scale: ['#F1F8E9', '#C5E1A5', '#9CCC65', '#7CB342', '#558B2F', '#33691E'],
+      blue_scale: ['#E3F2FD', '#90CAF9', '#42A5F5', '#1E88E5', '#1565C0', '#0D47A1'],
+      red_scale: ['#FFEBEE', '#FFCDD2', '#EF9A9A', '#E57373', '#EF5350', '#F44336', '#E53935', '#D32F2F'],
+      purple_scale: ['#F3E5F5', '#CE93D8', '#AB47BC', '#8E24AA', '#6A1B9A', '#4A148C'],
+      orange_scale: ['#FFF3E0', '#FFE0B2', '#FFCC80', '#FFB74D', '#FFA726', '#FF9800', '#FB8C00', '#F57C00'],
+      viridis: ['#440154', '#414487', '#2A788E', '#22A884', '#7AD151', '#FDE725'],
+      warm: ['#FFF5EB', '#FDD0A2', '#FD8D3C', '#E6550D', '#A63603'],
+      cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B']
     };
 
     // Handle series_labels - can be:
@@ -1205,34 +1090,6 @@ looker.plugins.visualizations.add({
       },
       title: { text: null },
       credits: { enabled: false },
-      tooltip: {
-        useHTML: true,
-        formatter: function() {
-          const format = config.value_format || 'auto';
-          const formatValue = (num) => {
-            if (format === 'currency') return '$' + (num >= 1000 ? (num / 1000).toFixed(1) + 'K' : num.toFixed(0));
-            if (format === 'percent') return (num * 100).toFixed(1) + '%';
-            if (format === 'decimal1') return num.toFixed(1);
-            if (format === 'decimal2') return num.toFixed(2);
-            if (format === 'number') return num.toLocaleString();
-            if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
-            if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
-            if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
-            return num.toLocaleString();
-          };
-
-          let html = `<b>${this.x}</b><br/>`;
-          if (this.points) {
-            this.points.forEach(point => {
-              html += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>${formatValue(point.y)}</b><br/>`;
-            });
-          } else {
-            html += `<span style="color:${this.color}">●</span> ${this.series.name}: <b>${formatValue(this.y)}</b>`;
-          }
-          return html;
-        },
-        shared: true
-      },
       xAxis: {
         categories: categories,
         type: 'category',
@@ -1380,21 +1237,18 @@ looker.plugins.visualizations.add({
         line: { marker: { enabled: true, radius: 3 } }
       },
       legend: {
-        enabled: config.hide_legend_with_formatting ? (ruleLegendItems.length > 0) : (seriesData.length > 1 || ruleLegendItems.length > 0),
+        enabled: config.hide_legend_with_formatting ? false : (seriesData.length > 1 || ruleLegendItems.length > 0),
         align: 'center',
         verticalAlign: 'bottom'
       },
-      series: [
-        ...seriesData.map(s => ({...s, showInLegend: config.hide_legend_with_formatting ? false : (s.showInLegend !== false)})),
-        ...ruleLegendItems.map(item => ({
-          name: item.name,
-          color: item.color,
-          type: 'line',
-          data: [],
-          showInLegend: true,
-          enableMouseTracking: false
-        }))
-      ]
+      series: [...seriesData, ...ruleLegendItems.map(item => ({
+        name: item.name,
+        color: item.color,
+        type: 'line',
+        data: [],
+        showInLegend: true,
+        enableMouseTracking: false
+      }))]
     };
 
     // TRENDLINE
@@ -1646,55 +1500,14 @@ looker.plugins.visualizations.add({
   const palettes = {
     google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC'],
     looker: ['#7FCDAE', '#7ED09C', '#7DD389', '#85D67C', '#9AD97B', '#B1DB7A'],
-    // Just need first colors from each palette for baseColor fallback
-    shoreline: ['#2D7CC3', '#EA4335', '#F4B400', '#34A853', '#FF6D00', '#9334E6'],
-    boardwalk: ['#2F4B7C', '#D45087', '#FF7C43', '#F95D6A', '#FFA600', '#A05195'],
-    breeze: ['#FDD835', '#F06292', '#4DD0E1', '#AED581', '#FFB74D', '#9575CD'],
-    vivid: ['#7B1FA2', '#00897B', '#F57C00', '#C62828', '#1976D2', '#00ACC1'],
-    springfield: ['#F4A582', '#92C5DE', '#D1E5F0', '#F7F7F7'],
-    cowells: ['#543005', '#8C510A', '#BF812D', '#DFC27D'],
-    organic: ['#66C2A5', '#FC8D62', '#8DA0CB', '#E78AC3'],
-    lighthouse: ['#8DD3C7', '#FFFFB3', '#BEBADA', '#FB8072'],
-    taos: ['#E41A1C', '#FF7F00', '#984EA3', '#4DAF4A'],
-    sonoma: ['#FBB4AE', '#B3CDE3', '#CCEBC5', '#DECBE4'],
-    casual: ['#1B9E77', '#D95F02', '#7570B3', '#E7298A'],
-    sunset: ['#8E0152', '#C51B7D', '#DE77AE', '#F1B6DA'],
-    ashland: ['#003C30', '#01665E', '#35978F', '#80CDC1'],
-    oasis: ['#2166AC', '#4393C3', '#92C5DE', '#D1E5F0'],
-    dalton: ['#40004B', '#762A83', '#9970AB', '#C2A5CF'],
-    legacy: ['#E41A1C', '#377EB8', '#4DAF4A', '#984EA3'],
-    seq_shoreline: ['#E8F4F8'],
-    seq_boardwalk: ['#FFF5F0'],
-    seq_breeze: ['#FFF7BC'],
-    seq_vivid: ['#F7FCF5'],
-    seq_springfield: ['#FCFBFD'],
-    seq_cowells: ['#FFF5EB'],
-    seq_organic: ['#F7FCF0'],
-    seq_lighthouse: ['#FFFFE5'],
-    seq_taos: ['#FFF7EC'],
-    seq_sonoma: ['#FFF7FB'],
-    seq_casual: ['#F7FCF5'],
-    seq_sunset: ['#FCFBFD'],
-    seq_ashland: ['#F7FCF0'],
-    seq_oasis: ['#FFF5F0'],
-    seq_dalton: ['#F7FCF5'],
-    seq_legacy: ['#FFF7EC'],
-    div_shoreline: ['#D73027'],
-    div_boardwalk: ['#8C510A'],
-    div_breeze: ['#C51B7D'],
-    div_vivid: ['#D7191C'],
-    div_springfield: ['#762A83'],
-    div_cowells: ['#A50026'],
-    div_organic: ['#40004B'],
-    div_lighthouse: ['#8C510A'],
-    div_taos: ['#D73027'],
-    div_sonoma: ['#762A83'],
-    div_casual: ['#D7191C'],
-    div_sunset: ['#C51B7D'],
-    div_ashland: ['#01665E'],
-    div_oasis: ['#2166AC'],
-    div_dalton: ['#40004B'],
-    div_legacy: ['#A50026']
+    green_scale: ['#F1F8E9', '#C5E1A5', '#9CCC65', '#7CB342', '#558B2F', '#33691E'],
+    blue_scale: ['#E3F2FD', '#90CAF9', '#42A5F5', '#1E88E5', '#1565C0', '#0D47A1'],
+    red_scale: ['#FFEBEE', '#FFCDD2', '#EF9A9A', '#E57373', '#EF5350', '#F44336', '#E53935', '#D32F2F'],
+    purple_scale: ['#F3E5F5', '#CE93D8', '#AB47BC', '#8E24AA', '#6A1B9A', '#4A148C'],
+    orange_scale: ['#FFF3E0', '#FFE0B2', '#FFCC80', '#FFB74D', '#FFA726', '#FF9800', '#FB8C00', '#F57C00'],
+    viridis: ['#440154', '#414487', '#2A788E', '#22A884', '#7AD151', '#FDE725'],
+    warm: ['#FFF5EB', '#FDD0A2', '#FD8D3C', '#E6550D', '#A63603'],
+    cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B']
   };
 
   // Use passed baseColor, or fallback to first color in palette
