@@ -823,10 +823,15 @@ looker.plugins.visualizations.add({
         if (renderedValue !== null && renderedValue !== undefined) {
           return renderedValue;
         }
-        // Fallback: try field's value_format
-        if (field && field.value_format) {
+        // Fallback: try field's value_format using LookerCharts utility
+        if (field) {
           try {
-            return LookerCharts.Utils.textForCell({ value: value, field: field });
+            // Create a cell object that LookerCharts.Utils.textForCell expects
+            const cellData = { value: value };
+            const formatted = LookerCharts.Utils.textForCell(cellData, field);
+            if (formatted && formatted !== String(value)) {
+              return formatted;
+            }
           } catch (e) {
             // Fall through to default
           }
@@ -1046,16 +1051,15 @@ looker.plugins.visualizations.add({
           rotation: isBar ? 0 : (config.x_axis_label_rotation || -45),
           formatter: function() {
             // Apply x_axis formatting
-            const formatType = config.x_axis_value_format_custom && config.x_axis_value_format_custom.trim() !== ''
-              ? 'auto'  // When custom string exists, we'll apply it below
-              : (config.x_axis_value_format || 'auto');
+            const formatType = config.x_axis_value_format || 'auto';
+            const customFormat = config.x_axis_value_format_custom || '';
 
             // If auto and no custom format, return raw value
-            if (formatType === 'auto' && (!config.x_axis_value_format_custom || config.x_axis_value_format_custom.trim() === '')) {
+            if (formatType === 'auto' && customFormat.trim() === '') {
               return this.value;
             }
 
-            return formatValue(this.value, formatType, config.x_axis_value_format_custom, dimensionField);
+            return formatValue(this.value, formatType, customFormat, dimensionField);
           }
         },
         tickInterval: tickInterval,
@@ -1070,10 +1074,9 @@ looker.plugins.visualizations.add({
         labels: {
           formatter: function() {
             // Y-axis uses ONLY y_axis_value_format, NOT value_format
-            const formatType = config.y_axis_value_format_custom && config.y_axis_value_format_custom.trim() !== ''
-              ? 'auto'  // When custom string exists, we'll apply it below
-              : (config.y_axis_value_format || 'auto');
-            return formatValue(this.value, formatType, config.y_axis_value_format_custom, measureFields[0]);
+            const formatType = config.y_axis_value_format || 'auto';
+            const customFormat = config.y_axis_value_format_custom || '';
+            return formatValue(this.value, formatType, customFormat, measureFields[0]);
           }
         },
         stackLabels: {
@@ -1087,10 +1090,9 @@ looker.plugins.visualizations.add({
             const num = this.total;
             if (num === undefined || num === null) return '';
             // Stack labels use value_format ONLY (not y_axis format)
-            const formatType = config.value_format_custom && config.value_format_custom.trim() !== ''
-              ? 'auto'  // When custom string exists, we'll apply it below
-              : (config.value_format || 'auto');
-            return formatValue(num, formatType, config.value_format_custom, measureFields[0]);
+            const formatType = config.value_format || 'auto';
+            const customFormat = config.value_format_custom || '';
+            return formatValue(num, formatType, customFormat, measureFields[0]);
           }
         },
         plotLines: config.ref_line_enabled ? [{
