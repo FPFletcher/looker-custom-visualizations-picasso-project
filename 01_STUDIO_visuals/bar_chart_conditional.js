@@ -1513,14 +1513,27 @@ looker.plugins.visualizations.add({
       }
     }
 
-    if (!this.chart) {
+    // --- AGGRESSIVE STABILITY CHECK ---
+    const chartNeedsRebuild = details.changed.includes('conditional_formatting_enabled') ||
+                              details.changed.includes('trend_line_enabled') ||
+                              details.changed.includes('series_positioning');
+
+    if (this.chart) {
+      if (chartNeedsRebuild) {
+          console.log('[CHART REBUILD] Detected feature toggle (CF/Trend/Stacking), destroying and recreating chart.');
+          this.chart.destroy();
+          this.chart = Highcharts.chart(this._chartContainer, chartOptions);
+      } else {
+          console.log('[CHART UPDATE] Updating existing chart with new options (deep merge: true).');
+          // Use (true, true) to ensure a deep update and immediate redraw.
+          this.chart.update(chartOptions, true, true);
+      }
+    } else {
       console.log('[CHART INIT] Creating new chart instance.');
       this.chart = Highcharts.chart(this._chartContainer, chartOptions);
-    } else {
-      console.log('[CHART UPDATE] Updating existing chart with new options (deep merge: true).');
-      // Use (true, true) to ensure a deep update and immediate redraw.
-      this.chart.update(chartOptions, true, true);
     }
+    // ----------------------------------
+
     console.log('=== TRENDLINE CHECK END ===');
     done();
   },
@@ -1564,7 +1577,7 @@ looker.plugins.visualizations.add({
 
     // Apply rules in priority order: Rule 1 > Rule 2 > Rule 3
     return values.map((val, index) => {
-        // FIX: Return base color (via null) immediately if non-numeric
+        // FIX: Return null immediately if non-numeric
         if (val === null || val === undefined || isNaN(val)) return null;
 
         // 1. Check discrete rules first (R1 > R2 > R3)
