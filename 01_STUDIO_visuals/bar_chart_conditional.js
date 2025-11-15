@@ -918,26 +918,17 @@ looker.plugins.visualizations.add({
       cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B']
     };
 
-    // Handle series_labels - Looker passes it as an object like {"measure.name": "Custom Label"}
-    // Sometimes it's nested as {"measure.name": {"value": "Custom Label"}}
-    const customLabels = config.series_labels && typeof config.series_labels === 'object'
-      ? config.series_labels
-      : null;
+    // Handle series_labels - it's a comma-separated string like "Label1,Label2,Label3"
+    const customLabelsArray = config.series_labels && typeof config.series_labels === 'string' && config.series_labels.trim() !== ''
+      ? config.series_labels.split(',').map(label => label.trim())
+      : [];
 
-    // Helper to extract label string from potentially nested object
-    const getSeriesLabel = (measureName, defaultLabel) => {
-      if (!customLabels || !customLabels[measureName]) return defaultLabel;
-      const label = customLabels[measureName];
-      // If it's a string, use it directly
-      if (typeof label === 'string') return label;
-      // If it's an object, try to extract the value
-      if (typeof label === 'object') {
-        // Try common patterns
-        if (label.value) return label.value;
-        if (label.label) return label.label;
-        // If it's an object with keys, take the first value
-        const values = Object.values(label);
-        if (values.length > 0 && typeof values[0] === 'string') return values[0];
+    console.log('Custom labels array:', customLabelsArray);
+
+    // Helper to get label for a series by index
+    const getSeriesLabel = (index, defaultLabel) => {
+      if (customLabelsArray.length > 0 && index < customLabelsArray.length && customLabelsArray[index]) {
+        return customLabelsArray[index];
       }
       return defaultLabel;
     };
@@ -962,7 +953,9 @@ looker.plugins.visualizations.add({
           const seriesIndex = pivotIndex * measures.length + measureIndex;
           const measureName = measure;
           const defaultName = `${queryResponse.fields.measures[measureIndex].label_short || queryResponse.fields.measures[measureIndex].label} - ${pivotValue.key}`;
-          const seriesName = getSeriesLabel(measureName, defaultName);
+          const seriesName = getSeriesLabel(seriesIndex, defaultName);
+
+          console.log(`Pivot series ${seriesIndex}: measureName=${measureName}, defaultName=${defaultName}, seriesName=${seriesName}`);
 
           // Determine series base color
           const baseColor = customColors ? customColors[seriesIndex % customColors.length] : palette[seriesIndex % palette.length];
@@ -1012,7 +1005,9 @@ looker.plugins.visualizations.add({
 
         const measureName = measure;
         const defaultName = queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label;
-        const seriesName = getSeriesLabel(measureName, defaultName);
+        const seriesName = getSeriesLabel(index, defaultName);
+
+        console.log(`Series ${index}: measureName=${measureName}, defaultName=${defaultName}, seriesName=${seriesName}`);
 
         if (shouldApplyFormatting) {
           // Apply conditional formatting
