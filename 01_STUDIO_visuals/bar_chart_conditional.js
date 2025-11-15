@@ -472,7 +472,14 @@ looker.plugins.visualizations.add({
       section: "X",
       order: 2
     },
-    // Removed x_axis_value_format and x_axis_value_format_custom per user request
+    // REINTRODUCED: x_axis_value_format_custom
+    x_axis_value_format_custom: {
+      type: "string",
+      label: "Custom Format String",
+      placeholder: "e.g., %Y-%m-%d, %b %Y, #,##0",
+      section: "X",
+      order: 2.6
+    },
     x_axis_label_rotation: {
       type: "number",
       label: "Label Rotation",
@@ -888,7 +895,13 @@ looker.plugins.visualizations.add({
     const dimension = queryResponse.fields.dimensions[0].name;
     const dimensionField = queryResponse.fields.dimensions[0];
     const categories = data.map(row => LookerCharts.Utils.textForCell(row[dimension]));
-    // rawDimensionValues removed
+    // --- RESTORED: Raw Dimension Values for X-Axis Custom Format ---
+    const rawDimensionValues = data.map(row => {
+      const cell = row[dimension];
+      // Extract the raw value for custom formatting if available
+      return cell && cell.value !== undefined ? cell.value : LookerCharts.Utils.textForCell(row[dimension]);
+    });
+    // ---------------------------------------------------------------
     const measures = queryResponse.fields.measures.map(m => m.name);
     const measureFields = queryResponse.fields.measures;
     const hasPivot = queryResponse.fields.pivots && queryResponse.fields.pivots.length > 0;
@@ -1018,8 +1031,6 @@ looker.plugins.visualizations.add({
     // **Conditional Formatting Fix (Stacked Measures)**
     // If formatting applies to stacked measures, we need to apply coloring based on stackedTotals.
     if (config.conditional_formatting_enabled && config.conditional_formatting_apply_to === 'stacked') {
-        const baseColor = customColors ? customColors[0] : palette[0];
-        // FIX: Use the dedicated stacked formatting function (getStackedColors)
         const stackedColors = this.getStackedColors(stackedTotals, config);
 
         seriesData = seriesData.map(series => {
@@ -1110,6 +1121,14 @@ looker.plugins.visualizations.add({
       }
     }
 
+    // Determine if the series legend should be enabled
+    let seriesLegendEnabled = seriesData.length > 1;
+    if (config.conditional_formatting_enabled && config.hide_legend_with_formatting) {
+        // If conditional formatting is enabled AND the user chose to hide the series legend,
+        // we only enable the legend if there are rule items to display.
+        seriesLegendEnabled = false;
+    }
+
     // Apply conditional formatting
     const chartOptions = {
       chart: {
@@ -1142,9 +1161,20 @@ looker.plugins.visualizations.add({
         title: { text: config.x_axis_label || null },
         labels: {
           rotation: isBar ? 0 : (config.x_axis_label_rotation || -45),
-          // X-Axis formatting relies on the default Looker text, as presets were removed.
           formatter: function() {
-            return this.value;
+            const customFormat = config.x_axis_value_format_custom || '';
+
+            if (customFormat.trim() !== '') {
+              // Use the raw dimension value for custom formatting
+              const rawValue = rawDimensionValues[this.pos];
+              if (rawValue === undefined || rawValue === null) {
+                  return this.value;
+              }
+              // For X-axis, formatType is often null, forcing usage of customFormat
+              return formatValue(rawValue, 'auto', customFormat, dimensionField);
+            }
+
+            return this.value; // Use Looker's default rendering
           }
         },
         tickInterval: tickInterval,
@@ -1286,18 +1316,27 @@ looker.plugins.visualizations.add({
         line: { marker: { enabled: true, radius: 3 } }
       },
       legend: {
-        enabled: config.hide_legend_with_formatting ? false : (seriesData.length > 1 || ruleLegendItems.length > 0),
+        // FIX 2: Only hide series legend if hide_legend_with_formatting is true, but always show if there are rule items.
+        enabled: seriesLegendEnabled || ruleLegendItems.length > 0,
+        // If series legend is hidden, align should be based on rule items presence.
+        // We'll keep it simple: if *anything* is in the legend, show it.
+        // We ensure that the data for ruleLegendItems is always added to the chart options.
         align: 'center',
         verticalAlign: 'bottom'
       },
-      series: [...seriesData, ...ruleLegendItems.map(item => ({
-        name: item.name,
-        color: item.color,
-        type: 'line',
-        data: [],
-        showInLegend: true,
-        enableMouseTracking: false
-      }))]
+      series: [
+        // Only include seriesData if the series legend is enabled OR if we are not hiding it,
+        // OR if conditional formatting is disabled.
+        ...seriesData,
+        ...ruleLegendItems.map(item => ({
+          name: item.name,
+          color: item.color,
+          type: 'line', // Hack to display custom legend entry
+          data: [],
+          showInLegend: true, // Always show rule legend items
+          enableMouseTracking: false
+        }))
+      ]
     };
 
     // TRENDLINE
