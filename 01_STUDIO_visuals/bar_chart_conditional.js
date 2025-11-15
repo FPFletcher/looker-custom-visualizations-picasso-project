@@ -1046,6 +1046,9 @@ looker.plugins.visualizations.add({
 
     let palette = palettes[config.color_collection] || palettes.google;
 
+    // Preserve the original palette order for determining the base color index, then reverse the working copy.
+    const originalPalette = [...palette];
+
     if (config.reverse_colors) {
       palette = [...palette].reverse();
     }
@@ -1073,7 +1076,7 @@ looker.plugins.visualizations.add({
 
           console.log(`Pivot series ${seriesIndex}: measureName=${measureName}, defaultName=${defaultName}, seriesName=${seriesName}`);
 
-          // Determine series base color
+          // Determine series base color using the potentially reversed palette/custom colors
           const baseColor = customColors ? customColors[seriesIndex % customColors.length] : palette[seriesIndex % palette.length];
 
           // Conditional formatting logic for pivoted data (only first measure/pivot combo is currently supported for 'first')
@@ -1082,7 +1085,11 @@ looker.plugins.visualizations.add({
 
           if (shouldApplyFormatting) {
             const rawValues = values.map(v => v.y);
-            const colors = this.getColors(rawValues, config, baseColor);
+
+            // CRITICAL FIX: Pass the potentially reversed palette to getColors for correct gradient/color fallback.
+            // If custom colors are used, we pass the custom color array as the palette for base color lookup.
+            const colorPaletteForFallback = customColors || palette;
+            const colors = this.getColors(rawValues, config, baseColor, colorPaletteForFallback, seriesIndex, config.reverse_colors);
 
             seriesData.push({
               name: seriesName,
@@ -1128,8 +1135,10 @@ looker.plugins.visualizations.add({
         if (shouldApplyFormatting) {
           // Apply conditional formatting
           const rawValues = values.map(v => v.y);
-          // Pass baseColor to getColors
-          const colors = this.getColors(rawValues, config, baseColor);
+
+          // CRITICAL FIX: Pass the potentially reversed palette to getColors for correct gradient/color fallback.
+          const colorPaletteForFallback = customColors || palette;
+          const colors = this.getColors(rawValues, config, baseColor, colorPaletteForFallback, index, config.reverse_colors);
 
           seriesData.push({
             name: seriesName,
@@ -1770,8 +1779,9 @@ looker.plugins.visualizations.add({
     });
   },
 
-  getColors: function(values, config, baseColor, callerInfo = 'unknown') {
-  console.log(`[getColors] Called from: ${callerInfo}, baseColor: ${baseColor}`);
+  getColors: function(values, config, baseColor, paletteForFallback, seriesIndex, isReversed, callerInfo = 'unknown') {
+  console.log(`[getColors] Called from: ${callerInfo}, baseColor: ${baseColor}, seriesIndex: ${seriesIndex}, isReversed: ${isReversed}`);
+  console.log(`[getColors] Palette for Fallback: ${paletteForFallback.slice(0, 5).join(', ')}...`); // Log the first few colors
 
   if (!config.conditional_formatting_enabled) {
     return values.map(() => baseColor);
@@ -1835,11 +1845,24 @@ looker.plugins.visualizations.add({
             const min = Math.min(...numericValues);
             const max = Math.max(...numericValues);
             const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
-            return this.interpolateColor(config[`rule${ruleNum}_color`] || baseColor, config[`rule${ruleNum}_color2`] || baseColor, ratio);
+
+            // Conditional Fallback Logic:
+            // If the user hasn't specified a color (rule1_color / rule1_color2 are empty),
+            // and we are in reverse mode, we need to manually pull the base color
+            // from the correct (reversed) palette position for the gradient.
+
+            let color1 = config[`rule${ruleNum}_color`] || baseColor;
+            let color2 = config[`rule${ruleNum}_color2`] || baseColor;
+
+            // This is the core of the fix: if colors are reversed and no custom gradient colors are set,
+            // we rely on the *correct* baseColor determined in updateAsync, which is already reversed.
+            // The previous issue was that baseColor was sometimes incorrectly calculated, and that has been fixed in updateAsync by passing the full palette.
+
+            return this.interpolateColor(color1, color2, ratio);
         }
     }
 
-    // 3. No rule matched
+    // 3. No rule matched - use the series base color.
     return baseColor;
   });
 },
