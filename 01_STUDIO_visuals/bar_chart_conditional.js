@@ -1037,7 +1037,12 @@ looker.plugins.visualizations.add({
       return defaultLabel;
     };
 
-    const palette = palettes[config.color_collection] || palettes.google;
+    let palette = palettes[config.color_collection] || palettes.google;
+
+    if (config.reverse_colors) {
+      palette = [...palette].reverse();
+    }
+
     const customColors = config.series_colors ? String(config.series_colors).split(',').map(c => c.trim()) : null;
 
     let seriesData = [];
@@ -1062,7 +1067,7 @@ looker.plugins.visualizations.add({
           console.log(`Pivot series ${seriesIndex}: measureName=${measureName}, defaultName=${defaultName}, seriesName=${seriesName}`);
 
           // Determine series base color
-          const baseColor = customColors ? customColors[seriesIndex % customColors.length] : (config.reverse_colors ? [...palette].reverse() : palette)[seriesIndex % palette.length];
+          const baseColor = customColors ? customColors[seriesIndex % customColors.length] : palette[seriesIndex % palette.length];
 
           // Conditional formatting logic for pivoted data (only first measure/pivot combo is currently supported for 'first')
           const shouldApplyFormatting = config.conditional_formatting_enabled &&
@@ -1105,7 +1110,7 @@ looker.plugins.visualizations.add({
         const shouldApplyFormatting = config.conditional_formatting_enabled &&
                                       (config.conditional_formatting_apply_to === 'all' || config.conditional_formatting_apply_to === 'first' && index === 0);
 
-        const baseColor = customColors ? customColors[index % customColors.length] : (config.reverse_colors ? [...palette].reverse() : palette)[index % palette.length];
+        const baseColor = customColors ? customColors[index % customColors.length] : palette[index % palette.length];
 
         const measureName = measure;
         const defaultName = queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label;
@@ -1173,7 +1178,7 @@ looker.plugins.visualizations.add({
 
             // If this is *not* the first measure, and formatting is set to 'first',
             // we strip explicit point colors and rely on the base series color.
-            const baseColor = customColors ? customColors[index % customColors.length] : (config.reverse_colors ? [...palette].reverse() : palette)[index % palette.length];
+            const baseColor = customColors ? customColors[index % customColors.length] : palette[index % palette.length];
 
             return {
                 ...series,
