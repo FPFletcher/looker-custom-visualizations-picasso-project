@@ -1,0 +1,80 @@
+{
+  "Île-de-France": {
+    "min_lat": 48.120,
+    "max_lat": 49.241,
+    "min_lon": 1.446,
+    "max_lon": 3.558
+  },
+  "Auvergne-Rhône-Alpes": {
+    "min_lat": 44.117,
+    "max_lat": 46.801,
+    "min_lon": 2.053,
+    "max_lon": 7.179
+  },
+  "Provence-Alpes-Côte d'Azur": {
+    "min_lat": 42.982,
+    "max_lat": 44.882,
+    "min_lon": 4.228,
+    "max_lon": 7.720
+  },
+  "Nouvelle-Aquitaine": {
+    "min_lat": 42.777,
+    "max_lat": 46.788,
+    "min_lon": -2.557,
+    "max_lon": 2.920
+  },
+  "Occitanie": {
+    "min_lat": 42.333,
+    "max_lat": 45.046,
+    "min_lon": -0.323,
+    "max_lon": 4.841
+  },
+  "Hauts-de-France": {
+    "min_lat": 49.013,
+    "max_lat": 51.089,
+    "min_lon": 1.373,
+    "max_lon": 4.236
+  },
+  "Grand Est": {
+    "min_lat": 47.419,
+    "max_lat": 50.179,
+    "min_lon": 3.391,
+    "max_lon": 8.233
+  },
+  "Pays de la Loire": {
+    "min_lat": 46.265,
+    "max_lat": 48.575,
+    "min_lon": -2.557,
+    "max_lon": 1.021
+  },
+  "Bretagne": {
+    "min_lat": 47.279,
+    "max_lat": 48.891,
+    "min_lon": -5.140,
+    "max_lon": -0.967
+  },
+  "Normandie": {
+    "min_lat": 48.180,
+    "max_lat": 50.077,
+    "min_lon": -1.995,
+    "max_lon": 1.798
+  },
+  "Centre-Val de Loire": {
+    "min_lat": 46.352,
+    "max_lat": 48.976,
+    "min_lon": 0.065,
+    "max_lon": 3.145
+  },
+  "Bourgogne-Franche-Comté": {
+    "min_lat": 46.160,
+    "max_lat": 48.406,
+    "min_lon": 2.839,
+    "max_lon": 7.161
+  },
+  "Corse": {
+    "min_lat": 41.333,
+    "max_lat": 43.028,
+    "min_lon": 8.538,
+    "max_lon": 9.560
+  }
+}
