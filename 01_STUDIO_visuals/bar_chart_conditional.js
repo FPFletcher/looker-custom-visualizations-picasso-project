@@ -812,18 +812,11 @@ looker.plugins.visualizations.add({
           }
         }
         // For numbers - basic support (user provides literal format string)
-        // **BUG FIX**: Using a simple string replace here is unreliable.
-        // It's better to use Looker's rendered value for complex formats,
-        // or a dedicated library (which we cannot include here).
-        // Since we can't include a library, we rely on Looker's renderedValue
-        // for complex LookML formats, and use basic fallbacks.
-        // If the user sets a custom format, treat it as a locale string base.
         if (!isNaN(value)) {
             // Simplified custom number format implementation
             if (customFormat.includes('$') || customFormat.includes('€') || customFormat.includes('£')) {
                 let currency = customFormat.match(/[$€£]/)?.[0] || '';
                 let decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-                let suffix = customFormat.match(/([KMBT])/) ? customFormat.match(/([KMBT])/) : (customFormat.includes("k") ? ["k"] : []);
                 let scaledValue = value;
                 let scaledSuffix = '';
                 if (customFormat.includes(',')) {
@@ -855,7 +848,6 @@ looker.plugins.visualizations.add({
       // **FIX**: Rely heavily on renderedValue for LookML formats.
       if (formatType === 'auto') {
         // First try to use the rendered value passed from Looker data
-        // This is the most reliable way to get the exact LookML formatting (like $x.x k)
         if (renderedValue !== null && renderedValue !== undefined) {
           return renderedValue;
         }
@@ -905,6 +897,8 @@ looker.plugins.visualizations.add({
         let d;
         // Attempt to parse the value as a Date. If it's a string, it might be an ISO date or just 'YYYY-MM-DD'.
         if (typeof value === 'string') {
+            // Check if the string is just 'YYYY-MM-DD' before attempting full date parsing, as Looker sometimes
+            // passes date dimension values as simple strings.
             d = new Date(value);
         } else if (value instanceof Date) {
             d = value;
@@ -945,7 +939,8 @@ looker.plugins.visualizations.add({
     const categories = data.map(row => LookerCharts.Utils.textForCell(row[dimension]));
     const rawDimensionValues = data.map(row => {
       const cell = row[dimension];
-      return cell && cell.value !== undefined ? cell.value : LookerCharts.Utils.textForCell(row[dimension]);
+      // FIX 2.1: Ensure we extract the raw value if it exists, otherwise use the cell itself.
+      return cell && cell.value !== undefined ? cell.value : cell;
     });
     const measures = queryResponse.fields.measures.map(m => m.name);
     const measureFields = queryResponse.fields.measures;
@@ -1005,8 +1000,8 @@ looker.plugins.visualizations.add({
               name: seriesName,
               data: values.map((v, i) => ({ ...v, color: colors[i] })),
               showInLegend: true,
-              // Set the base color for the series but let points override
-              color: baseColor
+              // Do NOT set series color here, use point colors
+              // color: baseColor // REMOVED: Rely on point colors
             });
           } else {
             seriesData.push({
@@ -1032,7 +1027,7 @@ looker.plugins.visualizations.add({
 
 
         const shouldApplyFormatting = config.conditional_formatting_enabled &&
-                                      (config.conditional_formatting_apply_to === 'all' || index === 0);
+                                      (config.conditional_formatting_apply_to === 'all' || config.conditional_formatting_apply_to === 'first' && index === 0); // FIX 3: Ensure 'first' only applies to index 0
 
         const baseColor = customColors ? customColors[index % customColors.length] : palette[index % palette.length];
 
@@ -1049,12 +1044,12 @@ looker.plugins.visualizations.add({
           seriesData.push({
             name: seriesName,
             data: values.map((v, i) => ({ ...v, color: colors[i] })),
-            // Add a base series color, important for tooltips/default area color
+            // Add a base series color (needed for area/line fill), but point colors will override bars
             color: baseColor,
             showInLegend: true
           });
         } else {
-          // No conditional formatting - use normal series color
+          // No conditional formatting applied to this specific series/mode
           seriesData.push({
             name: seriesName,
             data: values,
@@ -1079,14 +1074,43 @@ looker.plugins.visualizations.add({
         const baseColor = customColors ? customColors[0] : palette[0];
         const stackedColors = this.getColors(stackedTotals, config, baseColor);
 
-        seriesData = seriesData.map(series => ({
-            ...series,
-            data: series.data.map((point, index) => ({
-                ...point,
-                // Override point color with stacked conditional color
-                color: stackedColors[index]
-            }))
-        }));
+        // FIX 1: Apply stacked colors to ALL points in ALL series.
+        seriesData = seriesData.map(series => {
+            // Keep original base color for legend/lines/etc.
+            const seriesBaseColor = series.color;
+
+            return {
+                ...series,
+                data: series.data.map((point, index) => ({
+                    ...point,
+                    // Override point color with stacked conditional color
+                    color: stackedColors[index]
+                }))
+            }
+        });
+    } else if (config.conditional_formatting_enabled && config.conditional_formatting_apply_to === 'first') {
+        // FIX 3: When switching back to 'first', we must ensure NON-first series points
+        // revert to their original series color, which was handled by the `else` block above.
+        // We only need to adjust series that were NOT the first measure,
+        // and whose colors might have been inherited from a previous 'all' or 'stacked' state.
+
+        seriesData = seriesData.map((series, index) => {
+            // If this is the first measure, we leave it alone (it was colored above)
+            if (index === 0) return series;
+
+            // If this is *not* the first measure, and formatting is set to 'first',
+            // we strip explicit point colors and rely on the base series color.
+            const baseColor = customColors ? customColors[index % customColors.length] : palette[index % palette.length];
+
+            return {
+                ...series,
+                data: series.data.map(point => ({
+                    ...point,
+                    color: baseColor // Explicitly reset point color to series default
+                })),
+                color: baseColor // Ensure series color is also the default
+            };
+        });
     }
 
 
@@ -1179,9 +1203,8 @@ looker.plugins.visualizations.add({
             const customFormat = config.x_axis_value_format_custom || '';
             const rawValue = rawDimensionValues[this.pos];
 
-            // FIX 2: Only use the Looker pre-rendered category value if "Auto" is selected
-            // AND there is no custom format string. If a preset (like date_ymd) is selected,
-            // we must explicitly call formatValue to apply the requested formatting.
+            // FIX 2.2: The original code for the X-axis formatter was correct and relied on the logic in formatValue.
+            // The logic below ensures that if a format (custom or preset) is selected, it uses `formatValue` on the `rawValue`.
             if (formatType === 'auto' && customFormat.trim() === '') {
                 return this.value; // Use Looker's pre-rendered category value
             }
@@ -1512,11 +1535,7 @@ looker.plugins.visualizations.add({
     if (!this.chart) {
       this.chart = Highcharts.chart(this._chartContainer, chartOptions);
     } else {
-      // FIX 1: Forcing a non-animated, full redraw on update can resolve
-      // persistent coloring issues when conditional formatting logic changes.
-      // Use second parameter true to force an immediate redraw.
-      // Use third parameter true (oneToOne) to force replacement of arrays (like series)
-      // which is key to clearing persistent state when conditional formatting is switched.
+      // FIX: Force immediate redraw and deep merge to clear persistent coloring issues.
       this.chart.update(chartOptions, true, true);
     }
     done();
@@ -1564,33 +1583,27 @@ looker.plugins.visualizations.add({
 
     if (val === null || val === undefined || isNaN(val)) return false;
 
-    // Fix Top N / Bottom N logic: must check against the threshold for coloring
+    // Top N / Bottom N logic
     if (type === 'topn' || type === 'bottomn') {
         const numericVals = allVals.filter(v => typeof v === 'number');
         // Ensure N is positive integer, default to 5
         const n = Math.max(1, Math.floor(v1 || 5));
 
-        // Handle case where N is greater than available points
-        if (numericVals.length < n) {
-            // If there aren't enough points, just color all points if requested for top/bottom
-            if (n >= numericVals.length && numericVals.length > 0) {
-                 return true;
-            } else {
-                 return false;
-            }
-        }
-
         // Sort values based on rule type
-        const sorted = [...numericVals].sort((a, b) => type === 'topn' ? b - a : a - b);
+        // Use a Set to get unique values for threshold calculation
+        const uniqueSorted = [...new Set(numericVals)].sort((a, b) => type === 'topn' ? b - a : a - b);
+
+        // If n exceeds unique count, color everything
+        if (n >= uniqueSorted.length) return true;
 
         // Find the boundary value (the N-th element)
-        const threshold = sorted[n - 1];
+        const threshold = uniqueSorted[n - 1];
 
         if (type === 'topn') {
-            // Apply color if value is greater than or equal to the Nth value (handling ties)
+            // Apply color if value is greater than or equal to the Nth unique value (handling ties)
             return val >= threshold;
         } else { // bottomn
-            // Apply color if value is less than or equal to the Nth value (handling ties)
+            // Apply color if value is less than or equal to the Nth unique value (handling ties)
             return val <= threshold;
         }
     }
