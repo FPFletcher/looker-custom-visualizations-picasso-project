@@ -233,8 +233,6 @@ looker.plugins.visualizations.add({
     }
 
     try {
-      mapboxgl.accessToken = config.mapbox_token;
-
       if (config.data_mode === 'regions') {
         this._updateRegionMode(data, config, queryResponse, done);
       } else {
@@ -562,6 +560,9 @@ looker.plugins.visualizations.add({
   },
 
   _renderMap: function(layers, config, done) {
+    // Set Mapbox token BEFORE creating map
+    mapboxgl.accessToken = config.mapbox_token;
+
     const viewState = {
       longitude: config.center_lng,
       latitude: config.center_lat,
