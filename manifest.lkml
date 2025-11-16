@@ -57,16 +57,6 @@ visualization: {
 }
 #"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
 
-visualization: {
-  id: "combo_map_3d_googlemap"
-  label: "Combo Map 3D - Google"
-  file: "04_OTHER_visuals/map_combo_3d_googlemap.js"
-
-# No dependencies - uses Google Maps already loaded by Looker!
-  dependencies: []
-}
-
-#"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
 
 visualization: {
   id: "table_vis"
