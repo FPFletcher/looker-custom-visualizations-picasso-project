@@ -1,23 +1,21 @@
 /**
- * Multi-Layer 3D Map for Looker - Fixed US States Support
- *
- * IMPORTANT: Add these to your manifest dependencies:
+ * Multi-Layer 3D Map for Looker - Expanded & Combined Layers
+ * * IMPORTANT: Add these to your manifest dependencies:
  * - https://unpkg.com/topojson-client@3
- *
- * Manifest example:
+ * * Manifest example:
  * {
- *   "dependencies": {
- *     "deck.gl": "https://unpkg.com/deck.gl@latest/dist.min.js",
- *     "mapbox-gl": "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
- *     "mapbox-gl-css": "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
- *     "topojson": "https://unpkg.com/topojson-client@3"
- *   }
+ * "dependencies": {
+ * "deck.gl": "https://unpkg.com/deck.gl@latest/dist.min.js",
+ * "mapbox-gl": "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
+ * "mapbox-gl-css": "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
+ * "topojson": "https://unpkg.com/topojson-client@3"
+ * }
  * }
  */
 
 looker.plugins.visualizations.add({
   id: "combo_map_3d",
-  label: "Combo Map 3D",
+  label: "Combo Map 3D (Expanded)",
   options: {
     // MAP
     mapbox_token: {
@@ -42,19 +40,19 @@ looker.plugins.visualizations.add({
     center_lat: {
       type: "number",
       label: "Center Latitude",
-      default: 46.5,
+      default: 20,
       section: "Map"
     },
     center_lng: {
       type: "number",
       label: "Center Longitude",
-      default: 2.5,
+      default: 0,
       section: "Map"
     },
     zoom: {
       type: "number",
       label: "Zoom",
-      default: 6,
+      default: 2,
       section: "Map"
     },
     pitch: {
@@ -106,11 +104,34 @@ looker.plugins.visualizations.add({
       display: "select",
       values: [
         {"Custom (URL below)": "custom"},
-        {"US States": "us_states"},
-        {"US Counties": "us_counties"},
-        {"Countries": "countries"},
-        {"France Departments": "france_departments"},
-        {"France Regions": "france_regions"}
+        // Global
+        {"World Countries": "world_countries"},
+        // Americas
+        {"USA - States": "us_states"},
+        {"USA - Counties": "us_counties"},
+        {"Canada - Provinces": "canada_provinces"},
+        {"Mexico - States": "mexico_states"},
+        {"Brazil - States": "brazil_states"},
+        // Europe
+        {"France - Departments": "france_departments"},
+        {"France - Regions": "france_regions"},
+        {"UK - Regions": "uk_regions"},
+        {"UK - Sub-units": "uk_subunits"},
+        {"Germany - States (Bundesländer)": "germany_states"},
+        {"Spain - Autonomous Communities": "spain_communities"},
+        {"Italy - Regions": "italy_regions"},
+        {"Netherlands - Provinces": "netherlands_provinces"},
+        {"Switzerland - Cantons": "switzerland_cantons"},
+        // Asia & Oceania
+        {"Australia - States": "australia_states"},
+        {"Japan - Prefectures": "japan_prefectures"},
+        {"China - Provinces": "china_provinces"},
+        {"India - States": "india_states"},
+        // Combined / Super Layers
+        {"COMBINED: North America (US/Can/Mex)": "combined_north_america"},
+        {"COMBINED: Europe Major (Fr/De/Uk/Es/It)": "combined_europe_major"},
+        {"COMBINED: UK & Ireland": "combined_uk_ireland"},
+        {"COMBINED: DACH (De/Au/Ch)": "combined_dach"}
       ],
       default: "custom",
       section: "Layer 1"
@@ -287,17 +308,18 @@ looker.plugins.visualizations.add({
 
     console.log('[MAP] Region dimension:', regionDim.name);
 
-    const geojsonUrl = this._getGeoJSONUrl(config);
+    const geojsonSource = this._getGeoJSONUrl(config);
 
-    if (!geojsonUrl) {
+    if (!geojsonSource) {
       this.addError({ title: "GeoJSON Required", message: "Select map layer or provide URL" });
       done();
       return;
     }
 
-    console.log('[MAP] Loading:', geojsonUrl);
+    console.log('[MAP] Loading source(s)...');
 
-    this._loadGeoJSON(geojsonUrl).then(geojson => {
+    // _loadGeoJSON now handles both single URL strings AND arrays of URLs
+    this._loadGeoJSON(geojsonSource).then(geojson => {
       console.log('[MAP] GeoJSON loaded, features:', geojson.features.length);
       const layers = this._buildRegionLayers(data, geojson, config, queryResponse, regionDim, measures);
       this._renderMap(layers, config, done);
@@ -313,18 +335,100 @@ looker.plugins.visualizations.add({
       return config.layer1_geojson_url;
     }
 
+    // URL CONSTANTS
+    const URLS = {
+        world: 'https://unpkg.com/world-atlas@2/countries-110m.json',
+        us_states: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
+        us_counties: 'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json',
+
+        // France
+        fr_dept: 'https://france-geojson.gregoiredavid.fr/repo/departements.geojson',
+        fr_region: 'https://france-geojson.gregoiredavid.fr/repo/regions.geojson',
+
+        // Americas
+        canada: 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/canada.geojson',
+        mexico: 'https://raw.githubusercontent.com/angelnmara/geojson/master/mexico/mexico.geojson',
+        brazil: 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson',
+
+        // Europe
+        uk_regions: 'https://martinjc.github.io/UK-GeoJSON/json/eng/topo_eer.json', // English Regions
+        uk_subunits: 'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/united-kingdom/uk-subunits.json', // Scotland, Wales, etc
+        germany: 'https://raw.githubusercontent.com/isellsoap/deutschlandGeoJSON/main/2_bundeslaender/3_mittel.geo.json',
+        spain: 'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/spain/spain-comunidad-with-canary-islands.json',
+        italy: 'https://raw.githubusercontent.com/openpolis/geojson-italy/master/geojson/limits_IT_regions.geojson',
+        netherlands: 'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/netherlands/nl-provinces.json',
+        switzerland: 'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/switzerland/switzerland-cantons.json',
+        austria: 'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/austria/austria-states.json',
+        ireland: 'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/ireland/ireland-counties.json',
+
+        // Asia / Oceania
+        australia: 'https://raw.githubusercontent.com/tonywr71/GeoJson-Data/master/australian-states.json',
+        japan: 'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/japan/jp-prefectures.json',
+        china: 'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/china/china-provinces.json',
+        india: 'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/india/india-states.json'
+    };
+
     const builtInMaps = {
-      'us_states': 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
-      'us_counties': 'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json',
-      'countries': 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json',
-      'france_departments': 'https://france-geojson.gregoiredavid.fr/repo/departements.geojson',
-      'france_regions': 'https://france-geojson.gregoiredavid.fr/repo/regions.geojson'
+      'world_countries': URLS.world,
+
+      'us_states': URLS.us_states,
+      'us_counties': URLS.us_counties,
+      'canada_provinces': URLS.canada,
+      'mexico_states': URLS.mexico,
+      'brazil_states': URLS.brazil,
+
+      'france_departments': URLS.fr_dept,
+      'france_regions': URLS.fr_region,
+      'uk_regions': URLS.uk_regions,
+      'uk_subunits': URLS.uk_subunits,
+      'germany_states': URLS.germany,
+      'spain_communities': URLS.spain,
+      'italy_regions': URLS.italy,
+      'netherlands_provinces': URLS.netherlands,
+      'switzerland_cantons': URLS.switzerland,
+
+      'australia_states': URLS.australia,
+      'japan_prefectures': URLS.japan,
+      'china_provinces': URLS.china,
+      'india_states': URLS.india,
+
+      // --- COMBINED GROUPS (Arrays) ---
+      'combined_north_america': [URLS.us_states, URLS.canada, URLS.mexico],
+      'combined_europe_major': [URLS.fr_region, URLS.germany, URLS.uk_regions, URLS.spain, URLS.italy],
+      'combined_uk_ireland': [URLS.uk_subunits, URLS.ireland],
+      'combined_dach': [URLS.germany, URLS.austria, URLS.switzerland]
     };
 
     return builtInMaps[config.layer1_map_layer] || config.layer1_geojson_url;
   },
 
-  _loadGeoJSON: async function(url) {
+  // UPDATED: Handles both string URLs and Arrays of URLs
+  _loadGeoJSON: async function(urlOrList) {
+
+    // 1. Handle Array of URLs (Combined Layers)
+    if (Array.isArray(urlOrList)) {
+      console.log('[MAP] Loading combined layer group...');
+
+      // Fetch all sequentially or parallel (parallel is faster)
+      const promises = urlOrList.map(url => this._loadGeoJSON(url));
+      const results = await Promise.all(promises);
+
+      // Merge all FeatureCollections into one
+      const combinedFeatures = [];
+      results.forEach(geo => {
+        if (geo && geo.features) {
+          combinedFeatures.push(...geo.features);
+        }
+      });
+
+      return {
+        type: "FeatureCollection",
+        features: combinedFeatures
+      };
+    }
+
+    // 2. Handle Single URL
+    const url = urlOrList;
     if (this._geojsonCache[url]) {
       return this._geojsonCache[url];
     }
@@ -333,21 +437,22 @@ looker.plugins.visualizations.add({
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
 
     const data = await response.json();
+    let geojson = data;
 
-    // Handle TopoJSON
+    // Handle TopoJSON conversion
     if (data.type === 'Topology') {
       if (typeof topojson === 'undefined') {
         throw new Error('TopoJSON library not loaded - add to manifest');
       }
-      const objectKey = Object.keys(data.objects)[0];
+      // Try to find the main object
+      const keys = Object.keys(data.objects);
+      const objectKey = keys[0]; // Default to first
       console.log('[MAP] Converting TopoJSON object:', objectKey);
-      const geojson = topojson.feature(data, data.objects[objectKey]);
-      this._geojsonCache[url] = geojson;
-      return geojson;
+      geojson = topojson.feature(data, data.objects[objectKey]);
     }
 
-    this._geojsonCache[url] = data;
-    return data;
+    this._geojsonCache[url] = geojson;
+    return geojson;
   },
 
   _buildPointLayers: function(points, config, measures) {
@@ -423,7 +528,8 @@ looker.plugins.visualizations.add({
     });
 
     console.log('[MAP] Data regions (first 10):', Object.keys(dataMap).slice(0, 10));
-    console.log('[MAP] GeoJSON sample properties:', geojson.features[0]?.properties);
+    // Safety check for features
+    if(!geojson.features) return [];
 
     // Get value range
     const measureIdx = 0;
@@ -435,9 +541,10 @@ looker.plugins.visualizations.add({
     const property = config.layer1_geojson_property || 'name';
     const getDataForFeature = (feature) => {
       const props = feature.properties;
+      if (!props) return null;
 
       // Try exact match on specified property
-      if (dataMap[props[property]]) {
+      if (props[property] && dataMap[props[property]]) {
         return dataMap[props[property]];
       }
 
@@ -505,10 +612,14 @@ looker.plugins.visualizations.add({
       if (!values) return;
 
       let centroid;
-      if (feature.geometry.type === 'Polygon') {
-        centroid = this._polygonCentroid(feature.geometry.coordinates[0]);
-      } else if (feature.geometry.type === 'MultiPolygon') {
-        centroid = this._polygonCentroid(feature.geometry.coordinates[0][0]);
+      // Simple centroid calculation
+      if (feature.geometry) {
+          if (feature.geometry.type === 'Polygon') {
+            centroid = this._polygonCentroid(feature.geometry.coordinates[0]);
+          } else if (feature.geometry.type === 'MultiPolygon') {
+            // Just take the first polygon of the multipolygon for speed
+            centroid = this._polygonCentroid(feature.geometry.coordinates[0][0]);
+          }
       }
 
       if (centroid) {
@@ -552,6 +663,8 @@ looker.plugins.visualizations.add({
 
   _polygonCentroid: function(coordinates) {
     let x = 0, y = 0;
+    if(!coordinates || coordinates.length === 0) return [0,0];
+
     coordinates.forEach(coord => {
       x += coord[0];
       y += coord[1];
