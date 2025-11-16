@@ -974,6 +974,76 @@ looker.plugins.visualizations.add({
   },
 
   /**
+   * Build all layers from data and config
+   */
+  _buildLayers: function(processedData, config) {
+    console.log('[3D MAP] Building layers...');
+    const layers = [];
+
+    // Layer 1: Heatmap/Choropleth
+    if (config.layer1_enabled && config.layer1_measure) {
+      console.log('[3D MAP] Creating Layer 1 (type:', config.layer1_type, ')');
+      const layer1 = this._createLayer1(processedData, config);
+      if (layer1) {
+        console.log('[3D MAP] Layer 1 created successfully');
+        layers.push(layer1);
+      } else {
+        console.warn('[3D MAP] Layer 1 returned null');
+      }
+    } else {
+      console.log('[3D MAP] Layer 1 disabled or no measure specified');
+    }
+
+    // Layer 2: 3D Columns
+    if (config.layer2_enabled && config.layer2_measure) {
+      console.log('[3D MAP] Creating Layer 2 (type:', config.layer2_type, ')');
+      const layer2 = this._createLayer2(processedData, config);
+      if (layer2) {
+        console.log('[3D MAP] Layer 2 created successfully');
+        layers.push(layer2);
+      } else {
+        console.warn('[3D MAP] Layer 2 returned null');
+      }
+    } else {
+      console.log('[3D MAP] Layer 2 disabled or no measure specified');
+    }
+
+    // Layer 3: Points
+    if (config.layer3_enabled && config.layer3_measure) {
+      console.log('[3D MAP] Creating Layer 3 (type:', config.layer3_type, ')');
+      const layer3 = this._createLayer3(processedData, config);
+      if (layer3) {
+        console.log('[3D MAP] Layer 3 created successfully');
+        layers.push(layer3);
+      } else {
+        console.warn('[3D MAP] Layer 3 returned null');
+      }
+    } else {
+      console.log('[3D MAP] Layer 3 disabled or no measure specified');
+    }
+
+    // TEST: Add a simple scatter layer to verify Deck.gl is working
+    console.log('[3D MAP] Adding test scatter layer for debugging...');
+    const testLayer = new deck.ScatterplotLayer({
+      id: 'test-scatter-layer',
+      data: [
+        {position: [-95.7129, 37.0902]}, // Center of US
+        {position: [-118.2437, 34.0522]}, // LA
+        {position: [-73.9352, 40.7306]}, // NYC
+        {position: [2.3522, 48.8566]} // Paris
+      ],
+      getPosition: d => d.position,
+      getRadius: 100000,
+      getFillColor: [255, 0, 0, 200],
+      pickable: true
+    });
+    layers.push(testLayer);
+    console.log('[3D MAP] Test layer added. Total layers:', layers.length);
+
+    return layers;
+  },
+
+  /**
    * Create Layer 1: Heatmap/Choropleth
    */
   _createLayer1: function(data, config) {
