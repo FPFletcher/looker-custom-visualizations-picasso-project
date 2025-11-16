@@ -1,5 +1,5 @@
 /**
- * Multi-Layer 3D Map for Looker (like Looker Studio)
+ * Multi-Layer 3D Map for Looker (Enhanced Debug Version)
  * Combines multiple data layers on one map:
  * - Layer 1: Heatmap/Choropleth
  * - Layer 2: 3D Columns
@@ -142,24 +142,45 @@ looker.plugins.visualizations.add({
 
   create: function(element, config) {
     console.log('[MULTI-LAYER MAP] Creating...');
+    console.log('[MULTI-LAYER MAP] Config:', config);
     element.innerHTML = '<div id="map" style="width:100%;height:100%;"></div>';
     this._container = element.querySelector('#map');
+    console.log('[MULTI-LAYER MAP] Container:', this._container);
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    console.log('[MULTI-LAYER MAP] Update', { rows: data.length });
+    console.log('[MULTI-LAYER MAP] ========== UPDATE START ==========');
+    console.log('[MULTI-LAYER MAP] Data rows:', data.length);
+    console.log('[MULTI-LAYER MAP] Config:', config);
+    console.log('[MULTI-LAYER MAP] QueryResponse:', queryResponse);
 
     this.clearErrors();
 
     // Check dependencies
+    console.log('[MULTI-LAYER MAP] Checking dependencies...');
+    console.log('[MULTI-LAYER MAP] deck available:', typeof deck !== 'undefined');
+    console.log('[MULTI-LAYER MAP] mapboxgl available:', typeof mapboxgl !== 'undefined');
+
     if (typeof deck === 'undefined') {
-      this.addError({ title: "Missing Deck.gl", message: "Check manifest dependencies" });
+      const err = "Missing Deck.gl - Check manifest dependencies";
+      console.error('[MULTI-LAYER MAP]', err);
+      this.addError({ title: "Missing Deck.gl", message: err });
+      done();
+      return;
+    }
+
+    if (typeof mapboxgl === 'undefined') {
+      const err = "Missing Mapbox GL - Check manifest dependencies";
+      console.error('[MULTI-LAYER MAP]', err);
+      this.addError({ title: "Missing Mapbox GL", message: err });
       done();
       return;
     }
 
     if (!config.mapbox_token) {
-      this.addError({ title: "Mapbox Token Required", message: "Add token in settings" });
+      const err = "Add Mapbox token in visualization settings";
+      console.error('[MULTI-LAYER MAP]', err);
+      this.addError({ title: "Mapbox Token Required", message: err });
       done();
       return;
     }
@@ -169,37 +190,67 @@ looker.plugins.visualizations.add({
       const dims = queryResponse.fields.dimension_like;
       const measures = queryResponse.fields.measure_like;
 
+      console.log('[MULTI-LAYER MAP] Dimensions:', dims.map(d => `${d.name} (${d.type})`));
       console.log('[MULTI-LAYER MAP] Measures:', measures.map(m => m.name));
 
       // Find lat/lng
-      const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
-      const lngF = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lon'));
+      const latF = dims.find(d =>
+        d.type === 'latitude' ||
+        d.name.toLowerCase().includes('lat') ||
+        d.label_short?.toLowerCase().includes('lat')
+      );
+      const lngF = dims.find(d =>
+        d.type === 'longitude' ||
+        d.name.toLowerCase().includes('lon') ||
+        d.name.toLowerCase().includes('lng') ||
+        d.label_short?.toLowerCase().includes('lon') ||
+        d.label_short?.toLowerCase().includes('lng')
+      );
+
+      console.log('[MULTI-LAYER MAP] Latitude field:', latF?.name);
+      console.log('[MULTI-LAYER MAP] Longitude field:', lngF?.name);
 
       if (!latF || !lngF) {
-        this.addError({ title: "Need Lat/Lng", message: "Query must have latitude and longitude dimensions" });
+        const err = "Query must have latitude and longitude dimensions";
+        console.error('[MULTI-LAYER MAP]', err);
+        this.addError({ title: "Need Lat/Lng", message: err });
         done();
         return;
       }
 
-      console.log('[MULTI-LAYER MAP] Using:', latF.name, lngF.name);
-
       // Process data
-      const points = data.map(row => ({
-        position: [
-          parseFloat(row[lngF.name].value),
-          parseFloat(row[latF.name].value)
-        ],
-        values: measures.map(m => parseFloat(row[m.name]?.value) || 0)
-      })).filter(p => !isNaN(p.position[0]) && !isNaN(p.position[1]));
+      console.log('[MULTI-LAYER MAP] Processing data...');
+      const points = data.map((row, idx) => {
+        const lat = parseFloat(row[latF.name].value);
+        const lng = parseFloat(row[lngF.name].value);
+        const values = measures.map(m => parseFloat(row[m.name]?.value) || 0);
 
-      console.log('[MULTI-LAYER MAP] Points:', points.length);
+        if (idx < 3) {
+          console.log(`[MULTI-LAYER MAP] Row ${idx}:`, { lat, lng, values });
+        }
+
+        return {
+          position: [lng, lat],
+          values: values
+        };
+      }).filter(p => !isNaN(p.position[0]) && !isNaN(p.position[1]));
+
+      console.log('[MULTI-LAYER MAP] Valid points:', points.length);
+
+      if (points.length === 0) {
+        const err = "No valid lat/lng coordinates found in data";
+        console.error('[MULTI-LAYER MAP]', err);
+        this.addError({ title: "No Data", message: err });
+        done();
+        return;
+      }
 
       // Build layers
       const layers = [];
 
       // Layer 1: Heatmap
       if (config.layer1_enabled && points.length > 0 && measures.length > 0) {
-        console.log('[MULTI-LAYER MAP] Adding heatmap layer');
+        console.log('[MULTI-LAYER MAP] Adding Layer 1 (type:', config.layer1_type, ')');
 
         if (config.layer1_type === 'heatmap') {
           layers.push(new deck.HeatmapLayer({
@@ -212,6 +263,7 @@ looker.plugins.visualizations.add({
           }));
         } else {
           const colorRange = this._getColorRange(config.layer1_color_start, config.layer1_color_end);
+          console.log('[MULTI-LAYER MAP] Layer 1 color range:', colorRange);
           layers.push(new deck.HexagonLayer({
             id: 'hexagon-heatmap',
             data: points,
@@ -229,7 +281,12 @@ looker.plugins.visualizations.add({
       // Layer 2: 3D Columns
       if (config.layer2_enabled && points.length > 0) {
         const measureIdx = measures.length > 1 ? 1 : 0;
-        console.log('[MULTI-LAYER MAP] Adding 3D columns, measure index:', measureIdx);
+        console.log('[MULTI-LAYER MAP] Adding Layer 2 (3D columns), measure index:', measureIdx);
+        console.log('[MULTI-LAYER MAP] Layer 2 settings:', {
+          radius: config.layer2_radius,
+          elevationScale: config.layer2_height_scale,
+          color: config.layer2_color
+        });
 
         layers.push(new deck.ColumnLayer({
           id: '3d-columns',
@@ -250,7 +307,7 @@ looker.plugins.visualizations.add({
       // Layer 3: Points
       if (config.layer3_enabled && points.length > 0) {
         const measureIdx = measures.length > 2 ? 2 : 0;
-        console.log('[MULTI-LAYER MAP] Adding points, measure index:', measureIdx);
+        console.log('[MULTI-LAYER MAP] Adding Layer 3 (points), measure index:', measureIdx);
 
         layers.push(new deck.ScatterplotLayer({
           id: 'points',
@@ -263,10 +320,11 @@ looker.plugins.visualizations.add({
         }));
       }
 
-      console.log('[MULTI-LAYER MAP] Total layers:', layers.length);
+      console.log('[MULTI-LAYER MAP] Total layers to render:', layers.length);
 
       // Set Mapbox token
       mapboxgl.accessToken = config.mapbox_token;
+      console.log('[MULTI-LAYER MAP] Mapbox token set');
 
       // Create/update Deck
       const viewState = {
@@ -277,26 +335,53 @@ looker.plugins.visualizations.add({
         bearing: 0
       };
 
+      console.log('[MULTI-LAYER MAP] View state:', viewState);
+
       if (!this._deck) {
-        console.log('[MULTI-LAYER MAP] Creating Deck.gl');
-        this._deck = new deck.DeckGL({
-          container: this._container,
-          mapStyle: config.map_style,
-          initialViewState: viewState,
-          controller: true,
-          layers: layers,
-          onLoad: () => console.log('[MULTI-LAYER MAP] ✅ Map loaded!'),
-          onError: (err) => console.error('[MULTI-LAYER MAP] Error:', err)
-        });
+        console.log('[MULTI-LAYER MAP] Creating new Deck.gl instance');
+        try {
+          this._deck = new deck.DeckGL({
+            container: this._container,
+            mapStyle: config.map_style,
+            initialViewState: viewState,
+            controller: true,
+            layers: layers,
+            onLoad: () => console.log('[MULTI-LAYER MAP] ✅ Map loaded successfully!'),
+            onError: (err) => {
+              console.error('[MULTI-LAYER MAP] ❌ Deck.gl error:', err);
+              this.addError({ title: "Deck.gl Error", message: err.message || String(err) });
+            }
+          });
+          console.log('[MULTI-LAYER MAP] Deck.gl instance created:', this._deck);
+        } catch (err) {
+          console.error('[MULTI-LAYER MAP] ❌ Error creating Deck.gl:', err);
+          this.addError({ title: "Creation Error", message: err.message });
+          done();
+          return;
+        }
       } else {
-        console.log('[MULTI-LAYER MAP] Updating layers');
-        this._deck.setProps({ layers, initialViewState: viewState });
+        console.log('[MULTI-LAYER MAP] Updating existing Deck.gl instance');
+        try {
+          this._deck.setProps({
+            layers,
+            initialViewState: viewState,
+            mapStyle: config.map_style
+          });
+          console.log('[MULTI-LAYER MAP] Deck.gl updated');
+        } catch (err) {
+          console.error('[MULTI-LAYER MAP] ❌ Error updating Deck.gl:', err);
+          this.addError({ title: "Update Error", message: err.message });
+          done();
+          return;
+        }
       }
 
+      console.log('[MULTI-LAYER MAP] ========== UPDATE COMPLETE ==========');
       done();
 
     } catch (error) {
-      console.error('[MULTI-LAYER MAP] Error:', error);
+      console.error('[MULTI-LAYER MAP] ❌ Fatal error:', error);
+      console.error('[MULTI-LAYER MAP] Stack trace:', error.stack);
       this.addError({ title: "Error", message: error.message });
       done();
     }
@@ -332,8 +417,12 @@ looker.plugins.visualizations.add({
   },
 
   destroy: function() {
+    console.log('[MULTI-LAYER MAP] Destroying...');
     if (this._deck) {
       this._deck.finalize();
+      this._deck = null;
     }
   }
 });
+
+console.log('[MULTI-LAYER MAP] Visualization registered');
