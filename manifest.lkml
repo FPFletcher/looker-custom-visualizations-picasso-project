@@ -52,10 +52,10 @@ visualization: {
   dependencies: [
     "https://unpkg.com/deck.gl@^8.9.0/dist.min.js",
     "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
-    "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
     "https://d3js.org/d3.v7.min.js"
   ]
 }
+
 
 #"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
 

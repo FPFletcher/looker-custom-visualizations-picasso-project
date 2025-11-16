@@ -39,7 +39,7 @@ looker.plugins.visualizations.add({
     mapbox_token: {
       type: "string",
       label: "Mapbox Access Token",
-      placeholder: "pk.eyJ1...",
+      placeholder: "Get free token at mapbox.com/signup",
       section: "Map",
       order: 2
     },
@@ -152,6 +152,22 @@ looker.plugins.visualizations.add({
       default: "geojson",
       section: "Layer 1",
       order: 2
+    },
+
+    layer1_geojson_url: {
+      type: "string",
+      label: "GeoJSON URL (for State/Region Fill)",
+      placeholder: "https://raw.githubusercontent.com/YOUR_REPO/regions.geojson",
+      section: "Layer 1",
+      order: 3
+    },
+
+    layer1_geojson_property: {
+      type: "string",
+      label: "GeoJSON Property Key (region name field)",
+      default: "nom",
+      section: "Layer 1",
+      order: 4
     },
 
     layer1_measure: {
@@ -452,6 +468,16 @@ looker.plugins.visualizations.add({
    */
   create: function(element, config) {
     console.log('[3D MAP] Creating visualization...');
+
+    // Inject Mapbox CSS dynamically (can't be loaded via manifest)
+    if (!document.getElementById('mapbox-css')) {
+      const link = document.createElement('link');
+      link.id = 'mapbox-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css';
+      document.head.appendChild(link);
+      console.log('[3D MAP] Mapbox CSS injected');
+    }
 
     // Create main container
     element.innerHTML = '';
@@ -981,11 +1007,138 @@ looker.plugins.visualizations.add({
         colorRange: this._getColorRange(config.layer1_color_start, config.layer1_color_end),
         pickable: true
       });
-    } else {
+    } else if (config.layer1_type === 'geojson') {
       // GeoJsonLayer for state/region fills
-      console.log('[3D MAP] GeoJSON layer requested but not implemented yet');
+      console.log('[3D MAP] Creating GeoJsonLayer from URL:', config.layer1_geojson_url);
+
+      if (!config.layer1_geojson_url) {
+        console.warn('[3D MAP] No GeoJSON URL provided');
+        return null;
+      }
+
+      // Load GeoJSON and create layer
+      // Note: We need to fetch the data first, then create layer
+      // Store reference for async loading
+      if (!this._geojsonData) {
+        console.log('[3D MAP] Fetching GeoJSON data...');
+        this._loadGeoJSON(config.layer1_geojson_url, data, config);
+        return null;
+      }
+
+      console.log('[3D MAP] Creating GeoJsonLayer with loaded data');
+      return this._createGeoJsonLayer(data, config);
+    } else {
+      console.log('[3D MAP] Unknown layer type');
       return null;
     }
+  },
+
+  /**
+   * Load GeoJSON data from URL
+   */
+  _loadGeoJSON: function(url, data, config) {
+    console.log('[3D MAP] Loading GeoJSON from:', url);
+
+    fetch(url)
+      .then(response => {
+        console.log('[3D MAP] GeoJSON fetch response:', response.status);
+        return response.json();
+      })
+      .then(geojson => {
+        console.log('[3D MAP] GeoJSON loaded successfully');
+        console.log('[3D MAP] Features count:', geojson.features?.length);
+        this._geojsonData = geojson;
+
+        // Trigger re-render with loaded data
+        if (this._deckgl) {
+          console.log('[3D MAP] Re-rendering with GeoJSON data');
+          const layers = this._buildLayers(data, config);
+          this._deckgl.setProps({ layers: layers });
+        }
+      })
+      .catch(error => {
+        console.error('[3D MAP] Error loading GeoJSON:', error);
+      });
+  },
+
+  /**
+   * Create GeoJSON layer with data
+   */
+  _createGeoJsonLayer: function(data, config) {
+    console.log('[3D MAP] _createGeoJsonLayer called');
+
+    if (!this._geojsonData) {
+      console.warn('[3D MAP] No GeoJSON data available');
+      return null;
+    }
+
+    const measureField = config.layer1_measure;
+    const propertyKey = config.layer1_geojson_property || 'nom';
+
+    // Create lookup map from data for coloring
+    const dataLookup = {};
+    data.points.forEach(point => {
+      if (point.location) {
+        dataLookup[point.location] = point.measures[measureField] || 0;
+      }
+    });
+
+    // Also check aggregated data
+    Object.keys(data.aggregated).forEach(location => {
+      if (!dataLookup[location]) {
+        dataLookup[location] = data.aggregated[location].measures[measureField] || 0;
+      }
+    });
+
+    console.log('[3D MAP] Data lookup created:', Object.keys(dataLookup).length, 'entries');
+    console.log('[3D MAP] Sample data:', Object.keys(dataLookup).slice(0, 5));
+
+    // Get min/max for color scaling
+    const values = Object.values(dataLookup);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+
+    console.log('[3D MAP] Value range:', minValue, 'to', maxValue);
+
+    return new deck.GeoJsonLayer({
+      id: 'geojson-layer',
+      data: this._geojsonData,
+      filled: true,
+      stroked: true,
+      pickable: true,
+      autoHighlight: true,
+      opacity: config.layer1_opacity,
+
+      getFillColor: f => {
+        const regionName = f.properties[propertyKey];
+        const value = dataLookup[regionName];
+
+        if (value === undefined || value === null) {
+          console.log('[3D MAP] No data for region:', regionName);
+          return [200, 200, 200, 100]; // Gray for no data
+        }
+
+        // Normalize value to 0-1 range
+        const normalized = maxValue === minValue ? 0.5 : (value - minValue) / (maxValue - minValue);
+
+        // Interpolate color
+        const color = this._interpolateColorRgb(
+          config.layer1_color_start,
+          config.layer1_color_end,
+          normalized
+        );
+
+        return [...color, 255 * config.layer1_opacity];
+      },
+
+      getLineColor: [255, 255, 255, 100],
+      getLineWidth: 1000,
+      lineWidthMinPixels: 1,
+
+      updateTriggers: {
+        getFillColor: [measureField, dataLookup, config.layer1_color_start, config.layer1_color_end]
+      }
+    });
   },
 
   /**
