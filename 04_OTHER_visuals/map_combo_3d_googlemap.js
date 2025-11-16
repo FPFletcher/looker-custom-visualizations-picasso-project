@@ -429,6 +429,43 @@ looker.plugins.visualizations.add({
 
     this.clearErrors();
 
+    // Check if Google Maps is loaded
+    console.log('[GOOGLE 3D MAP] Checking Google Maps availability...');
+    console.log('[GOOGLE 3D MAP] window.google exists?', typeof window.google !== 'undefined');
+    console.log('[GOOGLE 3D MAP] google.maps exists?', typeof google !== 'undefined' && typeof google.maps !== 'undefined');
+
+    if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+      console.warn('[GOOGLE 3D MAP] Google Maps not loaded yet, waiting...');
+
+      // Wait for Google Maps to load
+      let attempts = 0;
+      const checkInterval = setInterval(() => {
+        attempts++;
+        console.log('[GOOGLE 3D MAP] Attempt', attempts, 'checking for Google Maps...');
+
+        if (typeof google !== 'undefined' && typeof google.maps !== 'undefined') {
+          console.log('[GOOGLE 3D MAP] Google Maps loaded! Proceeding...');
+          clearInterval(checkInterval);
+          this._renderVisualization(data, element, config, queryResponse, details, done);
+        } else if (attempts > 50) { // 5 seconds timeout
+          console.error('[GOOGLE 3D MAP] Timeout waiting for Google Maps');
+          clearInterval(checkInterval);
+          this.addError({
+            title: "Google Maps Not Available",
+            message: "Google Maps API failed to load. Try refreshing the page."
+          });
+          done();
+        }
+      }, 100);
+
+      return;
+    }
+
+    console.log('[GOOGLE 3D MAP] Google Maps available, proceeding...');
+    this._renderVisualization(data, element, config, queryResponse, details, done);
+  },
+
+  _renderVisualization: function(data, element, config, queryResponse, details, done) {
     try {
       // Parse query
       const dimensions = queryResponse.fields.dimension_like;
@@ -492,26 +529,37 @@ looker.plugins.visualizations.add({
    */
   _initializeMap: function(config) {
     console.log('[GOOGLE 3D MAP] Initializing map...');
+    console.log('[GOOGLE 3D MAP] Map div:', this._mapDiv);
+    console.log('[GOOGLE 3D MAP] google.maps.Map available?', typeof google.maps.Map !== 'undefined');
 
-    const mapOptions = {
-      center: { lat: config.center_lat, lng: config.center_lng },
-      zoom: config.zoom_level,
-      mapTypeId: config.map_type,
-      tilt: config.enable_3d_tilt ? config.tilt_angle : 0,
-      heading: config.heading,
-      mapTypeControl: true,
-      streetViewControl: false,
-      fullscreenControl: true,
-      rotateControl: config.enable_3d_tilt
-    };
+    try {
+      const mapOptions = {
+        center: { lat: config.center_lat, lng: config.center_lng },
+        zoom: config.zoom_level,
+        mapTypeId: config.map_type,
+        tilt: config.enable_3d_tilt ? config.tilt_angle : 0,
+        heading: config.heading,
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true,
+        rotateControl: config.enable_3d_tilt
+      };
 
-    this._map = new google.maps.Map(this._mapDiv, mapOptions);
+      console.log('[GOOGLE 3D MAP] Map options:', mapOptions);
 
-    console.log('[GOOGLE 3D MAP] Map initialized');
+      this._map = new google.maps.Map(this._mapDiv, mapOptions);
 
-    // Auto-rotation
-    if (config.enable_rotation) {
-      this._startRotation(config.rotation_speed);
+      console.log('[GOOGLE 3D MAP] Map initialized successfully');
+      console.log('[GOOGLE 3D MAP] Map object:', this._map);
+
+      // Auto-rotation
+      if (config.enable_rotation) {
+        console.log('[GOOGLE 3D MAP] Starting auto-rotation');
+        this._startRotation(config.rotation_speed);
+      }
+    } catch (error) {
+      console.error('[GOOGLE 3D MAP] Error initializing map:', error);
+      throw error;
     }
   },
 
@@ -539,12 +587,24 @@ looker.plugins.visualizations.add({
    */
   _processData: function(data, latField, lngField, locationField, measures, dimensions, config) {
     console.log('[GOOGLE 3D MAP] Processing data...');
+    console.log('[GOOGLE 3D MAP] Data rows:', data.length);
+    console.log('[GOOGLE 3D MAP] Lat field:', latField?.name);
+    console.log('[GOOGLE 3D MAP] Lng field:', lngField?.name);
+    console.log('[GOOGLE 3D MAP] Location field:', locationField?.name);
 
     const processed = {
       points: [],
       aggregated: {},
-      bounds: new google.maps.LatLngBounds()
+      bounds: null // Will create after checking google.maps
     };
+
+    // Create bounds object if Google Maps available
+    if (typeof google !== 'undefined' && typeof google.maps !== 'undefined') {
+      processed.bounds = new google.maps.LatLngBounds();
+      console.log('[GOOGLE 3D MAP] Bounds object created');
+    } else {
+      console.warn('[GOOGLE 3D MAP] Google Maps not available, skipping bounds');
+    }
 
     data.forEach((row, idx) => {
       let lat, lng, location;
@@ -563,7 +623,11 @@ looker.plugins.visualizations.add({
       }
 
       if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
-        processed.bounds.extend({ lat, lng });
+        if (processed.bounds) {
+          processed.bounds.extend({ lat, lng });
+        }
+
+        console.log('[GOOGLE 3D MAP] Processing point:', location || `${lat}, ${lng}`);
 
         // Extract measure values
         const measureValues = {};
@@ -658,9 +722,13 @@ looker.plugins.visualizations.add({
    * Update all layers
    */
   _updateLayers: function(data, config, measures) {
-    console.log('[GOOGLE 3D MAP] Updating layers...');
+    console.log('[GOOGLE 3D MAP] ========== Updating layers ==========');
+    console.log('[GOOGLE 3D MAP] Layer 1 enabled?', config.layer1_enabled);
+    console.log('[GOOGLE 3D MAP] Layer 2 enabled?', config.layer2_enabled);
+    console.log('[GOOGLE 3D MAP] Layer 3 enabled?', config.layer3_enabled);
 
     // Clear existing markers/overlays
+    console.log('[GOOGLE 3D MAP] Clearing existing markers:', this._markers.length);
     this._markers.forEach(m => m.setMap(null));
     this._overlays.forEach(o => o.setMap(null));
     this._markers = [];
@@ -668,21 +736,33 @@ looker.plugins.visualizations.add({
 
     // Layer 1: GeoJSON Choropleth
     if (config.layer1_enabled && config.layer1_geojson_url) {
+      console.log('[GOOGLE 3D MAP] Updating Layer 1...');
       this._updateLayer1(data, config);
     } else {
+      console.log('[GOOGLE 3D MAP] Layer 1 disabled or no URL');
       // Clear GeoJSON layer
-      this._map.data.forEach(feature => this._map.data.remove(feature));
+      if (this._map && this._map.data) {
+        this._map.data.forEach(feature => this._map.data.remove(feature));
+      }
     }
 
     // Layer 2: 3D Columns/Markers
     if (config.layer2_enabled && config.layer2_measure) {
+      console.log('[GOOGLE 3D MAP] Updating Layer 2...');
       this._updateLayer2(data, config, measures);
+    } else {
+      console.log('[GOOGLE 3D MAP] Layer 2 disabled or no measure');
     }
 
     // Layer 3: Points/Bubbles
     if (config.layer3_enabled && config.layer3_measure) {
+      console.log('[GOOGLE 3D MAP] Updating Layer 3...');
       this._updateLayer3(data, config, measures);
+    } else {
+      console.log('[GOOGLE 3D MAP] Layer 3 disabled or no measure');
     }
+
+    console.log('[GOOGLE 3D MAP] ========== Layers updated ==========');
   },
 
   /**
