@@ -52,10 +52,10 @@ visualization: {
   dependencies: [
     "https://unpkg.com/deck.gl@latest/dist.min.js",
     "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
-    "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
     "https://unpkg.com/topojson-client@3"
   ]
 }
+#"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
 
 visualization: {
   id: "combo_map_3d_googlemap"
