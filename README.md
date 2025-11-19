@@ -19,9 +19,9 @@ In terms of process used, a detailed guide can be found in our community platfor
 **One-line step by step:** Copy paste CDN Link in your Admin/ Visualization page OR Fork this repo → Connect to Looker via Git → Disable some visuals as needed on `manifest.lkml` → Deploy  
 
 **Detailed step by step:**  
-**To get a specific visual quickly**, simply **copy paste the CDN Links** of your chosen visuals (list [here](#01-studio-visuals)) to your Looker's "Admin"/ "Visualization" page.  
+**_ To get a specific visual quickly**, simply **copy paste the CDN Links** of your chosen visuals (list [here](#01-studio-visuals)) to your Looker's "Admin"/ "Visualization" page.  
 
-**To import and fully own the visualization set up,** 
+**_ To import and fully own the visualization set up,** 
 1. **Fork or Clone the Repository**
    - Fork [this repository](https://github.com/FPFletcher/looker-custom-visualizations-picasso-project) to your GitHub account, OR clone it directly:
 ```bash
