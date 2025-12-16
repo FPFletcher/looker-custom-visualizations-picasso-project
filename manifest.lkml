@@ -65,6 +65,12 @@ visualization: {
 }
 
 visualization: {
+  id: "custom-advanced-cross-filter-japanese"
+  label: "Advanced Cross Filtering (Japanese Version)"
+  file: "04_OTHER_visuals/advanced_cross_filtering_japanese.js"
+}
+
+visualization: {
   id: "table_vis"
   label: "Test"
   file: "table-viz.js"
