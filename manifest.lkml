@@ -59,6 +59,12 @@ visualization: {
 
 
 visualization: {
+  id: "custom-advanced-cross-filter"
+  label: "Advanced Cross Filtering"
+  file: "04_OTHER_visuals/advanced_cross_filtering.js"
+}
+
+visualization: {
   id: "table_vis"
   label: "Test"
   file: "table-viz.js"
