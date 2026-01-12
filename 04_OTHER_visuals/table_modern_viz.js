@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.4.1 - Fixed Field Formatting Registration
- * Build: 2026-01-12-v7
+ * Version: 4.5.0 - FIXED Field Name Matching
+ * Build: 2026-01-12-v8
  */
 
 const visObject = {
@@ -1057,8 +1057,8 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.4.1 - Build 2026-01-12-v7');
-    console.log('[TABLE] Fixed field formatting option registration');
+    console.log('[TABLE] Advanced Table v4.5.0 - Build 2026-01-12-v8');
+    console.log('[TABLE] FIXED: Field names now match correctly!');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1464,7 +1464,8 @@ const visObject = {
     console.log('[TABLE] Adding dynamic field formatting options for', allFields.length, 'fields');
 
     allFields.forEach((field, idx) => {
-      const fieldKey = field.name.replace(/\./g, '_');
+      // Keep field name as-is (don't replace dots/underscores) for config keys
+      const fieldKey = field.name;
       const baseOrder = 82 + (idx * 3); // 3 options per field (divider + label + format)
       const fieldLabel = field.label_short || field.label;
 
@@ -1568,11 +1569,12 @@ const visObject = {
     }
 
     // Extract custom field formatting (labels and value formats)
+    // Field names are stored as-is in config keys (e.g., field_label_order_items.created_year)
     parsed.fieldFormatting = {};
     if (config.enable_custom_field_formatting) {
       Object.keys(config).forEach(key => {
         if (key.startsWith('field_label_')) {
-          const fieldName = key.replace('field_label_', '').replace(/_/g, '.');
+          const fieldName = key.replace('field_label_', '');
           if (!parsed.fieldFormatting[fieldName]) {
             parsed.fieldFormatting[fieldName] = {};
           }
@@ -1580,7 +1582,7 @@ const visObject = {
             parsed.fieldFormatting[fieldName].label = config[key];
           }
         } else if (key.startsWith('field_format_')) {
-          const fieldName = key.replace('field_format_', '').replace(/_/g, '.');
+          const fieldName = key.replace('field_format_', '');
           if (!parsed.fieldFormatting[fieldName]) {
             parsed.fieldFormatting[fieldName] = {};
           }
@@ -1949,13 +1951,6 @@ const visObject = {
         : {};
 
       const displayLabel = fieldFormat.label || (field.label_short || field.label);
-
-      // Debug: Log field formatting lookup
-      if (config.enable_custom_field_formatting && idx === 0) {
-        console.log('[TABLE] DEBUG First field name:', field.name);
-        console.log('[TABLE] DEBUG fieldFormatting keys:', Object.keys(config.fieldFormatting || {}));
-        console.log('[TABLE] DEBUG fieldFormat for first field:', fieldFormat);
-      }
 
       html += `
         <th
