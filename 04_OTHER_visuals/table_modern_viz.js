@@ -443,6 +443,19 @@ const visObject = {
       order: 41
     },
 
+    comparison_mode: {
+      type: "string",
+      label: "Comparison Mode",
+      display: "select",
+      values: [
+        { "Metric vs Metric": "metric" },
+        { "Period over Period": "period" }
+      ],
+      default: "metric",
+      section: "Series",
+      order: 42
+    },
+
     comparison_primary_field: {
       type: "string",
       label: "Primary Measure",
@@ -450,17 +463,38 @@ const visObject = {
       default: "",
       placeholder: "measure_name",
       section: "Series",
-      order: 42
+      order: 43
     },
 
     comparison_secondary_field: {
       type: "string",
-      label: "Secondary Measure (to compare against)",
+      label: "Secondary Measure (Metric vs Metric mode)",
       display: "text",
       default: "",
       placeholder: "measure_name",
       section: "Series",
-      order: 43
+      order: 44
+    },
+
+    comparison_period_offset: {
+      type: "number",
+      label: "Period Offset (Period over Period mode)",
+      display: "number",
+      default: 1,
+      min: 1,
+      max: 100,
+      section: "Series",
+      order: 45
+    },
+
+    comparison_label: {
+      type: "string",
+      label: "Comparison Label",
+      display: "text",
+      default: "vs Previous",
+      placeholder: "vs Last Year, MoM, YoY, etc.",
+      section: "Series",
+      order: 46
     },
 
     comparison_type: {
@@ -475,7 +509,7 @@ const visObject = {
       ],
       default: "percentage",
       section: "Series",
-      order: 44
+      order: 47
     },
 
     show_comparison_arrows: {
@@ -483,7 +517,7 @@ const visObject = {
       label: "Show Comparison Arrows",
       default: true,
       section: "Series",
-      order: 45
+      order: 48
     },
 
     positive_comparison_color: {
@@ -492,7 +526,7 @@ const visObject = {
       display: "color",
       default: "#10b981",
       section: "Series",
-      order: 46
+      order: 49
     },
 
     negative_comparison_color: {
@@ -501,7 +535,7 @@ const visObject = {
       display: "color",
       default: "#ef4444",
       section: "Series",
-      order: 47
+      order: 50
     },
 
     series_divider_datachips: {
@@ -1552,10 +1586,12 @@ const visObject = {
 
     // Find hierarchy levels
     const hierarchyField = config.hierarchy_field;
+    const childrenMap = new Map(); // Track which values have children
 
     data.forEach((row, idx) => {
       const value = row[hierarchyField];
       const strValue = value && value.value !== undefined ? String(value.value) : String(value);
+      row._hierarchy_id = strValue;
 
       // For date hierarchy
       if (config.detect_date_hierarchy) {
@@ -1568,15 +1604,31 @@ const visObject = {
           if (day) {
             row._hierarchy_level = 2;
             row._hierarchy_parent = `${year}-${month}`;
+            // Mark parent as having children
+            if (!childrenMap.has(`${year}-${month}`)) {
+              childrenMap.set(`${year}-${month}`, []);
+            }
+            childrenMap.get(`${year}-${month}`).push(strValue);
           } else if (month) {
             row._hierarchy_level = 1;
             row._hierarchy_parent = year;
+            // Mark parent as having children
+            if (!childrenMap.has(year)) {
+              childrenMap.set(year, []);
+            }
+            childrenMap.get(year).push(strValue);
           } else {
             row._hierarchy_level = 0;
             row._hierarchy_parent = null;
           }
         }
       }
+    });
+
+    // Mark rows that have children
+    data.forEach(row => {
+      row._has_children = childrenMap.has(row._hierarchy_id);
+      row._children = childrenMap.get(row._hierarchy_id) || [];
     });
 
     return data;
@@ -1777,7 +1829,7 @@ const visObject = {
           >
             ${isHierarchyField ?
               this.renderHierarchyCell(cellValue, field, config, row, hierarchyLevel) :
-              this.renderCellContent(cellValue, field, config, row)}
+              this.renderCellContent(cellValue, field, config, row, rowIdx, data)}
           </td>
         `;
 
@@ -1795,22 +1847,23 @@ const visObject = {
 
   renderHierarchyCell: function(cellValue, field, config, row, level) {
     const indent = level * config.hierarchy_indent;
-    const hasChildren = row._has_children;
-    const isExpanded = this.state.expandedRows.has(row);
+    const hasChildren = row._has_children || false;
+    const rowId = row._hierarchy_id || '';
+    const isExpanded = this.state.expandedRows.has(rowId);
 
     let content = '';
     if (config.show_hierarchy_icons && hasChildren) {
       const icon = isExpanded ? '▼' : '▶';
       content = `
         <div class="hierarchy-cell" style="padding-left: ${indent}px;">
-          <span class="hierarchy-toggle" data-row-id="${row.id}">${icon}</span>
-          <span class="hierarchy-content">${this.renderCellContent(cellValue, field, config, row)}</span>
+          <span class="hierarchy-toggle" data-row-id="${this.escapeHtml(rowId)}">${icon}</span>
+          <span class="hierarchy-content">${this.renderCellContent(cellValue, field, config, row, undefined, undefined)}</span>
         </div>
       `;
     } else {
       content = `
         <div class="hierarchy-cell" style="padding-left: ${indent + (config.show_hierarchy_icons ? 22 : 0)}px;">
-          <span class="hierarchy-content">${this.renderCellContent(cellValue, field, config, row)}</span>
+          <span class="hierarchy-content">${this.renderCellContent(cellValue, field, config, row, undefined, undefined)}</span>
         </div>
       `;
     }
@@ -1818,7 +1871,7 @@ const visObject = {
     return content;
   },
 
-  renderCellContent: function(cellValue, field, config, row) {
+  renderCellContent: function(cellValue, field, config, row, rowIdx, data) {
     // Extract actual value and drill links
     let value = cellValue;
     let rendered = cellValue;
@@ -1854,7 +1907,7 @@ const visObject = {
 
     // Check for comparison
     if (config.enable_comparison && config.comparison_primary_field === field.name) {
-      return this.renderComparison(row, config, drillLinks);
+      return this.renderComparison(row, config, drillLinks, rowIdx, data);
     }
 
     // Wrap with drill links if available
@@ -2000,24 +2053,60 @@ const visObject = {
     return html;
   },
 
-  renderComparison: function(row, config, drillLinks) {
-    // Get primary and secondary values
+  renderComparison: function(row, config, drillLinks, rowIdx, data) {
     const primaryCell = row[config.comparison_primary_field];
-    const secondaryCell = row[config.comparison_secondary_field];
 
-    if (!primaryCell || !secondaryCell) {
-      const primaryVal = primaryCell && primaryCell.value !== undefined ? primaryCell.value : primaryCell;
-      return primaryVal !== undefined ? String(primaryVal) : '';
+    if (!primaryCell) {
+      return '';
     }
 
     const primaryValue = primaryCell.value !== undefined ? primaryCell.value : primaryCell;
     const primaryRendered = primaryCell.rendered || primaryValue;
-    const secondaryValue = secondaryCell.value !== undefined ? secondaryCell.value : secondaryCell;
-
     const primary = parseFloat(primaryValue);
-    const secondary = parseFloat(secondaryValue);
 
-    if (isNaN(primary) || isNaN(secondary) || secondary === 0) {
+    if (isNaN(primary)) {
+      return String(primaryRendered);
+    }
+
+    let secondary, comparisonLabel;
+
+    // METRIC VS METRIC MODE
+    if (config.comparison_mode === 'metric') {
+      const secondaryCell = row[config.comparison_secondary_field];
+
+      if (!secondaryCell) {
+        return String(primaryRendered);
+      }
+
+      const secondaryValue = secondaryCell.value !== undefined ? secondaryCell.value : secondaryCell;
+      secondary = parseFloat(secondaryValue);
+      comparisonLabel = config.comparison_label || 'vs Metric';
+    }
+    // PERIOD OVER PERIOD MODE
+    else if (config.comparison_mode === 'period') {
+      if (rowIdx === undefined || !data || rowIdx < config.comparison_period_offset) {
+        // Can't compare if we're in the first N rows
+        return String(primaryRendered);
+      }
+
+      const previousRowIdx = rowIdx - config.comparison_period_offset;
+      const previousRow = data[previousRowIdx];
+
+      if (!previousRow) {
+        return String(primaryRendered);
+      }
+
+      const previousCell = previousRow[config.comparison_primary_field];
+      if (!previousCell) {
+        return String(primaryRendered);
+      }
+
+      const previousValue = previousCell.value !== undefined ? previousCell.value : previousCell;
+      secondary = parseFloat(previousValue);
+      comparisonLabel = config.comparison_label || `vs -${config.comparison_period_offset}`;
+    }
+
+    if (isNaN(secondary) || secondary === 0) {
       return String(primaryRendered);
     }
 
@@ -2042,7 +2131,7 @@ const visObject = {
     let html = `
       <div class="comparison-container">
         <span${drillId ? ` class="drill-link" data-drill-id="${drillId}"` : ''}>${primaryRendered}</span>
-        <span class="comparison-value" style="color: ${color};">
+        <span class="comparison-value" style="color: ${color};" title="${comparisonLabel}">
           ${arrow} ${comparisonText}
         </span>
     `;
