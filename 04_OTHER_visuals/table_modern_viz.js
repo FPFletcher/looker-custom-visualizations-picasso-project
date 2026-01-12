@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.5.1 - Value Formatting Implemented
- * Build: 2026-01-12-v9
+ * Version: 4.6.0 - Subtotals Foundation + Null Fix
+ * Build: 2026-01-12-v10
  */
 
 const visObject = {
@@ -552,6 +552,58 @@ const visObject = {
       order: 72
     },
 
+    // ========== SUBTOTALS & TOTALS ==========
+    subtotals_divider: {
+      type: "string",
+      label: "─────────────────────────────── Subtotals & Totals ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 73
+    },
+
+    enable_subtotals: {
+      type: "boolean",
+      label: "Enable Subtotals",
+      default: false,
+      section: "Series",
+      order: 74
+    },
+
+    subtotal_dimension: {
+      type: "string",
+      label: "Group By Dimension (for Subtotals)",
+      display: "select",
+      values: [{"None": ""}],
+      default: "",
+      section: "Series",
+      order: 75
+    },
+
+    show_grand_total: {
+      type: "boolean",
+      label: "Show Grand Total Row",
+      default: false,
+      section: "Series",
+      order: 76
+    },
+
+    subtotal_label: {
+      type: "string",
+      label: "Subtotal Label Format",
+      default: "Subtotal: {value}",
+      placeholder: "Use {value} for dimension value",
+      section: "Series",
+      order: 77
+    },
+
+    grand_total_label: {
+      type: "string",
+      label: "Grand Total Label",
+      default: "Grand Total",
+      section: "Series",
+      order: 78
+    },
+
     series_divider_field_labels: {
       type: "string",
       label: "─────────────────────────────── Field Formatting ───────────────────────────────",
@@ -1057,8 +1109,9 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.5.1 - Build 2026-01-12-v9');
-    console.log('[TABLE] Labels & Value Formatting WORKING!');
+    console.log('[TABLE] Advanced Table v4.6.0 - Build 2026-01-12-v10');
+    console.log('[TABLE] Fixed: [object Object] → ∅');
+    console.log('[TABLE] Added: Subtotals configuration (WIP)');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1462,6 +1515,16 @@ const visObject = {
     // Dynamically add field formatting options (Label + Value Format only)
     const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
     console.log('[TABLE] Adding dynamic field formatting options for', allFields.length, 'fields');
+
+    // Populate subtotal dimension dropdown with available dimensions
+    const dimensions = queryResponse.fields.dimension_like;
+    if (dimensions.length > 0) {
+      const dimensionValues = [{"None": ""}];
+      dimensions.forEach(dim => {
+        dimensionValues.push({[dim.label_short || dim.label]: dim.name});
+      });
+      this.options.subtotal_dimension.values = dimensionValues;
+    }
 
     allFields.forEach((field, idx) => {
       // Keep field name as-is (don't replace dots/underscores) for config keys
@@ -2180,9 +2243,20 @@ const visObject = {
       drillLinks = cellValue.links || [];
     }
 
+    // Fix [object Object] display for null/empty values
+    if (value === null || value === undefined || value === '') {
+      rendered = '∅'; // Or use "(Empty)" if you prefer
+    } else if (typeof rendered === 'object' && rendered !== null) {
+      // If rendered is still an object, try to extract a sensible string
+      rendered = String(value);
+      if (rendered === '[object Object]') {
+        rendered = '∅';
+      }
+    }
+
     // Apply custom format if available
     const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name];
-    if (fieldFormat && fieldFormat.format) {
+    if (fieldFormat && fieldFormat.format && value !== null && value !== undefined && value !== '') {
       // Use the raw value for formatting, not the rendered value
       const formattedValue = this.formatValue(value, fieldFormat.format, field);
       if (formattedValue !== '') {
