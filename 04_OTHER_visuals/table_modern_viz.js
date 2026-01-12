@@ -1950,6 +1950,13 @@ const visObject = {
 
       const displayLabel = fieldFormat.label || (field.label_short || field.label);
 
+      // Debug: Log field formatting lookup
+      if (config.enable_custom_field_formatting && idx === 0) {
+        console.log('[TABLE] DEBUG First field name:', field.name);
+        console.log('[TABLE] DEBUG fieldFormatting keys:', Object.keys(config.fieldFormatting || {}));
+        console.log('[TABLE] DEBUG fieldFormat for first field:', fieldFormat);
+      }
+
       html += `
         <th
           class="sortable ${frozenClass}"
