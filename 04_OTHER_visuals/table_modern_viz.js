@@ -1,6 +1,6 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 3.0.0 - Production Grade with Proper Drills and Cell Bars
+ * Version: 4.0.0 - Production Ready
  */
 
 const visObject = {
@@ -11,27 +11,28 @@ const visObject = {
     // TAB: PLOT
     // ══════════════════════════════════════════════════════════════
 
-    plot_divider_theme: {
+    plot_divider_display: {
       type: "string",
-      label: "─────────────────────────────── Theme ───────────────────────────────",
+      label: "─────────────────────────────── Display Options ───────────────────────────────",
       display: "divider",
       section: "Plot",
       order: 0
     },
 
-    table_theme: {
-      type: "string",
-      label: "Table Theme",
-      display: "select",
-      values: [
-        { "Modern": "modern" },
-        { "Classic": "classic" },
-        { "Minimal": "minimal" },
-        { "Striped": "striped" }
-      ],
-      default: "modern",
+    show_row_numbers: {
+      type: "boolean",
+      label: "Show Row Numbers",
+      default: false,
       section: "Plot",
       order: 1
+    },
+
+    show_headers: {
+      type: "boolean",
+      label: "Show Headers",
+      default: true,
+      section: "Plot",
+      order: 2
     },
 
     plot_divider_pagination: {
@@ -83,36 +84,12 @@ const visObject = {
       order: 14
     },
 
-    plot_divider_display: {
-      type: "string",
-      label: "─────────────────────────────── Display Options ───────────────────────────────",
-      display: "divider",
-      section: "Plot",
-      order: 20
-    },
-
-    show_row_numbers: {
-      type: "boolean",
-      label: "Show Row Numbers",
-      default: false,
-      section: "Plot",
-      order: 21
-    },
-
-    show_headers: {
-      type: "boolean",
-      label: "Show Headers",
-      default: true,
-      section: "Plot",
-      order: 22
-    },
-
     plot_divider_freezing: {
       type: "string",
       label: "─────────────────────────────── Freezing ───────────────────────────────",
       display: "divider",
       section: "Plot",
-      order: 30
+      order: 20
     },
 
     freeze_columns: {
@@ -123,7 +100,7 @@ const visObject = {
       min: 0,
       max: 10,
       section: "Plot",
-      order: 31
+      order: 21
     },
 
     freeze_header_row: {
@@ -131,7 +108,7 @@ const visObject = {
       label: "Freeze Header Row",
       default: true,
       section: "Plot",
-      order: 32
+      order: 22
     },
 
     plot_divider_filtering: {
@@ -139,7 +116,7 @@ const visObject = {
       label: "─────────────────────────────── Filtering ───────────────────────────────",
       display: "divider",
       section: "Plot",
-      order: 40
+      order: 30
     },
 
     enable_table_filter: {
@@ -147,7 +124,7 @@ const visObject = {
       label: "Enable Table-wide Filter",
       default: false,
       section: "Plot",
-      order: 41
+      order: 31
     },
 
     enable_column_filters: {
@@ -155,7 +132,7 @@ const visObject = {
       label: "Enable Column Filters",
       default: false,
       section: "Plot",
-      order: 42
+      order: 32
     },
 
     filter_highlight_color: {
@@ -164,7 +141,7 @@ const visObject = {
       display: "color",
       default: "#fef08a",
       section: "Plot",
-      order: 43
+      order: 33
     },
 
     // ══════════════════════════════════════════════════════════════
@@ -179,39 +156,144 @@ const visObject = {
       order: 0
     },
 
-    enable_cell_bars: {
+    enable_cell_bars_1: {
       type: "boolean",
-      label: "Enable Cell Bar Charts",
+      label: "Enable Cell Bar Set 1",
       default: false,
       section: "Series",
       order: 1
     },
 
-    cell_bar_field: {
+    cell_bar_fields_1: {
       type: "string",
-      label: "Cell Bar Field",
+      label: "Cell Bar Fields 1 (comma-separated)",
       display: "text",
       default: "",
-      placeholder: "measure_name",
+      placeholder: "measure1,measure2,measure3",
       section: "Series",
       order: 2
     },
 
-    cell_bar_color: {
+    cell_bar_color_1: {
       type: "string",
-      label: "Cell Bar Color",
+      label: "Cell Bar Color 1",
       display: "color",
       default: "#3b82f6",
       section: "Series",
       order: 3
     },
 
-    cell_bar_show_value: {
+    cell_bar_gradient_1: {
       type: "boolean",
-      label: "Show Value on Cell Bar",
-      default: true,
+      label: "Use Gradient for Set 1",
+      default: false,
       section: "Series",
       order: 4
+    },
+
+    cell_bar_gradient_end_1: {
+      type: "string",
+      label: "Gradient End Color 1",
+      display: "color",
+      default: "#93c5fd",
+      section: "Series",
+      order: 5
+    },
+
+    enable_cell_bars_2: {
+      type: "boolean",
+      label: "Enable Cell Bar Set 2",
+      default: false,
+      section: "Series",
+      order: 6
+    },
+
+    cell_bar_fields_2: {
+      type: "string",
+      label: "Cell Bar Fields 2 (comma-separated)",
+      display: "text",
+      default: "",
+      placeholder: "measure1,measure2",
+      section: "Series",
+      order: 7
+    },
+
+    cell_bar_color_2: {
+      type: "string",
+      label: "Cell Bar Color 2",
+      display: "color",
+      default: "#10b981",
+      section: "Series",
+      order: 8
+    },
+
+    cell_bar_gradient_2: {
+      type: "boolean",
+      label: "Use Gradient for Set 2",
+      default: false,
+      section: "Series",
+      order: 9
+    },
+
+    cell_bar_gradient_end_2: {
+      type: "string",
+      label: "Gradient End Color 2",
+      display: "color",
+      default: "#6ee7b7",
+      section: "Series",
+      order: 10
+    },
+
+    enable_cell_bars_3: {
+      type: "boolean",
+      label: "Enable Cell Bar Set 3",
+      default: false,
+      section: "Series",
+      order: 11
+    },
+
+    cell_bar_fields_3: {
+      type: "string",
+      label: "Cell Bar Fields 3 (comma-separated)",
+      display: "text",
+      default: "",
+      placeholder: "measure1,measure2",
+      section: "Series",
+      order: 12
+    },
+
+    cell_bar_color_3: {
+      type: "string",
+      label: "Cell Bar Color 3",
+      display: "color",
+      default: "#f59e0b",
+      section: "Series",
+      order: 13
+    },
+
+    cell_bar_gradient_3: {
+      type: "boolean",
+      label: "Use Gradient for Set 3",
+      default: false,
+      section: "Series",
+      order: 14
+    },
+
+    cell_bar_gradient_end_3: {
+      type: "string",
+      label: "Gradient End Color 3",
+      display: "color",
+      default: "#fcd34d",
+      section: "Series",
+      order: 15
+    },
+
+    cell_bar_show_value: {
+      type: "boolean",
+      label: "Show Value on Cell Bars",
+      default: true,
+      section: "Series",
+      order: 16
     },
 
     cell_bar_max_width: {
@@ -222,77 +304,7 @@ const visObject = {
       min: 20,
       max: 100,
       section: "Series",
-      order: 5
-    },
-
-    series_divider_sparklines: {
-      type: "string",
-      label: "─────────────────────────────── Trend Sparklines ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 10
-    },
-
-    enable_sparklines: {
-      type: "boolean",
-      label: "Enable Trend Sparklines",
-      default: false,
-      section: "Series",
-      order: 11
-    },
-
-    sparkline_measure: {
-      type: "string",
-      label: "Sparkline Measure",
-      display: "text",
-      default: "",
-      placeholder: "measure_name",
-      section: "Series",
-      order: 12
-    },
-
-    sparkline_dimension: {
-      type: "string",
-      label: "Group By Dimension",
-      display: "text",
-      default: "",
-      placeholder: "dimension_name (e.g., product, category)",
-      section: "Series",
-      order: 13
-    },
-
-    sparkline_type: {
-      type: "string",
-      label: "Sparkline Type",
-      display: "select",
-      values: [
-        { "Line": "line" },
-        { "Area": "area" },
-        { "Bar": "bar" }
-      ],
-      default: "line",
-      section: "Series",
-      order: 14
-    },
-
-    sparkline_color: {
-      type: "string",
-      label: "Sparkline Color",
-      display: "color",
-      default: "#3b82f6",
-      section: "Series",
-      order: 15
-    },
-
-    sparkline_height: {
-      type: "number",
-      label: "Sparkline Height (px)",
-      default: 30,
-      display: "number",
-      min: 20,
-      max: 100,
-      section: "Series",
-      order: 16
+      order: 17
     },
 
     series_divider_grouping: {
@@ -319,12 +331,13 @@ const visObject = {
       order: 22
     },
 
-    column_group_1_fields: {
-      type: "string",
-      label: "Group 1 Fields (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "field1,field2,field3",
+    column_group_1_count: {
+      type: "number",
+      label: "Group 1 - Number of Columns from Left",
+      display: "number",
+      default: 2,
+      min: 1,
+      max: 20,
       section: "Series",
       order: 23
     },
@@ -337,12 +350,13 @@ const visObject = {
       order: 24
     },
 
-    column_group_2_fields: {
-      type: "string",
-      label: "Group 2 Fields (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "field1,field2,field3",
+    column_group_2_count: {
+      type: "number",
+      label: "Group 2 - Number of Columns from Left",
+      display: "number",
+      default: 4,
+      min: 1,
+      max: 20,
       section: "Series",
       order: 25
     },
@@ -355,14 +369,31 @@ const visObject = {
       order: 26
     },
 
-    column_group_3_fields: {
-      type: "string",
-      label: "Group 3 Fields (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "field1,field2,field3",
+    column_group_3_count: {
+      type: "number",
+      label: "Group 3 - Number of Columns from Left",
+      display: "number",
+      default: 6,
+      min: 1,
+      max: 20,
       section: "Series",
       order: 27
+    },
+
+    group_remaining_columns: {
+      type: "boolean",
+      label: "Group All Remaining Columns",
+      default: false,
+      section: "Series",
+      order: 28
+    },
+
+    remaining_columns_name: {
+      type: "string",
+      label: "Remaining Columns Group Name",
+      default: "Other",
+      section: "Series",
+      order: 29
     },
 
     group_header_bg_color: {
@@ -371,7 +402,7 @@ const visObject = {
       display: "color",
       default: "#e0e7ff",
       section: "Series",
-      order: 28
+      order: 30
     },
 
     series_divider_hierarchy: {
@@ -379,7 +410,7 @@ const visObject = {
       label: "─────────────────────────────── Hierarchical Data ───────────────────────────────",
       display: "divider",
       section: "Series",
-      order: 30
+      order: 40
     },
 
     enable_hierarchy: {
@@ -387,7 +418,7 @@ const visObject = {
       label: "Enable Hierarchical Display",
       default: false,
       section: "Series",
-      order: 31
+      order: 41
     },
 
     hierarchy_field: {
@@ -397,7 +428,7 @@ const visObject = {
       default: "",
       placeholder: "dimension_name",
       section: "Series",
-      order: 32
+      order: 42
     },
 
     hierarchy_indent: {
@@ -408,7 +439,7 @@ const visObject = {
       min: 0,
       max: 100,
       section: "Series",
-      order: 33
+      order: 43
     },
 
     show_hierarchy_icons: {
@@ -416,7 +447,7 @@ const visObject = {
       label: "Show Hierarchy Expand/Collapse Icons",
       default: true,
       section: "Series",
-      order: 34
+      order: 44
     },
 
     detect_date_hierarchy: {
@@ -424,7 +455,7 @@ const visObject = {
       label: "Auto-detect Date Hierarchy",
       default: true,
       section: "Series",
-      order: 35
+      order: 45
     },
 
     series_divider_comparison: {
@@ -432,7 +463,7 @@ const visObject = {
       label: "─────────────────────────────── Comparison ───────────────────────────────",
       display: "divider",
       section: "Series",
-      order: 40
+      order: 50
     },
 
     enable_comparison: {
@@ -440,7 +471,7 @@ const visObject = {
       label: "Enable Comparison Display",
       default: false,
       section: "Series",
-      order: 41
+      order: 51
     },
 
     comparison_mode: {
@@ -453,7 +484,7 @@ const visObject = {
       ],
       default: "metric",
       section: "Series",
-      order: 42
+      order: 52
     },
 
     comparison_primary_field: {
@@ -463,7 +494,7 @@ const visObject = {
       default: "",
       placeholder: "measure_name",
       section: "Series",
-      order: 43
+      order: 53
     },
 
     comparison_secondary_field: {
@@ -473,18 +504,18 @@ const visObject = {
       default: "",
       placeholder: "measure_name",
       section: "Series",
-      order: 44
+      order: 54
     },
 
     comparison_period_offset: {
       type: "number",
-      label: "Period Offset (Period over Period mode)",
+      label: "Period Offset (use negative for previous, e.g., -1)",
       display: "number",
-      default: 1,
-      min: 1,
+      default: -1,
+      min: -100,
       max: 100,
       section: "Series",
-      order: 45
+      order: 55
     },
 
     comparison_label: {
@@ -494,7 +525,7 @@ const visObject = {
       default: "vs Previous",
       placeholder: "vs Last Year, MoM, YoY, etc.",
       section: "Series",
-      order: 46
+      order: 56
     },
 
     comparison_type: {
@@ -509,7 +540,7 @@ const visObject = {
       ],
       default: "percentage",
       section: "Series",
-      order: 47
+      order: 57
     },
 
     show_comparison_arrows: {
@@ -517,7 +548,7 @@ const visObject = {
       label: "Show Comparison Arrows",
       default: true,
       section: "Series",
-      order: 48
+      order: 58
     },
 
     positive_comparison_color: {
@@ -526,7 +557,7 @@ const visObject = {
       display: "color",
       default: "#10b981",
       section: "Series",
-      order: 49
+      order: 59
     },
 
     negative_comparison_color: {
@@ -535,43 +566,7 @@ const visObject = {
       display: "color",
       default: "#ef4444",
       section: "Series",
-      order: 50
-    },
-
-    series_divider_datachips: {
-      type: "string",
-      label: "─────────────────────────────── Data Chips ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 50
-    },
-
-    enable_datachips: {
-      type: "boolean",
-      label: "Enable Data Chips",
-      default: false,
-      section: "Series",
-      order: 51
-    },
-
-    datachip_field: {
-      type: "string",
-      label: "Data Chip Field",
-      display: "text",
-      default: "",
-      placeholder: "status",
-      section: "Series",
-      order: 52
-    },
-
-    datachip_config: {
-      type: "string",
-      label: "Data Chip Configuration (JSON)",
-      display: "textarea",
-      default: '{"Active": "#10b981", "Inactive": "#ef4444", "Pending": "#f59e0b"}',
-      placeholder: '{"value": "color"}',
-      section: "Series",
-      order: 53
+      order: 60
     },
 
     series_divider_emojis: {
@@ -579,7 +574,7 @@ const visObject = {
       label: "─────────────────────────────── Emojis ───────────────────────────────",
       display: "divider",
       section: "Series",
-      order: 60
+      order: 70
     },
 
     enable_emojis: {
@@ -587,7 +582,7 @@ const visObject = {
       label: "Enable Emoji Rendering",
       default: false,
       section: "Series",
-      order: 61
+      order: 71
     },
 
     emoji_mapping: {
@@ -597,19 +592,53 @@ const visObject = {
       default: '{"positive": "✅", "negative": "❌", "warning": "⚠️", "star": "⭐"}',
       placeholder: '{"keyword": "emoji"}',
       section: "Series",
-      order: 62
+      order: 72
     },
 
     // ══════════════════════════════════════════════════════════════
     // TAB: FORMATTING
     // ══════════════════════════════════════════════════════════════
 
+    formatting_divider_theme: {
+      type: "string",
+      label: "─────────────────────────────── Theme ───────────────────────────────",
+      display: "divider",
+      section: "Formatting",
+      order: 0
+    },
+
+    table_theme: {
+      type: "string",
+      label: "Table Theme",
+      display: "select",
+      values: [
+        { "Modern": "modern" },
+        { "Classic": "classic" },
+        { "Minimal": "minimal" },
+        { "Striped": "striped" },
+        { "Bordered": "bordered" },
+        { "Compact": "compact" }
+      ],
+      default: "modern",
+      section: "Formatting",
+      order: 1
+    },
+
+    stripe_color: {
+      type: "string",
+      label: "Stripe Background Color",
+      display: "color",
+      default: "#f9fafb",
+      section: "Formatting",
+      order: 2
+    },
+
     formatting_divider_headers: {
       type: "string",
       label: "─────────────────────────────── Headers ───────────────────────────────",
       display: "divider",
       section: "Formatting",
-      order: 0
+      order: 10
     },
 
     header_font_family: {
@@ -628,7 +657,7 @@ const visObject = {
       ],
       default: "default",
       section: "Formatting",
-      order: 1
+      order: 11
     },
 
     header_font_size: {
@@ -639,7 +668,7 @@ const visObject = {
       min: 8,
       max: 32,
       section: "Formatting",
-      order: 2
+      order: 12
     },
 
     header_font_weight: {
@@ -654,7 +683,7 @@ const visObject = {
       ],
       default: "bold",
       section: "Formatting",
-      order: 3
+      order: 13
     },
 
     header_text_color: {
@@ -663,7 +692,7 @@ const visObject = {
       display: "color",
       default: "#1f2937",
       section: "Formatting",
-      order: 4
+      order: 14
     },
 
     header_bg_color: {
@@ -672,7 +701,7 @@ const visObject = {
       display: "color",
       default: "#f9fafb",
       section: "Formatting",
-      order: 5
+      order: 15
     },
 
     header_alignment: {
@@ -686,7 +715,7 @@ const visObject = {
       ],
       default: "left",
       section: "Formatting",
-      order: 6
+      order: 16
     },
 
     formatting_divider_cells: {
@@ -694,7 +723,7 @@ const visObject = {
       label: "─────────────────────────────── Cells ───────────────────────────────",
       display: "divider",
       section: "Formatting",
-      order: 10
+      order: 20
     },
 
     cell_font_family: {
@@ -713,7 +742,7 @@ const visObject = {
       ],
       default: "default",
       section: "Formatting",
-      order: 11
+      order: 21
     },
 
     cell_font_size: {
@@ -724,7 +753,7 @@ const visObject = {
       min: 8,
       max: 32,
       section: "Formatting",
-      order: 12
+      order: 22
     },
 
     cell_text_color: {
@@ -733,7 +762,7 @@ const visObject = {
       display: "color",
       default: "#374151",
       section: "Formatting",
-      order: 13
+      order: 23
     },
 
     cell_bg_color: {
@@ -742,7 +771,7 @@ const visObject = {
       display: "color",
       default: "#ffffff",
       section: "Formatting",
-      order: 14
+      order: 24
     },
 
     cell_alignment: {
@@ -757,7 +786,7 @@ const visObject = {
       ],
       default: "auto",
       section: "Formatting",
-      order: 15
+      order: 25
     },
 
     wrap_text: {
@@ -765,7 +794,7 @@ const visObject = {
       label: "Wrap Text in Cells",
       default: false,
       section: "Formatting",
-      order: 16
+      order: 26
     },
 
     row_height: {
@@ -776,7 +805,7 @@ const visObject = {
       min: 24,
       max: 200,
       section: "Formatting",
-      order: 17
+      order: 27
     },
 
     formatting_divider_borders: {
@@ -784,7 +813,7 @@ const visObject = {
       label: "─────────────────────────────── Borders & Spacing ───────────────────────────────",
       display: "divider",
       section: "Formatting",
-      order: 20
+      order: 30
     },
 
     show_borders: {
@@ -792,7 +821,7 @@ const visObject = {
       label: "Show Borders",
       default: true,
       section: "Formatting",
-      order: 21
+      order: 31
     },
 
     border_style: {
@@ -807,7 +836,7 @@ const visObject = {
       ],
       default: "solid",
       section: "Formatting",
-      order: 22
+      order: 32
     },
 
     border_width: {
@@ -818,7 +847,7 @@ const visObject = {
       min: 0,
       max: 5,
       section: "Formatting",
-      order: 23
+      order: 33
     },
 
     border_color: {
@@ -827,7 +856,7 @@ const visObject = {
       display: "color",
       default: "#e5e7eb",
       section: "Formatting",
-      order: 24
+      order: 34
     },
 
     show_gridlines: {
@@ -835,7 +864,7 @@ const visObject = {
       label: "Show Gridlines",
       default: true,
       section: "Formatting",
-      order: 25
+      order: 35
     },
 
     column_spacing: {
@@ -846,7 +875,7 @@ const visObject = {
       min: 0,
       max: 50,
       section: "Formatting",
-      order: 26
+      order: 36
     },
 
     row_spacing: {
@@ -857,7 +886,7 @@ const visObject = {
       min: 0,
       max: 20,
       section: "Formatting",
-      order: 27
+      order: 37
     },
 
     formatting_divider_hover: {
@@ -865,7 +894,7 @@ const visObject = {
       label: "─────────────────────────────── Hover & Interaction ───────────────────────────────",
       display: "divider",
       section: "Formatting",
-      order: 30
+      order: 40
     },
 
     enable_hover: {
@@ -873,7 +902,7 @@ const visObject = {
       label: "Enable Hover Effects",
       default: true,
       section: "Formatting",
-      order: 31
+      order: 41
     },
 
     hover_highlight_type: {
@@ -888,7 +917,7 @@ const visObject = {
       ],
       default: "row",
       section: "Formatting",
-      order: 32
+      order: 42
     },
 
     hover_bg_color: {
@@ -897,7 +926,7 @@ const visObject = {
       display: "color",
       default: "#f3f4f6",
       section: "Formatting",
-      order: 33
+      order: 43
     },
 
     enable_tooltips: {
@@ -905,7 +934,7 @@ const visObject = {
       label: "Enable Tooltips",
       default: true,
       section: "Formatting",
-      order: 34
+      order: 44
     },
 
     tooltip_show_label: {
@@ -913,7 +942,7 @@ const visObject = {
       label: "Show Field Label in Tooltip",
       default: true,
       section: "Formatting",
-      order: 35
+      order: 45
     },
 
     formatting_divider_conditional: {
@@ -921,7 +950,7 @@ const visObject = {
       label: "─────────────────────────────── Conditional Formatting ───────────────────────────────",
       display: "divider",
       section: "Formatting",
-      order: 40
+      order: 50
     },
 
     enable_row_conditional: {
@@ -929,7 +958,7 @@ const visObject = {
       label: "Enable Row Conditional Formatting",
       default: false,
       section: "Formatting",
-      order: 41
+      order: 51
     },
 
     row_condition_field: {
@@ -939,7 +968,7 @@ const visObject = {
       default: "",
       placeholder: "field_name",
       section: "Formatting",
-      order: 42
+      order: 52
     },
 
     row_condition_operator: {
@@ -957,7 +986,7 @@ const visObject = {
       ],
       default: ">",
       section: "Formatting",
-      order: 43
+      order: 53
     },
 
     row_condition_value: {
@@ -966,7 +995,7 @@ const visObject = {
       display: "text",
       default: "",
       section: "Formatting",
-      order: 44
+      order: 54
     },
 
     row_condition_bg_color: {
@@ -975,7 +1004,7 @@ const visObject = {
       display: "color",
       default: "#fef3c7",
       section: "Formatting",
-      order: 45
+      order: 55
     },
 
     row_condition_text_color: {
@@ -984,7 +1013,7 @@ const visObject = {
       display: "color",
       default: "#92400e",
       section: "Formatting",
-      order: 46
+      order: 56
     },
 
     enable_column_conditional: {
@@ -992,7 +1021,7 @@ const visObject = {
       label: "Enable Column Conditional Formatting",
       default: false,
       section: "Formatting",
-      order: 47
+      order: 57
     },
 
     column_condition_field: {
@@ -1002,7 +1031,7 @@ const visObject = {
       default: "",
       placeholder: "field_name",
       section: "Formatting",
-      order: 48
+      order: 58
     },
 
     column_condition_operator: {
@@ -1019,7 +1048,7 @@ const visObject = {
       ],
       default: ">",
       section: "Formatting",
-      order: 49
+      order: 59
     },
 
     column_condition_value: {
@@ -1028,7 +1057,7 @@ const visObject = {
       display: "text",
       default: "",
       section: "Formatting",
-      order: 50
+      order: 60
     },
 
     column_condition_bg_color: {
@@ -1037,7 +1066,7 @@ const visObject = {
       display: "color",
       default: "#dbeafe",
       section: "Formatting",
-      order: 51
+      order: 61
     },
 
     column_condition_text_color: {
@@ -1046,7 +1075,7 @@ const visObject = {
       display: "color",
       default: "#1e40af",
       section: "Formatting",
-      order: 52
+      order: 62
     }
   },
 
@@ -1137,10 +1166,12 @@ const visObject = {
           background: #ffffff;
         }
 
+        /* STRIPED THEME */
         table.advanced-table.striped tbody tr:nth-child(even) {
-          background: #f9fafb;
+          background: var(--stripe-color, #f9fafb);
         }
 
+        /* MINIMAL THEME */
         table.advanced-table.minimal {
           border: none;
         }
@@ -1151,6 +1182,7 @@ const visObject = {
           border-bottom: 1px solid #f3f4f6;
         }
 
+        /* CLASSIC THEME */
         table.advanced-table.classic {
           border: 2px solid #d1d5db;
         }
@@ -1162,6 +1194,28 @@ const visObject = {
 
         table.advanced-table.classic td {
           border: 1px solid #e5e7eb;
+        }
+
+        /* BORDERED THEME */
+        table.advanced-table.bordered {
+          border: 2px solid #374151;
+        }
+
+        table.advanced-table.bordered th {
+          background: #1f2937;
+          color: #ffffff;
+          border: 1px solid #4b5563;
+        }
+
+        table.advanced-table.bordered td {
+          border: 1px solid #d1d5db;
+        }
+
+        /* COMPACT THEME */
+        table.advanced-table.compact th,
+        table.advanced-table.compact td {
+          padding: 4px 8px !important;
+          font-size: 10px;
         }
 
         .column-group-header {
@@ -1177,15 +1231,18 @@ const visObject = {
           background: inherit;
         }
 
-        .frozen-header {
+        thead {
           position: sticky;
           top: 0;
-          z-index: 3;
+          z-index: 10;
+        }
+
+        thead th {
           background: inherit;
         }
 
-        .frozen-column.frozen-header {
-          z-index: 4;
+        .frozen-column thead th {
+          z-index: 11;
         }
 
         th, td {
@@ -1271,28 +1328,6 @@ const visObject = {
 
         .hierarchy-content {
           flex: 1;
-        }
-
-        .sparkline-container {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-        }
-
-        .sparkline-svg {
-          width: 100%;
-          height: 100%;
-        }
-
-        .data-chip {
-          display: inline-block;
-          padding: 4px 10px;
-          border-radius: 12px;
-          font-size: 11px;
-          font-weight: 500;
-          color: white;
-          white-space: nowrap;
         }
 
         .comparison-container {
@@ -1391,8 +1426,7 @@ const visObject = {
       tableFilter: '',
       columnFilters: {},
       expandedRows: new Set(),
-      data: [],
-      sparklineData: {}
+      data: []
     };
   },
 
@@ -1413,11 +1447,6 @@ const visObject = {
 
     // Parse configuration
     const parsedConfig = this.parseConfig(config);
-
-    // Process sparkline data if enabled
-    if (parsedConfig.enable_sparklines && parsedConfig.sparkline_dimension && parsedConfig.sparkline_measure) {
-      this.state.sparklineData = this.processSparklineData(data, parsedConfig, queryResponse);
-    }
 
     // Apply filters
     let filteredData = this.applyFilters(data, parsedConfig);
@@ -1440,7 +1469,7 @@ const visObject = {
       filteredData.slice(startIdx, endIdx) : filteredData;
 
     // Render table
-    this.renderTable(pageData, filteredData.length, totalPages, parsedConfig, queryResponse);
+    this.renderTable(pageData, filteredData, totalPages, parsedConfig, queryResponse);
 
     done();
   },
@@ -1450,14 +1479,6 @@ const visObject = {
 
     // Parse JSON configurations
     try {
-      if (config.datachip_config) {
-        parsed.datachips = JSON.parse(config.datachip_config);
-      }
-    } catch (e) {
-      parsed.datachips = {};
-    }
-
-    try {
       if (config.emoji_mapping) {
         parsed.emojis = JSON.parse(config.emoji_mapping);
       }
@@ -1465,55 +1486,47 @@ const visObject = {
       parsed.emojis = {};
     }
 
-    // Parse column groups
+    // Parse cell bar sets
+    parsed.cellBarSets = [];
+    for (let i = 1; i <= 3; i++) {
+      if (config[`enable_cell_bars_${i}`] && config[`cell_bar_fields_${i}`]) {
+        parsed.cellBarSets.push({
+          fields: config[`cell_bar_fields_${i}`].split(',').map(f => f.trim()).filter(f => f),
+          color: config[`cell_bar_color_${i}`],
+          gradient: config[`cell_bar_gradient_${i}`],
+          gradientEnd: config[`cell_bar_gradient_end_${i}`]
+        });
+      }
+    }
+
+    // Parse column groups based on counts
     parsed.column_groups = [];
-    if (config.column_group_1_name && config.column_group_1_fields) {
-      parsed.column_groups.push({
-        name: config.column_group_1_name,
-        fields: config.column_group_1_fields.split(',').map(f => f.trim()).filter(f => f)
-      });
+    const fields = this.queryResponse ?
+      this.queryResponse.fields.dimension_like.concat(this.queryResponse.fields.measure_like) : [];
+
+    let currentIndex = 0;
+    for (let i = 1; i <= 3; i++) {
+      const name = config[`column_group_${i}_name`];
+      const count = config[`column_group_${i}_count`];
+      if (name && count > 0) {
+        const groupFields = fields.slice(currentIndex, currentIndex + count).map(f => f.name);
+        if (groupFields.length > 0) {
+          parsed.column_groups.push({ name, fields: groupFields });
+          currentIndex += count;
+        }
+      }
     }
-    if (config.column_group_2_name && config.column_group_2_fields) {
+
+    // Handle remaining columns
+    if (config.group_remaining_columns && currentIndex < fields.length) {
+      const remainingFields = fields.slice(currentIndex).map(f => f.name);
       parsed.column_groups.push({
-        name: config.column_group_2_name,
-        fields: config.column_group_2_fields.split(',').map(f => f.trim()).filter(f => f)
-      });
-    }
-    if (config.column_group_3_name && config.column_group_3_fields) {
-      parsed.column_groups.push({
-        name: config.column_group_3_name,
-        fields: config.column_group_3_fields.split(',').map(f => f.trim()).filter(f => f)
+        name: config.remaining_columns_name || 'Other',
+        fields: remainingFields
       });
     }
 
     return parsed;
-  },
-
-  processSparklineData: function(data, config, queryResponse) {
-    // Group data by the sparkline dimension and extract measure values
-    const sparklineData = {};
-    const dimension = config.sparkline_dimension;
-    const measure = config.sparkline_measure;
-
-    data.forEach(row => {
-      const dimCell = row[dimension];
-      const dimValue = dimCell && dimCell.value !== undefined ? dimCell.value : dimCell;
-      const key = String(dimValue);
-
-      if (!sparklineData[key]) {
-        sparklineData[key] = [];
-      }
-
-      const measureCell = row[measure];
-      const measureValue = measureCell && measureCell.value !== undefined ?
-        parseFloat(measureCell.value) : parseFloat(measureCell);
-
-      if (!isNaN(measureValue)) {
-        sparklineData[key].push(measureValue);
-      }
-    });
-
-    return sparklineData;
   },
 
   applyFilters: function(data, config) {
@@ -1586,7 +1599,7 @@ const visObject = {
 
     // Find hierarchy levels
     const hierarchyField = config.hierarchy_field;
-    const childrenMap = new Map(); // Track which values have children
+    const childrenMap = new Map();
 
     data.forEach((row, idx) => {
       const value = row[hierarchyField];
@@ -1604,7 +1617,6 @@ const visObject = {
           if (day) {
             row._hierarchy_level = 2;
             row._hierarchy_parent = `${year}-${month}`;
-            // Mark parent as having children
             if (!childrenMap.has(`${year}-${month}`)) {
               childrenMap.set(`${year}-${month}`, []);
             }
@@ -1612,7 +1624,6 @@ const visObject = {
           } else if (month) {
             row._hierarchy_level = 1;
             row._hierarchy_parent = year;
-            // Mark parent as having children
             if (!childrenMap.has(year)) {
               childrenMap.set(year, []);
             }
@@ -1634,12 +1645,17 @@ const visObject = {
     return data;
   },
 
-  renderTable: function(data, totalRows, totalPages, config, queryResponse) {
+  renderTable: function(pageData, allFilteredData, totalPages, config, queryResponse) {
     let html = '';
+
+    // Set CSS variable for stripe color
+    const style = document.createElement('style');
+    style.innerHTML = `:root { --stripe-color: ${config.stripe_color || '#f9fafb'}; }`;
+    document.head.appendChild(style);
 
     // Top pagination
     if (config.enable_pagination && (config.pagination_position === 'top' || config.pagination_position === 'both')) {
-      html += this.renderPagination(totalRows, totalPages, config, 'top');
+      html += this.renderPagination(allFilteredData.length, totalPages, config, 'top');
     }
 
     // Table-wide filter
@@ -1672,13 +1688,13 @@ const visObject = {
     }
 
     // Body
-    html += this.renderBody(data, config, queryResponse);
+    html += this.renderBody(pageData, allFilteredData, config, queryResponse);
 
     html += '</table></div>';
 
     // Bottom pagination
     if (config.enable_pagination && (config.pagination_position === 'bottom' || config.pagination_position === 'both')) {
-      html += this.renderPagination(totalRows, totalPages, config, 'bottom');
+      html += this.renderPagination(allFilteredData.length, totalPages, config, 'bottom');
     }
 
     this.container.innerHTML = html;
@@ -1741,25 +1757,23 @@ const visObject = {
   renderHeaders: function(config, queryResponse) {
     const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
     const styles = this.getHeaderStyles(config);
-    const frozenClass = config.freeze_header_row ? 'frozen-header' : '';
 
-    let html = `<thead><tr class="${frozenClass}" style="${styles}">`;
+    let html = `<thead><tr style="${styles}">`;
 
     if (config.show_row_numbers) {
-      html += `<th class="row-number-cell ${frozenClass}">#</th>`;
+      html += `<th class="row-number-cell">#</th>`;
     }
 
     let leftOffset = 0;
     fields.forEach((field, idx) => {
       const isFrozen = idx < config.freeze_columns;
-      const frozenColClass = isFrozen ? 'frozen-column' : '';
-      const combinedClass = `${frozenClass} ${frozenColClass}`.trim();
+      const frozenClass = isFrozen ? 'frozen-column' : '';
       const sortIndicator = this.state.sortField === field.name ?
         (this.state.sortDirection === 'asc' ? '▲' : '▼') : '';
 
       html += `
         <th
-          class="sortable ${combinedClass}"
+          class="sortable ${frozenClass}"
           data-field="${field.name}"
           style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
         >
@@ -1787,24 +1801,28 @@ const visObject = {
     return html;
   },
 
-  renderBody: function(data, config, queryResponse) {
+  renderBody: function(pageData, allFilteredData, config, queryResponse) {
     const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
     const styles = this.getCellStyles(config);
 
+    // Get the index offset for the current page
+    const pageOffset = (this.state.currentPage - 1) * config.page_size;
+
     let html = '<tbody>';
 
-    data.forEach((row, rowIdx) => {
+    pageData.forEach((row, pageRowIdx) => {
+      const actualRowIdx = pageOffset + pageRowIdx; // Actual index in allFilteredData
       const rowStyles = this.getRowConditionalStyles(row, config, styles);
       const hierarchyLevel = row._hierarchy_level || 0;
 
       html += `<tr
         style="${rowStyles}"
-        data-row="${rowIdx}"
+        data-row="${pageRowIdx}"
         data-hierarchy-level="${hierarchyLevel}"
       >`;
 
       if (config.show_row_numbers) {
-        const globalRowNum = (this.state.currentPage - 1) * config.page_size + rowIdx + 1;
+        const globalRowNum = actualRowIdx + 1;
         html += `<td class="row-number-cell">${globalRowNum}</td>`;
       }
 
@@ -1823,13 +1841,13 @@ const visObject = {
           <td
             class="${frozenClass}"
             data-field="${field.name}"
-            data-row="${rowIdx}"
+            data-row="${pageRowIdx}"
             data-col="${colIdx}"
             style="${cellStyles}; ${isFrozen ? `left: ${leftOffset}px;` : ''}"
           >
             ${isHierarchyField ?
               this.renderHierarchyCell(cellValue, field, config, row, hierarchyLevel) :
-              this.renderCellContent(cellValue, field, config, row, rowIdx, data)}
+              this.renderCellContent(cellValue, field, config, row, actualRowIdx, allFilteredData)}
           </td>
         `;
 
@@ -1883,21 +1901,12 @@ const visObject = {
       drillLinks = cellValue.links || [];
     }
 
-    // Check for cell bars
-    if (config.enable_cell_bars && config.cell_bar_field === field.name) {
-      return this.renderCellBar(value, rendered, config, drillLinks);
-    }
-
-    // Check for sparklines
-    if (config.enable_sparklines && config.sparkline_dimension === field.name) {
-      const dimValue = String(value);
-      const sparklineValues = this.state.sparklineData[dimValue] || [];
-      return this.renderSparkline(sparklineValues, rendered, config, drillLinks);
-    }
-
-    // Check for data chips
-    if (config.enable_datachips && config.datachip_field === field.name) {
-      return this.renderDataChip(value, config, drillLinks);
+    // Check for cell bars (any of the 3 sets)
+    for (let i = 0; i < config.cellBarSets.length; i++) {
+      const barSet = config.cellBarSets[i];
+      if (barSet.fields.includes(field.name)) {
+        return this.renderCellBar(value, rendered, config, drillLinks, barSet, field.name);
+      }
     }
 
     // Check for emojis
@@ -1915,7 +1924,6 @@ const visObject = {
       const drillId = `drill-${Math.random().toString(36).substr(2, 9)}`;
       rendered = `<span class="drill-link" data-drill-id="${drillId}">${rendered}</span>`;
 
-      // Store drill links for later access
       setTimeout(() => {
         const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
         if (elem) {
@@ -1935,13 +1943,13 @@ const visObject = {
     return rendered;
   },
 
-  renderCellBar: function(value, rendered, config, drillLinks) {
+  renderCellBar: function(value, rendered, config, drillLinks, barSet, fieldName) {
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return rendered;
 
-    // Find min/max values in the dataset for this field to scale properly
+    // Find min/max values for THIS field across the dataset
     const allValues = this.state.data.map(row => {
-      const cell = row[config.cell_bar_field];
+      const cell = row[fieldName];
       const val = cell && cell.value !== undefined ? cell.value : cell;
       return parseFloat(val);
     }).filter(v => !isNaN(v));
@@ -1954,90 +1962,24 @@ const visObject = {
 
     const drillId = drillLinks && drillLinks.length > 0 ? `drill-${Math.random().toString(36).substr(2, 9)}` : null;
 
+    // Create gradient or solid color
+    let barColor;
+    if (barSet.gradient) {
+      barColor = `linear-gradient(90deg, ${barSet.color}, ${barSet.gradientEnd})`;
+    } else {
+      barColor = barSet.color;
+    }
+
     const html = `
       <div class="cell-bar-container">
         <div class="cell-bar-background">
-          <div class="cell-bar-fill" style="width: ${widthPercent}%; background-color: ${config.cell_bar_color};"></div>
+          <div class="cell-bar-fill" style="width: ${widthPercent}%; background: ${barColor};"></div>
         </div>
         ${config.cell_bar_show_value ?
           `<div class="cell-bar-value${drillId ? ' drill-link' : ''}" ${drillId ? `data-drill-id="${drillId}"` : ''}>${rendered}</div>` :
           ''}
       </div>
     `;
-
-    if (drillId) {
-      setTimeout(() => {
-        const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
-        if (elem) {
-          elem.addEventListener('click', (e) => {
-            LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e });
-          });
-        }
-      }, 0);
-    }
-
-    return html;
-  },
-
-  renderSparkline: function(values, rendered, config, drillLinks) {
-    if (!values || values.length === 0) return rendered;
-
-    const max = Math.max(...values);
-    const min = Math.min(...values);
-    const range = max - min || 1;
-
-    const points = values.map((v, i) => {
-      const x = (i / Math.max(values.length - 1, 1)) * 100;
-      const y = ((max - v) / range) * 100;
-      return `${x},${y}`;
-    }).join(' ');
-
-    let svgContent = '';
-    if (config.sparkline_type === 'line') {
-      svgContent = `<polyline points="${points}" fill="none" stroke="${config.sparkline_color}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
-    } else if (config.sparkline_type === 'area') {
-      svgContent = `
-        <polyline points="0,100 ${points} 100,100" fill="${config.sparkline_color}" opacity="0.3"/>
-        <polyline points="${points}" fill="none" stroke="${config.sparkline_color}" stroke-width="2" vector-effect="non-scaling-stroke"/>
-      `;
-    } else if (config.sparkline_type === 'bar') {
-      const barWidth = 100 / values.length * 0.8;
-      svgContent = values.map((v, i) => {
-        const x = (i / values.length) * 100;
-        const height = ((v - min) / range) * 100;
-        return `<rect x="${x}" y="${100 - height}" width="${barWidth}" height="${height}" fill="${config.sparkline_color}"/>`;
-      }).join('');
-    }
-
-    const drillId = drillLinks && drillLinks.length > 0 ? `drill-${Math.random().toString(36).substr(2, 9)}` : null;
-
-    const html = `
-      <div class="sparkline-container${drillId ? ' drill-link' : ''}" style="height: ${config.sparkline_height}px;" ${drillId ? `data-drill-id="${drillId}"` : ''}>
-        <svg class="sparkline-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          ${svgContent}
-        </svg>
-      </div>
-    `;
-
-    if (drillId) {
-      setTimeout(() => {
-        const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
-        if (elem) {
-          elem.addEventListener('click', (e) => {
-            LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e });
-          });
-        }
-      }, 0);
-    }
-
-    return html;
-  },
-
-  renderDataChip: function(value, config, drillLinks) {
-    const color = config.datachips[value] || '#6b7280';
-    const drillId = drillLinks && drillLinks.length > 0 ? `drill-${Math.random().toString(36).substr(2, 9)}` : null;
-
-    const html = `<span class="data-chip${drillId ? ' drill-link' : ''}" style="background-color: ${color};" ${drillId ? `data-drill-id="${drillId}"` : ''}>${this.escapeHtml(String(value))}</span>`;
 
     if (drillId) {
       setTimeout(() => {
@@ -2084,26 +2026,33 @@ const visObject = {
     }
     // PERIOD OVER PERIOD MODE
     else if (config.comparison_mode === 'period') {
-      if (rowIdx === undefined || !data || rowIdx < config.comparison_period_offset) {
-        // Can't compare if we're in the first N rows
+      if (rowIdx === undefined || !data) {
         return String(primaryRendered);
       }
 
-      const previousRowIdx = rowIdx - config.comparison_period_offset;
-      const previousRow = data[previousRowIdx];
+      // Handle negative offset (previous rows)
+      const offset = config.comparison_period_offset;
+      const compareRowIdx = rowIdx - offset;
 
-      if (!previousRow) {
+      if (compareRowIdx < 0 || compareRowIdx >= data.length) {
+        // Out of bounds
         return String(primaryRendered);
       }
 
-      const previousCell = previousRow[config.comparison_primary_field];
-      if (!previousCell) {
+      const compareRow = data[compareRowIdx];
+
+      if (!compareRow) {
         return String(primaryRendered);
       }
 
-      const previousValue = previousCell.value !== undefined ? previousCell.value : previousCell;
-      secondary = parseFloat(previousValue);
-      comparisonLabel = config.comparison_label || `vs -${config.comparison_period_offset}`;
+      const compareCell = compareRow[config.comparison_primary_field];
+      if (!compareCell) {
+        return String(primaryRendered);
+      }
+
+      const compareValue = compareCell.value !== undefined ? compareCell.value : compareCell;
+      secondary = parseFloat(compareValue);
+      comparisonLabel = config.comparison_label || `vs ${offset > 0 ? '+' : ''}${offset}`;
     }
 
     if (isNaN(secondary) || secondary === 0) {
@@ -2252,7 +2201,6 @@ const visObject = {
   },
 
   evaluateCondition: function(value, operator, compareValue) {
-    // Convert to numbers if possible
     const numValue = parseFloat(value);
     const numCompare = parseFloat(compareValue);
 
@@ -2267,7 +2215,6 @@ const visObject = {
       }
     }
 
-    // String comparison
     const strValue = String(value).toLowerCase();
     const strCompare = String(compareValue).toLowerCase();
 
@@ -2322,7 +2269,6 @@ const visObject = {
     // Sortable headers
     this.container.querySelectorAll('th.sortable').forEach(th => {
       th.addEventListener('click', function(e) {
-        // Don't sort if clicking on filter input
         if (e.target.classList.contains('column-filter')) return;
 
         const field = this.dataset.field;
@@ -2363,7 +2309,6 @@ const visObject = {
         });
 
         td.addEventListener('mouseleave', function() {
-          // Reset all cells to original background
           self.container.querySelectorAll('tbody td').forEach(cell => {
             cell.style.backgroundColor = '';
           });
@@ -2400,7 +2345,6 @@ const visObject = {
       toggle.addEventListener('click', function(e) {
         e.stopPropagation();
         const rowId = this.dataset.rowId;
-        // Toggle expanded state and re-render
         if (self.state.expandedRows.has(rowId)) {
           self.state.expandedRows.delete(rowId);
         } else {
