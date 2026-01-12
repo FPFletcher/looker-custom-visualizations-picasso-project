@@ -1593,6 +1593,15 @@ const visObject = {
     console.log('[TABLE] Config parsed, freeze_header_row:', parsedConfig.freeze_header_row);
     console.log('[TABLE] Table theme:', parsedConfig.table_theme);
     console.log('[TABLE] Stripe color:', parsedConfig.stripe_color);
+    console.log('[TABLE] Totals data available:', !!queryResponse.totals_data);
+    console.log('[TABLE] Subtotals data available:', !!queryResponse.subtotals_data);
+    console.log('[TABLE] Row totals available:', !!queryResponse.row_totals);
+    if (queryResponse.totals_data) {
+      console.log('[TABLE] Totals data:', queryResponse.totals_data);
+    }
+    if (queryResponse.subtotals_data) {
+      console.log('[TABLE] Subtotals data:', queryResponse.subtotals_data);
+    }
 
     // Apply filters
     let filteredData = this.applyFilters(data, parsedConfig);
