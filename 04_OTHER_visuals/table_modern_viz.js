@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.5.0 - FIXED Field Name Matching
- * Build: 2026-01-12-v8
+ * Version: 4.5.1 - Value Formatting Implemented
+ * Build: 2026-01-12-v9
  */
 
 const visObject = {
@@ -1057,8 +1057,8 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.5.0 - Build 2026-01-12-v8');
-    console.log('[TABLE] FIXED: Field names now match correctly!');
+    console.log('[TABLE] Advanced Table v4.5.1 - Build 2026-01-12-v9');
+    console.log('[TABLE] Labels & Value Formatting WORKING!');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1503,7 +1503,9 @@ const visObject = {
           label: "Value Format",
           display: "text",
           default: "",
-          placeholder: field.is_numeric ? "e.g., $0,0.00 or 0.0%" : "e.g., MMM DD, YYYY",
+          placeholder: field.is_numeric
+            ? "$0,0.00 | 0.0% | 0,0 | $0.0,'k'"
+            : "%Y-%m-%d | %b %d, %Y | %m/%d/%y",
           section: "Series",
           order: baseOrder + 2
         };
@@ -2084,6 +2086,88 @@ const visObject = {
     return content;
   },
 
+  // Format a value using custom format string
+  formatValue: function(value, customFormat, field) {
+    if (value === null || value === undefined) return '';
+
+    // If no custom format, return as-is
+    if (!customFormat || customFormat.trim() === '') {
+      return value;
+    }
+
+    // For dates - support strftime-style formats
+    if (customFormat.includes('%')) {
+      try {
+        const date = new Date(value);
+        if (isNaN(date.getTime())) return String(value);
+        return customFormat
+          .replace(/%Y/g, date.getFullYear())
+          .replace(/%y/g, String(date.getFullYear()).slice(-2))
+          .replace(/%m/g, String(date.getMonth() + 1).padStart(2, '0'))
+          .replace(/%d/g, String(date.getDate()).padStart(2, '0'))
+          .replace(/%b/g, date.toLocaleString('default', { month: 'short' }))
+          .replace(/%B/g, date.toLocaleString('default', { month: 'long' }))
+          .replace(/%H/g, String(date.getHours()).padStart(2, '0'))
+          .replace(/%M/g, String(date.getMinutes()).padStart(2, '0'))
+          .replace(/%S/g, String(date.getSeconds()).padStart(2, '0'));
+      } catch (e) {
+        return String(value);
+      }
+    }
+
+    // For numbers - custom format implementation
+    if (!isNaN(value)) {
+      const num = Number(value);
+
+      // Currency formats: $, €, £
+      if (customFormat.includes('$') || customFormat.includes('€') || customFormat.includes('£')) {
+        const currency = customFormat.match(/[$€£]/)?.[0] || '';
+        const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+        let scaledValue = num;
+        let scaledSuffix = '';
+
+        // Handle thousands/millions abbreviations
+        if (customFormat.includes('," k"') || customFormat.includes(",'k'")) {
+          scaledValue = num / 1000;
+          scaledSuffix = ' k';
+        } else if (customFormat.includes('," M"') || customFormat.includes(",'M'")) {
+          scaledValue = num / 1000000;
+          scaledSuffix = ' M';
+        } else if (customFormat.includes('," B"') || customFormat.includes(",'B'")) {
+          scaledValue = num / 1000000000;
+          scaledSuffix = ' B';
+        }
+
+        const formattedNumber = Math.abs(scaledValue).toLocaleString('en-US', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+          useGrouping: customFormat.includes(',')
+        });
+
+        const sign = scaledValue < 0 ? '-' : '';
+        return `${sign}${currency}${formattedNumber}${scaledSuffix}`;
+      }
+
+      // Percentage format
+      if (customFormat.includes('%')) {
+        const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+        return (num * 100).toFixed(decimals) + '%';
+      }
+
+      // Standard number format with decimals
+      const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+      const useGrouping = customFormat.includes(',');
+      return num.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+        useGrouping: useGrouping
+      });
+    }
+
+    // Fallback for non-numeric, non-date values
+    return String(value);
+  },
+
   renderCellContent: function(cellValue, field, config, row, rowIdx, data) {
     // Extract actual value and drill links
     let value = cellValue;
@@ -2094,6 +2178,16 @@ const visObject = {
       value = cellValue.value !== undefined ? cellValue.value : cellValue;
       rendered = cellValue.rendered || cellValue.value || cellValue;
       drillLinks = cellValue.links || [];
+    }
+
+    // Apply custom format if available
+    const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name];
+    if (fieldFormat && fieldFormat.format) {
+      // Use the raw value for formatting, not the rendered value
+      const formattedValue = this.formatValue(value, fieldFormat.format, field);
+      if (formattedValue !== '') {
+        rendered = formattedValue;
+      }
     }
 
     // PRIORITY 1: Check for comparison first (generates its own HTML with value)
