@@ -65,6 +65,12 @@ visualization: {
 }
 
 visualization: {
+  id: "table_modern_viz"
+  label: "Table Modern"
+  file: "04_OTHER_visuals/table_modern_viz.js"
+}
+
+visualization: {
   id: "table_vis"
   label: "Test"
   file: "table-viz.js"
