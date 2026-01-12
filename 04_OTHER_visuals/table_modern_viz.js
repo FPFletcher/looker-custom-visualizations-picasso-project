@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.9.0 - Looker Totals/Subtotals Integration + Fixes
- * Build: 2026-01-12-v13
+ * Version: 4.10.0 - Subtotals Fixed + Full Collapse
+ * Build: 2026-01-12-v14
  */
 
 const visObject = {
@@ -1139,10 +1139,10 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.9.0 - Build 2026-01-12-v13');
-    console.log('[TABLE] ✅ Looker Totals/Subtotals buttons linked!');
-    console.log('[TABLE] ✅ Fixed subtotal label position');
-    console.log('[TABLE] ✅ Empty cells in totals (not ∅)');
+    console.log('[TABLE] Advanced Table v4.10.0 - Build 2026-01-12-v14');
+    console.log('[TABLE] ✅ Fixed subtotal label in correct column');
+    console.log('[TABLE] ✅ Collapse works across all pages');
+    console.log('[TABLE] ✅ Starts fully collapsed in Top mode');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1698,14 +1698,42 @@ const visObject = {
     if (parsedConfig.enable_subtotals && parsedConfig.subtotal_dimension) {
       console.log('[TABLE] Calculating subtotals by:', parsedConfig.subtotal_dimension);
       const measures = queryResponse.fields.measure_like;
-      filteredData = this.calculateSubtotals(filteredData, parsedConfig.subtotal_dimension, measures, parsedConfig);
+      const dimensions = queryResponse.fields.dimension_like;
+      filteredData = this.calculateSubtotals(filteredData, parsedConfig.subtotal_dimension, measures, parsedConfig, dimensions);
+
+      // Apply collapse state from this.state
+      if (parsedConfig.subtotal_position === 'top') {
+        // If no collapse state exists, start with all collapsed
+        if (!this.state.collapsedGroups) {
+          this.state.collapsedGroups = {};
+          filteredData.forEach(row => {
+            if (row.__isSubtotal) {
+              this.state.collapsedGroups[row.__groupValue] = true;
+            }
+          });
+        }
+
+        // Apply collapse state to rows
+        filteredData = filteredData.filter(row => {
+          if (row.__isSubtotal) {
+            row.__isCollapsed = this.state.collapsedGroups[row.__groupValue] || false;
+            return true; // Always show subtotal row
+          }
+          if (row.__parentGroup !== undefined) {
+            // Hide detail row if parent is collapsed
+            return !this.state.collapsedGroups[row.__parentGroup];
+          }
+          return true;
+        });
+      }
     }
 
     // Add grand total row if enabled
     if (parsedConfig.show_grand_total) {
       console.log('[TABLE] Adding grand total row');
       const measures = queryResponse.fields.measure_like;
-      const grandTotal = this.calculateGrandTotal(filteredData, measures, parsedConfig);
+      const dimensions = queryResponse.fields.dimension_like;
+      const grandTotal = this.calculateGrandTotal(filteredData, measures, parsedConfig, dimensions);
       filteredData.push(grandTotal);
     }
 
@@ -1828,12 +1856,15 @@ const visObject = {
   },
 
   // Calculate subtotals for grouped data
-  calculateSubtotals: function(data, groupByField, measures, config) {
+  calculateSubtotals: function(data, groupByField, measures, config, dimensions) {
     if (!data || data.length === 0) return data;
 
     const result = [];
     const groups = {};
     const subtotalPosition = config.subtotal_position || 'bottom';
+
+    console.log('[TABLE] Grouping by field:', groupByField);
+    console.log('[TABLE] All dimensions:', dimensions.map(d => d.name));
 
     // Group data by the specified field
     data.forEach(row => {
@@ -1858,7 +1889,7 @@ const visObject = {
         __isSubtotal: true,
         __groupValue: groupValue,
         __groupField: groupByField,
-        __isCollapsed: subtotalPosition === 'top' // Start collapsed if at top
+        __isCollapsed: false // Will be set based on state later
       };
 
       // Set the grouping dimension value with subtotal label
@@ -1866,19 +1897,12 @@ const visObject = {
       const subtotalLabel = labelTemplate.replace('{value}', groupValue === 'null' ? '∅' : groupValue);
       subtotalRow[groupByField] = { value: subtotalLabel, rendered: subtotalLabel };
 
-      // Set all OTHER dimension fields to empty (not the grouping field)
-      // Get all dimensions from the first row
-      const firstRow = groupRows[0];
-      Object.keys(firstRow).forEach(fieldName => {
-        if (fieldName.startsWith('__')) return; // Skip internal fields
+      console.log('[TABLE] Created subtotal row, label in field:', groupByField, '=', subtotalLabel);
 
-        // Check if this field is a dimension (not a measure, not the grouping field)
-        const fieldValue = firstRow[fieldName];
-        const isNumeric = typeof (fieldValue?.value ?? fieldValue) === 'number';
-
-        // If it's NOT the grouping field and NOT numeric (i.e., it's another dimension)
-        if (fieldName !== groupByField && !isNumeric) {
-          subtotalRow[fieldName] = { value: '', rendered: '' }; // Empty cell
+      // Set ALL other dimensions (not the grouping field) to empty
+      dimensions.forEach(dim => {
+        if (dim.name !== groupByField) {
+          subtotalRow[dim.name] = { value: '', rendered: '' };
         }
       });
 
@@ -1927,43 +1951,22 @@ const visObject = {
   },
 
   // Calculate grand total row
-  calculateGrandTotal: function(data, measures, config) {
+  calculateGrandTotal: function(data, measures, config, dimensions) {
     const totalRow = { __isGrandTotal: true };
     const label = config.grand_total_label || 'Grand Total';
 
     // Set label in first dimension column
-    const firstRow = data.find(row => !row.__isSubtotal && !row.__isGrandTotal);
-    if (!firstRow) return totalRow;
+    if (dimensions.length > 0) {
+      const firstDimField = dimensions[0].name;
+      totalRow[firstDimField] = { value: label, rendered: label };
 
-    let firstDimensionField = null;
-    Object.keys(firstRow).forEach(fieldName => {
-      if (fieldName.startsWith('__')) return;
-      if (firstDimensionField === null) {
-        const fieldValue = firstRow[fieldName];
-        const isNumeric = typeof (fieldValue?.value ?? fieldValue) === 'number';
-        if (!isNumeric) {
-          firstDimensionField = fieldName;
+      // Set all OTHER dimensions to empty
+      dimensions.forEach((dim, idx) => {
+        if (idx > 0) { // Skip first dimension (has the label)
+          totalRow[dim.name] = { value: '', rendered: '' };
         }
-      }
-    });
-
-    // Set grand total label in first dimension field
-    if (firstDimensionField) {
-      totalRow[firstDimensionField] = { value: label, rendered: label };
+      });
     }
-
-    // Set all OTHER dimension fields to empty
-    Object.keys(firstRow).forEach(fieldName => {
-      if (fieldName.startsWith('__')) return;
-      if (fieldName === firstDimensionField) return; // Skip the label field
-
-      const fieldValue = firstRow[fieldName];
-      const isNumeric = typeof (fieldValue?.value ?? fieldValue) === 'number';
-
-      if (!isNumeric) {
-        totalRow[fieldName] = { value: '', rendered: '' }; // Empty cell for other dimensions
-      }
-    });
 
     // Calculate totals for each measure
     measures.forEach(measure => {
@@ -2948,26 +2951,22 @@ const visObject = {
           const isCollapsed = this.classList.contains('collapsed');
           const groupValue = this.dataset.group;
 
-          // Toggle collapsed state
-          if (isCollapsed) {
-            this.classList.remove('collapsed');
-            // Show detail rows
-            let nextRow = this.nextElementSibling;
-            while (nextRow && nextRow.classList.contains('detail-row') &&
-                   nextRow.dataset.parentGroup === groupValue) {
-              nextRow.style.display = '';
-              nextRow = nextRow.nextElementSibling;
-            }
-          } else {
-            this.classList.add('collapsed');
-            // Hide detail rows
-            let nextRow = this.nextElementSibling;
-            while (nextRow && nextRow.classList.contains('detail-row') &&
-                   nextRow.dataset.parentGroup === groupValue) {
-              nextRow.style.display = 'none';
-              nextRow = nextRow.nextElementSibling;
-            }
+          // Toggle collapsed state in the actual data
+          if (!self.state.collapsedGroups) {
+            self.state.collapsedGroups = {};
           }
+
+          if (isCollapsed) {
+            // Expand: remove from collapsed groups
+            delete self.state.collapsedGroups[groupValue];
+          } else {
+            // Collapse: add to collapsed groups
+            self.state.collapsedGroups[groupValue] = true;
+          }
+
+          // Re-render to apply collapse state across all pages
+          console.log('[TABLE] Toggling group:', groupValue, isCollapsed ? 'expanding' : 'collapsing');
+          self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
         });
       });
     }
