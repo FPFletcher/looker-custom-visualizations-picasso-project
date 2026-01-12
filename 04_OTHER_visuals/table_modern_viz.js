@@ -1204,13 +1204,18 @@ const visObject = {
           z-index: 101;
         }
 
-        /* STRIPED THEME - Use CSS custom property */
+        /* STRIPED THEME - Use CSS custom property with !important to override inline styles */
         table.advanced-table.striped tbody tr:nth-child(odd) {
-          background: var(--stripe-color, #f9fafb);
+          background: var(--stripe-color, #f9fafb) !important;
         }
 
         table.advanced-table.striped tbody tr:nth-child(even) {
-          background: #ffffff;
+          background: #ffffff !important;
+        }
+
+        /* Override cell background in striped mode */
+        table.advanced-table.striped tbody tr td {
+          background: inherit !important;
         }
 
         /* MINIMAL THEME */
@@ -1796,7 +1801,24 @@ const visObject = {
       if (stripeCheck) {
         const stripeStyle = window.getComputedStyle(stripeCheck);
         console.log('[TABLE] First odd row background:', stripeStyle.backgroundColor);
+        console.log('[TABLE] First odd row inline style:', stripeCheck.getAttribute('style'));
       }
+
+      const stripeCheckEven = this.container.querySelector('tbody tr:nth-child(even)');
+      if (stripeCheckEven) {
+        const evenStyle = window.getComputedStyle(stripeCheckEven);
+        console.log('[TABLE] First even row background:', evenStyle.backgroundColor);
+      }
+
+      // Check if table has striped class
+      const table = this.container.querySelector('table');
+      console.log('[TABLE] Table classList:', table.className);
+      console.log('[TABLE] Has striped class:', table.classList.contains('striped'));
+
+      // Check CSS variable
+      const root = document.querySelector(':root');
+      const rootStyle = window.getComputedStyle(root);
+      console.log('[TABLE] CSS variable --stripe-color:', rootStyle.getPropertyValue('--stripe-color'));
     }, 100);
 
     // Attach event listeners
@@ -1871,10 +1893,18 @@ const visObject = {
       const sortIndicator = this.state.sortField === field.name ?
         (this.state.sortDirection === 'asc' ? '▲' : '▼') : '';
 
-      // Get custom label if available
-      const displayLabel = config.customFieldLabels && config.customFieldLabels[field.name]
-        ? config.customFieldLabels[field.name]
-        : (field.label_short || field.label);
+      // Get custom label if available - check multiple key formats
+      const configKey = `field_label_${field.name.replace(/\./g, '_')}`;
+      let displayLabel = field.label_short || field.label;
+
+      if (config.enable_custom_labels) {
+        // Check if custom label exists and is not empty
+        if (config[configKey] && config[configKey].trim() !== '' &&
+            config[configKey] !== displayLabel) {
+          displayLabel = config[configKey];
+          console.log(`[TABLE] Using custom label for ${field.name}: "${displayLabel}"`);
+        }
+      }
 
       html += `
         <th
@@ -2006,22 +2036,39 @@ const visObject = {
       drillLinks = cellValue.links || [];
     }
 
-    // Check for cell bars (any of the 3 sets)
+    // PRIORITY 1: Check for comparison first (generates its own HTML with value)
+    let isComparisonField = config.enable_comparison && config.comparison_primary_field === field.name;
+    let comparisonHtml = null;
+
+    if (isComparisonField) {
+      comparisonHtml = this.renderComparison(row, config, drillLinks, rowIdx, data);
+    }
+
+    // PRIORITY 2: Check for cell bars (can wrap comparison or regular value)
+    let isCellBarField = false;
+    let cellBarSet = null;
     for (let i = 0; i < config.cellBarSets.length; i++) {
-      const barSet = config.cellBarSets[i];
-      if (barSet.fields.includes(field.name)) {
-        return this.renderCellBar(value, rendered, config, drillLinks, barSet, field.name);
+      if (config.cellBarSets[i].fields.includes(field.name)) {
+        isCellBarField = true;
+        cellBarSet = config.cellBarSets[i];
+        break;
       }
+    }
+
+    if (isCellBarField) {
+      // If it's also a comparison field, use the comparison HTML as the "rendered" value
+      const displayValue = isComparisonField ? comparisonHtml : rendered;
+      return this.renderCellBar(value, displayValue, config, drillLinks, cellBarSet, field.name);
+    }
+
+    // If comparison but no cell bar, return comparison
+    if (isComparisonField) {
+      return comparisonHtml;
     }
 
     // Check for emojis
     if (config.enable_emojis && config.emojis[value]) {
       rendered = `${config.emojis[value]} ${rendered}`;
-    }
-
-    // Check for comparison
-    if (config.enable_comparison && config.comparison_primary_field === field.name) {
-      return this.renderComparison(row, config, drillLinks, rowIdx, data);
     }
 
     // Wrap with drill links if available
@@ -2075,6 +2122,7 @@ const visObject = {
       barColor = barSet.color;
     }
 
+    // Use rendered value which could be comparison HTML
     const html = `
       <div class="cell-bar-container">
         <div class="cell-bar-background">
