@@ -1,19 +1,23 @@
 /**
  * Advanced Table Visualization for Looker
  * Production-grade table with extensive customization capabilities
- * Version: 1.0.0
+ * Version: 2.0.0
  */
 
 const visObject = {
   id: "advanced_table_visual",
   label: "Advanced Table",
   options: {
-    // ──────────────── PLOT ────────────────
-    plot_section: {
+    // ══════════════════════════════════════════════════════════════
+    // TAB: PLOT
+    // ══════════════════════════════════════════════════════════════
+
+    plot_divider_theme: {
       type: "string",
-      label: "─────────────────────────────── PLOT ───────────────────────────────",
-      display: "text",
-      default: ""
+      label: "─────────────────────────────── Theme ───────────────────────────────",
+      display: "divider",
+      section: "Plot",
+      order: 0
     },
 
     table_theme: {
@@ -27,21 +31,24 @@ const visObject = {
         { "Striped": "striped" }
       ],
       default: "modern",
+      section: "Plot",
       order: 1
     },
 
-    show_row_numbers: {
-      type: "boolean",
-      label: "Show Row Numbers",
-      default: false,
-      order: 2
+    plot_divider_pagination: {
+      type: "string",
+      label: "─────────────────────────────── Pagination ───────────────────────────────",
+      display: "divider",
+      section: "Plot",
+      order: 10
     },
 
     enable_pagination: {
       type: "boolean",
       label: "Enable Pagination",
       default: true,
-      order: 3
+      section: "Plot",
+      order: 11
     },
 
     page_size: {
@@ -51,7 +58,8 @@ const visObject = {
       display: "number",
       min: 5,
       max: 1000,
-      order: 4
+      section: "Plot",
+      order: 12
     },
 
     pagination_position: {
@@ -64,29 +72,447 @@ const visObject = {
         { "Both": "both" }
       ],
       default: "bottom",
-      order: 5
+      section: "Plot",
+      order: 13
     },
 
     show_page_info: {
       type: "boolean",
       label: "Show Page Info",
       default: true,
-      order: 6
+      section: "Plot",
+      order: 14
     },
 
-    // ──────────────── HEADERS ────────────────
-    headers_section: {
+    plot_divider_display: {
       type: "string",
-      label: "─────────────────────────────── HEADERS ───────────────────────────────",
-      display: "text",
-      default: ""
+      label: "─────────────────────────────── Display Options ───────────────────────────────",
+      display: "divider",
+      section: "Plot",
+      order: 20
+    },
+
+    show_row_numbers: {
+      type: "boolean",
+      label: "Show Row Numbers",
+      default: false,
+      section: "Plot",
+      order: 21
     },
 
     show_headers: {
       type: "boolean",
       label: "Show Headers",
       default: true,
+      section: "Plot",
+      order: 22
+    },
+
+    plot_divider_freezing: {
+      type: "string",
+      label: "─────────────────────────────── Freezing ───────────────────────────────",
+      display: "divider",
+      section: "Plot",
+      order: 30
+    },
+
+    freeze_columns: {
+      type: "number",
+      label: "Freeze Left Columns",
+      default: 0,
+      display: "number",
+      min: 0,
+      max: 10,
+      section: "Plot",
+      order: 31
+    },
+
+    freeze_header_row: {
+      type: "boolean",
+      label: "Freeze Header Row",
+      default: true,
+      section: "Plot",
+      order: 32
+    },
+
+    plot_divider_filtering: {
+      type: "string",
+      label: "─────────────────────────────── Filtering ───────────────────────────────",
+      display: "divider",
+      section: "Plot",
+      order: 40
+    },
+
+    enable_table_filter: {
+      type: "boolean",
+      label: "Enable Table-wide Filter",
+      default: false,
+      section: "Plot",
+      order: 41
+    },
+
+    enable_column_filters: {
+      type: "boolean",
+      label: "Enable Column Filters",
+      default: false,
+      section: "Plot",
+      order: 42
+    },
+
+    filter_highlight_color: {
+      type: "string",
+      label: "Filter Highlight Color",
+      display: "color",
+      default: "#fef08a",
+      section: "Plot",
+      order: 43
+    },
+
+    // ══════════════════════════════════════════════════════════════
+    // TAB: SERIES
+    // ══════════════════════════════════════════════════════════════
+
+    series_divider_grouping: {
+      type: "string",
+      label: "─────────────────────────────── Column Grouping ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 0
+    },
+
+    enable_column_groups: {
+      type: "boolean",
+      label: "Enable Column Grouping",
+      default: false,
+      section: "Series",
+      order: 1
+    },
+
+    column_group_1_name: {
+      type: "string",
+      label: "Group 1 Name",
+      default: "",
+      section: "Series",
+      order: 2
+    },
+
+    column_group_1_fields: {
+      type: "string",
+      label: "Group 1 Fields (comma-separated)",
+      display: "text",
+      default: "",
+      placeholder: "field1,field2,field3",
+      section: "Series",
+      order: 3
+    },
+
+    column_group_2_name: {
+      type: "string",
+      label: "Group 2 Name",
+      default: "",
+      section: "Series",
+      order: 4
+    },
+
+    column_group_2_fields: {
+      type: "string",
+      label: "Group 2 Fields (comma-separated)",
+      display: "text",
+      default: "",
+      placeholder: "field1,field2,field3",
+      section: "Series",
+      order: 5
+    },
+
+    column_group_3_name: {
+      type: "string",
+      label: "Group 3 Name",
+      default: "",
+      section: "Series",
+      order: 6
+    },
+
+    column_group_3_fields: {
+      type: "string",
+      label: "Group 3 Fields (comma-separated)",
+      display: "text",
+      default: "",
+      placeholder: "field1,field2,field3",
+      section: "Series",
+      order: 7
+    },
+
+    group_header_bg_color: {
+      type: "string",
+      label: "Group Header Background Color",
+      display: "color",
+      default: "#e0e7ff",
+      section: "Series",
+      order: 8
+    },
+
+    series_divider_hierarchy: {
+      type: "string",
+      label: "─────────────────────────────── Hierarchical Data ───────────────────────────────",
+      display: "divider",
+      section: "Series",
       order: 10
+    },
+
+    enable_hierarchy: {
+      type: "boolean",
+      label: "Enable Hierarchical Display",
+      default: false,
+      section: "Series",
+      order: 11
+    },
+
+    hierarchy_field: {
+      type: "string",
+      label: "Hierarchy Field",
+      display: "text",
+      default: "",
+      placeholder: "dimension_name",
+      section: "Series",
+      order: 12
+    },
+
+    hierarchy_indent: {
+      type: "number",
+      label: "Hierarchy Indent (px)",
+      default: 20,
+      display: "number",
+      min: 0,
+      max: 100,
+      section: "Series",
+      order: 13
+    },
+
+    show_hierarchy_icons: {
+      type: "boolean",
+      label: "Show Hierarchy Expand/Collapse Icons",
+      default: true,
+      section: "Series",
+      order: 14
+    },
+
+    detect_date_hierarchy: {
+      type: "boolean",
+      label: "Auto-detect Date Hierarchy",
+      default: true,
+      section: "Series",
+      order: 15
+    },
+
+    series_divider_sparklines: {
+      type: "string",
+      label: "─────────────────────────────── Sparklines ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 20
+    },
+
+    enable_sparklines: {
+      type: "boolean",
+      label: "Enable Sparklines",
+      default: false,
+      section: "Series",
+      order: 21
+    },
+
+    sparkline_field: {
+      type: "string",
+      label: "Sparkline Field",
+      display: "text",
+      default: "",
+      placeholder: "measure_name",
+      section: "Series",
+      order: 22
+    },
+
+    sparkline_type: {
+      type: "string",
+      label: "Sparkline Type",
+      display: "select",
+      values: [
+        { "Line": "line" },
+        { "Bar": "bar" },
+        { "Area": "area" }
+      ],
+      default: "line",
+      section: "Series",
+      order: 23
+    },
+
+    sparkline_color: {
+      type: "string",
+      label: "Sparkline Color",
+      display: "color",
+      default: "#3b82f6",
+      section: "Series",
+      order: 24
+    },
+
+    sparkline_height: {
+      type: "number",
+      label: "Sparkline Height (px)",
+      default: 30,
+      display: "number",
+      min: 20,
+      max: 100,
+      section: "Series",
+      order: 25
+    },
+
+    series_divider_comparison: {
+      type: "string",
+      label: "─────────────────────────────── Comparison ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 30
+    },
+
+    enable_comparison: {
+      type: "boolean",
+      label: "Enable Comparison Display",
+      default: false,
+      section: "Series",
+      order: 31
+    },
+
+    comparison_primary_field: {
+      type: "string",
+      label: "Primary Measure",
+      display: "text",
+      default: "",
+      placeholder: "measure_name",
+      section: "Series",
+      order: 32
+    },
+
+    comparison_secondary_field: {
+      type: "string",
+      label: "Secondary Measure (to compare against)",
+      display: "text",
+      default: "",
+      placeholder: "measure_name",
+      section: "Series",
+      order: 33
+    },
+
+    comparison_type: {
+      type: "string",
+      label: "Comparison Display Type",
+      display: "select",
+      values: [
+        { "Percentage": "percentage" },
+        { "Absolute": "absolute" },
+        { "Inline Bar": "bar" },
+        { "Both": "both" }
+      ],
+      default: "percentage",
+      section: "Series",
+      order: 34
+    },
+
+    show_comparison_arrows: {
+      type: "boolean",
+      label: "Show Comparison Arrows",
+      default: true,
+      section: "Series",
+      order: 35
+    },
+
+    positive_comparison_color: {
+      type: "string",
+      label: "Positive Comparison Color",
+      display: "color",
+      default: "#10b981",
+      section: "Series",
+      order: 36
+    },
+
+    negative_comparison_color: {
+      type: "string",
+      label: "Negative Comparison Color",
+      display: "color",
+      default: "#ef4444",
+      section: "Series",
+      order: 37
+    },
+
+    series_divider_datachips: {
+      type: "string",
+      label: "─────────────────────────────── Data Chips ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 40
+    },
+
+    enable_datachips: {
+      type: "boolean",
+      label: "Enable Data Chips",
+      default: false,
+      section: "Series",
+      order: 41
+    },
+
+    datachip_field: {
+      type: "string",
+      label: "Data Chip Field",
+      display: "text",
+      default: "",
+      placeholder: "status",
+      section: "Series",
+      order: 42
+    },
+
+    datachip_config: {
+      type: "string",
+      label: "Data Chip Configuration (JSON)",
+      display: "textarea",
+      default: '{"Active": "#10b981", "Inactive": "#ef4444", "Pending": "#f59e0b"}',
+      placeholder: '{"value": "color"}',
+      section: "Series",
+      order: 43
+    },
+
+    series_divider_emojis: {
+      type: "string",
+      label: "─────────────────────────────── Emojis ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 50
+    },
+
+    enable_emojis: {
+      type: "boolean",
+      label: "Enable Emoji Rendering",
+      default: false,
+      section: "Series",
+      order: 51
+    },
+
+    emoji_mapping: {
+      type: "string",
+      label: "Emoji Mapping (JSON)",
+      display: "textarea",
+      default: '{"positive": "✅", "negative": "❌", "warning": "⚠️", "star": "⭐"}',
+      placeholder: '{"keyword": "emoji"}',
+      section: "Series",
+      order: 52
+    },
+
+    // ══════════════════════════════════════════════════════════════
+    // TAB: FORMATTING
+    // ══════════════════════════════════════════════════════════════
+
+    formatting_divider_headers: {
+      type: "string",
+      label: "─────────────────────────────── Headers ───────────────────────────────",
+      display: "divider",
+      section: "Formatting",
+      order: 0
     },
 
     header_font_family: {
@@ -104,7 +530,8 @@ const visObject = {
         { "Roboto": "Roboto, sans-serif" }
       ],
       default: "default",
-      order: 11
+      section: "Formatting",
+      order: 1
     },
 
     header_font_size: {
@@ -114,7 +541,8 @@ const visObject = {
       display: "number",
       min: 8,
       max: 32,
-      order: 12
+      section: "Formatting",
+      order: 2
     },
 
     header_font_weight: {
@@ -128,7 +556,8 @@ const visObject = {
         { "Semi-Bold": "600" }
       ],
       default: "bold",
-      order: 13
+      section: "Formatting",
+      order: 3
     },
 
     header_text_color: {
@@ -136,7 +565,8 @@ const visObject = {
       label: "Header Text Color",
       display: "color",
       default: "#1f2937",
-      order: 14
+      section: "Formatting",
+      order: 4
     },
 
     header_bg_color: {
@@ -144,7 +574,8 @@ const visObject = {
       label: "Header Background Color",
       display: "color",
       default: "#f9fafb",
-      order: 15
+      section: "Formatting",
+      order: 5
     },
 
     header_alignment: {
@@ -157,15 +588,16 @@ const visObject = {
         { "Right": "right" }
       ],
       default: "left",
-      order: 16
+      section: "Formatting",
+      order: 6
     },
 
-    // ──────────────── CELLS ────────────────
-    cells_section: {
+    formatting_divider_cells: {
       type: "string",
-      label: "─────────────────────────────── CELLS ───────────────────────────────",
-      display: "text",
-      default: ""
+      label: "─────────────────────────────── Cells ───────────────────────────────",
+      display: "divider",
+      section: "Formatting",
+      order: 10
     },
 
     cell_font_family: {
@@ -183,7 +615,8 @@ const visObject = {
         { "Roboto": "Roboto, sans-serif" }
       ],
       default: "default",
-      order: 20
+      section: "Formatting",
+      order: 11
     },
 
     cell_font_size: {
@@ -193,7 +626,8 @@ const visObject = {
       display: "number",
       min: 8,
       max: 32,
-      order: 21
+      section: "Formatting",
+      order: 12
     },
 
     cell_text_color: {
@@ -201,7 +635,8 @@ const visObject = {
       label: "Cell Text Color",
       display: "color",
       default: "#374151",
-      order: 22
+      section: "Formatting",
+      order: 13
     },
 
     cell_bg_color: {
@@ -209,7 +644,8 @@ const visObject = {
       label: "Cell Background Color",
       display: "color",
       default: "#ffffff",
-      order: 23
+      section: "Formatting",
+      order: 14
     },
 
     cell_alignment: {
@@ -223,14 +659,16 @@ const visObject = {
         { "Right": "right" }
       ],
       default: "auto",
-      order: 24
+      section: "Formatting",
+      order: 15
     },
 
     wrap_text: {
       type: "boolean",
       label: "Wrap Text in Cells",
       default: false,
-      order: 25
+      section: "Formatting",
+      order: 16
     },
 
     row_height: {
@@ -240,22 +678,24 @@ const visObject = {
       display: "number",
       min: 24,
       max: 200,
-      order: 26
+      section: "Formatting",
+      order: 17
     },
 
-    // ──────────────── BORDERS & SPACING ────────────────
-    borders_section: {
+    formatting_divider_borders: {
       type: "string",
-      label: "─────────────────────────────── BORDERS & SPACING ───────────────────────────────",
-      display: "text",
-      default: ""
+      label: "─────────────────────────────── Borders & Spacing ───────────────────────────────",
+      display: "divider",
+      section: "Formatting",
+      order: 20
     },
 
     show_borders: {
       type: "boolean",
       label: "Show Borders",
       default: true,
-      order: 30
+      section: "Formatting",
+      order: 21
     },
 
     border_style: {
@@ -269,7 +709,8 @@ const visObject = {
         { "None": "none" }
       ],
       default: "solid",
-      order: 31
+      section: "Formatting",
+      order: 22
     },
 
     border_width: {
@@ -279,7 +720,8 @@ const visObject = {
       display: "number",
       min: 0,
       max: 5,
-      order: 32
+      section: "Formatting",
+      order: 23
     },
 
     border_color: {
@@ -287,14 +729,16 @@ const visObject = {
       label: "Border Color",
       display: "color",
       default: "#e5e7eb",
-      order: 33
+      section: "Formatting",
+      order: 24
     },
 
     show_gridlines: {
       type: "boolean",
       label: "Show Gridlines",
       default: true,
-      order: 34
+      section: "Formatting",
+      order: 25
     },
 
     column_spacing: {
@@ -304,7 +748,8 @@ const visObject = {
       display: "number",
       min: 0,
       max: 50,
-      order: 35
+      section: "Formatting",
+      order: 26
     },
 
     row_spacing: {
@@ -314,50 +759,24 @@ const visObject = {
       display: "number",
       min: 0,
       max: 20,
-      order: 36
+      section: "Formatting",
+      order: 27
     },
 
-    // ──────────────── FREEZING ────────────────
-    freezing_section: {
+    formatting_divider_hover: {
       type: "string",
-      label: "─────────────────────────────── FREEZING ───────────────────────────────",
-      display: "text",
-      default: ""
-    },
-
-    freeze_columns: {
-      type: "number",
-      label: "Freeze Left Columns",
-      default: 0,
-      display: "number",
-      min: 0,
-      max: 10,
-      order: 40
-    },
-
-    freeze_rows: {
-      type: "number",
-      label: "Freeze Top Rows",
-      default: 0,
-      display: "number",
-      min: 0,
-      max: 10,
-      order: 41
-    },
-
-    // ──────────────── HOVER & INTERACTION ────────────────
-    hover_section: {
-      type: "string",
-      label: "─────────────────────────────── HOVER & INTERACTION ───────────────────────────────",
-      display: "text",
-      default: ""
+      label: "─────────────────────────────── Hover & Interaction ───────────────────────────────",
+      display: "divider",
+      section: "Formatting",
+      order: 30
     },
 
     enable_hover: {
       type: "boolean",
       label: "Enable Hover Effects",
       default: true,
-      order: 50
+      section: "Formatting",
+      order: 31
     },
 
     hover_highlight_type: {
@@ -371,7 +790,8 @@ const visObject = {
         { "Row & Column": "cross" }
       ],
       default: "row",
-      order: 51
+      section: "Formatting",
+      order: 32
     },
 
     hover_bg_color: {
@@ -379,36 +799,40 @@ const visObject = {
       label: "Hover Background Color",
       display: "color",
       default: "#f3f4f6",
-      order: 52
+      section: "Formatting",
+      order: 33
     },
 
     enable_tooltips: {
       type: "boolean",
       label: "Enable Tooltips",
       default: true,
-      order: 53
+      section: "Formatting",
+      order: 34
     },
 
     tooltip_show_label: {
       type: "boolean",
       label: "Show Field Label in Tooltip",
       default: true,
-      order: 54
+      section: "Formatting",
+      order: 35
     },
 
-    // ──────────────── CONDITIONAL FORMATTING ────────────────
-    conditional_section: {
+    formatting_divider_conditional: {
       type: "string",
-      label: "─────────────────────────────── CONDITIONAL FORMATTING ───────────────────────────────",
-      display: "text",
-      default: ""
+      label: "─────────────────────────────── Conditional Formatting ───────────────────────────────",
+      display: "divider",
+      section: "Formatting",
+      order: 40
     },
 
     enable_row_conditional: {
       type: "boolean",
       label: "Enable Row Conditional Formatting",
       default: false,
-      order: 60
+      section: "Formatting",
+      order: 41
     },
 
     row_condition_field: {
@@ -417,7 +841,8 @@ const visObject = {
       display: "text",
       default: "",
       placeholder: "field_name",
-      order: 61
+      section: "Formatting",
+      order: 42
     },
 
     row_condition_operator: {
@@ -434,7 +859,8 @@ const visObject = {
         { "Contains": "contains" }
       ],
       default: ">",
-      order: 62
+      section: "Formatting",
+      order: 43
     },
 
     row_condition_value: {
@@ -442,7 +868,8 @@ const visObject = {
       label: "Row Condition Value",
       display: "text",
       default: "",
-      order: 63
+      section: "Formatting",
+      order: 44
     },
 
     row_condition_bg_color: {
@@ -450,7 +877,8 @@ const visObject = {
       label: "Row Condition Background Color",
       display: "color",
       default: "#fef3c7",
-      order: 64
+      section: "Formatting",
+      order: 45
     },
 
     row_condition_text_color: {
@@ -458,14 +886,16 @@ const visObject = {
       label: "Row Condition Text Color",
       display: "color",
       default: "#92400e",
-      order: 65
+      section: "Formatting",
+      order: 46
     },
 
     enable_column_conditional: {
       type: "boolean",
       label: "Enable Column Conditional Formatting",
       default: false,
-      order: 66
+      section: "Formatting",
+      order: 47
     },
 
     column_condition_field: {
@@ -474,7 +904,8 @@ const visObject = {
       display: "text",
       default: "",
       placeholder: "field_name",
-      order: 67
+      section: "Formatting",
+      order: 48
     },
 
     column_condition_operator: {
@@ -490,7 +921,8 @@ const visObject = {
         { "Not Equal": "!=" }
       ],
       default: ">",
-      order: 68
+      section: "Formatting",
+      order: 49
     },
 
     column_condition_value: {
@@ -498,7 +930,8 @@ const visObject = {
       label: "Column Condition Value",
       display: "text",
       default: "",
-      order: 69
+      section: "Formatting",
+      order: 50
     },
 
     column_condition_bg_color: {
@@ -506,7 +939,8 @@ const visObject = {
       label: "Column Condition Background Color",
       display: "color",
       default: "#dbeafe",
-      order: 70
+      section: "Formatting",
+      order: 51
     },
 
     column_condition_text_color: {
@@ -514,329 +948,8 @@ const visObject = {
       label: "Column Condition Text Color",
       display: "color",
       default: "#1e40af",
-      order: 71
-    },
-
-    // ──────────────── FILTERING ────────────────
-    filtering_section: {
-      type: "string",
-      label: "─────────────────────────────── FILTERING ───────────────────────────────",
-      display: "text",
-      default: ""
-    },
-
-    enable_table_filter: {
-      type: "boolean",
-      label: "Enable Table-wide Filter",
-      default: false,
-      order: 80
-    },
-
-    enable_column_filters: {
-      type: "boolean",
-      label: "Enable Column Filters",
-      default: false,
-      order: 81
-    },
-
-    filter_highlight_color: {
-      type: "string",
-      label: "Filter Highlight Color",
-      display: "color",
-      default: "#fef08a",
-      order: 82
-    },
-
-    // ──────────────── HIERARCHICAL DATA ────────────────
-    hierarchy_section: {
-      type: "string",
-      label: "─────────────────────────────── HIERARCHICAL DATA ───────────────────────────────",
-      display: "text",
-      default: ""
-    },
-
-    enable_hierarchy: {
-      type: "boolean",
-      label: "Enable Hierarchical Display",
-      default: false,
-      order: 90
-    },
-
-    hierarchy_field: {
-      type: "string",
-      label: "Hierarchy Field",
-      display: "text",
-      default: "",
-      placeholder: "dimension_name",
-      order: 91
-    },
-
-    hierarchy_indent: {
-      type: "number",
-      label: "Hierarchy Indent (px)",
-      default: 20,
-      display: "number",
-      min: 0,
-      max: 100,
-      order: 92
-    },
-
-    show_hierarchy_icons: {
-      type: "boolean",
-      label: "Show Hierarchy Expand/Collapse Icons",
-      default: true,
-      order: 93
-    },
-
-    detect_date_hierarchy: {
-      type: "boolean",
-      label: "Auto-detect Date Hierarchy",
-      default: true,
-      order: 94
-    },
-
-    // ──────────────── COLUMN GROUPING ────────────────
-    grouping_section: {
-      type: "string",
-      label: "─────────────────────────────── COLUMN GROUPING ───────────────────────────────",
-      display: "text",
-      default: ""
-    },
-
-    enable_column_groups: {
-      type: "boolean",
-      label: "Enable Column Grouping",
-      default: false,
-      order: 100
-    },
-
-    column_groups_config: {
-      type: "string",
-      label: "Column Groups Configuration (JSON)",
-      display: "textarea",
-      default: '{"Sales": ["orders.count", "orders.total"], "Customer": ["users.count", "users.name"]}',
-      placeholder: '{"Group1": ["field1", "field2"]}',
-      order: 101
-    },
-
-    group_header_bg_color: {
-      type: "string",
-      label: "Group Header Background Color",
-      display: "color",
-      default: "#e0e7ff",
-      order: 102
-    },
-
-    // ──────────────── ROW GROUPING ────────────────
-    row_grouping_section: {
-      type: "string",
-      label: "─────────────────────────────── ROW GROUPING ───────────────────────────────",
-      display: "text",
-      default: ""
-    },
-
-    enable_row_groups: {
-      type: "boolean",
-      label: "Enable Row Grouping",
-      default: false,
-      order: 110
-    },
-
-    row_group_fields: {
-      type: "string",
-      label: "Row Group Fields (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "field1,field2",
-      order: 111
-    },
-
-    show_group_totals: {
-      type: "boolean",
-      label: "Show Group Totals",
-      default: false,
-      order: 112
-    },
-
-    group_total_label: {
-      type: "string",
-      label: "Group Total Label",
-      display: "text",
-      default: "Total",
-      order: 113
-    },
-
-    // ──────────────── SPARKLINES ────────────────
-    sparklines_section: {
-      type: "string",
-      label: "─────────────────────────────── SPARKLINES ───────────────────────────────",
-      display: "text",
-      default: ""
-    },
-
-    enable_sparklines: {
-      type: "boolean",
-      label: "Enable Sparklines",
-      default: false,
-      order: 120
-    },
-
-    sparkline_fields: {
-      type: "string",
-      label: "Sparkline Fields (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "measure1,measure2",
-      order: 121
-    },
-
-    sparkline_type: {
-      type: "string",
-      label: "Sparkline Type",
-      display: "select",
-      values: [
-        { "Line": "line" },
-        { "Bar": "bar" },
-        { "Area": "area" }
-      ],
-      default: "line",
-      order: 122
-    },
-
-    sparkline_color: {
-      type: "string",
-      label: "Sparkline Color",
-      display: "color",
-      default: "#3b82f6",
-      order: 123
-    },
-
-    sparkline_height: {
-      type: "number",
-      label: "Sparkline Height (px)",
-      default: 30,
-      display: "number",
-      min: 20,
-      max: 100,
-      order: 124
-    },
-
-    // ──────────────── DATA CHIPS ────────────────
-    datachips_section: {
-      type: "string",
-      label: "─────────────────────────────── DATA CHIPS ───────────────────────────────",
-      display: "text",
-      default: ""
-    },
-
-    enable_datachips: {
-      type: "boolean",
-      label: "Enable Data Chips",
-      default: false,
-      order: 130
-    },
-
-    datachip_fields: {
-      type: "string",
-      label: "Data Chip Fields (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "status,priority",
-      order: 131
-    },
-
-    datachip_config: {
-      type: "string",
-      label: "Data Chip Configuration (JSON)",
-      display: "textarea",
-      default: '{"Active": "#10b981", "Inactive": "#ef4444", "Pending": "#f59e0b"}',
-      placeholder: '{"value": "color"}',
-      order: 132
-    },
-
-    // ──────────────── EMOJIS ────────────────
-    emojis_section: {
-      type: "string",
-      label: "─────────────────────────────── EMOJIS ───────────────────────────────",
-      display: "text",
-      default: ""
-    },
-
-    enable_emojis: {
-      type: "boolean",
-      label: "Enable Emoji Rendering",
-      default: false,
-      order: 140
-    },
-
-    emoji_mapping: {
-      type: "string",
-      label: "Emoji Mapping (JSON)",
-      display: "textarea",
-      default: '{"positive": "✅", "negative": "❌", "warning": "⚠️", "star": "⭐"}',
-      placeholder: '{"keyword": "emoji"}',
-      order: 141
-    },
-
-    // ──────────────── COMPARISON ────────────────
-    comparison_section: {
-      type: "string",
-      label: "─────────────────────────────── COMPARISON ───────────────────────────────",
-      display: "text",
-      default: ""
-    },
-
-    enable_comparison: {
-      type: "boolean",
-      label: "Enable Comparison Display",
-      default: false,
-      order: 150
-    },
-
-    comparison_field: {
-      type: "string",
-      label: "Comparison Field (secondary measure)",
-      display: "text",
-      default: "",
-      placeholder: "measure_name",
-      order: 151
-    },
-
-    comparison_type: {
-      type: "string",
-      label: "Comparison Display Type",
-      display: "select",
-      values: [
-        { "Percentage": "percentage" },
-        { "Absolute": "absolute" },
-        { "Inline Bar": "bar" },
-        { "Both": "both" }
-      ],
-      default: "percentage",
-      order: 152
-    },
-
-    show_comparison_arrows: {
-      type: "boolean",
-      label: "Show Comparison Arrows",
-      default: true,
-      order: 153
-    },
-
-    positive_comparison_color: {
-      type: "string",
-      label: "Positive Comparison Color",
-      display: "color",
-      default: "#10b981",
-      order: 154
-    },
-
-    negative_comparison_color: {
-      type: "string",
-      label: "Negative Comparison Color",
-      display: "color",
-      default: "#ef4444",
-      order: 155
+      section: "Formatting",
+      order: 52
     }
   },
 
@@ -931,38 +1044,50 @@ const visObject = {
           background: #f9fafb;
         }
 
+        table.advanced-table.minimal {
+          border: none;
+        }
+
+        table.advanced-table.minimal th,
+        table.advanced-table.minimal td {
+          border: none;
+          border-bottom: 1px solid #f3f4f6;
+        }
+
+        table.advanced-table.classic {
+          border: 2px solid #d1d5db;
+        }
+
+        table.advanced-table.classic th {
+          background: #e5e7eb;
+          border: 1px solid #d1d5db;
+        }
+
+        table.advanced-table.classic td {
+          border: 1px solid #e5e7eb;
+        }
+
         .column-group-header {
           text-align: center;
           font-weight: 600;
           padding: 8px;
+          border-bottom: 2px solid #d1d5db;
         }
 
         .frozen-column {
           position: sticky;
-          left: 0;
           z-index: 2;
           background: inherit;
         }
 
-        .frozen-row {
+        .frozen-header {
           position: sticky;
           top: 0;
           z-index: 3;
           background: inherit;
         }
 
-        .frozen-column.frozen-row {
-          z-index: 4;
-        }
-
-        thead th {
-          position: sticky;
-          top: 0;
-          z-index: 3;
-          background: inherit;
-        }
-
-        .frozen-column thead th {
+        .frozen-column.frozen-header {
           z-index: 4;
         }
 
@@ -1011,10 +1136,15 @@ const visObject = {
           font-size: 12px;
           color: #6b7280;
           user-select: none;
+          flex-shrink: 0;
         }
 
         .hierarchy-toggle:hover {
           color: #374151;
+        }
+
+        .hierarchy-content {
+          flex: 1;
         }
 
         .sparkline-container {
@@ -1042,12 +1172,16 @@ const visObject = {
         .comparison-container {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
+          flex-wrap: wrap;
         }
 
         .comparison-value {
           font-size: 0.85em;
           font-weight: 500;
+          display: flex;
+          align-items: center;
+          gap: 4px;
         }
 
         .comparison-arrow {
@@ -1057,13 +1191,8 @@ const visObject = {
         .comparison-bar {
           height: 6px;
           border-radius: 3px;
-          margin-top: 4px;
           transition: width 0.3s ease;
-        }
-
-        .group-total-row {
-          font-weight: 600;
-          background: #f3f4f6 !important;
+          margin-top: 4px;
         }
 
         .highlight-match {
@@ -1072,16 +1201,21 @@ const visObject = {
         }
 
         .tooltip {
-          position: absolute;
+          position: fixed;
           background: rgba(0, 0, 0, 0.9);
           color: white;
           padding: 8px 12px;
           border-radius: 6px;
           font-size: 12px;
           pointer-events: none;
-          z-index: 1000;
+          z-index: 10000;
           max-width: 300px;
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          display: none;
+        }
+
+        .tooltip.visible {
+          display: block;
         }
 
         .tooltip-label {
@@ -1105,16 +1239,21 @@ const visObject = {
         }
       </style>
       <div id="advanced-table-container"></div>
+      <div class="tooltip" id="table-tooltip">
+        <div class="tooltip-label"></div>
+        <div class="tooltip-value"></div>
+      </div>
     `;
 
     this.container = element.querySelector("#advanced-table-container");
+    this.tooltip = element.querySelector("#table-tooltip");
     this.state = {
       currentPage: 1,
       sortField: null,
       sortDirection: 'asc',
       tableFilter: '',
       columnFilters: {},
-      expandedGroups: new Set(),
+      expandedRows: new Set(),
       data: []
     };
   },
@@ -1146,7 +1285,7 @@ const visObject = {
     }
 
     // Process hierarchical data if enabled
-    if (parsedConfig.enable_hierarchy) {
+    if (parsedConfig.enable_hierarchy && parsedConfig.hierarchy_field) {
       filteredData = this.processHierarchicalData(filteredData, parsedConfig, queryResponse);
     }
 
@@ -1168,14 +1307,6 @@ const visObject = {
 
     // Parse JSON configurations
     try {
-      if (config.column_groups_config) {
-        parsed.column_groups = JSON.parse(config.column_groups_config);
-      }
-    } catch (e) {
-      parsed.column_groups = {};
-    }
-
-    try {
       if (config.datachip_config) {
         parsed.datachips = JSON.parse(config.datachip_config);
       }
@@ -1191,15 +1322,26 @@ const visObject = {
       parsed.emojis = {};
     }
 
-    // Parse field lists
-    parsed.sparkline_fields_list = config.sparkline_fields ?
-      config.sparkline_fields.split(',').map(f => f.trim()) : [];
-
-    parsed.datachip_fields_list = config.datachip_fields ?
-      config.datachip_fields.split(',').map(f => f.trim()) : [];
-
-    parsed.row_group_fields_list = config.row_group_fields ?
-      config.row_group_fields.split(',').map(f => f.trim()) : [];
+    // Parse column groups
+    parsed.column_groups = [];
+    if (config.column_group_1_name && config.column_group_1_fields) {
+      parsed.column_groups.push({
+        name: config.column_group_1_name,
+        fields: config.column_group_1_fields.split(',').map(f => f.trim()).filter(f => f)
+      });
+    }
+    if (config.column_group_2_name && config.column_group_2_fields) {
+      parsed.column_groups.push({
+        name: config.column_group_2_name,
+        fields: config.column_group_2_fields.split(',').map(f => f.trim()).filter(f => f)
+      });
+    }
+    if (config.column_group_3_name && config.column_group_3_fields) {
+      parsed.column_groups.push({
+        name: config.column_group_3_name,
+        fields: config.column_group_3_fields.split(',').map(f => f.trim()).filter(f => f)
+      });
+    }
 
     return parsed;
   },
@@ -1270,8 +1412,38 @@ const visObject = {
   },
 
   processHierarchicalData: function(data, config, queryResponse) {
-    // This is a simplified hierarchy implementation
-    // In production, you'd want more sophisticated logic
+    if (!config.hierarchy_field) return data;
+
+    // Find hierarchy levels
+    const hierarchyField = config.hierarchy_field;
+    const hierarchyLevels = {};
+
+    data.forEach((row, idx) => {
+      const value = row[hierarchyField];
+      const strValue = value && value.value !== undefined ? String(value.value) : String(value);
+
+      // For date hierarchy
+      if (config.detect_date_hierarchy) {
+        const dateMatch = strValue.match(/(\d{4})-?(\d{2})?-?(\d{2})?/);
+        if (dateMatch) {
+          const year = dateMatch[1];
+          const month = dateMatch[2];
+          const day = dateMatch[3];
+
+          if (day) {
+            row._hierarchy_level = 2;
+            row._hierarchy_parent = `${year}-${month}`;
+          } else if (month) {
+            row._hierarchy_level = 1;
+            row._hierarchy_parent = year;
+          } else {
+            row._hierarchy_level = 0;
+            row._hierarchy_parent = null;
+          }
+        }
+      }
+    });
+
     return data;
   },
 
@@ -1291,7 +1463,7 @@ const visObject = {
             type="text"
             class="filter-input"
             placeholder="Search across all columns..."
-            value="${this.state.tableFilter}"
+            value="${this.escapeHtml(this.state.tableFilter)}"
             id="table-filter-input"
           />
         </div>
@@ -1300,10 +1472,10 @@ const visObject = {
 
     // Table
     html += '<div class="table-wrapper">';
-    html += `<table class="advanced-table ${config.table_theme === 'striped' ? 'striped' : ''}" style="${this.getTableStyles(config)}">`;
+    html += `<table class="advanced-table ${config.table_theme}" style="${this.getTableStyles(config)}">`;
 
     // Column groups
-    if (config.enable_column_groups && config.column_groups) {
+    if (config.enable_column_groups && config.column_groups.length > 0) {
       html += this.renderColumnGroups(config, queryResponse);
     }
 
@@ -1359,14 +1531,13 @@ const visObject = {
     let html = '<thead><tr>';
 
     if (config.show_row_numbers) {
-      html += '<th rowspan="2" class="row-number-cell"></th>';
+      html += '<th rowspan="2" class="row-number-cell">#</th>';
     }
 
     const groupedFields = new Set();
-    Object.keys(groups).forEach(groupName => {
-      const groupFields = groups[groupName];
-      html += `<th colspan="${groupFields.length}" class="column-group-header" style="background: ${config.group_header_bg_color};">${groupName}</th>`;
-      groupFields.forEach(f => groupedFields.add(f));
+    groups.forEach(group => {
+      html += `<th colspan="${group.fields.length}" class="column-group-header" style="background: ${config.group_header_bg_color};">${this.escapeHtml(group.name)}</th>`;
+      group.fields.forEach(f => groupedFields.add(f));
     });
 
     // Ungrouped fields
@@ -1383,26 +1554,29 @@ const visObject = {
   renderHeaders: function(config, queryResponse) {
     const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
     const styles = this.getHeaderStyles(config);
+    const frozenClass = config.freeze_header_row ? 'frozen-header' : '';
 
-    let html = '<thead><tr style="' + styles + '">';
+    let html = `<thead><tr class="${frozenClass}" style="${styles}">`;
 
     if (config.show_row_numbers) {
-      html += '<th class="row-number-cell">#</th>';
+      html += `<th class="row-number-cell ${frozenClass}">#</th>`;
     }
 
+    let leftOffset = 0;
     fields.forEach((field, idx) => {
       const isFrozen = idx < config.freeze_columns;
-      const frozenClass = isFrozen ? 'frozen-column' : '';
+      const frozenColClass = isFrozen ? 'frozen-column' : '';
+      const combinedClass = `${frozenClass} ${frozenColClass}`.trim();
       const sortIndicator = this.state.sortField === field.name ?
         (this.state.sortDirection === 'asc' ? '▲' : '▼') : '';
 
       html += `
         <th
-          class="sortable ${frozenClass}"
+          class="sortable ${combinedClass}"
           data-field="${field.name}"
-          style="left: ${isFrozen ? idx * 150 : 'auto'}px;"
+          style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
         >
-          ${field.label_short || field.label}
+          ${this.escapeHtml(field.label_short || field.label)}
           ${sortIndicator ? `<span class="sort-indicator">${sortIndicator}</span>` : ''}
           ${config.enable_column_filters ? `
             <input
@@ -1410,11 +1584,17 @@ const visObject = {
               class="column-filter"
               data-field="${field.name}"
               placeholder="Filter..."
+              value="${this.escapeHtml(this.state.columnFilters[field.name] || '')}"
               onclick="event.stopPropagation();"
             />
           ` : ''}
         </th>
       `;
+
+      if (isFrozen) {
+        // Approximate column width for frozen positioning
+        leftOffset += 150;
+      }
     });
 
     html += '</tr></thead>';
@@ -1429,12 +1609,12 @@ const visObject = {
 
     data.forEach((row, rowIdx) => {
       const rowStyles = this.getRowConditionalStyles(row, config, styles);
+      const hierarchyLevel = row._hierarchy_level || 0;
 
       html += `<tr
         style="${rowStyles}"
         data-row="${rowIdx}"
-        onmouseenter="this.dataset.hover='true'"
-        onmouseleave="this.dataset.hover='false'"
+        data-hierarchy-level="${hierarchyLevel}"
       >`;
 
       if (config.show_row_numbers) {
@@ -1442,6 +1622,7 @@ const visObject = {
         html += `<td class="row-number-cell">${globalRowNum}</td>`;
       }
 
+      let leftOffset = 0;
       fields.forEach((field, colIdx) => {
         const cellValue = row[field.name];
         const isFrozen = colIdx < config.freeze_columns;
@@ -1449,17 +1630,26 @@ const visObject = {
 
         const cellStyles = this.getColumnConditionalStyles(row, field.name, config, styles);
 
+        // Check if this is the hierarchy field
+        const isHierarchyField = config.enable_hierarchy && field.name === config.hierarchy_field;
+
         html += `
           <td
             class="${frozenClass}"
             data-field="${field.name}"
             data-row="${rowIdx}"
             data-col="${colIdx}"
-            style="${cellStyles}; left: ${isFrozen ? colIdx * 150 : 'auto'}px;"
+            style="${cellStyles}; ${isFrozen ? `left: ${leftOffset}px;` : ''}"
           >
-            ${this.renderCellContent(cellValue, field, config, row)}
+            ${isHierarchyField ?
+              this.renderHierarchyCell(cellValue, field, config, row, hierarchyLevel) :
+              this.renderCellContent(cellValue, field, config, row)}
           </td>
         `;
+
+        if (isFrozen) {
+          leftOffset += 150;
+        }
       });
 
       html += '</tr>';
@@ -1469,34 +1659,67 @@ const visObject = {
     return html;
   },
 
+  renderHierarchyCell: function(cellValue, field, config, row, level) {
+    const indent = level * config.hierarchy_indent;
+    const hasChildren = row._has_children;
+    const isExpanded = this.state.expandedRows.has(row);
+
+    let content = '';
+    if (config.show_hierarchy_icons && hasChildren) {
+      const icon = isExpanded ? '▼' : '▶';
+      content = `
+        <div class="hierarchy-cell" style="padding-left: ${indent}px;">
+          <span class="hierarchy-toggle" data-row-id="${row.id}">${icon}</span>
+          <span class="hierarchy-content">${this.renderCellContent(cellValue, field, config, row)}</span>
+        </div>
+      `;
+    } else {
+      content = `
+        <div class="hierarchy-cell" style="padding-left: ${indent + (config.show_hierarchy_icons ? 22 : 0)}px;">
+          <span class="hierarchy-content">${this.renderCellContent(cellValue, field, config, row)}</span>
+        </div>
+      `;
+    }
+
+    return content;
+  },
+
   renderCellContent: function(cellValue, field, config, row) {
     // Extract actual value
     let value = cellValue;
     let rendered = cellValue;
+    let links = null;
 
     if (cellValue && cellValue.value !== undefined) {
       value = cellValue.value;
       rendered = cellValue.rendered || cellValue.value;
+      links = cellValue.links;
     }
 
     // Check for sparklines
-    if (config.enable_sparklines && config.sparkline_fields_list.includes(field.name)) {
-      return this.renderSparkline(value, config);
+    if (config.enable_sparklines && config.sparkline_field === field.name) {
+      return this.renderSparkline(row, config, field);
     }
 
     // Check for data chips
-    if (config.enable_datachips && config.datachip_fields_list.includes(field.name)) {
+    if (config.enable_datachips && config.datachip_field === field.name) {
       return this.renderDataChip(value, config);
     }
 
     // Check for emojis
     if (config.enable_emojis && config.emojis[value]) {
-      return `${config.emojis[value]} ${rendered}`;
+      rendered = `${config.emojis[value]} ${rendered}`;
     }
 
     // Check for comparison
-    if (config.enable_comparison && field.name === config.comparison_field) {
-      return this.renderComparison(value, config);
+    if (config.enable_comparison && config.comparison_primary_field === field.name) {
+      return this.renderComparison(row, config);
+    }
+
+    // Wrap with drill links if available
+    if (links && links.length > 0) {
+      const drillLink = links[0];
+      rendered = `<a href="${drillLink.url}" target="_blank" style="color: inherit; text-decoration: underline;">${rendered}</a>`;
     }
 
     // Highlight filter matches
@@ -1508,39 +1731,48 @@ const visObject = {
     return rendered;
   },
 
-  renderSparkline: function(data, config) {
-    // Simplified sparkline - in production use proper charting
-    if (!Array.isArray(data)) {
-      data = String(data).split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
-    }
+  renderSparkline: function(row, config, field) {
+    // Get all numeric fields for this row to create sparkline
+    const numericFields = this.queryResponse.fields.measure_like;
+    const values = numericFields.map(f => {
+      const cell = row[f.name];
+      const val = cell && cell.value !== undefined ? cell.value : cell;
+      return parseFloat(val) || 0;
+    }).filter(v => !isNaN(v));
 
-    if (data.length === 0) return '';
+    if (values.length === 0) return '';
 
-    const max = Math.max(...data);
-    const min = Math.min(...data);
+    const max = Math.max(...values);
+    const min = Math.min(...values);
     const range = max - min || 1;
 
-    const points = data.map((v, i) => {
-      const x = (i / (data.length - 1)) * 100;
+    const points = values.map((v, i) => {
+      const x = (i / Math.max(values.length - 1, 1)) * 100;
       const y = ((max - v) / range) * 100;
       return `${x},${y}`;
     }).join(' ');
 
+    let svgContent = '';
+    if (config.sparkline_type === 'line') {
+      svgContent = `<polyline points="${points}" fill="none" stroke="${config.sparkline_color}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+    } else if (config.sparkline_type === 'area') {
+      svgContent = `
+        <polyline points="0,100 ${points} 100,100" fill="${config.sparkline_color}" opacity="0.3"/>
+        <polyline points="${points}" fill="none" stroke="${config.sparkline_color}" stroke-width="2" vector-effect="non-scaling-stroke"/>
+      `;
+    } else if (config.sparkline_type === 'bar') {
+      const barWidth = 100 / values.length * 0.8;
+      svgContent = values.map((v, i) => {
+        const x = (i / values.length) * 100;
+        const height = ((v - min) / range) * 100;
+        return `<rect x="${x}" y="${100 - height}" width="${barWidth}" height="${height}" fill="${config.sparkline_color}"/>`;
+      }).join('');
+    }
+
     return `
       <div class="sparkline-container" style="height: ${config.sparkline_height}px;">
         <svg class="sparkline-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          ${config.sparkline_type === 'line' ?
-            `<polyline points="${points}" fill="none" stroke="${config.sparkline_color}" stroke-width="2"/>` :
-            config.sparkline_type === 'area' ?
-            `<polyline points="0,100 ${points} 100,100" fill="${config.sparkline_color}" opacity="0.3"/>
-             <polyline points="${points}" fill="none" stroke="${config.sparkline_color}" stroke-width="2"/>` :
-            data.map((v, i) => {
-              const x = (i / data.length) * 100;
-              const height = ((v - min) / range) * 100;
-              const width = (100 / data.length) * 0.8;
-              return `<rect x="${x}" y="${100 - height}" width="${width}" height="${height}" fill="${config.sparkline_color}"/>`;
-            }).join('')
-          }
+          ${svgContent}
         </svg>
       </div>
     `;
@@ -1548,35 +1780,70 @@ const visObject = {
 
   renderDataChip: function(value, config) {
     const color = config.datachips[value] || '#6b7280';
-    return `<span class="data-chip" style="background-color: ${color};">${value}</span>`;
+    return `<span class="data-chip" style="background-color: ${color};">${this.escapeHtml(String(value))}</span>`;
   },
 
-  renderComparison: function(value, config) {
-    // Simplified comparison - assumes percentage or absolute difference
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return value;
+  renderComparison: function(row, config) {
+    // Get primary and secondary values
+    const primaryCell = row[config.comparison_primary_field];
+    const secondaryCell = row[config.comparison_secondary_field];
 
-    const isPositive = numValue >= 0;
+    if (!primaryCell || !secondaryCell) {
+      const primaryVal = primaryCell && primaryCell.value !== undefined ? primaryCell.value : primaryCell;
+      return primaryVal !== undefined ? String(primaryVal) : '';
+    }
+
+    const primaryValue = primaryCell.value !== undefined ? primaryCell.value : primaryCell;
+    const secondaryValue = secondaryCell.value !== undefined ? secondaryCell.value : secondaryCell;
+
+    const primary = parseFloat(primaryValue);
+    const secondary = parseFloat(secondaryValue);
+
+    if (isNaN(primary) || isNaN(secondary) || secondary === 0) {
+      return String(primaryValue);
+    }
+
+    const diff = primary - secondary;
+    const percentDiff = (diff / Math.abs(secondary)) * 100;
+    const isPositive = diff >= 0;
     const color = isPositive ? config.positive_comparison_color : config.negative_comparison_color;
     const arrow = config.show_comparison_arrows ? (isPositive ? '↑' : '↓') : '';
 
-    let display = '';
+    let comparisonText = '';
     if (config.comparison_type === 'percentage' || config.comparison_type === 'both') {
-      display = `${numValue > 0 ? '+' : ''}${numValue.toFixed(1)}%`;
+      comparisonText = `${diff > 0 ? '+' : ''}${percentDiff.toFixed(1)}%`;
+    }
+    if (config.comparison_type === 'absolute' || config.comparison_type === 'both') {
+      if (comparisonText) comparisonText += ` (${diff > 0 ? '+' : ''}${diff.toFixed(0)})`;
+      else comparisonText = `${diff > 0 ? '+' : ''}${diff.toFixed(0)}`;
     }
 
-    return `
+    let html = `
       <div class="comparison-container">
-        <span class="comparison-arrow" style="color: ${color};">${arrow}</span>
-        <span class="comparison-value" style="color: ${color};">${display}</span>
-      </div>
+        <span>${primaryValue}</span>
+        <span class="comparison-value" style="color: ${color};">
+          ${arrow} ${comparisonText}
+        </span>
     `;
+
+    if (config.comparison_type === 'bar' || config.comparison_type === 'both') {
+      const maxVal = Math.max(Math.abs(primary), Math.abs(secondary));
+      const barWidth = Math.abs(percentDiff);
+      html += `
+        <div style="width: 100%; max-width: 60px;">
+          <div class="comparison-bar" style="width: ${Math.min(barWidth, 100)}%; background-color: ${color};"></div>
+        </div>
+      `;
+    }
+
+    html += '</div>';
+    return html;
   },
 
   getTableStyles: function(config) {
     let styles = '';
 
-    if (config.show_borders) {
+    if (config.table_theme !== 'minimal' && config.show_borders) {
       styles += `border: ${config.border_width}px ${config.border_style} ${config.border_color};`;
     }
 
@@ -1596,7 +1863,7 @@ const visObject = {
     styles += `text-align: ${config.header_alignment};`;
     styles += `padding: ${config.row_spacing}px ${config.column_spacing}px;`;
 
-    if (config.show_borders) {
+    if (config.table_theme !== 'minimal' && config.show_borders) {
       styles += `border: ${config.border_width}px ${config.border_style} ${config.border_color};`;
     }
 
@@ -1625,7 +1892,7 @@ const visObject = {
       styles += `text-align: ${config.cell_alignment};`;
     }
 
-    if (config.show_gridlines && config.show_borders) {
+    if (config.table_theme !== 'minimal' && config.show_gridlines && config.show_borders) {
       styles += `border: ${config.border_width}px ${config.border_style} ${config.border_color};`;
     }
 
@@ -1707,7 +1974,7 @@ const visObject = {
           case 'last': self.state.currentPage = totalPages; break;
         }
 
-        self.trigger('updateAsync', [self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {}]);
+        self.trigger('updateAsync');
       });
     });
 
@@ -1717,7 +1984,7 @@ const visObject = {
       tableFilterInput.addEventListener('input', function() {
         self.state.tableFilter = this.value;
         self.state.currentPage = 1;
-        self.trigger('updateAsync', [self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {}]);
+        self.trigger('updateAsync');
       });
     }
 
@@ -1727,13 +1994,16 @@ const visObject = {
         const field = this.dataset.field;
         self.state.columnFilters[field] = this.value;
         self.state.currentPage = 1;
-        self.trigger('updateAsync', [self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {}]);
+        self.trigger('updateAsync');
       });
     });
 
     // Sortable headers
     this.container.querySelectorAll('th.sortable').forEach(th => {
-      th.addEventListener('click', function() {
+      th.addEventListener('click', function(e) {
+        // Don't sort if clicking on filter input
+        if (e.target.classList.contains('column-filter')) return;
+
         const field = this.dataset.field;
 
         if (self.state.sortField === field) {
@@ -1743,7 +2013,7 @@ const visObject = {
           self.state.sortDirection = 'asc';
         }
 
-        self.trigger('updateAsync', [self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {}]);
+        self.trigger('updateAsync');
       });
     });
 
@@ -1789,39 +2059,50 @@ const visObject = {
             .find(f => f.name === field);
 
           if (fieldObj && config.tooltip_show_label) {
-            const tooltip = document.createElement('div');
-            tooltip.className = 'tooltip';
-            tooltip.innerHTML = `
-              <div class="tooltip-label">${fieldObj.label_short || fieldObj.label}</div>
-              <div>${this.textContent}</div>
-            `;
-            document.body.appendChild(tooltip);
-
             const rect = this.getBoundingClientRect();
-            tooltip.style.left = rect.left + 'px';
-            tooltip.style.top = (rect.bottom + 5) + 'px';
-
-            this.tooltipElement = tooltip;
+            self.tooltip.querySelector('.tooltip-label').textContent = fieldObj.label_short || fieldObj.label;
+            self.tooltip.querySelector('.tooltip-value').textContent = this.textContent.trim();
+            self.tooltip.style.left = rect.left + 'px';
+            self.tooltip.style.top = (rect.bottom + 5) + 'px';
+            self.tooltip.classList.add('visible');
           }
         });
 
         td.addEventListener('mouseleave', function() {
-          if (this.tooltipElement) {
-            this.tooltipElement.remove();
-            this.tooltipElement = null;
-          }
+          self.tooltip.classList.remove('visible');
         });
       });
     }
+
+    // Hierarchy toggles
+    this.container.querySelectorAll('.hierarchy-toggle').forEach(toggle => {
+      toggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const rowId = this.dataset.rowId;
+        // Toggle expanded state and re-render
+        if (self.state.expandedRows.has(rowId)) {
+          self.state.expandedRows.delete(rowId);
+        } else {
+          self.state.expandedRows.add(rowId);
+        }
+        self.trigger('updateAsync');
+      });
+    });
+  },
+
+  escapeHtml: function(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   },
 
   escapeRegex: function(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   },
 
-  trigger: function(event, args) {
+  trigger: function(event) {
     if (event === 'updateAsync') {
-      this.updateAsync.apply(this, args);
+      this.updateAsync(this.state.data, this.container.parentElement, this.config, this.queryResponse, {}, () => {});
     }
   }
 };
