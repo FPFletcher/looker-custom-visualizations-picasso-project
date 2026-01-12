@@ -1,6 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.0.0 - Production Ready
+ * Version: 4.1.0 - Bug Fixes: Filtering, Sorting, Striping
+ * Build: 2026-01-12-v2
  */
 
 const visObject = {
@@ -1098,6 +1099,10 @@ const visObject = {
   },
 
   create: function(element, config) {
+    console.log('[TABLE] ========================================');
+    console.log('[TABLE] Advanced Table v4.1.0 - Build 2026-01-12-v2');
+    console.log('[TABLE] ========================================');
+
     element.innerHTML = `
       <style>
         #advanced-table-container {
@@ -1183,6 +1188,28 @@ const visObject = {
           border-collapse: separate;
           border-spacing: 0;
           background: #ffffff;
+        }
+
+        /* Apply cell styles via CSS instead of inline */
+        table.advanced-table tbody td {
+          font-size: var(--cell-font-size, 11px);
+          color: var(--cell-text-color, #374151);
+          height: var(--row-height, 36px);
+          padding: var(--row-spacing, 0px) var(--column-spacing, 12px);
+          white-space: var(--wrap-text, nowrap);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          border: var(--show-borders, 1px) var(--border-style, solid) var(--border-color, #e5e7eb);
+        }
+
+        table.advanced-table tbody td[data-column-conditional="true"] {
+          background-color: var(--column-condition-bg-color, #dbeafe) !important;
+          color: var(--column-condition-text-color, #1e40af) !important;
+        }
+
+        table.advanced-table tbody tr[data-row-conditional="true"] td {
+          background-color: var(--row-condition-bg-color, #fef3c7) !important;
+          color: var(--row-condition-text-color, #92400e) !important;
         }
 
         /* FROZEN HEADER - Critical positioning */
@@ -1728,16 +1755,35 @@ const visObject = {
 
     let html = '';
 
-    // Set CSS variable for stripe color - CRITICAL for striped theme
+    // Set CSS variables for stripe color and cell styling
     const existingStyle = document.getElementById('table-stripe-style');
     if (existingStyle) {
       existingStyle.remove();
     }
     const style = document.createElement('style');
     style.id = 'table-stripe-style';
-    style.innerHTML = `:root { --stripe-color: ${config.stripe_color || '#f9fafb'}; }`;
+
+    // Build CSS with all variables
+    let cssVars = `:root {
+      --stripe-color: ${config.stripe_color || '#f9fafb'};
+      --cell-font-size: ${config.cell_font_size || 11}px;
+      --cell-text-color: ${config.cell_text_color || '#374151'};
+      --row-height: ${config.row_height || 36}px;
+      --row-spacing: ${config.row_spacing || 0}px;
+      --column-spacing: ${config.column_spacing || 12}px;
+      --wrap-text: ${config.wrap_text ? 'normal' : 'nowrap'};
+      --show-borders: ${config.show_borders ? config.border_width || 1 : 0}px;
+      --border-style: ${config.border_style || 'solid'};
+      --border-color: ${config.border_color || '#e5e7eb'};
+      --column-condition-bg-color: ${config.column_condition_bg_color || '#dbeafe'};
+      --column-condition-text-color: ${config.column_condition_text_color || '#1e40af'};
+      --row-condition-bg-color: ${config.row_condition_bg_color || '#fef3c7'};
+      --row-condition-text-color: ${config.row_condition_text_color || '#92400e'};
+    }`;
+
+    style.innerHTML = cssVars;
     document.head.appendChild(style);
-    console.log('[TABLE] Injected stripe color CSS:', style.innerHTML);
+    console.log('[TABLE] Injected CSS variables');
 
     // Top pagination
     if (config.enable_pagination && (config.pagination_position === 'top' || config.pagination_position === 'both')) {
@@ -1751,10 +1797,13 @@ const visObject = {
           <input
             type="text"
             class="filter-input"
-            placeholder="Search across all columns..."
+            placeholder="Search across all columns... (Press Enter)"
             value="${this.escapeHtml(this.state.tableFilter)}"
             id="table-filter-input"
           />
+          <button class="filter-button" id="table-filter-button" style="margin-left: 8px; padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            🔍 Filter
+          </button>
         </div>
       `;
     }
@@ -1919,9 +1968,8 @@ const visObject = {
               type="text"
               class="column-filter"
               data-field="${field.name}"
-              placeholder="Filter..."
+              placeholder="Filter... (Enter)"
               value="${this.escapeHtml(this.state.columnFilters[field.name] || '')}"
-              onclick="event.stopPropagation();"
             />
           ` : ''}
         </th>
@@ -1938,7 +1986,6 @@ const visObject = {
 
   renderBody: function(pageData, allFilteredData, config, queryResponse) {
     const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-    const styles = this.getCellStyles(config);
 
     // Get the index offset for the current page
     const pageOffset = (this.state.currentPage - 1) * config.page_size;
@@ -1947,13 +1994,21 @@ const visObject = {
 
     pageData.forEach((row, pageRowIdx) => {
       const actualRowIdx = pageOffset + pageRowIdx; // Actual index in allFilteredData
-      const rowStyles = this.getRowConditionalStyles(row, config, styles);
       const hierarchyLevel = row._hierarchy_level || 0;
 
+      // Check row conditional formatting but don't apply inline styles
+      const hasRowConditional = config.enable_row_conditional &&
+        config.row_condition_field &&
+        this.evaluateCondition(
+          row[config.row_condition_field],
+          config.row_condition_operator,
+          config.row_condition_value
+        );
+
       html += `<tr
-        style="${rowStyles}"
         data-row="${pageRowIdx}"
         data-hierarchy-level="${hierarchyLevel}"
+        ${hasRowConditional ? `data-row-conditional="true"` : ''}
       >`;
 
       if (config.show_row_numbers) {
@@ -1967,7 +2022,14 @@ const visObject = {
         const isFrozen = colIdx < config.freeze_columns;
         const frozenClass = isFrozen ? 'frozen-column' : '';
 
-        const cellStyles = this.getColumnConditionalStyles(row, field.name, config, styles);
+        // Check column conditional formatting
+        const hasColumnConditional = config.enable_column_conditional &&
+          config.column_condition_field === field.name &&
+          this.evaluateCondition(
+            cellValue,
+            config.column_condition_operator,
+            config.column_condition_value
+          );
 
         // Check if this is the hierarchy field
         const isHierarchyField = config.enable_hierarchy && field.name === config.hierarchy_field;
@@ -1978,7 +2040,8 @@ const visObject = {
             data-field="${field.name}"
             data-row="${pageRowIdx}"
             data-col="${colIdx}"
-            style="${cellStyles}; ${isFrozen ? `left: ${leftOffset}px;` : ''}"
+            ${hasColumnConditional ? `data-column-conditional="true"` : ''}
+            style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
           >
             ${isHierarchyField ?
               this.renderHierarchyCell(cellValue, field, config, row, hierarchyLevel) :
@@ -2042,6 +2105,7 @@ const visObject = {
 
     if (isComparisonField) {
       comparisonHtml = this.renderComparison(row, config, drillLinks, rowIdx, data);
+      console.log('[TABLE] Rendering comparison for', field.name, '- HTML length:', comparisonHtml ? comparisonHtml.length : 0);
     }
 
     // PRIORITY 2: Check for cell bars (can wrap comparison or regular value)
@@ -2051,6 +2115,7 @@ const visObject = {
       if (config.cellBarSets[i].fields.includes(field.name)) {
         isCellBarField = true;
         cellBarSet = config.cellBarSets[i];
+        console.log('[TABLE] Field', field.name, 'has cell bar from set', i + 1);
         break;
       }
     }
@@ -2058,11 +2123,13 @@ const visObject = {
     if (isCellBarField) {
       // If it's also a comparison field, use the comparison HTML as the "rendered" value
       const displayValue = isComparisonField ? comparisonHtml : rendered;
+      console.log('[TABLE] Rendering cell bar for', field.name, 'with comparison:', isComparisonField);
       return this.renderCellBar(value, displayValue, config, drillLinks, cellBarSet, field.name);
     }
 
     // If comparison but no cell bar, return comparison
     if (isComparisonField) {
+      console.log('[TABLE] Rendering comparison only for', field.name);
       return comparisonHtml;
     }
 
@@ -2399,32 +2466,65 @@ const visObject = {
       });
     });
 
-    // Table filter
+    // Table filter with Enter key and button
     const tableFilterInput = this.container.querySelector('#table-filter-input');
+    const tableFilterButton = this.container.querySelector('#table-filter-button');
+
+    const applyTableFilter = function() {
+      self.state.tableFilter = tableFilterInput.value;
+      self.state.currentPage = 1;
+      self.trigger('updateAsync');
+    };
+
     if (tableFilterInput) {
-      tableFilterInput.addEventListener('input', function() {
-        self.state.tableFilter = this.value;
-        self.state.currentPage = 1;
-        self.trigger('updateAsync');
+      // Enter key
+      tableFilterInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          applyTableFilter();
+        }
       });
     }
 
-    // Column filters
+    if (tableFilterButton) {
+      tableFilterButton.addEventListener('click', applyTableFilter);
+    }
+
+    // Column filters with Enter key
     this.container.querySelectorAll('.column-filter').forEach(input => {
-      input.addEventListener('input', function() {
-        const field = this.dataset.field;
-        self.state.columnFilters[field] = this.value;
+      const applyColumnFilter = function() {
+        const field = input.dataset.field;
+        self.state.columnFilters[field] = input.value;
         self.state.currentPage = 1;
+        console.log('[TABLE] Column filter applied for', field, ':', input.value);
         self.trigger('updateAsync');
+      };
+
+      // Enter key
+      input.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          applyColumnFilter();
+        }
+      });
+
+      // Stop propagation on click to prevent header sorting
+      input.addEventListener('click', function(e) {
+        e.stopPropagation();
       });
     });
 
-    // Sortable headers
+    // Sortable headers - use addEventListener instead of onclick
     this.container.querySelectorAll('th.sortable').forEach(th => {
       th.addEventListener('click', function(e) {
-        if (e.target.classList.contains('column-filter')) return;
+        // Don't sort if clicking on filter input
+        if (e.target.classList.contains('column-filter')) {
+          return;
+        }
 
         const field = this.dataset.field;
+        console.log('[TABLE] Sort clicked on field:', field);
 
         if (self.state.sortField === field) {
           self.state.sortDirection = self.state.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -2433,6 +2533,7 @@ const visObject = {
           self.state.sortDirection = 'asc';
         }
 
+        console.log('[TABLE] New sort state:', self.state.sortField, self.state.sortDirection);
         self.trigger('updateAsync');
       });
     });
