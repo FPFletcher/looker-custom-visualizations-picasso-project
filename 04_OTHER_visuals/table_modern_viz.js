@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.7.0 - Subtotals & Grand Totals WORKING!
- * Build: 2026-01-12-v11
+ * Version: 4.8.0 - Enhanced Subtotals + Fixes
+ * Build: 2026-01-12-v12
  */
 
 const visObject = {
@@ -596,12 +596,42 @@ const visObject = {
       order: 77
     },
 
+    subtotal_position: {
+      type: "string",
+      label: "Subtotal Position",
+      display: "select",
+      values: [
+        {"Top (Collapsible)": "top"},
+        {"Bottom": "bottom"}
+      ],
+      default: "bottom",
+      section: "Series",
+      order: 78
+    },
+
+    subtotal_background_color: {
+      type: "string",
+      label: "Subtotal Background Color",
+      display: "color",
+      default: "#f0f0f0",
+      section: "Series",
+      order: 79
+    },
+
     grand_total_label: {
       type: "string",
       label: "Grand Total Label",
       default: "Grand Total",
       section: "Series",
-      order: 78
+      order: 80
+    },
+
+    show_grand_total_on_all_pages: {
+      type: "boolean",
+      label: "Show Grand Total on All Pages",
+      default: true,
+      section: "Series",
+      order: 81
     },
 
     series_divider_field_labels: {
@@ -1109,8 +1139,11 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.7.0 - Build 2026-01-12-v11');
-    console.log('[TABLE] Subtotals & Grand Totals WORKING!');
+    console.log('[TABLE] Advanced Table v4.8.0 - Build 2026-01-12-v12');
+    console.log('[TABLE] ✅ LookML formatting as default');
+    console.log('[TABLE] ✅ Grand total on all pages');
+    console.log('[TABLE] ✅ Collapsible subtotals at top');
+    console.log('[TABLE] ✅ Custom subtotal background color');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1464,10 +1497,27 @@ const visObject = {
 
         /* Subtotal and Grand Total Rows */
         .advanced-table tbody tr.subtotal-row {
-          background-color: #f0f0f0 !important;
           font-weight: 600;
           border-top: 2px solid #ddd;
           border-bottom: 1px solid #ddd;
+          cursor: pointer;
+        }
+
+        .advanced-table tbody tr.subtotal-row.position-top {
+          cursor: pointer;
+        }
+
+        .advanced-table tbody tr.subtotal-row.position-top::before {
+          content: '▼ ';
+          margin-right: 5px;
+        }
+
+        .advanced-table tbody tr.subtotal-row.position-top.collapsed::before {
+          content: '▶ ';
+        }
+
+        .advanced-table tbody tr.subtotal-row.collapsed + tr.detail-row {
+          display: none;
         }
 
         .advanced-table tbody tr.grand-total-row {
@@ -1475,10 +1525,6 @@ const visObject = {
           font-weight: 700;
           border-top: 3px solid #333;
           border-bottom: 3px solid #333;
-        }
-
-        .advanced-table.modern tbody tr.subtotal-row {
-          background-color: #e3f2fd !important;
         }
 
         .advanced-table.modern tbody tr.grand-total-row {
@@ -1654,11 +1700,29 @@ const visObject = {
     }
 
     // Calculate pagination
-    const totalPages = Math.ceil(filteredData.length / parsedConfig.page_size);
+    // Separate grand total if it exists and should be shown on all pages
+    let grandTotalRow = null;
+    let dataWithoutGrandTotal = filteredData;
+
+    if (parsedConfig.show_grand_total && parsedConfig.show_grand_total_on_all_pages) {
+      // Find and extract grand total row
+      const grandTotalIdx = filteredData.findIndex(row => row.__isGrandTotal);
+      if (grandTotalIdx >= 0) {
+        grandTotalRow = filteredData[grandTotalIdx];
+        dataWithoutGrandTotal = filteredData.filter(row => !row.__isGrandTotal);
+      }
+    }
+
+    const totalPages = Math.ceil(dataWithoutGrandTotal.length / parsedConfig.page_size);
     const startIdx = (this.state.currentPage - 1) * parsedConfig.page_size;
     const endIdx = startIdx + parsedConfig.page_size;
-    const pageData = parsedConfig.enable_pagination ?
-      filteredData.slice(startIdx, endIdx) : filteredData;
+    let pageData = parsedConfig.enable_pagination ?
+      dataWithoutGrandTotal.slice(startIdx, endIdx) : dataWithoutGrandTotal;
+
+    // Add grand total to every page if enabled
+    if (grandTotalRow && parsedConfig.show_grand_total_on_all_pages) {
+      pageData = [...pageData, grandTotalRow];
+    }
 
     // Render table
     this.renderTable(pageData, filteredData, totalPages, parsedConfig, queryResponse);
@@ -1754,6 +1818,7 @@ const visObject = {
 
     const result = [];
     const groups = {};
+    const subtotalPosition = config.subtotal_position || 'bottom';
 
     // Group data by the specified field
     data.forEach(row => {
@@ -1773,11 +1838,13 @@ const visObject = {
     Object.keys(groups).forEach(groupValue => {
       const groupRows = groups[groupValue];
 
-      // Add all rows in the group
-      groupRows.forEach(row => result.push(row));
-
       // Calculate subtotal row
-      const subtotalRow = { __isSubtotal: true, __groupValue: groupValue };
+      const subtotalRow = {
+        __isSubtotal: true,
+        __groupValue: groupValue,
+        __groupField: groupByField,
+        __isCollapsed: subtotalPosition === 'top' // Start collapsed if at top
+      };
 
       // Set the grouping dimension value with subtotal label
       const labelTemplate = config.subtotal_label || 'Subtotal: {value}';
@@ -1810,7 +1877,19 @@ const visObject = {
         };
       });
 
-      result.push(subtotalRow);
+      if (subtotalPosition === 'top') {
+        // Subtotal at top, then detail rows (marked as children)
+        result.push(subtotalRow);
+        groupRows.forEach(row => {
+          row.__parentGroup = groupValue;
+          row.__parentField = groupByField;
+          result.push(row);
+        });
+      } else {
+        // Detail rows first, then subtotal at bottom
+        groupRows.forEach(row => result.push(row));
+        result.push(subtotalRow);
+      }
     });
 
     return result;
@@ -2004,6 +2083,11 @@ const visObject = {
       --column-condition-text-color: ${config.column_condition_text_color || '#1e40af'};
       --row-condition-bg-color: ${config.row_condition_bg_color || '#fef3c7'};
       --row-condition-text-color: ${config.row_condition_text_color || '#92400e'};
+      --subtotal-bg-color: ${config.subtotal_background_color || '#f0f0f0'};
+    }
+
+    .advanced-table tbody tr.subtotal-row {
+      background-color: var(--subtotal-bg-color) !important;
     }`;
 
     style.innerHTML = cssVars;
@@ -2215,7 +2299,18 @@ const visObject = {
       // Determine row type
       const isSubtotalRow = row.__isSubtotal || false;
       const isGrandTotalRow = row.__isGrandTotal || false;
-      const rowClass = isGrandTotalRow ? 'grand-total-row' : (isSubtotalRow ? 'subtotal-row' : '');
+      const isDetailRow = row.__parentGroup !== undefined;
+      const isCollapsed = row.__isCollapsed || false;
+      const subtotalPosition = config.subtotal_position || 'bottom';
+
+      let rowClass = '';
+      if (isGrandTotalRow) {
+        rowClass = 'grand-total-row';
+      } else if (isSubtotalRow) {
+        rowClass = `subtotal-row position-${subtotalPosition}${isCollapsed ? ' collapsed' : ''}`;
+      } else if (isDetailRow) {
+        rowClass = 'detail-row';
+      }
 
       // Check row conditional formatting but don't apply inline styles
       const hasRowConditional = config.enable_row_conditional &&
@@ -2226,12 +2321,16 @@ const visObject = {
           config.row_condition_value
         );
 
-      html += `<tr
-        data-row="${pageRowIdx}"
-        data-hierarchy-level="${hierarchyLevel}"
-        ${rowClass ? `class="${rowClass}"` : ''}
-        ${hasRowConditional ? `data-row-conditional="true"` : ''}
-      >`;
+      const dataAttrs = [
+        `data-row="${pageRowIdx}"`,
+        `data-hierarchy-level="${hierarchyLevel}"`,
+        rowClass ? `class="${rowClass}"` : '',
+        hasRowConditional ? `data-row-conditional="true"` : '',
+        isSubtotalRow && subtotalPosition === 'top' ? `data-group="${row.__groupValue}"` : '',
+        isDetailRow ? `data-parent-group="${row.__parentGroup}"` : ''
+      ].filter(Boolean).join(' ');
+
+      html += `<tr ${dataAttrs}>`;
 
       if (config.show_row_numbers) {
         const globalRowNum = actualRowIdx + 1;
@@ -2310,84 +2409,90 @@ const visObject = {
   },
 
   // Format a value using custom format string
-  formatValue: function(value, customFormat, field) {
+  formatValue: function(value, customFormat, field, renderedValue) {
     if (value === null || value === undefined) return '';
 
-    // If no custom format, return as-is
-    if (!customFormat || customFormat.trim() === '') {
-      return value;
-    }
-
-    // For dates - support strftime-style formats
-    if (customFormat.includes('%')) {
-      try {
-        const date = new Date(value);
-        if (isNaN(date.getTime())) return String(value);
-        return customFormat
-          .replace(/%Y/g, date.getFullYear())
-          .replace(/%y/g, String(date.getFullYear()).slice(-2))
-          .replace(/%m/g, String(date.getMonth() + 1).padStart(2, '0'))
-          .replace(/%d/g, String(date.getDate()).padStart(2, '0'))
-          .replace(/%b/g, date.toLocaleString('default', { month: 'short' }))
-          .replace(/%B/g, date.toLocaleString('default', { month: 'long' }))
-          .replace(/%H/g, String(date.getHours()).padStart(2, '0'))
-          .replace(/%M/g, String(date.getMinutes()).padStart(2, '0'))
-          .replace(/%S/g, String(date.getSeconds()).padStart(2, '0'));
-      } catch (e) {
-        return String(value);
+    // PRIORITY 1: Custom format overrides everything
+    if (customFormat && customFormat.trim() !== '') {
+      // For dates - support strftime-style formats
+      if (customFormat.includes('%')) {
+        try {
+          const date = new Date(value);
+          if (isNaN(date.getTime())) return String(value);
+          return customFormat
+            .replace(/%Y/g, date.getFullYear())
+            .replace(/%y/g, String(date.getFullYear()).slice(-2))
+            .replace(/%m/g, String(date.getMonth() + 1).padStart(2, '0'))
+            .replace(/%d/g, String(date.getDate()).padStart(2, '0'))
+            .replace(/%b/g, date.toLocaleString('default', { month: 'short' }))
+            .replace(/%B/g, date.toLocaleString('default', { month: 'long' }))
+            .replace(/%H/g, String(date.getHours()).padStart(2, '0'))
+            .replace(/%M/g, String(date.getMinutes()).padStart(2, '0'))
+            .replace(/%S/g, String(date.getSeconds()).padStart(2, '0'));
+        } catch (e) {
+          return String(value);
+        }
       }
-    }
 
-    // For numbers - custom format implementation
-    if (!isNaN(value)) {
-      const num = Number(value);
+      // For numbers - custom format implementation
+      if (!isNaN(value)) {
+        const num = Number(value);
 
-      // Currency formats: $, €, £
-      if (customFormat.includes('$') || customFormat.includes('€') || customFormat.includes('£')) {
-        const currency = customFormat.match(/[$€£]/)?.[0] || '';
-        const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-        let scaledValue = num;
-        let scaledSuffix = '';
+        // Currency formats: $, €, £
+        if (customFormat.includes('$') || customFormat.includes('€') || customFormat.includes('£')) {
+          const currency = customFormat.match(/[$€£]/)?.[0] || '';
+          const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+          let scaledValue = num;
+          let scaledSuffix = '';
 
-        // Handle thousands/millions abbreviations
-        if (customFormat.includes('," k"') || customFormat.includes(",'k'")) {
-          scaledValue = num / 1000;
-          scaledSuffix = ' k';
-        } else if (customFormat.includes('," M"') || customFormat.includes(",'M'")) {
-          scaledValue = num / 1000000;
-          scaledSuffix = ' M';
-        } else if (customFormat.includes('," B"') || customFormat.includes(",'B'")) {
-          scaledValue = num / 1000000000;
-          scaledSuffix = ' B';
+          // Handle thousands/millions abbreviations
+          if (customFormat.includes('," k"') || customFormat.includes(",'k'")) {
+            scaledValue = num / 1000;
+            scaledSuffix = ' k';
+          } else if (customFormat.includes('," M"') || customFormat.includes(",'M'")) {
+            scaledValue = num / 1000000;
+            scaledSuffix = ' M';
+          } else if (customFormat.includes('," B"') || customFormat.includes(",'B'")) {
+            scaledValue = num / 1000000000;
+            scaledSuffix = ' B';
+          }
+
+          const formattedNumber = Math.abs(scaledValue).toLocaleString('en-US', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+            useGrouping: customFormat.includes(',')
+          });
+
+          const sign = scaledValue < 0 ? '-' : '';
+          return `${sign}${currency}${formattedNumber}${scaledSuffix}`;
         }
 
-        const formattedNumber = Math.abs(scaledValue).toLocaleString('en-US', {
+        // Percentage format
+        if (customFormat.includes('%')) {
+          const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+          return (num * 100).toFixed(decimals) + '%';
+        }
+
+        // Standard number format with decimals
+        const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+        const useGrouping = customFormat.includes(',');
+        return num.toLocaleString('en-US', {
           minimumFractionDigits: decimals,
           maximumFractionDigits: decimals,
-          useGrouping: customFormat.includes(',')
+          useGrouping: useGrouping
         });
-
-        const sign = scaledValue < 0 ? '-' : '';
-        return `${sign}${currency}${formattedNumber}${scaledSuffix}`;
       }
 
-      // Percentage format
-      if (customFormat.includes('%')) {
-        const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-        return (num * 100).toFixed(decimals) + '%';
-      }
-
-      // Standard number format with decimals
-      const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-      const useGrouping = customFormat.includes(',');
-      return num.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-        useGrouping: useGrouping
-      });
+      // Fallback for non-numeric, non-date values
+      return String(value);
     }
 
-    // Fallback for non-numeric, non-date values
+    // PRIORITY 2: Use LookML rendered value (default)
+    if (renderedValue !== null && renderedValue !== undefined) {
+      return renderedValue;
+    }
+
+    // PRIORITY 3: Fallback to raw value
     return String(value);
   },
 
@@ -2417,8 +2522,8 @@ const visObject = {
     // Apply custom format if available
     const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name];
     if (fieldFormat && fieldFormat.format && value !== null && value !== undefined && value !== '') {
-      // Use the raw value for formatting, not the rendered value
-      const formattedValue = this.formatValue(value, fieldFormat.format, field);
+      // Pass the rendered value as fallback
+      const formattedValue = this.formatValue(value, fieldFormat.format, field, rendered);
       if (formattedValue !== '') {
         rendered = formattedValue;
       }
@@ -2771,6 +2876,37 @@ const visObject = {
 
   attachEventListeners: function(config) {
     const self = this;
+
+    // Subtotal row collapse/expand (only for top position)
+    if (config.subtotal_position === 'top') {
+      this.container.querySelectorAll('tr.subtotal-row.position-top').forEach(subtotalRow => {
+        subtotalRow.addEventListener('click', function() {
+          const isCollapsed = this.classList.contains('collapsed');
+          const groupValue = this.dataset.group;
+
+          // Toggle collapsed state
+          if (isCollapsed) {
+            this.classList.remove('collapsed');
+            // Show detail rows
+            let nextRow = this.nextElementSibling;
+            while (nextRow && nextRow.classList.contains('detail-row') &&
+                   nextRow.dataset.parentGroup === groupValue) {
+              nextRow.style.display = '';
+              nextRow = nextRow.nextElementSibling;
+            }
+          } else {
+            this.classList.add('collapsed');
+            // Hide detail rows
+            let nextRow = this.nextElementSibling;
+            while (nextRow && nextRow.classList.contains('detail-row') &&
+                   nextRow.dataset.parentGroup === groupValue) {
+              nextRow.style.display = 'none';
+              nextRow = nextRow.nextElementSibling;
+            }
+          }
+        });
+      });
+    }
 
     // Pagination buttons
     this.container.querySelectorAll('.pagination-button').forEach(btn => {
