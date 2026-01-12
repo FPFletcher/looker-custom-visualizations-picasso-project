@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.1.1 - Enhanced Trigger Debugging
- * Build: 2026-01-12-v3
+ * Version: 4.2.0 - Direct updateAsync Calls (FIXED)
+ * Build: 2026-01-12-v4
  */
 
 const visObject = {
@@ -1100,7 +1100,8 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.1.1 - Build 2026-01-12-v3');
+    console.log('[TABLE] Advanced Table v4.2.0 - Build 2026-01-12-v4');
+    console.log('[TABLE] Direct updateAsync calls - SHOULD WORK NOW!');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -2462,7 +2463,9 @@ const visObject = {
           case 'last': self.state.currentPage = totalPages; break;
         }
 
-        self.trigger('updateAsync');
+        console.log('[TABLE] Pagination clicked, re-rendering...');
+        // Direct call to updateAsync
+        self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
       });
     });
 
@@ -2474,8 +2477,11 @@ const visObject = {
       console.log('[TABLE] Applying table filter:', tableFilterInput.value);
       self.state.tableFilter = tableFilterInput.value;
       self.state.currentPage = 1;
-      console.log('[TABLE] Table filter state updated, triggering re-render...');
-      self.trigger('updateAsync');
+      console.log('[TABLE] Table filter state updated, calling updateAsync directly...');
+      // Direct call to updateAsync
+      self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {
+        console.log('[TABLE] Filter update complete');
+      });
     };
 
     if (tableFilterInput) {
@@ -2514,7 +2520,10 @@ const visObject = {
         self.state.currentPage = 1;
         console.log('[TABLE] Column filter applied for', field, ':', input.value);
         console.log('[TABLE] Current filter state:', self.state.columnFilters);
-        self.trigger('updateAsync');
+        // Direct call to updateAsync
+        self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {
+          console.log('[TABLE] Column filter update complete');
+        });
       };
 
       // Enter key
@@ -2553,7 +2562,10 @@ const visObject = {
         }
 
         console.log('[TABLE] New sort state:', self.state.sortField, self.state.sortDirection);
-        self.trigger('updateAsync');
+        // Direct call to updateAsync
+        self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {
+          console.log('[TABLE] Sort update complete');
+        });
       });
     });
 
@@ -2623,7 +2635,11 @@ const visObject = {
         } else {
           self.state.expandedRows.add(rowId);
         }
-        self.trigger('updateAsync');
+        console.log('[TABLE] Hierarchy toggle clicked, re-rendering...');
+        // Direct call to updateAsync
+        self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {
+          console.log('[TABLE] Hierarchy update complete');
+        });
       });
     });
   },
@@ -2639,36 +2655,9 @@ const visObject = {
   },
 
   trigger: function(event) {
-    console.log('[TABLE] ========================================');
-    console.log('[TABLE] Trigger called:', event);
-    console.log('[TABLE] Has data:', !!this.state.data);
-    console.log('[TABLE] Has container:', !!this.container);
-    console.log('[TABLE] Has config:', !!this.config);
-    console.log('[TABLE] Has queryResponse:', !!this.queryResponse);
-    console.log('[TABLE] ========================================');
-
-    if (event === 'updateAsync') {
-      // Force a re-render by calling updateAsync directly with stored data
-      if (this.state.data && this.container && this.config && this.queryResponse) {
-        console.log('[TABLE] All requirements met, calling updateAsync...');
-        this.updateAsync(
-          this.state.data,
-          this.container.parentElement,
-          this.config,
-          this.queryResponse,
-          {},
-          () => {
-            console.log('[TABLE] Re-render complete via trigger');
-          }
-        );
-      } else {
-        console.error('[TABLE] Cannot trigger updateAsync - missing requirements:');
-        console.error('  - data:', !!this.state.data);
-        console.error('  - container:', !!this.container);
-        console.error('  - config:', !!this.config);
-        console.error('  - queryResponse:', !!this.queryResponse);
-      }
-    }
+    // Legacy function - no longer used
+    // All interactions now call updateAsync directly
+    console.log('[TABLE] Legacy trigger called (should not happen):', event);
   }
 };
 
