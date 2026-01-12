@@ -595,6 +595,24 @@ const visObject = {
       order: 72
     },
 
+    series_divider_field_labels: {
+      type: "string",
+      label: "─────────────────────────────── Field Customization ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 80
+    },
+
+    enable_custom_labels: {
+      type: "boolean",
+      label: "Enable Custom Field Labels",
+      default: false,
+      section: "Series",
+      order: 81
+    },
+
+    // Dynamic field options will be added here in updateAsync
+
     // ══════════════════════════════════════════════════════════════
     // TAB: FORMATTING
     // ══════════════════════════════════════════════════════════════
@@ -1157,6 +1175,7 @@ const visObject = {
         .table-wrapper {
           overflow: auto;
           position: relative;
+          max-height: 100%;
         }
 
         table.advanced-table {
@@ -1166,9 +1185,32 @@ const visObject = {
           background: #ffffff;
         }
 
-        /* STRIPED THEME */
-        table.advanced-table.striped tbody tr:nth-child(even) {
+        /* FROZEN HEADER - Critical positioning */
+        table.advanced-table thead {
+          position: sticky;
+          top: 0;
+          z-index: 100;
+        }
+
+        table.advanced-table thead th {
+          position: sticky;
+          top: 0;
+          z-index: 100;
+          background: inherit;
+        }
+
+        /* Frozen columns within header have higher z-index */
+        table.advanced-table thead th.frozen-column {
+          z-index: 101;
+        }
+
+        /* STRIPED THEME - Use CSS custom property */
+        table.advanced-table.striped tbody tr:nth-child(odd) {
           background: var(--stripe-color, #f9fafb);
+        }
+
+        table.advanced-table.striped tbody tr:nth-child(even) {
+          background: #ffffff;
         }
 
         /* MINIMAL THEME */
@@ -1229,20 +1271,6 @@ const visObject = {
           position: sticky;
           z-index: 2;
           background: inherit;
-        }
-
-        thead {
-          position: sticky;
-          top: 0;
-          z-index: 10;
-        }
-
-        thead th {
-          background: inherit;
-        }
-
-        .frozen-column thead th {
-          z-index: 11;
         }
 
         th, td {
@@ -1431,6 +1459,7 @@ const visObject = {
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
+    console.log('[TABLE] Starting updateAsync');
     this.clearErrors();
 
     // Validate data
@@ -1440,6 +1469,28 @@ const visObject = {
       return;
     }
 
+    // Dynamically add field label customization options
+    const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
+    console.log('[TABLE] Adding dynamic field options for', allFields.length, 'fields');
+
+    allFields.forEach((field, idx) => {
+      const optionKey = `field_label_${field.name.replace(/\./g, '_')}`;
+      if (!this.options[optionKey]) {
+        this.options[optionKey] = {
+          type: "string",
+          label: `${field.label_short || field.label}`,
+          display: "text",
+          default: field.label_short || field.label,
+          placeholder: field.label_short || field.label,
+          section: "Series",
+          order: 82 + idx
+        };
+      }
+    });
+
+    // Trigger options update
+    this.trigger('registerOptions', this.options);
+
     // Store data and config
     this.state.data = data;
     this.config = config;
@@ -1447,6 +1498,10 @@ const visObject = {
 
     // Parse configuration
     const parsedConfig = this.parseConfig(config);
+
+    console.log('[TABLE] Config parsed, freeze_header_row:', parsedConfig.freeze_header_row);
+    console.log('[TABLE] Table theme:', parsedConfig.table_theme);
+    console.log('[TABLE] Stripe color:', parsedConfig.stripe_color);
 
     // Apply filters
     let filteredData = this.applyFilters(data, parsedConfig);
@@ -1471,6 +1526,7 @@ const visObject = {
     // Render table
     this.renderTable(pageData, filteredData, totalPages, parsedConfig, queryResponse);
 
+    console.log('[TABLE] Render complete');
     done();
   },
 
@@ -1485,6 +1541,20 @@ const visObject = {
     } catch (e) {
       parsed.emojis = {};
     }
+
+    // Extract custom field labels
+    parsed.customFieldLabels = {};
+    if (config.enable_custom_labels) {
+      Object.keys(config).forEach(key => {
+        if (key.startsWith('field_label_')) {
+          const fieldName = key.replace('field_label_', '').replace(/_/g, '.');
+          if (config[key] && config[key].trim() !== '') {
+            parsed.customFieldLabels[fieldName] = config[key];
+          }
+        }
+      });
+    }
+    console.log('[TABLE] Custom field labels:', parsed.customFieldLabels);
 
     // Parse cell bar sets
     parsed.cellBarSets = [];
@@ -1646,12 +1716,23 @@ const visObject = {
   },
 
   renderTable: function(pageData, allFilteredData, totalPages, config, queryResponse) {
+    console.log('[TABLE] renderTable called');
+    console.log('[TABLE] - freeze_header_row:', config.freeze_header_row);
+    console.log('[TABLE] - table_theme:', config.table_theme);
+    console.log('[TABLE] - stripe_color:', config.stripe_color);
+
     let html = '';
 
-    // Set CSS variable for stripe color
+    // Set CSS variable for stripe color - CRITICAL for striped theme
+    const existingStyle = document.getElementById('table-stripe-style');
+    if (existingStyle) {
+      existingStyle.remove();
+    }
     const style = document.createElement('style');
+    style.id = 'table-stripe-style';
     style.innerHTML = `:root { --stripe-color: ${config.stripe_color || '#f9fafb'}; }`;
     document.head.appendChild(style);
+    console.log('[TABLE] Injected stripe color CSS:', style.innerHTML);
 
     // Top pagination
     if (config.enable_pagination && (config.pagination_position === 'top' || config.pagination_position === 'both')) {
@@ -1676,6 +1757,7 @@ const visObject = {
     // Table
     html += '<div class="table-wrapper">';
     html += `<table class="advanced-table ${config.table_theme}" style="${this.getTableStyles(config)}">`;
+    console.log('[TABLE] Table classes:', `advanced-table ${config.table_theme}`);
 
     // Column groups
     if (config.enable_column_groups && config.column_groups.length > 0) {
@@ -1698,6 +1780,24 @@ const visObject = {
     }
 
     this.container.innerHTML = html;
+    console.log('[TABLE] HTML rendered, checking for frozen headers...');
+
+    // Check if headers are properly frozen
+    setTimeout(() => {
+      const thead = this.container.querySelector('thead');
+      if (thead) {
+        const computedStyle = window.getComputedStyle(thead);
+        console.log('[TABLE] thead computed position:', computedStyle.position);
+        console.log('[TABLE] thead computed top:', computedStyle.top);
+        console.log('[TABLE] thead computed z-index:', computedStyle.zIndex);
+      }
+
+      const stripeCheck = this.container.querySelector('tbody tr:nth-child(odd)');
+      if (stripeCheck) {
+        const stripeStyle = window.getComputedStyle(stripeCheck);
+        console.log('[TABLE] First odd row background:', stripeStyle.backgroundColor);
+      }
+    }, 100);
 
     // Attach event listeners
     this.attachEventListeners(config);
@@ -1771,13 +1871,18 @@ const visObject = {
       const sortIndicator = this.state.sortField === field.name ?
         (this.state.sortDirection === 'asc' ? '▲' : '▼') : '';
 
+      // Get custom label if available
+      const displayLabel = config.customFieldLabels && config.customFieldLabels[field.name]
+        ? config.customFieldLabels[field.name]
+        : (field.label_short || field.label);
+
       html += `
         <th
           class="sortable ${frozenClass}"
           data-field="${field.name}"
           style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
         >
-          ${this.escapeHtml(field.label_short || field.label)}
+          ${this.escapeHtml(displayLabel)}
           ${sortIndicator ? `<span class="sort-indicator">${sortIndicator}</span>` : ''}
           ${config.enable_column_filters ? `
             <input
