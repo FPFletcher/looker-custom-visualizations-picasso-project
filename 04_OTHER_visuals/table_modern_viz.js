@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.3.0 - Filter Fix + Field Formatting
- * Build: 2026-01-12-v5
+ * Version: 4.4.0 - Simplified Field Formatting
+ * Build: 2026-01-12-v6
  */
 
 const visObject = {
@@ -406,71 +406,14 @@ const visObject = {
       order: 30
     },
 
-    series_divider_hierarchy: {
-      type: "string",
-      label: "─────────────────────────────── Hierarchical Data ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 40
-    },
-
-    enable_hierarchy: {
-      type: "boolean",
-      label: "Enable Hierarchical Display",
-      default: false,
-      section: "Series",
-      order: 41
-    },
-
-    hierarchy_mode: {
-      type: "string",
-      label: "Hierarchy Mode",
-      display: "select",
-      values: [
-        { "Inline (Single Column Indent)": "inline" },
-        { "Tree View (SAP BO Style)": "tree" }
-      ],
-      default: "inline",
-      section: "Series",
-      order: 42
-    },
-
-    hierarchy_fields: {
-      type: "string",
-      label: "Hierarchy Fields (comma-separated, left to right)",
-      display: "text",
-      default: "",
-      placeholder: "continent,country,city,plant_id",
-      section: "Series",
-      order: 43
-    },
-
-    hierarchy_indent: {
-      type: "number",
-      label: "Hierarchy Indent (px)",
-      default: 20,
-      display: "number",
-      min: 0,
-      max: 100,
-      section: "Series",
-      order: 44
-    },
-
-    show_hierarchy_icons: {
-      type: "boolean",
-      label: "Show Hierarchy Expand/Collapse Icons",
-      default: true,
-      section: "Series",
-      order: 45
-    },
-
-    hierarchy_collapse_by_default: {
-      type: "boolean",
-      label: "Collapse All by Default",
-      default: true,
-      section: "Series",
-      order: 46
-    },
+    // Hierarchy is disabled in v4.x - Coming in v5.0 as SAP BO-style tree
+    // series_divider_hierarchy: {
+    //   type: "string",
+    //   label: "─────────────────────────────── Hierarchical Data ───────────────────────────────",
+    //   display: "divider",
+    //   section: "Series",
+    //   order: 40
+    // },
 
     series_divider_comparison: {
       type: "string",
@@ -1114,8 +1057,8 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.3.0 - Build 2026-01-12-v5');
-    console.log('[TABLE] Filter fix + Field formatting');
+    console.log('[TABLE] Advanced Table v4.4.0 - Build 2026-01-12-v6');
+    console.log('[TABLE] Simplified field formatting (Label + Value Format only)');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1516,56 +1459,49 @@ const visObject = {
       return;
     }
 
-    // Dynamically add field formatting options
+    // Dynamically add field formatting options (Label + Value Format only)
     const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
     console.log('[TABLE] Adding dynamic field formatting options for', allFields.length, 'fields');
 
     allFields.forEach((field, idx) => {
       const fieldKey = field.name.replace(/\./g, '_');
-      const baseOrder = 82 + (idx * 3); // 3 options per field
+      const baseOrder = 82 + (idx * 2); // 2 options per field (reduced from 3)
+      const fieldLabel = field.label_short || field.label;
+
+      // Grouped label for better UX
+      if (!this.options[`field_divider_${fieldKey}`]) {
+        this.options[`field_divider_${fieldKey}`] = {
+          type: "string",
+          label: `━━━ ${fieldLabel} ━━━`,
+          display: "divider",
+          section: "Series",
+          order: baseOrder - 0.5
+        };
+      }
 
       // Label
       if (!this.options[`field_label_${fieldKey}`]) {
         this.options[`field_label_${fieldKey}`] = {
           type: "string",
-          label: `${field.label_short || field.label} - Label`,
+          label: "Label",
           display: "text",
-          default: field.label_short || field.label,
-          placeholder: field.label_short || field.label,
+          default: fieldLabel,
+          placeholder: fieldLabel,
           section: "Series",
           order: baseOrder
         };
       }
 
-      // Alignment
-      if (!this.options[`field_align_${fieldKey}`]) {
-        this.options[`field_align_${fieldKey}`] = {
+      // Value Format (for measures only)
+      if (field.is_numeric && !this.options[`field_format_${fieldKey}`]) {
+        this.options[`field_format_${fieldKey}`] = {
           type: "string",
-          label: `${field.label_short || field.label} - Alignment`,
-          display: "select",
-          values: [
-            { "Auto": "auto" },
-            { "Left": "left" },
-            { "Center": "center" },
-            { "Right": "right" }
-          ],
-          default: "auto",
+          label: "Value Format",
+          display: "text",
+          default: "",
+          placeholder: "e.g., $0,0.00 or 0.0%",
           section: "Series",
           order: baseOrder + 1
-        };
-      }
-
-      // Width
-      if (!this.options[`field_width_${fieldKey}`]) {
-        this.options[`field_width_${fieldKey}`] = {
-          type: "number",
-          label: `${field.label_short || field.label} - Width (px)`,
-          display: "number",
-          default: 150,
-          min: 50,
-          max: 500,
-          section: "Series",
-          order: baseOrder + 2
         };
       }
     });
@@ -1624,7 +1560,7 @@ const visObject = {
       parsed.emojis = {};
     }
 
-    // Extract custom field formatting (labels, alignment, width)
+    // Extract custom field formatting (labels and value formats)
     parsed.fieldFormatting = {};
     if (config.enable_custom_field_formatting) {
       Object.keys(config).forEach(key => {
@@ -1636,18 +1572,14 @@ const visObject = {
           if (config[key] && config[key].trim() !== '') {
             parsed.fieldFormatting[fieldName].label = config[key];
           }
-        } else if (key.startsWith('field_align_')) {
-          const fieldName = key.replace('field_align_', '').replace(/_/g, '.');
+        } else if (key.startsWith('field_format_')) {
+          const fieldName = key.replace('field_format_', '').replace(/_/g, '.');
           if (!parsed.fieldFormatting[fieldName]) {
             parsed.fieldFormatting[fieldName] = {};
           }
-          parsed.fieldFormatting[fieldName].alignment = config[key];
-        } else if (key.startsWith('field_width_')) {
-          const fieldName = key.replace('field_width_', '').replace(/_/g, '.');
-          if (!parsed.fieldFormatting[fieldName]) {
-            parsed.fieldFormatting[fieldName] = {};
+          if (config[key] && config[key].trim() !== '') {
+            parsed.fieldFormatting[fieldName].format = config[key];
           }
-          parsed.fieldFormatting[fieldName].width = config[key];
         }
       });
     }
@@ -2004,24 +1936,18 @@ const visObject = {
       const sortIndicator = this.state.sortField === field.name ?
         (this.state.sortDirection === 'asc' ? '▲' : '▼') : '';
 
-      // Get custom formatting if available
+      // Get custom label if available
       const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name]
         ? config.fieldFormatting[field.name]
         : {};
 
       const displayLabel = fieldFormat.label || (field.label_short || field.label);
-      const customWidth = fieldFormat.width || 150;
-      const customAlign = fieldFormat.alignment || config.header_alignment || 'left';
-
-      if (fieldFormat.label) {
-        console.log(`[TABLE] Using custom label for ${field.name}: "${displayLabel}"`);
-      }
 
       html += `
         <th
           class="sortable ${frozenClass}"
           data-field="${field.name}"
-          style="${isFrozen ? `left: ${leftOffset}px;` : ''} width: ${customWidth}px; text-align: ${customAlign};"
+          style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
         >
           ${this.escapeHtml(displayLabel)}
           ${sortIndicator ? `<span class="sort-indicator">${sortIndicator}</span>` : ''}
@@ -2038,7 +1964,7 @@ const visObject = {
       `;
 
       if (isFrozen) {
-        leftOffset += customWidth;
+        leftOffset += 150;
       }
     });
 
@@ -2084,13 +2010,6 @@ const visObject = {
         const isFrozen = colIdx < config.freeze_columns;
         const frozenClass = isFrozen ? 'frozen-column' : '';
 
-        // Get custom formatting for this field
-        const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name]
-          ? config.fieldFormatting[field.name]
-          : {};
-        const customWidth = fieldFormat.width || 150;
-        const customAlign = fieldFormat.alignment || 'auto';
-
         // Check column conditional formatting
         const hasColumnConditional = config.enable_column_conditional &&
           config.column_condition_field === field.name &&
@@ -2110,7 +2029,7 @@ const visObject = {
             data-row="${pageRowIdx}"
             data-col="${colIdx}"
             ${hasColumnConditional ? `data-column-conditional="true"` : ''}
-            style="${isFrozen ? `left: ${leftOffset}px;` : ''} width: ${customWidth}px; text-align: ${customAlign === 'auto' ? (field.is_numeric ? 'right' : 'left') : customAlign};"
+            style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
           >
             ${isHierarchyField ?
               this.renderHierarchyCell(cellValue, field, config, row, hierarchyLevel) :
@@ -2119,7 +2038,7 @@ const visObject = {
         `;
 
         if (isFrozen) {
-          leftOffset += customWidth;
+          leftOffset += 150;
         }
       });
 
@@ -2174,7 +2093,6 @@ const visObject = {
 
     if (isComparisonField) {
       comparisonHtml = this.renderComparison(row, config, drillLinks, rowIdx, data);
-      console.log('[TABLE] Rendering comparison for', field.name, '- HTML length:', comparisonHtml ? comparisonHtml.length : 0);
     }
 
     // PRIORITY 2: Check for cell bars (can wrap comparison or regular value)
@@ -2184,7 +2102,6 @@ const visObject = {
       if (config.cellBarSets[i].fields.includes(field.name)) {
         isCellBarField = true;
         cellBarSet = config.cellBarSets[i];
-        console.log('[TABLE] Field', field.name, 'has cell bar from set', i + 1);
         break;
       }
     }
@@ -2192,14 +2109,12 @@ const visObject = {
     if (isCellBarField) {
       // If it's also a comparison field, use the comparison HTML as the "rendered" value
       const displayValue = isComparisonField ? comparisonHtml : rendered;
-      console.log('[TABLE] Rendering cell bar for', field.name, 'with comparison:', isComparisonField);
       // Don't apply filter highlighting to cell bars - it breaks the HTML
       return this.renderCellBar(value, displayValue, config, drillLinks, cellBarSet, field.name);
     }
 
     // If comparison but no cell bar, return comparison
     if (isComparisonField) {
-      console.log('[TABLE] Rendering comparison only for', field.name);
       // Don't apply filter highlighting to comparison HTML - it breaks the structure
       return comparisonHtml;
     }
