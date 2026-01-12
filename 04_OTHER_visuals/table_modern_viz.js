@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.2.0 - Direct updateAsync Calls (FIXED)
- * Build: 2026-01-12-v4
+ * Version: 4.3.0 - Filter Fix + Field Formatting
+ * Build: 2026-01-12-v5
  */
 
 const visObject = {
@@ -422,14 +422,27 @@ const visObject = {
       order: 41
     },
 
-    hierarchy_field: {
+    hierarchy_mode: {
       type: "string",
-      label: "Hierarchy Field",
-      display: "text",
-      default: "",
-      placeholder: "dimension_name",
+      label: "Hierarchy Mode",
+      display: "select",
+      values: [
+        { "Inline (Single Column Indent)": "inline" },
+        { "Tree View (SAP BO Style)": "tree" }
+      ],
+      default: "inline",
       section: "Series",
       order: 42
+    },
+
+    hierarchy_fields: {
+      type: "string",
+      label: "Hierarchy Fields (comma-separated, left to right)",
+      display: "text",
+      default: "",
+      placeholder: "continent,country,city,plant_id",
+      section: "Series",
+      order: 43
     },
 
     hierarchy_indent: {
@@ -440,7 +453,7 @@ const visObject = {
       min: 0,
       max: 100,
       section: "Series",
-      order: 43
+      order: 44
     },
 
     show_hierarchy_icons: {
@@ -448,15 +461,15 @@ const visObject = {
       label: "Show Hierarchy Expand/Collapse Icons",
       default: true,
       section: "Series",
-      order: 44
+      order: 45
     },
 
-    detect_date_hierarchy: {
+    hierarchy_collapse_by_default: {
       type: "boolean",
-      label: "Auto-detect Date Hierarchy",
+      label: "Collapse All by Default",
       default: true,
       section: "Series",
-      order: 45
+      order: 46
     },
 
     series_divider_comparison: {
@@ -598,21 +611,22 @@ const visObject = {
 
     series_divider_field_labels: {
       type: "string",
-      label: "─────────────────────────────── Field Customization ───────────────────────────────",
+      label: "─────────────────────────────── Field Formatting ───────────────────────────────",
       display: "divider",
       section: "Series",
       order: 80
     },
 
-    enable_custom_labels: {
+    enable_custom_field_formatting: {
       type: "boolean",
-      label: "Enable Custom Field Labels",
+      label: "Enable Custom Field Formatting",
       default: false,
       section: "Series",
       order: 81
     },
 
-    // Dynamic field options will be added here in updateAsync
+    // Dynamic field formatting options will be added here in updateAsync
+    // Each field gets: label, alignment, width, font options
 
     // ══════════════════════════════════════════════════════════════
     // TAB: FORMATTING
@@ -1100,8 +1114,8 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.2.0 - Build 2026-01-12-v4');
-    console.log('[TABLE] Direct updateAsync calls - SHOULD WORK NOW!');
+    console.log('[TABLE] Advanced Table v4.3.0 - Build 2026-01-12-v5');
+    console.log('[TABLE] Filter fix + Field formatting');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1502,21 +1516,56 @@ const visObject = {
       return;
     }
 
-    // Dynamically add field label customization options
+    // Dynamically add field formatting options
     const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-    console.log('[TABLE] Adding dynamic field options for', allFields.length, 'fields');
+    console.log('[TABLE] Adding dynamic field formatting options for', allFields.length, 'fields');
 
     allFields.forEach((field, idx) => {
-      const optionKey = `field_label_${field.name.replace(/\./g, '_')}`;
-      if (!this.options[optionKey]) {
-        this.options[optionKey] = {
+      const fieldKey = field.name.replace(/\./g, '_');
+      const baseOrder = 82 + (idx * 3); // 3 options per field
+
+      // Label
+      if (!this.options[`field_label_${fieldKey}`]) {
+        this.options[`field_label_${fieldKey}`] = {
           type: "string",
-          label: `${field.label_short || field.label}`,
+          label: `${field.label_short || field.label} - Label`,
           display: "text",
           default: field.label_short || field.label,
           placeholder: field.label_short || field.label,
           section: "Series",
-          order: 82 + idx
+          order: baseOrder
+        };
+      }
+
+      // Alignment
+      if (!this.options[`field_align_${fieldKey}`]) {
+        this.options[`field_align_${fieldKey}`] = {
+          type: "string",
+          label: `${field.label_short || field.label} - Alignment`,
+          display: "select",
+          values: [
+            { "Auto": "auto" },
+            { "Left": "left" },
+            { "Center": "center" },
+            { "Right": "right" }
+          ],
+          default: "auto",
+          section: "Series",
+          order: baseOrder + 1
+        };
+      }
+
+      // Width
+      if (!this.options[`field_width_${fieldKey}`]) {
+        this.options[`field_width_${fieldKey}`] = {
+          type: "number",
+          label: `${field.label_short || field.label} - Width (px)`,
+          display: "number",
+          default: 150,
+          min: 50,
+          max: 500,
+          section: "Series",
+          order: baseOrder + 2
         };
       }
     });
@@ -1575,19 +1624,34 @@ const visObject = {
       parsed.emojis = {};
     }
 
-    // Extract custom field labels
-    parsed.customFieldLabels = {};
-    if (config.enable_custom_labels) {
+    // Extract custom field formatting (labels, alignment, width)
+    parsed.fieldFormatting = {};
+    if (config.enable_custom_field_formatting) {
       Object.keys(config).forEach(key => {
         if (key.startsWith('field_label_')) {
           const fieldName = key.replace('field_label_', '').replace(/_/g, '.');
-          if (config[key] && config[key].trim() !== '') {
-            parsed.customFieldLabels[fieldName] = config[key];
+          if (!parsed.fieldFormatting[fieldName]) {
+            parsed.fieldFormatting[fieldName] = {};
           }
+          if (config[key] && config[key].trim() !== '') {
+            parsed.fieldFormatting[fieldName].label = config[key];
+          }
+        } else if (key.startsWith('field_align_')) {
+          const fieldName = key.replace('field_align_', '').replace(/_/g, '.');
+          if (!parsed.fieldFormatting[fieldName]) {
+            parsed.fieldFormatting[fieldName] = {};
+          }
+          parsed.fieldFormatting[fieldName].alignment = config[key];
+        } else if (key.startsWith('field_width_')) {
+          const fieldName = key.replace('field_width_', '').replace(/_/g, '.');
+          if (!parsed.fieldFormatting[fieldName]) {
+            parsed.fieldFormatting[fieldName] = {};
+          }
+          parsed.fieldFormatting[fieldName].width = config[key];
         }
       });
     }
-    console.log('[TABLE] Custom field labels:', parsed.customFieldLabels);
+    console.log('[TABLE] Field formatting:', parsed.fieldFormatting);
 
     // Parse cell bar sets
     parsed.cellBarSets = [];
@@ -1802,9 +1866,6 @@ const visObject = {
             value="${this.escapeHtml(this.state.tableFilter)}"
             id="table-filter-input"
           />
-          <button class="filter-button" id="table-filter-button" style="margin-left: 8px; padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            🔍 Filter
-          </button>
         </div>
       `;
     }
@@ -1943,24 +2004,24 @@ const visObject = {
       const sortIndicator = this.state.sortField === field.name ?
         (this.state.sortDirection === 'asc' ? '▲' : '▼') : '';
 
-      // Get custom label if available - check multiple key formats
-      const configKey = `field_label_${field.name.replace(/\./g, '_')}`;
-      let displayLabel = field.label_short || field.label;
+      // Get custom formatting if available
+      const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name]
+        ? config.fieldFormatting[field.name]
+        : {};
 
-      if (config.enable_custom_labels) {
-        // Check if custom label exists and is not empty
-        if (config[configKey] && config[configKey].trim() !== '' &&
-            config[configKey] !== displayLabel) {
-          displayLabel = config[configKey];
-          console.log(`[TABLE] Using custom label for ${field.name}: "${displayLabel}"`);
-        }
+      const displayLabel = fieldFormat.label || (field.label_short || field.label);
+      const customWidth = fieldFormat.width || 150;
+      const customAlign = fieldFormat.alignment || config.header_alignment || 'left';
+
+      if (fieldFormat.label) {
+        console.log(`[TABLE] Using custom label for ${field.name}: "${displayLabel}"`);
       }
 
       html += `
         <th
           class="sortable ${frozenClass}"
           data-field="${field.name}"
-          style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
+          style="${isFrozen ? `left: ${leftOffset}px;` : ''} width: ${customWidth}px; text-align: ${customAlign};"
         >
           ${this.escapeHtml(displayLabel)}
           ${sortIndicator ? `<span class="sort-indicator">${sortIndicator}</span>` : ''}
@@ -1977,7 +2038,7 @@ const visObject = {
       `;
 
       if (isFrozen) {
-        leftOffset += 150;
+        leftOffset += customWidth;
       }
     });
 
@@ -2023,6 +2084,13 @@ const visObject = {
         const isFrozen = colIdx < config.freeze_columns;
         const frozenClass = isFrozen ? 'frozen-column' : '';
 
+        // Get custom formatting for this field
+        const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name]
+          ? config.fieldFormatting[field.name]
+          : {};
+        const customWidth = fieldFormat.width || 150;
+        const customAlign = fieldFormat.alignment || 'auto';
+
         // Check column conditional formatting
         const hasColumnConditional = config.enable_column_conditional &&
           config.column_condition_field === field.name &&
@@ -2042,7 +2110,7 @@ const visObject = {
             data-row="${pageRowIdx}"
             data-col="${colIdx}"
             ${hasColumnConditional ? `data-column-conditional="true"` : ''}
-            style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
+            style="${isFrozen ? `left: ${leftOffset}px;` : ''} width: ${customWidth}px; text-align: ${customAlign === 'auto' ? (field.is_numeric ? 'right' : 'left') : customAlign};"
           >
             ${isHierarchyField ?
               this.renderHierarchyCell(cellValue, field, config, row, hierarchyLevel) :
@@ -2051,7 +2119,7 @@ const visObject = {
         `;
 
         if (isFrozen) {
-          leftOffset += 150;
+          leftOffset += customWidth;
         }
       });
 
@@ -2125,12 +2193,14 @@ const visObject = {
       // If it's also a comparison field, use the comparison HTML as the "rendered" value
       const displayValue = isComparisonField ? comparisonHtml : rendered;
       console.log('[TABLE] Rendering cell bar for', field.name, 'with comparison:', isComparisonField);
+      // Don't apply filter highlighting to cell bars - it breaks the HTML
       return this.renderCellBar(value, displayValue, config, drillLinks, cellBarSet, field.name);
     }
 
     // If comparison but no cell bar, return comparison
     if (isComparisonField) {
       console.log('[TABLE] Rendering comparison only for', field.name);
+      // Don't apply filter highlighting to comparison HTML - it breaks the structure
       return comparisonHtml;
     }
 
@@ -2154,7 +2224,7 @@ const visObject = {
       }, 0);
     }
 
-    // Highlight filter matches
+    // Highlight filter matches - ONLY for plain text cells (not comparison/cell bars)
     if (this.state.tableFilter && config.enable_table_filter) {
       const regex = new RegExp(`(${this.escapeRegex(this.state.tableFilter)})`, 'gi');
       rendered = String(rendered).replace(regex, '<span class="highlight-match">$1</span>');
@@ -2469,9 +2539,8 @@ const visObject = {
       });
     });
 
-    // Table filter with Enter key and button
+    // Table filter with Enter key
     const tableFilterInput = this.container.querySelector('#table-filter-input');
-    const tableFilterButton = this.container.querySelector('#table-filter-button');
 
     const applyTableFilter = function() {
       console.log('[TABLE] Applying table filter:', tableFilterInput.value);
@@ -2486,7 +2555,6 @@ const visObject = {
 
     if (tableFilterInput) {
       console.log('[TABLE] Table filter input found, attaching Enter key listener');
-      // Enter key
       tableFilterInput.addEventListener('keypress', function(e) {
         console.log('[TABLE] Key pressed in table filter:', e.key);
         if (e.key === 'Enter') {
@@ -2497,16 +2565,6 @@ const visObject = {
       });
     } else {
       console.warn('[TABLE] Table filter input NOT found');
-    }
-
-    if (tableFilterButton) {
-      console.log('[TABLE] Table filter button found, attaching click listener');
-      tableFilterButton.addEventListener('click', function() {
-        console.log('[TABLE] Filter button clicked');
-        applyTableFilter();
-      });
-    } else {
-      console.warn('[TABLE] Table filter button NOT found');
     }
 
     // Column filters with Enter key
