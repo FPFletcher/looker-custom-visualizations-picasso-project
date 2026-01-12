@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.6.0 - Subtotals Foundation + Null Fix
- * Build: 2026-01-12-v10
+ * Version: 4.7.0 - Subtotals & Grand Totals WORKING!
+ * Build: 2026-01-12-v11
  */
 
 const visObject = {
@@ -1109,9 +1109,8 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.6.0 - Build 2026-01-12-v10');
-    console.log('[TABLE] Fixed: [object Object] → ∅');
-    console.log('[TABLE] Added: Subtotals configuration (WIP)');
+    console.log('[TABLE] Advanced Table v4.7.0 - Build 2026-01-12-v11');
+    console.log('[TABLE] Subtotals & Grand Totals WORKING!');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1463,6 +1462,29 @@ const visObject = {
           border-right: 2px solid #e5e7eb;
         }
 
+        /* Subtotal and Grand Total Rows */
+        .advanced-table tbody tr.subtotal-row {
+          background-color: #f0f0f0 !important;
+          font-weight: 600;
+          border-top: 2px solid #ddd;
+          border-bottom: 1px solid #ddd;
+        }
+
+        .advanced-table tbody tr.grand-total-row {
+          background-color: #e8e8e8 !important;
+          font-weight: 700;
+          border-top: 3px solid #333;
+          border-bottom: 3px solid #333;
+        }
+
+        .advanced-table.modern tbody tr.subtotal-row {
+          background-color: #e3f2fd !important;
+        }
+
+        .advanced-table.modern tbody tr.grand-total-row {
+          background-color: #bbdefb !important;
+        }
+
         .drill-link {
           cursor: pointer;
           color: inherit;
@@ -1611,6 +1633,21 @@ const visObject = {
       filteredData = this.sortData(filteredData, this.state.sortField, this.state.sortDirection);
     }
 
+    // Apply subtotals if enabled
+    if (parsedConfig.enable_subtotals && parsedConfig.subtotal_dimension) {
+      console.log('[TABLE] Calculating subtotals by:', parsedConfig.subtotal_dimension);
+      const measures = queryResponse.fields.measure_like;
+      filteredData = this.calculateSubtotals(filteredData, parsedConfig.subtotal_dimension, measures, parsedConfig);
+    }
+
+    // Add grand total row if enabled
+    if (parsedConfig.show_grand_total) {
+      console.log('[TABLE] Adding grand total row');
+      const measures = queryResponse.fields.measure_like;
+      const grandTotal = this.calculateGrandTotal(filteredData, measures, parsedConfig);
+      filteredData.push(grandTotal);
+    }
+
     // Process hierarchical data if enabled
     if (parsedConfig.enable_hierarchy && parsedConfig.hierarchy_field) {
       filteredData = this.processHierarchicalData(filteredData, parsedConfig, queryResponse);
@@ -1709,6 +1746,114 @@ const visObject = {
     }
 
     return parsed;
+  },
+
+  // Calculate subtotals for grouped data
+  calculateSubtotals: function(data, groupByField, measures, config) {
+    if (!data || data.length === 0) return data;
+
+    const result = [];
+    const groups = {};
+
+    // Group data by the specified field
+    data.forEach(row => {
+      let groupValue = row[groupByField];
+      if (groupValue && typeof groupValue === 'object') {
+        groupValue = groupValue.value || groupValue.rendered || 'null';
+      }
+      groupValue = groupValue || 'null';
+
+      if (!groups[groupValue]) {
+        groups[groupValue] = [];
+      }
+      groups[groupValue].push(row);
+    });
+
+    // Process each group
+    Object.keys(groups).forEach(groupValue => {
+      const groupRows = groups[groupValue];
+
+      // Add all rows in the group
+      groupRows.forEach(row => result.push(row));
+
+      // Calculate subtotal row
+      const subtotalRow = { __isSubtotal: true, __groupValue: groupValue };
+
+      // Set the grouping dimension value with subtotal label
+      const labelTemplate = config.subtotal_label || 'Subtotal: {value}';
+      const subtotalLabel = labelTemplate.replace('{value}', groupValue === 'null' ? '∅' : groupValue);
+      subtotalRow[groupByField] = { value: subtotalLabel, rendered: subtotalLabel };
+
+      // Calculate totals for each measure
+      measures.forEach(measure => {
+        let sum = 0;
+        let count = 0;
+
+        groupRows.forEach(row => {
+          let value = row[measure.name];
+          if (value && typeof value === 'object') {
+            value = value.value;
+          }
+          if (value !== null && value !== undefined && !isNaN(value)) {
+            sum += Number(value);
+            count++;
+          }
+        });
+
+        // Store both value and rendered for subtotal
+        subtotalRow[measure.name] = {
+          value: sum,
+          rendered: sum.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          })
+        };
+      });
+
+      result.push(subtotalRow);
+    });
+
+    return result;
+  },
+
+  // Calculate grand total row
+  calculateGrandTotal: function(data, measures, config) {
+    const totalRow = { __isGrandTotal: true };
+    const label = config.grand_total_label || 'Grand Total';
+
+    // Set label in first column
+    const firstField = Object.keys(data[0])[0];
+    totalRow[firstField] = { value: label, rendered: label };
+
+    // Calculate totals for each measure
+    measures.forEach(measure => {
+      let sum = 0;
+      let count = 0;
+
+      data.forEach(row => {
+        // Skip subtotal rows when calculating grand total
+        if (row.__isSubtotal) return;
+
+        let value = row[measure.name];
+        if (value && typeof value === 'object') {
+          value = value.value;
+        }
+        if (value !== null && value !== undefined && !isNaN(value)) {
+          sum += Number(value);
+          count++;
+        }
+      });
+
+      totalRow[measure.name] = {
+        value: sum,
+        rendered: sum.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        })
+      };
+    });
+
+    return totalRow;
   },
 
   applyFilters: function(data, config) {
@@ -2067,6 +2212,11 @@ const visObject = {
       const actualRowIdx = pageOffset + pageRowIdx; // Actual index in allFilteredData
       const hierarchyLevel = row._hierarchy_level || 0;
 
+      // Determine row type
+      const isSubtotalRow = row.__isSubtotal || false;
+      const isGrandTotalRow = row.__isGrandTotal || false;
+      const rowClass = isGrandTotalRow ? 'grand-total-row' : (isSubtotalRow ? 'subtotal-row' : '');
+
       // Check row conditional formatting but don't apply inline styles
       const hasRowConditional = config.enable_row_conditional &&
         config.row_condition_field &&
@@ -2079,6 +2229,7 @@ const visObject = {
       html += `<tr
         data-row="${pageRowIdx}"
         data-hierarchy-level="${hierarchyLevel}"
+        ${rowClass ? `class="${rowClass}"` : ''}
         ${hasRowConditional ? `data-row-conditional="true"` : ''}
       >`;
 
