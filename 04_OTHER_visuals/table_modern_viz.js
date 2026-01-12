@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.4.0 - Simplified Field Formatting
- * Build: 2026-01-12-v6
+ * Version: 4.4.1 - Fixed Field Formatting Registration
+ * Build: 2026-01-12-v7
  */
 
 const visObject = {
@@ -1057,8 +1057,8 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.4.0 - Build 2026-01-12-v6');
-    console.log('[TABLE] Simplified field formatting (Label + Value Format only)');
+    console.log('[TABLE] Advanced Table v4.4.1 - Build 2026-01-12-v7');
+    console.log('[TABLE] Fixed field formatting option registration');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1465,46 +1465,53 @@ const visObject = {
 
     allFields.forEach((field, idx) => {
       const fieldKey = field.name.replace(/\./g, '_');
-      const baseOrder = 82 + (idx * 2); // 2 options per field (reduced from 3)
+      const baseOrder = 82 + (idx * 3); // 3 options per field (divider + label + format)
       const fieldLabel = field.label_short || field.label;
 
       // Grouped label for better UX
-      if (!this.options[`field_divider_${fieldKey}`]) {
-        this.options[`field_divider_${fieldKey}`] = {
+      const dividerKey = `field_divider_${fieldKey}`;
+      if (!this.options[dividerKey]) {
+        this.options[dividerKey] = {
           type: "string",
           label: `━━━ ${fieldLabel} ━━━`,
           display: "divider",
           section: "Series",
-          order: baseOrder - 0.5
+          order: baseOrder
         };
       }
 
-      // Label
-      if (!this.options[`field_label_${fieldKey}`]) {
-        this.options[`field_label_${fieldKey}`] = {
+      // Label (for all fields)
+      const labelKey = `field_label_${fieldKey}`;
+      if (!this.options[labelKey]) {
+        this.options[labelKey] = {
           type: "string",
           label: "Label",
           display: "text",
           default: fieldLabel,
           placeholder: fieldLabel,
           section: "Series",
-          order: baseOrder
+          order: baseOrder + 1
         };
       }
 
-      // Value Format (for measures only)
-      if (field.is_numeric && !this.options[`field_format_${fieldKey}`]) {
-        this.options[`field_format_${fieldKey}`] = {
+      // Value Format (for ALL fields - dimensions and measures)
+      const formatKey = `field_format_${fieldKey}`;
+      if (!this.options[formatKey]) {
+        this.options[formatKey] = {
           type: "string",
           label: "Value Format",
           display: "text",
           default: "",
-          placeholder: "e.g., $0,0.00 or 0.0%",
+          placeholder: field.is_numeric ? "e.g., $0,0.00 or 0.0%" : "e.g., MMM DD, YYYY",
           section: "Series",
-          order: baseOrder + 1
+          order: baseOrder + 2
         };
       }
     });
+
+    // CRITICAL: Register the dynamically added options
+    this.trigger('registerOptions', this.options);
+    console.log('[TABLE] Field formatting options registered');
 
     // Trigger options update
     this.trigger('registerOptions', this.options);
