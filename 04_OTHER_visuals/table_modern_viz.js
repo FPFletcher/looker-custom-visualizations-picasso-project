@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.1.0 - Bug Fixes: Filtering, Sorting, Striping
- * Build: 2026-01-12-v2
+ * Version: 4.1.1 - Enhanced Trigger Debugging
+ * Build: 2026-01-12-v3
  */
 
 const visObject = {
@@ -1100,7 +1100,7 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.1.0 - Build 2026-01-12-v2');
+    console.log('[TABLE] Advanced Table v4.1.1 - Build 2026-01-12-v3');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -2471,40 +2471,59 @@ const visObject = {
     const tableFilterButton = this.container.querySelector('#table-filter-button');
 
     const applyTableFilter = function() {
+      console.log('[TABLE] Applying table filter:', tableFilterInput.value);
       self.state.tableFilter = tableFilterInput.value;
       self.state.currentPage = 1;
+      console.log('[TABLE] Table filter state updated, triggering re-render...');
       self.trigger('updateAsync');
     };
 
     if (tableFilterInput) {
+      console.log('[TABLE] Table filter input found, attaching Enter key listener');
       // Enter key
       tableFilterInput.addEventListener('keypress', function(e) {
+        console.log('[TABLE] Key pressed in table filter:', e.key);
         if (e.key === 'Enter') {
           e.preventDefault();
+          console.log('[TABLE] Enter pressed, applying filter...');
           applyTableFilter();
         }
       });
+    } else {
+      console.warn('[TABLE] Table filter input NOT found');
     }
 
     if (tableFilterButton) {
-      tableFilterButton.addEventListener('click', applyTableFilter);
+      console.log('[TABLE] Table filter button found, attaching click listener');
+      tableFilterButton.addEventListener('click', function() {
+        console.log('[TABLE] Filter button clicked');
+        applyTableFilter();
+      });
+    } else {
+      console.warn('[TABLE] Table filter button NOT found');
     }
 
     // Column filters with Enter key
     this.container.querySelectorAll('.column-filter').forEach(input => {
+      const field = input.dataset.field;
+      console.log('[TABLE] Attaching column filter listener for:', field);
+
       const applyColumnFilter = function() {
-        const field = input.dataset.field;
+        console.log('[TABLE] Applying column filter for', field, ':', input.value);
         self.state.columnFilters[field] = input.value;
         self.state.currentPage = 1;
         console.log('[TABLE] Column filter applied for', field, ':', input.value);
+        console.log('[TABLE] Current filter state:', self.state.columnFilters);
         self.trigger('updateAsync');
       };
 
       // Enter key
       input.addEventListener('keypress', function(e) {
+        console.log('[TABLE] Key pressed in column filter for', field, ':', e.key);
         if (e.key === 'Enter') {
           e.preventDefault();
           e.stopPropagation();
+          console.log('[TABLE] Enter pressed in column filter, applying...');
           applyColumnFilter();
         }
       });
@@ -2620,8 +2639,35 @@ const visObject = {
   },
 
   trigger: function(event) {
+    console.log('[TABLE] ========================================');
+    console.log('[TABLE] Trigger called:', event);
+    console.log('[TABLE] Has data:', !!this.state.data);
+    console.log('[TABLE] Has container:', !!this.container);
+    console.log('[TABLE] Has config:', !!this.config);
+    console.log('[TABLE] Has queryResponse:', !!this.queryResponse);
+    console.log('[TABLE] ========================================');
+
     if (event === 'updateAsync') {
-      this.updateAsync(this.state.data, this.container.parentElement, this.config, this.queryResponse, {}, () => {});
+      // Force a re-render by calling updateAsync directly with stored data
+      if (this.state.data && this.container && this.config && this.queryResponse) {
+        console.log('[TABLE] All requirements met, calling updateAsync...');
+        this.updateAsync(
+          this.state.data,
+          this.container.parentElement,
+          this.config,
+          this.queryResponse,
+          {},
+          () => {
+            console.log('[TABLE] Re-render complete via trigger');
+          }
+        );
+      } else {
+        console.error('[TABLE] Cannot trigger updateAsync - missing requirements:');
+        console.error('  - data:', !!this.state.data);
+        console.error('  - container:', !!this.container);
+        console.error('  - config:', !!this.config);
+        console.error('  - queryResponse:', !!this.queryResponse);
+      }
     }
   }
 };
