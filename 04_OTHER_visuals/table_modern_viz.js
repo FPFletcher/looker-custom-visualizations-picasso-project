@@ -1,7 +1,6 @@
 /**
  * Advanced Table Visualization for Looker
- * Production-grade table with extensive customization capabilities
- * Version: 2.0.0
+ * Version: 3.0.0 - Production Grade with Proper Drills and Cell Bars
  */
 
 const visObject = {
@@ -172,162 +171,94 @@ const visObject = {
     // TAB: SERIES
     // ══════════════════════════════════════════════════════════════
 
-    series_divider_grouping: {
+    series_divider_cell_bars: {
       type: "string",
-      label: "─────────────────────────────── Column Grouping ───────────────────────────────",
+      label: "─────────────────────────────── Cell Bar Charts ───────────────────────────────",
       display: "divider",
       section: "Series",
       order: 0
     },
 
-    enable_column_groups: {
+    enable_cell_bars: {
       type: "boolean",
-      label: "Enable Column Grouping",
+      label: "Enable Cell Bar Charts",
       default: false,
       section: "Series",
       order: 1
     },
 
-    column_group_1_name: {
+    cell_bar_field: {
       type: "string",
-      label: "Group 1 Name",
+      label: "Cell Bar Field",
+      display: "text",
       default: "",
+      placeholder: "measure_name",
       section: "Series",
       order: 2
     },
 
-    column_group_1_fields: {
+    cell_bar_color: {
       type: "string",
-      label: "Group 1 Fields (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "field1,field2,field3",
+      label: "Cell Bar Color",
+      display: "color",
+      default: "#3b82f6",
       section: "Series",
       order: 3
     },
 
-    column_group_2_name: {
-      type: "string",
-      label: "Group 2 Name",
-      default: "",
+    cell_bar_show_value: {
+      type: "boolean",
+      label: "Show Value on Cell Bar",
+      default: true,
       section: "Series",
       order: 4
     },
 
-    column_group_2_fields: {
-      type: "string",
-      label: "Group 2 Fields (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "field1,field2,field3",
+    cell_bar_max_width: {
+      type: "number",
+      label: "Cell Bar Max Width (%)",
+      default: 100,
+      display: "number",
+      min: 20,
+      max: 100,
       section: "Series",
       order: 5
     },
 
-    column_group_3_name: {
+    series_divider_sparklines: {
       type: "string",
-      label: "Group 3 Name",
-      default: "",
-      section: "Series",
-      order: 6
-    },
-
-    column_group_3_fields: {
-      type: "string",
-      label: "Group 3 Fields (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "field1,field2,field3",
-      section: "Series",
-      order: 7
-    },
-
-    group_header_bg_color: {
-      type: "string",
-      label: "Group Header Background Color",
-      display: "color",
-      default: "#e0e7ff",
-      section: "Series",
-      order: 8
-    },
-
-    series_divider_hierarchy: {
-      type: "string",
-      label: "─────────────────────────────── Hierarchical Data ───────────────────────────────",
+      label: "─────────────────────────────── Trend Sparklines ───────────────────────────────",
       display: "divider",
       section: "Series",
       order: 10
     },
 
-    enable_hierarchy: {
+    enable_sparklines: {
       type: "boolean",
-      label: "Enable Hierarchical Display",
+      label: "Enable Trend Sparklines",
       default: false,
       section: "Series",
       order: 11
     },
 
-    hierarchy_field: {
+    sparkline_measure: {
       type: "string",
-      label: "Hierarchy Field",
-      display: "text",
-      default: "",
-      placeholder: "dimension_name",
-      section: "Series",
-      order: 12
-    },
-
-    hierarchy_indent: {
-      type: "number",
-      label: "Hierarchy Indent (px)",
-      default: 20,
-      display: "number",
-      min: 0,
-      max: 100,
-      section: "Series",
-      order: 13
-    },
-
-    show_hierarchy_icons: {
-      type: "boolean",
-      label: "Show Hierarchy Expand/Collapse Icons",
-      default: true,
-      section: "Series",
-      order: 14
-    },
-
-    detect_date_hierarchy: {
-      type: "boolean",
-      label: "Auto-detect Date Hierarchy",
-      default: true,
-      section: "Series",
-      order: 15
-    },
-
-    series_divider_sparklines: {
-      type: "string",
-      label: "─────────────────────────────── Sparklines ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 20
-    },
-
-    enable_sparklines: {
-      type: "boolean",
-      label: "Enable Sparklines",
-      default: false,
-      section: "Series",
-      order: 21
-    },
-
-    sparkline_field: {
-      type: "string",
-      label: "Sparkline Field",
+      label: "Sparkline Measure",
       display: "text",
       default: "",
       placeholder: "measure_name",
       section: "Series",
-      order: 22
+      order: 12
+    },
+
+    sparkline_dimension: {
+      type: "string",
+      label: "Group By Dimension",
+      display: "text",
+      default: "",
+      placeholder: "dimension_name (e.g., product, category)",
+      section: "Series",
+      order: 13
     },
 
     sparkline_type: {
@@ -336,12 +267,12 @@ const visObject = {
       display: "select",
       values: [
         { "Line": "line" },
-        { "Bar": "bar" },
-        { "Area": "area" }
+        { "Area": "area" },
+        { "Bar": "bar" }
       ],
       default: "line",
       section: "Series",
-      order: 23
+      order: 14
     },
 
     sparkline_color: {
@@ -350,7 +281,7 @@ const visObject = {
       display: "color",
       default: "#3b82f6",
       section: "Series",
-      order: 24
+      order: 15
     },
 
     sparkline_height: {
@@ -361,7 +292,139 @@ const visObject = {
       min: 20,
       max: 100,
       section: "Series",
+      order: 16
+    },
+
+    series_divider_grouping: {
+      type: "string",
+      label: "─────────────────────────────── Column Grouping ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 20
+    },
+
+    enable_column_groups: {
+      type: "boolean",
+      label: "Enable Column Grouping",
+      default: false,
+      section: "Series",
+      order: 21
+    },
+
+    column_group_1_name: {
+      type: "string",
+      label: "Group 1 Name",
+      default: "",
+      section: "Series",
+      order: 22
+    },
+
+    column_group_1_fields: {
+      type: "string",
+      label: "Group 1 Fields (comma-separated)",
+      display: "text",
+      default: "",
+      placeholder: "field1,field2,field3",
+      section: "Series",
+      order: 23
+    },
+
+    column_group_2_name: {
+      type: "string",
+      label: "Group 2 Name",
+      default: "",
+      section: "Series",
+      order: 24
+    },
+
+    column_group_2_fields: {
+      type: "string",
+      label: "Group 2 Fields (comma-separated)",
+      display: "text",
+      default: "",
+      placeholder: "field1,field2,field3",
+      section: "Series",
       order: 25
+    },
+
+    column_group_3_name: {
+      type: "string",
+      label: "Group 3 Name",
+      default: "",
+      section: "Series",
+      order: 26
+    },
+
+    column_group_3_fields: {
+      type: "string",
+      label: "Group 3 Fields (comma-separated)",
+      display: "text",
+      default: "",
+      placeholder: "field1,field2,field3",
+      section: "Series",
+      order: 27
+    },
+
+    group_header_bg_color: {
+      type: "string",
+      label: "Group Header Background Color",
+      display: "color",
+      default: "#e0e7ff",
+      section: "Series",
+      order: 28
+    },
+
+    series_divider_hierarchy: {
+      type: "string",
+      label: "─────────────────────────────── Hierarchical Data ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 30
+    },
+
+    enable_hierarchy: {
+      type: "boolean",
+      label: "Enable Hierarchical Display",
+      default: false,
+      section: "Series",
+      order: 31
+    },
+
+    hierarchy_field: {
+      type: "string",
+      label: "Hierarchy Field",
+      display: "text",
+      default: "",
+      placeholder: "dimension_name",
+      section: "Series",
+      order: 32
+    },
+
+    hierarchy_indent: {
+      type: "number",
+      label: "Hierarchy Indent (px)",
+      default: 20,
+      display: "number",
+      min: 0,
+      max: 100,
+      section: "Series",
+      order: 33
+    },
+
+    show_hierarchy_icons: {
+      type: "boolean",
+      label: "Show Hierarchy Expand/Collapse Icons",
+      default: true,
+      section: "Series",
+      order: 34
+    },
+
+    detect_date_hierarchy: {
+      type: "boolean",
+      label: "Auto-detect Date Hierarchy",
+      default: true,
+      section: "Series",
+      order: 35
     },
 
     series_divider_comparison: {
@@ -369,7 +432,7 @@ const visObject = {
       label: "─────────────────────────────── Comparison ───────────────────────────────",
       display: "divider",
       section: "Series",
-      order: 30
+      order: 40
     },
 
     enable_comparison: {
@@ -377,7 +440,7 @@ const visObject = {
       label: "Enable Comparison Display",
       default: false,
       section: "Series",
-      order: 31
+      order: 41
     },
 
     comparison_primary_field: {
@@ -387,7 +450,7 @@ const visObject = {
       default: "",
       placeholder: "measure_name",
       section: "Series",
-      order: 32
+      order: 42
     },
 
     comparison_secondary_field: {
@@ -397,7 +460,7 @@ const visObject = {
       default: "",
       placeholder: "measure_name",
       section: "Series",
-      order: 33
+      order: 43
     },
 
     comparison_type: {
@@ -412,7 +475,7 @@ const visObject = {
       ],
       default: "percentage",
       section: "Series",
-      order: 34
+      order: 44
     },
 
     show_comparison_arrows: {
@@ -420,7 +483,7 @@ const visObject = {
       label: "Show Comparison Arrows",
       default: true,
       section: "Series",
-      order: 35
+      order: 45
     },
 
     positive_comparison_color: {
@@ -429,7 +492,7 @@ const visObject = {
       display: "color",
       default: "#10b981",
       section: "Series",
-      order: 36
+      order: 46
     },
 
     negative_comparison_color: {
@@ -438,7 +501,7 @@ const visObject = {
       display: "color",
       default: "#ef4444",
       section: "Series",
-      order: 37
+      order: 47
     },
 
     series_divider_datachips: {
@@ -446,7 +509,7 @@ const visObject = {
       label: "─────────────────────────────── Data Chips ───────────────────────────────",
       display: "divider",
       section: "Series",
-      order: 40
+      order: 50
     },
 
     enable_datachips: {
@@ -454,7 +517,7 @@ const visObject = {
       label: "Enable Data Chips",
       default: false,
       section: "Series",
-      order: 41
+      order: 51
     },
 
     datachip_field: {
@@ -464,7 +527,7 @@ const visObject = {
       default: "",
       placeholder: "status",
       section: "Series",
-      order: 42
+      order: 52
     },
 
     datachip_config: {
@@ -474,7 +537,7 @@ const visObject = {
       default: '{"Active": "#10b981", "Inactive": "#ef4444", "Pending": "#f59e0b"}',
       placeholder: '{"value": "color"}',
       section: "Series",
-      order: 43
+      order: 53
     },
 
     series_divider_emojis: {
@@ -482,7 +545,7 @@ const visObject = {
       label: "─────────────────────────────── Emojis ───────────────────────────────",
       display: "divider",
       section: "Series",
-      order: 50
+      order: 60
     },
 
     enable_emojis: {
@@ -490,7 +553,7 @@ const visObject = {
       label: "Enable Emoji Rendering",
       default: false,
       section: "Series",
-      order: 51
+      order: 61
     },
 
     emoji_mapping: {
@@ -500,7 +563,7 @@ const visObject = {
       default: '{"positive": "✅", "negative": "❌", "warning": "⚠️", "star": "⭐"}',
       placeholder: '{"keyword": "emoji"}',
       section: "Series",
-      order: 52
+      order: 62
     },
 
     // ══════════════════════════════════════════════════════════════
@@ -1120,6 +1183,35 @@ const visObject = {
           font-size: 12px;
         }
 
+        .cell-bar-container {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+        }
+
+        .cell-bar-background {
+          flex: 1;
+          height: 20px;
+          background: #f3f4f6;
+          border-radius: 3px;
+          overflow: hidden;
+          position: relative;
+        }
+
+        .cell-bar-fill {
+          height: 100%;
+          transition: width 0.3s ease;
+          border-radius: 3px;
+        }
+
+        .cell-bar-value {
+          font-weight: 500;
+          white-space: nowrap;
+          min-width: 50px;
+          text-align: right;
+        }
+
         .hierarchy-cell {
           display: flex;
           align-items: center;
@@ -1231,6 +1323,17 @@ const visObject = {
           border-right: 2px solid #e5e7eb;
         }
 
+        .drill-link {
+          cursor: pointer;
+          color: inherit;
+          text-decoration: underline;
+          text-decoration-style: dotted;
+        }
+
+        .drill-link:hover {
+          text-decoration-style: solid;
+        }
+
         @media print {
           .pagination-controls,
           .filter-container {
@@ -1254,7 +1357,8 @@ const visObject = {
       tableFilter: '',
       columnFilters: {},
       expandedRows: new Set(),
-      data: []
+      data: [],
+      sparklineData: {}
     };
   },
 
@@ -1275,6 +1379,11 @@ const visObject = {
 
     // Parse configuration
     const parsedConfig = this.parseConfig(config);
+
+    // Process sparkline data if enabled
+    if (parsedConfig.enable_sparklines && parsedConfig.sparkline_dimension && parsedConfig.sparkline_measure) {
+      this.state.sparklineData = this.processSparklineData(data, parsedConfig, queryResponse);
+    }
 
     // Apply filters
     let filteredData = this.applyFilters(data, parsedConfig);
@@ -1344,6 +1453,33 @@ const visObject = {
     }
 
     return parsed;
+  },
+
+  processSparklineData: function(data, config, queryResponse) {
+    // Group data by the sparkline dimension and extract measure values
+    const sparklineData = {};
+    const dimension = config.sparkline_dimension;
+    const measure = config.sparkline_measure;
+
+    data.forEach(row => {
+      const dimCell = row[dimension];
+      const dimValue = dimCell && dimCell.value !== undefined ? dimCell.value : dimCell;
+      const key = String(dimValue);
+
+      if (!sparklineData[key]) {
+        sparklineData[key] = [];
+      }
+
+      const measureCell = row[measure];
+      const measureValue = measureCell && measureCell.value !== undefined ?
+        parseFloat(measureCell.value) : parseFloat(measureCell);
+
+      if (!isNaN(measureValue)) {
+        sparklineData[key].push(measureValue);
+      }
+    });
+
+    return sparklineData;
   },
 
   applyFilters: function(data, config) {
@@ -1416,7 +1552,6 @@ const visObject = {
 
     // Find hierarchy levels
     const hierarchyField = config.hierarchy_field;
-    const hierarchyLevels = {};
 
     data.forEach((row, idx) => {
       const value = row[hierarchyField];
@@ -1592,7 +1727,6 @@ const visObject = {
       `;
 
       if (isFrozen) {
-        // Approximate column width for frozen positioning
         leftOffset += 150;
       }
     });
@@ -1685,25 +1819,32 @@ const visObject = {
   },
 
   renderCellContent: function(cellValue, field, config, row) {
-    // Extract actual value
+    // Extract actual value and drill links
     let value = cellValue;
     let rendered = cellValue;
-    let links = null;
+    let drillLinks = [];
 
-    if (cellValue && cellValue.value !== undefined) {
-      value = cellValue.value;
-      rendered = cellValue.rendered || cellValue.value;
-      links = cellValue.links;
+    if (cellValue && typeof cellValue === 'object') {
+      value = cellValue.value !== undefined ? cellValue.value : cellValue;
+      rendered = cellValue.rendered || cellValue.value || cellValue;
+      drillLinks = cellValue.links || [];
+    }
+
+    // Check for cell bars
+    if (config.enable_cell_bars && config.cell_bar_field === field.name) {
+      return this.renderCellBar(value, rendered, config, drillLinks);
     }
 
     // Check for sparklines
-    if (config.enable_sparklines && config.sparkline_field === field.name) {
-      return this.renderSparkline(row, config, field);
+    if (config.enable_sparklines && config.sparkline_dimension === field.name) {
+      const dimValue = String(value);
+      const sparklineValues = this.state.sparklineData[dimValue] || [];
+      return this.renderSparkline(sparklineValues, rendered, config, drillLinks);
     }
 
     // Check for data chips
     if (config.enable_datachips && config.datachip_field === field.name) {
-      return this.renderDataChip(value, config);
+      return this.renderDataChip(value, config, drillLinks);
     }
 
     // Check for emojis
@@ -1713,13 +1854,23 @@ const visObject = {
 
     // Check for comparison
     if (config.enable_comparison && config.comparison_primary_field === field.name) {
-      return this.renderComparison(row, config);
+      return this.renderComparison(row, config, drillLinks);
     }
 
     // Wrap with drill links if available
-    if (links && links.length > 0) {
-      const drillLink = links[0];
-      rendered = `<a href="${drillLink.url}" target="_blank" style="color: inherit; text-decoration: underline;">${rendered}</a>`;
+    if (drillLinks && drillLinks.length > 0) {
+      const drillId = `drill-${Math.random().toString(36).substr(2, 9)}`;
+      rendered = `<span class="drill-link" data-drill-id="${drillId}">${rendered}</span>`;
+
+      // Store drill links for later access
+      setTimeout(() => {
+        const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
+        if (elem) {
+          elem.addEventListener('click', (e) => {
+            LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e });
+          });
+        }
+      }, 0);
     }
 
     // Highlight filter matches
@@ -1731,16 +1882,52 @@ const visObject = {
     return rendered;
   },
 
-  renderSparkline: function(row, config, field) {
-    // Get all numeric fields for this row to create sparkline
-    const numericFields = this.queryResponse.fields.measure_like;
-    const values = numericFields.map(f => {
-      const cell = row[f.name];
+  renderCellBar: function(value, rendered, config, drillLinks) {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return rendered;
+
+    // Find min/max values in the dataset for this field to scale properly
+    const allValues = this.state.data.map(row => {
+      const cell = row[config.cell_bar_field];
       const val = cell && cell.value !== undefined ? cell.value : cell;
-      return parseFloat(val) || 0;
+      return parseFloat(val);
     }).filter(v => !isNaN(v));
 
-    if (values.length === 0) return '';
+    const maxValue = Math.max(...allValues);
+    const minValue = Math.min(...allValues, 0);
+    const range = maxValue - minValue;
+
+    const widthPercent = range > 0 ? ((numValue - minValue) / range) * config.cell_bar_max_width : 0;
+
+    const drillId = drillLinks && drillLinks.length > 0 ? `drill-${Math.random().toString(36).substr(2, 9)}` : null;
+
+    const html = `
+      <div class="cell-bar-container">
+        <div class="cell-bar-background">
+          <div class="cell-bar-fill" style="width: ${widthPercent}%; background-color: ${config.cell_bar_color};"></div>
+        </div>
+        ${config.cell_bar_show_value ?
+          `<div class="cell-bar-value${drillId ? ' drill-link' : ''}" ${drillId ? `data-drill-id="${drillId}"` : ''}>${rendered}</div>` :
+          ''}
+      </div>
+    `;
+
+    if (drillId) {
+      setTimeout(() => {
+        const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
+        if (elem) {
+          elem.addEventListener('click', (e) => {
+            LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e });
+          });
+        }
+      }, 0);
+    }
+
+    return html;
+  },
+
+  renderSparkline: function(values, rendered, config, drillLinks) {
+    if (!values || values.length === 0) return rendered;
 
     const max = Math.max(...values);
     const min = Math.min(...values);
@@ -1769,21 +1956,51 @@ const visObject = {
       }).join('');
     }
 
-    return `
-      <div class="sparkline-container" style="height: ${config.sparkline_height}px;">
+    const drillId = drillLinks && drillLinks.length > 0 ? `drill-${Math.random().toString(36).substr(2, 9)}` : null;
+
+    const html = `
+      <div class="sparkline-container${drillId ? ' drill-link' : ''}" style="height: ${config.sparkline_height}px;" ${drillId ? `data-drill-id="${drillId}"` : ''}>
         <svg class="sparkline-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
           ${svgContent}
         </svg>
       </div>
     `;
+
+    if (drillId) {
+      setTimeout(() => {
+        const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
+        if (elem) {
+          elem.addEventListener('click', (e) => {
+            LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e });
+          });
+        }
+      }, 0);
+    }
+
+    return html;
   },
 
-  renderDataChip: function(value, config) {
+  renderDataChip: function(value, config, drillLinks) {
     const color = config.datachips[value] || '#6b7280';
-    return `<span class="data-chip" style="background-color: ${color};">${this.escapeHtml(String(value))}</span>`;
+    const drillId = drillLinks && drillLinks.length > 0 ? `drill-${Math.random().toString(36).substr(2, 9)}` : null;
+
+    const html = `<span class="data-chip${drillId ? ' drill-link' : ''}" style="background-color: ${color};" ${drillId ? `data-drill-id="${drillId}"` : ''}>${this.escapeHtml(String(value))}</span>`;
+
+    if (drillId) {
+      setTimeout(() => {
+        const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
+        if (elem) {
+          elem.addEventListener('click', (e) => {
+            LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e });
+          });
+        }
+      }, 0);
+    }
+
+    return html;
   },
 
-  renderComparison: function(row, config) {
+  renderComparison: function(row, config, drillLinks) {
     // Get primary and secondary values
     const primaryCell = row[config.comparison_primary_field];
     const secondaryCell = row[config.comparison_secondary_field];
@@ -1794,13 +2011,14 @@ const visObject = {
     }
 
     const primaryValue = primaryCell.value !== undefined ? primaryCell.value : primaryCell;
+    const primaryRendered = primaryCell.rendered || primaryValue;
     const secondaryValue = secondaryCell.value !== undefined ? secondaryCell.value : secondaryCell;
 
     const primary = parseFloat(primaryValue);
     const secondary = parseFloat(secondaryValue);
 
     if (isNaN(primary) || isNaN(secondary) || secondary === 0) {
-      return String(primaryValue);
+      return String(primaryRendered);
     }
 
     const diff = primary - secondary;
@@ -1818,25 +2036,39 @@ const visObject = {
       else comparisonText = `${diff > 0 ? '+' : ''}${diff.toFixed(0)}`;
     }
 
+    const drillId = primaryCell.links && primaryCell.links.length > 0 ? `drill-${Math.random().toString(36).substr(2, 9)}` : null;
+    const links = primaryCell.links || [];
+
     let html = `
       <div class="comparison-container">
-        <span>${primaryValue}</span>
+        <span${drillId ? ` class="drill-link" data-drill-id="${drillId}"` : ''}>${primaryRendered}</span>
         <span class="comparison-value" style="color: ${color};">
           ${arrow} ${comparisonText}
         </span>
     `;
 
     if (config.comparison_type === 'bar' || config.comparison_type === 'both') {
-      const maxVal = Math.max(Math.abs(primary), Math.abs(secondary));
-      const barWidth = Math.abs(percentDiff);
+      const barWidth = Math.min(Math.abs(percentDiff), 100);
       html += `
         <div style="width: 100%; max-width: 60px;">
-          <div class="comparison-bar" style="width: ${Math.min(barWidth, 100)}%; background-color: ${color};"></div>
+          <div class="comparison-bar" style="width: ${barWidth}%; background-color: ${color};"></div>
         </div>
       `;
     }
 
     html += '</div>';
+
+    if (drillId) {
+      setTimeout(() => {
+        const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
+        if (elem) {
+          elem.addEventListener('click', (e) => {
+            LookerCharts.Utils.openDrillMenu({ links: links, event: e });
+          });
+        }
+      }, 0);
+    }
+
     return html;
   },
 
