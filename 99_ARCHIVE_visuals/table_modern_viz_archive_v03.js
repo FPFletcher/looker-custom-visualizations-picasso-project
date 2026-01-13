@@ -261,134 +261,72 @@ const visObject = {
           };
         },
 
-      updateAsync: function(data, element, config, queryResponse, details, done) {
+  updateAsync: function(data, element, config, queryResponse, details, done) {
         this.clearErrors();
-        if (!queryResponse || !data || data.length === 0) {
-          this.addError({ title: "No Data", message: "No data available to display" });
-          done();
-          return;
-        }
+        if (!queryResponse || !data || data.length === 0) { done(); return; }
 
-        // Dynamically update subtotal dimension dropdown options
         const dimensions = queryResponse.fields.dimension_like;
         if (dimensions.length > 0) {
           const dimensionValues = [{"None": ""}];
-          dimensions.forEach(dim => {
-            dimensionValues.push({[dim.label_short || dim.label]: dim.name});
-          });
+          dimensions.forEach(dim => dimensionValues.push({[dim.label_short || dim.label]: dim.name}));
           this.options.subtotal_dimension.values = dimensionValues;
         }
-
         this.trigger('registerOptions', this.options);
+
         this.state.data = data;
-        this.config = config;
-        this.queryResponse = queryResponse;
-
-        const parsedConfig = this.parseConfig(config);
         const measures = queryResponse.fields.measure_like;
+        let filteredData = this.applyFilters(data, config);
+        if (this.state.sortField) filteredData = this.sortData(filteredData, this.state.sortField, this.state.sortDirection);
 
-        // AUTO-COLLAPSE ON DIMENSION CHANGE
-        const currentDimKey = parsedConfig.enable_bo_hierarchy ?
-        parsedConfig.hierarchy_dimensions : parsedConfig.subtotal_dimension;
-
-        if (currentDimKey && this.state.lastSubtotalDimension !== currentDimKey) {
+        // AUTO-COLLAPSE RESET
+        const currentKey = config.enable_bo_hierarchy ? config.hierarchy_dimensions : config.subtotal_dimension;
+        if (currentKey && this.state.lastSubtotalDimension !== currentKey) {
           this.state.collapsedGroups = {};
-          this.state.lastSubtotalDimension = currentDimKey;
+          this.state.lastSubtotalDimension = currentKey;
           this.state.forceInitialCollapse = true;
-          this.state.currentPage = 1;
         }
 
-        let filteredData = this.applyFilters(data, parsedConfig);
-
-        if (this.state.sortField) {
-          filteredData = this.sortData(filteredData, this.state.sortField, this.state.sortDirection);
-        }
-
-        // TRIGGER BO-STYLE HIERARCHY OR STANDARD SUBTOTALS
-        if (parsedConfig.enable_bo_hierarchy && parsedConfig.hierarchy_dimensions) {
-          const hierarchyList = parsedConfig.hierarchy_dimensions.split(',').map(f => f.trim());
-          filteredData = this.calculateSubtotals(filteredData, hierarchyList, measures, parsedConfig, dimensions);
-
-          // Handle Expand/Collapse Logic for Recursive Hierarchy
-          if (!this.state.collapsedGroups || this.state.forceInitialCollapse) {
-            this.state.collapsedGroups = {};
-            filteredData.forEach(row => {
-              if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true;
-            });
+        // TRIGGER HIERARCHY OR STANDARD
+        if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
+          const hierarchyList = config.hierarchy_dimensions.split(',').map(f => f.trim());
+          filteredData = this.calculateSubtotals(filteredData, hierarchyList, measures, config, dimensions);
+          if (this.state.forceInitialCollapse) {
+            filteredData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
             this.state.forceInitialCollapse = false;
           }
-
           filteredData = filteredData.filter(row => {
-            if (row.__isSubtotal) {
-              row.__isCollapsed = this.state.collapsedGroups[row.__groupValue] || false;
-              // Check if any parent in the path is collapsed
-              const pathParts = String(row.__groupValue).split('|');
-              if (pathParts.length > 1) {
-                let currentPath = "";
-                for (let i = 0; i < pathParts.length - 1; i++) {
-                  currentPath = currentPath ? `${currentPath}|${pathParts[i]}` : pathParts[i];
-                  if (this.state.collapsedGroups[currentPath]) return false;
-                }
-              }
-              return true;
-            }
-            // Filter detail rows based on parent path
-            if (row.__parentGroup !== undefined) {
-              const pathParts = String(row.__parentGroup).split('|');
-              let currentPath = "";
-              for (let i = 0; i < pathParts.length; i++) {
-                currentPath = currentPath ? `${currentPath}|${pathParts[i]}` : pathParts[i];
-                if (this.state.collapsedGroups[currentPath]) return false;
-              }
+            const pathParts = String(row.__isSubtotal ? row.__groupValue : row.__parentGroup || "").split('|');
+            let currentPath = "";
+            for (let i = 0; i < (row.__isSubtotal ? pathParts.length - 1 : pathParts.length); i++) {
+              currentPath = currentPath ? `${currentPath}|${pathParts[i]}` : pathParts[i];
+              if (this.state.collapsedGroups[currentPath]) return false;
             }
             return true;
           });
-
-        } else if (parsedConfig.enable_subtotals && parsedConfig.subtotal_dimension) {
-          // Standard single-level subtotals
-          filteredData = this.calculateSubtotals(filteredData, [parsedConfig.subtotal_dimension], measures, parsedConfig, dimensions);
-
-          if (parsedConfig.subtotal_position === 'top') {
-            if (!this.state.collapsedGroups || this.state.forceInitialCollapse) {
-              this.state.collapsedGroups = {};
-              filteredData.forEach(row => {
-                if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true;
-              });
+        } else if (config.enable_subtotals && config.subtotal_dimension) {
+          filteredData = this.calculateSubtotals(filteredData, [config.subtotal_dimension], measures, config, dimensions);
+          if (config.subtotal_position === 'top') {
+            if (this.state.forceInitialCollapse) {
+              filteredData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
               this.state.forceInitialCollapse = false;
             }
-            filteredData = filteredData.filter(row => {
-              if (row.__isSubtotal) {
-                row.__isCollapsed = this.state.collapsedGroups[row.__groupValue] || false;
-                return true;
-              }
-              return !this.state.collapsedGroups[row.__parentGroup];
-            });
+            filteredData = filteredData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
           }
         }
 
-        // Accurate Grand Total (Sums raw data only)
-        if (parsedConfig.show_grand_total) {
-          const grandTotal = this.calculateGrandTotal(data, measures, parsedConfig, dimensions);
-          filteredData.push(grandTotal);
+        if (config.show_grand_total) filteredData.push(this.calculateGrandTotal(data, measures, config, dimensions));
+
+        const totalPages = Math.max(1, Math.ceil(filteredData.filter(r => !r.__isGrandTotal).length / config.page_size));
+        if (this.state.currentPage > totalPages) this.state.currentPage = totalPages;
+
+        const startIdx = (this.state.currentPage - 1) * config.page_size;
+        let pageData = config.enable_pagination ? filteredData.filter(r => !r.__isGrandTotal).slice(startIdx, startIdx + config.page_size) : filteredData.filter(r => !r.__isGrandTotal);
+        if (config.show_grand_total && config.show_grand_total_on_all_pages) {
+          const gt = filteredData.find(r => r.__isGrandTotal);
+          if (gt) pageData.push(gt);
         }
 
-        let dataWithoutGrandTotal = filteredData.filter(row => !row.__isGrandTotal);
-        let grandTotalRow = filteredData.find(row => row.__isGrandTotal);
-
-        // Pagination Calculation
-        const totalPages = Math.ceil(dataWithoutGrandTotal.length / parsedConfig.page_size);
-        if (this.state.currentPage > totalPages && totalPages > 0) this.state.currentPage = totalPages;
-
-        const startIdx = (this.state.currentPage - 1) * parsedConfig.page_size;
-        const endIdx = startIdx + parsedConfig.page_size;
-        let pageData = parsedConfig.enable_pagination ?
-        dataWithoutGrandTotal.slice(startIdx, endIdx) : dataWithoutGrandTotal;
-
-        if (grandTotalRow && parsedConfig.show_grand_total_on_all_pages) {
-          pageData.push(grandTotalRow);
-        }
-
-        this.renderTable(pageData, filteredData, totalPages, parsedConfig, queryResponse);
+        this.renderTable(pageData, filteredData.length, totalPages, config, queryResponse);
         done();
       },
 
@@ -456,69 +394,35 @@ const visObject = {
     return parsed;
   },
 
-calculateSubtotals: function(data, groupByFields, measures, config, dimensions) {
-        if (!data || data.length === 0) return data;
-        const fields = Array.isArray(groupByFields) ? groupByFields : [groupByFields];
+      calculateSubtotals: function(data, fields, measures, config, dimensions) {
         const result = [];
-
         const groupData = (rows, level, parentPath) => {
           const field = fields[level];
           const groups = {};
-
           rows.forEach(row => {
             let val = row[field];
             let key = (val && typeof val === 'object') ? (val.value || val.rendered || 'null') : (val || 'null');
             if (!groups[key]) groups[key] = [];
             groups[key].push(row);
           });
-
           Object.keys(groups).forEach(key => {
             const currentPath = parentPath ? `${parentPath}|${key}` : key;
-            const groupRows = groups[key];
-
-            // Create Subtotal Row
-            const subRow = {
-              __isSubtotal: true,
-              __groupValue: currentPath,
-              __level: level,
-              __memberValue: key
-            };
-
-            // Set the label in the primary hierarchy column
-            const targetDim = fields[0];
-            subRow[targetDim] = { value: key, rendered: key };
-
-            // Set other hierarchy dimensions to empty to prevent "UI Gap"
-            fields.forEach((f, i) => { if(i > 0) subRow[f] = { value: '', rendered: '' }; });
-
-            // Calculate measure totals for this level
-            measures.forEach(m => {
-              let sum = 0;
-              groupRows.forEach(r => {
-                let v = r[m.name];
-                sum += Number((v && typeof v === 'object' ? v.value : v) || 0);
-              });
-              subRow[m.name] = { value: sum, rendered: sum.toLocaleString(undefined, {minimumFractionDigits: 2}) };
-            });
-
-            result.push(subRow);
-
-            // If there are more levels, recurse. Otherwise, add detail rows.
-            if (level < fields.length - 1) {
-              groupData(groupRows, level + 1, currentPath);
-            } else {
-              groupRows.forEach(r => {
-                r.__parentGroup = currentPath;
-                r.__level = level + 1;
-                result.push(r);
-              });
-            }
+            const sub = { __isSubtotal: true, __groupValue: currentPath, __level: level };
+            sub[fields[0]] = { value: key, rendered: key }; // Put text in the tree column
+          fields.forEach((f, i) => { if(i > 0) sub[f] = { value: '', rendered: '' }; }); // Clear others
+          measures.forEach(m => {
+            let sum = 0;
+            groups[key].forEach(r => { let v = r[m.name]; sum += Number((v && typeof v === 'object' ? v.value : v) || 0); });
+            sub[m.name] = { value: sum, rendered: sum.toLocaleString(undefined, {minimumFractionDigits: 2}) };
           });
-        };
-
-        groupData(data, 0, "");
-        return result;
-      },
+          result.push(sub);
+          if (level < fields.length - 1) groupData(groups[key], level + 1, currentPath);
+          else groups[key].forEach(r => { r.__parentGroup = currentPath; r.__level = level + 1; result.push(r); });
+        });
+      };
+      groupData(data, 0, "");
+      return result;
+    },
 
 calculateGrandTotal: function(rawData, measures, config, dimensions) {
   const totalRow = { __isGrandTotal: true };
@@ -652,52 +556,36 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
           return html + '</div></div>';
         },
 
-        renderBody: function(pageData, allFilteredData, config, queryResponse) {
+        renderBody: function(pageData, config, queryResponse) {
           const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-          const pageOffset = (this.state.currentPage - 1) * config.page_size;
+          const hierarchyDims = config.enable_bo_hierarchy ? config.hierarchy_dimensions.split(',').map(f => f.trim()) : [];
+          const mainTreeCol = hierarchyDims[0] || config.subtotal_dimension;
           let html = '<tbody>';
 
-          // Identify which columns should be hidden (redundant hierarchy levels)
-          const hierarchyDims = config.enable_bo_hierarchy ? config.hierarchy_dimensions.split(',').map(f => f.trim()) : [];
-          const mainTreeCol = hierarchyDims[0];
-
-          pageData.forEach((row, pageRowIdx) => {
-            const actualRowIdx = pageOffset + pageRowIdx;
-            const isSub = !!row.__isSubtotal;
+          pageData.forEach((row, i) => {
+            const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
             const level = row.__level || 0;
-            const isCollapsed = this.state.collapsedGroups[row.__groupValue];
+            html += `<tr class="${isGT?'grand-total-row':(isSub?'subtotal-row':'detail-row')}" data-group="${row.__groupValue || ''}" style="${isSub?'background:'+config.subtotal_background_color:''}">`;
+            if (config.show_row_numbers) html += `<td>${(isSub||isGT)?'':i+1}</td>`;
 
-            const rowClass = row.__isGrandTotal ? 'grand-total-row' : (isSub ? `subtotal-row level-${level}` : 'detail-row');
-            html += `<tr class="${rowClass}" data-group="${row.__groupValue || ''}">`;
+            fields.forEach(f => {
+              // Hide child columns in Hierarchy mode to keep it in ONE column
+              if (config.enable_bo_hierarchy && hierarchyDims.includes(f.name) && f.name !== mainTreeCol) return;
 
-            if (config.show_row_numbers) {
-              html += `<td class="row-number-cell">${(isSub || row.__isGrandTotal) ? '' : actualRowIdx + 1}</td>`;
-            }
-
-            fields.forEach((f) => {
-              // Skip dimension columns that are merged into the tree (except the first one)
-              if (config.enable_bo_hierarchy && hierarchyDims.includes(f.name) && f.name !== mainTreeCol) {
-                return;
-              }
-
-              let content = (row[f.name] && typeof row[f.name] === 'object') ? (row[f.name].rendered || row[f.name].value || '∅') : (row[f.name] || '∅');
+              let content = this.renderCellContent(row[f.name], f, config, row);
               let style = "";
 
-              // Apply Indentation and Toggles to the Main Tree Column
-              if (f.name === mainTreeCol || (!config.enable_bo_hierarchy && f.name === config.subtotal_dimension)) {
-                const padding = level * 20;
-                style = `style="padding-left: ${padding + 12}px;"`;
+              if (f.name === mainTreeCol) {
+                style = `style="padding-left: ${(level * 20) + 12}px;"`;
                 if (isSub) {
-                  const icon = isCollapsed ? '▶' : '▼';
+                  const icon = this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼';
                   content = `<span class="subtotal-toggle">${icon}</span>${content}`;
                 }
               }
-
-              html += `<td ${style} class="${isSub && (f.name === mainTreeCol || f.name === config.subtotal_dimension) ? 'subtotal-trigger-cell' : ''}">${content}</td>`;
+              html += `<td ${style}>${content}</td>`;
             });
             html += '</tr>';
           });
-
           return html + '</tbody>';
         },
 
