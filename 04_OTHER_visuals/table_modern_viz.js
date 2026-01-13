@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.11.0 - Column Offset Fixed + Debug
- * Build: 2026-01-12-v15
+ * Version: 4.12.0 - Collapse Cell Fixed (No More Offset!)
+ * Build: 2026-01-12-v16
  */
 
 const visObject = {
@@ -1139,9 +1139,9 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.11.0 - Build 2026-01-12-v15');
-    console.log('[TABLE] ✅ FIXED: Column offset (row numbers)');
-    console.log('[TABLE] 🔍 Debugging Looker buttons...');
+    console.log('[TABLE] Advanced Table v4.12.0 - Build 2026-01-12-v16');
+    console.log('[TABLE] ✅ FIXED: Dedicated collapse cell (NO OFFSET!)');
+    console.log('[TABLE] ✅ Arrows: ▶ collapsed, ▼ expanded');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1503,15 +1503,6 @@ const visObject = {
 
         .advanced-table tbody tr.subtotal-row.position-top {
           cursor: pointer;
-        }
-
-        .advanced-table tbody tr.subtotal-row.position-top::before {
-          content: '▼ ';
-          margin-right: 5px;
-        }
-
-        .advanced-table tbody tr.subtotal-row.position-top.collapsed::before {
-          content: '▶ ';
         }
 
         .advanced-table tbody tr.subtotal-row.collapsed + tr.detail-row {
@@ -2305,6 +2296,11 @@ const visObject = {
 
     let html = `<thead><tr style="${styles}">`;
 
+    // Add empty header for collapse cell if using top-positioned subtotals
+    if (config.subtotal_position === 'top' && config.enable_subtotals) {
+      html += `<th class="collapse-cell" style="width: 30px;"></th>`;
+    }
+
     if (config.show_row_numbers) {
       html += `<th class="row-number-cell">#</th>`;
     }
@@ -2399,6 +2395,16 @@ const visObject = {
       ].filter(Boolean).join(' ');
 
       html += `<tr ${dataAttrs}>`;
+
+      // Add collapse indicator cell for top-positioned subtotals (before row numbers)
+      if (isSubtotalRow && config.subtotal_position === 'top') {
+        const isCollapsed = row.__isCollapsed;
+        const collapseIcon = isCollapsed ? '▶' : '▼';
+        html += `<td class="collapse-cell" style="width: 30px; text-align: center; cursor: pointer; user-select: none; font-size: 14px;">${collapseIcon}</td>`;
+      } else if (config.subtotal_position === 'top' && config.enable_subtotals) {
+        // Empty cell for detail rows
+        html += `<td class="collapse-cell" style="width: 30px;"></td>`;
+      }
 
       if (config.show_row_numbers) {
         // Subtotal and grand total rows get empty row number
@@ -2955,8 +2961,10 @@ const visObject = {
 
     // Subtotal row collapse/expand (only for top position)
     if (config.subtotal_position === 'top') {
+      // Click on entire subtotal row OR the collapse cell
       this.container.querySelectorAll('tr.subtotal-row.position-top').forEach(subtotalRow => {
-        subtotalRow.addEventListener('click', function() {
+        subtotalRow.addEventListener('click', function(e) {
+          // Only toggle if clicking the row itself, not other interactive elements
           const isCollapsed = this.classList.contains('collapsed');
           const groupValue = this.dataset.group;
 
