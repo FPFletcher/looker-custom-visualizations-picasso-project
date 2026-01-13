@@ -1962,29 +1962,89 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
                 return renderedValue !== null ? renderedValue : String(value);
                 },
 
-                renderCellContent: function(cellValue, field, config, row, rowIdx, data) {
-                let value = cellValue, rendered = cellValue, drillLinks = [];
-              if (cellValue && typeof cellValue === 'object') {
-                value = cellValue.value;
-                rendered = cellValue.rendered || cellValue.value;
-                drillLinks = cellValue.links || [];
-              }
-              if (value === null || value === undefined) return '∅';
-              const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name];
-              if (fieldFormat && fieldFormat.format && value !== '') {
-                rendered = this.formatValue(value, fieldFormat.format, field, rendered);
-              }
-              if (config.enable_comparison && config.comparison_primary_field === field.name) return this.renderComparison(row, config, drillLinks, rowIdx, data);
-              if (drillLinks.length > 0) {
-                const drillId = `drill-${Math.random().toString(36).substr(2, 9)}`;
-                rendered = `<span class="drill-link" data-drill-id="${drillId}">${rendered}</span>`;
-                setTimeout(() => {
-                  const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
-                  if (elem) elem.addEventListener('click', (e) => LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e }));
-                }, 0);
-              }
-              return rendered;
-            },
+        renderCellContent: function(cellValue, field, config, row, rowIdx, data) {
+          let value = cellValue, rendered = cellValue, drillLinks = [];
+          if (cellValue && typeof cellValue === 'object') {
+            value = cellValue.value;
+            rendered = cellValue.rendered || cellValue.value;
+            drillLinks = cellValue.links || [];
+          }
+          if (value === null || value === undefined) return '∅';
+
+          // Custom format override
+          const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name];
+          if (fieldFormat && fieldFormat.format && value !== '') {
+            rendered = this.formatValue(value, fieldFormat.format, field, rendered);
+          }
+
+          // AUTOMATIC EMOJI RENDERING (Pre-defined logic)
+          const valStr = String(value).toLowerCase();
+          if (valStr.includes('complete') || valStr.includes('yes')) rendered = `✅ ${rendered}`;
+          else if (valStr.includes('cancelled') || valStr.includes('no')) rendered = `❌ ${rendered}`;
+          else if (valStr.includes('warning')) rendered = `⚠️ ${rendered}`;
+
+          // Priority 1: Comparison display
+          if (config.enable_comparison && config.comparison_primary_field === field.name) {
+            rendered = this.renderComparison(row, config, drillLinks, rowIdx, data);
+          }
+
+          // Priority 2: Cell Bar Chart (Applies to detail, subtotal, and grand total)
+          let isCellBarField = false;
+          let cellBarSet = null;
+          for (let i = 0; i < config.cellBarSets.length; i++) {
+            if (config.cellBarSets[i].fields.includes(field.name)) {
+              isCellBarField = true;
+              cellBarSet = config.cellBarSets[i];
+              break;
+            }
+          }
+
+          if (isCellBarField) {
+            return this.renderCellBar(value, rendered, config, drillLinks, cellBarSet, field.name);
+          }
+
+          // Wrap with drill links
+          if (drillLinks.length > 0) {
+            const drillId = `drill-${Math.random().toString(36).substr(2, 9)}`;
+            rendered = `<span class="drill-link" data-drill-id="${drillId}">${rendered}</span>`;
+            setTimeout(() => {
+              const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
+              if (elem) elem.addEventListener('click', (e) => LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e }));
+            }, 0);
+          }
+          return rendered;
+        },
+
+        renderCellBar: function(value, rendered, config, drillLinks, barSet, fieldName) {
+          const numValue = parseFloat(value);
+          if (isNaN(numValue)) return rendered;
+
+          // Determine min/max from the currently visible state data
+          const allValues = this.state.data.map(row => {
+            const cell = row[fieldName];
+            const val = (cell && typeof cell === 'object') ? cell.value : cell;
+            return parseFloat(val);
+          }).filter(v => !isNaN(v));
+
+          const maxValue = Math.max(...allValues);
+          const minValue = Math.min(...allValues, 0);
+          const range = maxValue - minValue;
+          const widthPercent = range > 0 ? ((numValue - minValue) / range) * (config.cell_bar_max_width || 100) : 0;
+
+          const barColor = barSet.color || '#3b82f6';
+          const drillId = drillLinks && drillLinks.length > 0 ? `drill-${Math.random().toString(36).substr(2, 9)}` : null;
+
+          return `
+          <div class="cell-bar-container" style="display: flex; align-items: center; gap: 8px; width: 100%;">
+          <div class="cell-bar-background" style="flex: 1; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative;">
+          <div class="cell-bar-fill" style="width: ${widthPercent}%; height: 100%; background: ${barColor};"></div>
+          </div>
+          <div class="cell-bar-value" style="font-weight: 500; white-space: nowrap;">
+          ${drillId ? `<span class="drill-link" data-drill-id="${drillId}">${rendered}</span>` : rendered}
+          </div>
+          </div>
+          `;
+        },
 
         renderComparison: function(row, config, drillLinks, rowIdx, data) {
           const primaryCell = row[config.comparison_primary_field];
@@ -2059,26 +2119,33 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
 
         attachEventListeners: function(config) {
           const self = this;
+
+          // RESTORED: Row Hover Effect
+          this.container.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('mouseenter', () => {
+              row.style.backgroundColor = '#f3f4f6';
+            });
+            row.addEventListener('mouseleave', () => {
+              row.style.backgroundColor = '';
+            });
+          });
+
+          // Subtotal Toggle Logic
           if (config.subtotal_position === 'top') {
             this.container.querySelectorAll('tr.subtotal-row.position-top').forEach(row => {
               row.addEventListener('click', function() {
                 const g = this.dataset.group;
                 if (!self.state.collapsedGroups) self.state.collapsedGroups = {};
+                if (this.classList.contains('collapsed')) delete self.state.collapsedGroups[g];
+                else self.state.collapsedGroups[g] = true;
 
-                if (this.classList.contains('collapsed')) {
-                  delete self.state.collapsedGroups[g];
-                } else {
-                  self.state.collapsedGroups[g] = true;
-                }
-
-                // FIX: Removed "self.state.currentPage = 1;" to keep you on the current page.
-                // The bounds-check logic inside updateAsync will automatically handle
-                // cases where a page disappears due to collapsing rows.
-
+                // Re-render while staying on the current page
                 self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
               });
             });
           }
+
+          // Pagination Click Logic
           this.container.querySelectorAll('.pagination-button').forEach(btn => {
             btn.addEventListener('click', function() {
               const totalPages = Math.ceil(self.state.data.length / config.page_size);
@@ -2091,12 +2158,32 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
               self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
             });
           });
+
+          // Table-wide Filter (Enter Key)
           const filterInput = this.container.querySelector('#table-filter-input');
-          if (filterInput) filterInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { self.state.tableFilter = filterInput.value; self.state.currentPage = 1; self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {}); } });
+          if (filterInput) {
+            filterInput.addEventListener('keypress', (e) => {
+              if (e.key === 'Enter') {
+                self.state.tableFilter = filterInput.value;
+                self.state.currentPage = 1;
+                self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
+              }
+            });
+          }
+
+          // Column Filters (Enter Key)
           this.container.querySelectorAll('.column-filter').forEach(input => {
-            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') { self.state.columnFilters[input.dataset.field] = input.value; self.state.currentPage = 1; self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {}); } });
+            input.addEventListener('keypress', (e) => {
+              if (e.key === 'Enter') {
+                self.state.columnFilters[input.dataset.field] = input.value;
+                self.state.currentPage = 1;
+                self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
+              }
+            });
             input.addEventListener('click', (e) => e.stopPropagation());
           });
+
+          // Header Sorting
           this.container.querySelectorAll('th.sortable').forEach(th => {
             th.addEventListener('click', (e) => {
               if (e.target.classList.contains('column-filter')) return;
