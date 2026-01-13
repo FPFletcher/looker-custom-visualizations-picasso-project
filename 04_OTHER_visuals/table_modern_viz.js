@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.10.0 - Subtotals Fixed + Full Collapse
- * Build: 2026-01-12-v14
+ * Version: 4.11.0 - Column Offset Fixed + Debug
+ * Build: 2026-01-12-v15
  */
 
 const visObject = {
@@ -1139,10 +1139,9 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.10.0 - Build 2026-01-12-v14');
-    console.log('[TABLE] ✅ Fixed subtotal label in correct column');
-    console.log('[TABLE] ✅ Collapse works across all pages');
-    console.log('[TABLE] ✅ Starts fully collapsed in Top mode');
+    console.log('[TABLE] Advanced Table v4.11.0 - Build 2026-01-12-v15');
+    console.log('[TABLE] ✅ FIXED: Column offset (row numbers)');
+    console.log('[TABLE] 🔍 Debugging Looker buttons...');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -1654,9 +1653,14 @@ const visObject = {
     this.config = config;
     this.queryResponse = queryResponse;
 
+    console.log('[TABLE] Details parameter:', details);
+
     // Link Looker's native Totals/Subtotals buttons to our viz features
     // The 'details' parameter contains: details.totals_enabled, details.subtotals_enabled
     if (details) {
+      console.log('[TABLE] Details.totals_enabled:', details.totals_enabled);
+      console.log('[TABLE] Details.subtotals_enabled:', details.subtotals_enabled);
+
       // If Looker's Totals button is enabled and we have totals_data, enable grand total
       if (details.totals_enabled && queryResponse.totals_data) {
         config.show_grand_total = true;
@@ -2397,8 +2401,13 @@ const visObject = {
       html += `<tr ${dataAttrs}>`;
 
       if (config.show_row_numbers) {
-        const globalRowNum = actualRowIdx + 1;
-        html += `<td class="row-number-cell">${globalRowNum}</td>`;
+        // Subtotal and grand total rows get empty row number
+        if (isSubtotalRow || isGrandTotalRow) {
+          html += `<td class="row-number-cell"></td>`;
+        } else {
+          const globalRowNum = actualRowIdx + 1;
+          html += `<td class="row-number-cell">${globalRowNum}</td>`;
+        }
       }
 
       let leftOffset = 0;
