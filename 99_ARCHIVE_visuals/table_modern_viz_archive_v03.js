@@ -8,36 +8,54 @@ const visObject = {
   id: "advanced_table_visual",
   label: "Advanced Table",
   options: {
+    // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
-    plot_divider_display: { type: "string", label: "──────────────── Display Options ────────────────", display: "divider", section: "Plot", order: 0 },
-    show_row_numbers: { type: "boolean", label: "Show Row Numbers", default: false, section: "Plot", order: 1 },
-    show_headers: { type: "boolean", label: "Show Headers", default: true, section: "Plot", order: 2 },
-    enable_pagination: { type: "boolean", label: "Enable Pagination", default: true, section: "Plot", order: 11 },
-    page_size: { type: "number", label: "Page Size", default: 25, display: "number", min: 5, max: 1000, section: "Plot", order: 12 },
-    pagination_position: { type: "string", label: "Pagination Position", display: "select", values: [{ "Top": "top" }, { "Bottom": "bottom" }, { "Both": "both" }], default: "bottom", section: "Plot", order: 13 },
+    // ══════════════════════════════════════════════════════════════
+    plot_divider_display: { type: "string", label: "──────────────── Display Options ────────────────", display: "divider", section: "Plot", order: 10 },
+    show_row_numbers: { type: "boolean", label: "Show Row Numbers", default: false, section: "Plot", order: 11 },
+    show_headers: { type: "boolean", label: "Show Headers", default: true, section: "Plot", order: 12 },
 
-    // TAB: SERIES - HIERARCHY (FORCED TO TOP)
-    hierarchy_divider: { type: "string", label: "──────────────── BO Hierarchy Mode ────────────────", display: "divider", section: "Series", order: -100 },
-    enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Series", order: -99 },
-    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels (comma-separated)", display: "text", default: "", placeholder: "products.brand,products.category", section: "Series", order: -98 },
+    plot_divider_pagination: { type: "string", label: "──────────────── Pagination ────────────────", display: "divider", section: "Plot", order: 20 },
+    enable_pagination: { type: "boolean", label: "Enable Pagination", default: true, section: "Plot", order: 21 },
+    page_size: { type: "number", label: "Page Size", default: 25, display: "number", section: "Plot", order: 22 },
 
-    // TAB: SERIES - SUBTOTALS
-    subtotals_divider: { type: "string", label: "──────────────── Standard Subtotals ────────────────", display: "divider", section: "Series", order: -90 },
-    enable_subtotals: { type: "boolean", label: "Enable Subtotals (Standard)", default: false, section: "Series", order: -89 },
-    subtotal_dimension: { type: "string", label: "Group By Dimension (Standard)", display: "select", values: [{"None": ""}], default: "", section: "Series", order: -88 },
-    subtotal_position: { type: "string", label: "Subtotal Position", display: "select", values: [{"Top (Collapsible)": "top"}, {"Bottom": "bottom"}], default: "bottom", section: "Series", order: -87 },
-    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: -86 },
+    // ══════════════════════════════════════════════════════════════
+    // TAB: SERIES
+    // ══════════════════════════════════════════════════════════════
 
-    // TAB: SERIES - DATA CHIPS
-    chips_divider: { type: "string", label: "──────────────── Data Chips ────────────────", display: "divider", section: "Series", order: -70 },
-    enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: true, section: "Series", order: -69 },
-    data_chip_fields: { type: "string", label: "Apply Chips to Fields (comma-separated)", display: "text", default: "", section: "Series", order: -68 },
-    chip_match_green: { type: "string", label: "Green Match", default: "complete,yes,active", section: "Series", order: -67 },
-    chip_match_red: { type: "string", label: "Red Match", default: "cancelled,no,inactive,null", section: "Series", order: -66 },
+    // SECTION 1: HIERARCHY
+    hierarchy_divider: { type: "string", label: "──────────────── BO Hierarchy Mode ────────────────", display: "divider", section: "Series", order: 10 },
+    enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Series", order: 11 },
+    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels (comma-separated)", display: "text", default: "", placeholder: "brand,category", section: "Series", order: 12 },
 
-    // TAB: SERIES - FIELD FORMATTING (FORCED TO BOTTOM)
-    field_labels_divider: { type: "string", label: "──────────────── Field Formatting ────────────────", display: "divider", section: "Series", order: 500 },
-    enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 501 }
+    // SECTION 2: SUBTOTALS
+    subtotals_divider: { type: "string", label: "──────────────── Standard Subtotals ────────────────", display: "divider", section: "Series", order: 20 },
+    enable_subtotals: { type: "boolean", label: "Enable Subtotals", default: false, section: "Series", order: 21 },
+    subtotal_dimension: { type: "string", label: "Group By Dimension", display: "select", values: [{"None": ""}], default: "", section: "Series", order: 22 },
+    subtotal_position: { type: "string", label: "Subtotal Position", display: "select", values: [{"Top": "top"}, {"Bottom": "bottom"}], default: "bottom", section: "Series", order: 23 },
+    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 24 },
+
+    // SECTION 3: GRAND TOTALS
+    totals_divider: { type: "string", label: "──────────────── Grand Totals ────────────────", display: "divider", section: "Series", order: 30 },
+    show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 31 },
+    grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Series", order: 32 },
+
+    // SECTION 4: DATA CHIPS
+    chips_divider: { type: "string", label: "──────────────── Data Chips ────────────────", display: "divider", section: "Series", order: 40 },
+    enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: true, section: "Series", order: 41 },
+    data_chip_fields: { type: "string", label: "Apply Chips to Fields", display: "text", default: "", section: "Series", order: 42 },
+    chip_match_green: { type: "string", label: "Green Match", default: "complete,yes", section: "Series", order: 43 },
+    chip_match_red: { type: "string", label: "Red Match", default: "cancelled,no", section: "Series", order: 44 },
+
+    // SECTION 5: FIELD FORMATTING (Dynamic fields will appear here)
+    field_labels_divider: { type: "string", label: "──────────────── Field Formatting ────────────────", display: "divider", section: "Series", order: 50 },
+    enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 51 },
+
+    // ══════════════════════════════════════════════════════════════
+    // TAB: FORMATTING
+    // ══════════════════════════════════════════════════════════════
+    formatting_divider_theme: { type: "string", label: "──────────────── Theme ────────────────", display: "divider", section: "Formatting", order: 10 },
+    table_theme: { type: "string", label: "Table Theme", display: "select", values: [{ "Modern": "modern" }, { "Compact": "compact" }], default: "modern", section: "Formatting", order: 11 }
   },
 
   create: function(element, config) {
