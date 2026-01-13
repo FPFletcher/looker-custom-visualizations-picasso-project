@@ -1986,27 +1986,62 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
               return rendered;
             },
 
-            renderComparison: function(row, config, drillLinks, rowIdx, data) {
-              const primaryCell = row[config.comparison_primary_field];
-              if (!primaryCell) return '';
-              const primary = parseFloat(primaryCell.value !== undefined ? primaryCell.value : primaryCell);
-              const primaryRendered = primaryCell.rendered || primary;
-              if (isNaN(primary)) return String(primaryRendered);
-              let secondary = 0;
-              if (config.comparison_mode === 'metric') {
-                const secondaryCell = row[config.comparison_secondary_field];
-                if (secondaryCell) secondary = parseFloat(secondaryCell.value !== undefined ? secondaryCell.value : secondaryCell);
-              } else if (config.comparison_mode === 'period' && data && rowIdx !== undefined) {
-                const compareRow = data[rowIdx - config.comparison_period_offset];
-                if (compareRow && compareRow[config.comparison_primary_field]) {
-                  secondary = parseFloat(compareRow[config.comparison_primary_field].value || compareRow[config.comparison_primary_field]);
-                }
-              }
-              if (isNaN(secondary) || secondary === 0) return String(primaryRendered);
-              const diff = primary - secondary;
-              const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
-              return `<div class="comparison-container"><span>${primaryRendered}</span><span style="color:${color}; font-size:0.85em;">${config.show_comparison_arrows ? (diff>=0?'↑':'↓') : ''} ${Math.abs((diff/Math.abs(secondary))*100).toFixed(1)}%</span></div>`;
-            },
+        renderComparison: function(row, config, drillLinks, rowIdx, data) {
+          const primaryCell = row[config.comparison_primary_field];
+          if (!primaryCell) return '';
+
+          const primaryValue = primaryCell.value !== undefined ? primaryCell.value : primaryCell;
+          const primaryRendered = primaryCell.rendered || primaryValue;
+          const primary = parseFloat(primaryValue);
+
+          if (isNaN(primary)) return String(primaryRendered);
+
+          // FIX: Explicitly disable comparison for the Grand Total row
+          if (row.__isGrandTotal) {
+            return String(primaryRendered);
+          }
+
+          let secondary = 0;
+
+          if (config.comparison_mode === 'metric') {
+            const secondaryCell = row[config.comparison_secondary_field];
+            if (secondaryCell) {
+              secondary = parseFloat(secondaryCell.value !== undefined ? secondaryCell.value : secondaryCell);
+            }
+          } else if (config.comparison_mode === 'period' && data && rowIdx !== undefined) {
+            // FIX: Find "like-wise" elements only (Subtotal vs Subtotal or Detail vs Detail)
+            const isSubtotal = !!row.__isSubtotal;
+
+            // Filter the data to only include rows of the same "type"
+            const likeRows = data.filter(r => !!r.__isSubtotal === isSubtotal && !r.__isGrandTotal);
+
+            // Find the index of the current row within that "like-wise" subset
+            const currentLikeIdx = likeRows.indexOf(row);
+            const compareRow = likeRows[currentLikeIdx - config.comparison_period_offset];
+
+            if (compareRow && compareRow[config.comparison_primary_field]) {
+              const compareCell = compareRow[config.comparison_primary_field];
+              secondary = parseFloat(compareCell.value !== undefined ? compareCell.value : compareCell);
+            }
+          }
+
+          if (isNaN(secondary) || secondary === 0) return String(primaryRendered);
+
+          const diff = primary - secondary;
+          const percentDiff = (diff / Math.abs(secondary)) * 100;
+          const isPositive = diff >= 0;
+          const color = isPositive ? config.positive_comparison_color : config.negative_comparison_color;
+          const arrow = config.show_comparison_arrows ? (isPositive ? '↑' : '↓') : '';
+
+          return `
+          <div class="comparison-container">
+          <span>${primaryRendered}</span>
+          <span style="color: ${color}; font-size: 0.85em; font-weight: 500; margin-left: 8px;">
+          ${arrow} ${Math.abs(percentDiff).toFixed(1)}%
+          </span>
+          </div>
+          `;
+        },
 
             getTableStyles: function(config) { return (config.table_theme !== 'minimal' && config.show_borders) ? `border: ${config.border_width}px ${config.border_style} ${config.border_color};` : ''; },
             getHeaderStyles: function(config) { return `font-size:${config.header_font_size}px; font-weight:${config.header_font_weight}; color:${config.header_text_color}; background-color:${config.header_bg_color}; text-align:${config.header_alignment};`; },
