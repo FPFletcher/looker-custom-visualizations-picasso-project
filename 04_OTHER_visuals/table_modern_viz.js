@@ -8,1158 +8,54 @@ const visObject = {
   id: "advanced_table_visual",
   label: "Advanced Table",
   options: {
-    // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
-    // ══════════════════════════════════════════════════════════════
-
-    plot_divider_display: {
-      type: "string",
-      label: "─────────────────────────────── Display Options ───────────────────────────────",
-      display: "divider",
-      section: "Plot",
-      order: 0
-    },
-
-    show_row_numbers: {
-      type: "boolean",
-      label: "Show Row Numbers",
-      default: false,
-      section: "Plot",
-      order: 1
-    },
-
-    show_headers: {
-      type: "boolean",
-      label: "Show Headers",
-      default: true,
-      section: "Plot",
-      order: 2
-    },
-
-    plot_divider_pagination: {
-      type: "string",
-      label: "─────────────────────────────── Pagination ───────────────────────────────",
-      display: "divider",
-      section: "Plot",
-      order: 10
-    },
-
-    enable_pagination: {
-      type: "boolean",
-      label: "Enable Pagination",
-      default: true,
-      section: "Plot",
-      order: 11
-    },
-
-    page_size: {
-      type: "number",
-      label: "Page Size",
-      default: 25,
-      display: "number",
-      min: 5,
-      max: 1000,
-      section: "Plot",
-      order: 12
-    },
-
-    pagination_position: {
-      type: "string",
-      label: "Pagination Position",
-      display: "select",
-      values: [
-        { "Top": "top" },
-        { "Bottom": "bottom" },
-        { "Both": "both" }
-      ],
-      default: "bottom",
-      section: "Plot",
-      order: 13
-    },
-
-    show_page_info: {
-      type: "boolean",
-      label: "Show Page Info",
-      default: true,
-      section: "Plot",
-      order: 14
-    },
-
-    plot_divider_freezing: {
-      type: "string",
-      label: "─────────────────────────────── Freezing ───────────────────────────────",
-      display: "divider",
-      section: "Plot",
-      order: 20
-    },
-
-    freeze_columns: {
-      type: "number",
-      label: "Freeze Left Columns",
-      default: 0,
-      display: "number",
-      min: 0,
-      max: 10,
-      section: "Plot",
-      order: 21
-    },
-
-    freeze_header_row: {
-      type: "boolean",
-      label: "Freeze Header Row",
-      default: true,
-      section: "Plot",
-      order: 22
-    },
-
-    plot_divider_filtering: {
-      type: "string",
-      label: "─────────────────────────────── Filtering ───────────────────────────────",
-      display: "divider",
-      section: "Plot",
-      order: 30
-    },
-
-    enable_table_filter: {
-      type: "boolean",
-      label: "Enable Table-wide Filter",
-      default: false,
-      section: "Plot",
-      order: 31
-    },
-
-    enable_column_filters: {
-      type: "boolean",
-      label: "Enable Column Filters",
-      default: false,
-      section: "Plot",
-      order: 32
-    },
-
-    filter_highlight_color: {
-      type: "string",
-      label: "Filter Highlight Color",
-      display: "color",
-      default: "#fef08a",
-      section: "Plot",
-      order: 33
-    },
-
-    // ══════════════════════════════════════════════════════════════
-    // TAB: SERIES
-    // ══════════════════════════════════════════════════════════════
-
-    series_divider_cell_bars: {
-      type: "string",
-      label: "─────────────────────────────── Cell Bar Charts ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 0
-    },
-
-    enable_cell_bars_1: {
-      type: "boolean",
-      label: "Enable Cell Bar Set 1",
-      default: false,
-      section: "Series",
-      order: 1
-    },
-
-    cell_bar_fields_1: {
-      type: "string",
-      label: "Cell Bar Fields 1 (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "measure1,measure2,measure3",
-      section: "Series",
-      order: 2
-    },
-
-    cell_bar_color_1: {
-      type: "string",
-      label: "Cell Bar Color 1",
-      display: "color",
-      default: "#3b82f6",
-      section: "Series",
-      order: 3
-    },
-
-    cell_bar_gradient_1: {
-      type: "boolean",
-      label: "Use Gradient for Set 1",
-      default: false,
-      section: "Series",
-      order: 4
-    },
-
-    cell_bar_gradient_end_1: {
-      type: "string",
-      label: "Gradient End Color 1",
-      display: "color",
-      default: "#93c5fd",
-      section: "Series",
-      order: 5
-    },
-
-    enable_cell_bars_2: {
-      type: "boolean",
-      label: "Enable Cell Bar Set 2",
-      default: false,
-      section: "Series",
-      order: 6
-    },
-
-    cell_bar_fields_2: {
-      type: "string",
-      label: "Cell Bar Fields 2 (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "measure1,measure2",
-      section: "Series",
-      order: 7
-    },
-
-    cell_bar_color_2: {
-      type: "string",
-      label: "Cell Bar Color 2",
-      display: "color",
-      default: "#10b981",
-      section: "Series",
-      order: 8
-    },
-
-    cell_bar_gradient_2: {
-      type: "boolean",
-      label: "Use Gradient for Set 2",
-      default: false,
-      section: "Series",
-      order: 9
-    },
-
-    cell_bar_gradient_end_2: {
-      type: "string",
-      label: "Gradient End Color 2",
-      display: "color",
-      default: "#6ee7b7",
-      section: "Series",
-      order: 10
-    },
-
-    enable_cell_bars_3: {
-      type: "boolean",
-      label: "Enable Cell Bar Set 3",
-      default: false,
-      section: "Series",
-      order: 11
-    },
-
-    cell_bar_fields_3: {
-      type: "string",
-      label: "Cell Bar Fields 3 (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "measure1,measure2",
-      section: "Series",
-      order: 12
-    },
-
-    cell_bar_color_3: {
-      type: "string",
-      label: "Cell Bar Color 3",
-      display: "color",
-      default: "#f59e0b",
-      section: "Series",
-      order: 13
-    },
-
-    cell_bar_gradient_3: {
-      type: "boolean",
-      label: "Use Gradient for Set 3",
-      default: false,
-      section: "Series",
-      order: 14
-    },
-
-    cell_bar_gradient_end_3: {
-      type: "string",
-      label: "Gradient End Color 3",
-      display: "color",
-      default: "#fcd34d",
-      section: "Series",
-      order: 15
-    },
-
-    cell_bar_show_value: {
-      type: "boolean",
-      label: "Show Value on Cell Bars",
-      default: true,
-      section: "Series",
-      order: 16
-    },
-
-    cell_bar_max_width: {
-      type: "number",
-      label: "Cell Bar Max Width (%)",
-      default: 100,
-      display: "number",
-      min: 20,
-      max: 100,
-      section: "Series",
-      order: 17
-    },
-
-    series_divider_grouping: {
-      type: "string",
-      label: "─────────────────────────────── Column Grouping ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 20
-    },
-
-    enable_column_groups: {
-      type: "boolean",
-      label: "Enable Column Grouping",
-      default: false,
-      section: "Series",
-      order: 21
-    },
-
-    column_group_1_name: {
-      type: "string",
-      label: "Group 1 Name",
-      default: "",
-      section: "Series",
-      order: 22
-    },
-
-    column_group_1_count: {
-      type: "number",
-      label: "Group 1 - Number of Columns from Left",
-      display: "number",
-      default: 2,
-      min: 1,
-      max: 20,
-      section: "Series",
-      order: 23
-    },
-
-    column_group_2_name: {
-      type: "string",
-      label: "Group 2 Name",
-      default: "",
-      section: "Series",
-      order: 24
-    },
-
-    column_group_2_count: {
-      type: "number",
-      label: "Group 2 - Number of Columns from Left",
-      display: "number",
-      default: 4,
-      min: 1,
-      max: 20,
-      section: "Series",
-      order: 25
-    },
-
-    column_group_3_name: {
-      type: "string",
-      label: "Group 3 Name",
-      default: "",
-      section: "Series",
-      order: 26
-    },
-
-    column_group_3_count: {
-      type: "number",
-      label: "Group 3 - Number of Columns from Left",
-      display: "number",
-      default: 6,
-      min: 1,
-      max: 20,
-      section: "Series",
-      order: 27
-    },
-
-    group_remaining_columns: {
-      type: "boolean",
-      label: "Group All Remaining Columns",
-      default: false,
-      section: "Series",
-      order: 28
-    },
-
-    remaining_columns_name: {
-      type: "string",
-      label: "Remaining Columns Group Name",
-      default: "Other",
-      section: "Series",
-      order: 29
-    },
-
-    group_header_bg_color: {
-      type: "string",
-      label: "Group Header Background Color",
-      display: "color",
-      default: "#e0e7ff",
-      section: "Series",
-      order: 30
-    },
-
-    series_divider_comparison: {
-      type: "string",
-      label: "─────────────────────────────── Comparison ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 50
-    },
-
-    enable_comparison: {
-      type: "boolean",
-      label: "Enable Comparison Display",
-      default: false,
-      section: "Series",
-      order: 51
-    },
-
-    comparison_mode: {
-      type: "string",
-      label: "Comparison Mode",
-      display: "select",
-      values: [
-        { "Metric vs Metric": "metric" },
-        { "Period over Period": "period" }
-      ],
-      default: "metric",
-      section: "Series",
-      order: 52
-    },
-
-    comparison_primary_field: {
-      type: "string",
-      label: "Primary Measure",
-      display: "text",
-      default: "",
-      placeholder: "measure_name",
-      section: "Series",
-      order: 53
-    },
-
-    comparison_secondary_field: {
-      type: "string",
-      label: "Secondary Measure (Metric vs Metric mode)",
-      display: "text",
-      default: "",
-      placeholder: "measure_name",
-      section: "Series",
-      order: 54
-    },
-
-    comparison_period_offset: {
-      type: "number",
-      label: "Period Offset (use negative for previous, e.g., -1)",
-      display: "number",
-      default: -1,
-      min: -100,
-      max: 100,
-      section: "Series",
-      order: 55
-    },
-
-    comparison_label: {
-      type: "string",
-      label: "Comparison Label",
-      display: "text",
-      default: "vs Previous",
-      placeholder: "vs Last Year, MoM, YoY, etc.",
-      section: "Series",
-      order: 56
-    },
-
-    comparison_type: {
-      type: "string",
-      label: "Comparison Display Type",
-      display: "select",
-      values: [
-        { "Percentage": "percentage" },
-        { "Absolute": "absolute" },
-        { "Inline Bar": "bar" },
-        { "Both": "both" }
-      ],
-      default: "percentage",
-      section: "Series",
-      order: 57
-    },
-
-    show_comparison_arrows: {
-      type: "boolean",
-      label: "Show Comparison Arrows",
-      default: true,
-      section: "Series",
-      order: 58
-    },
-
-    positive_comparison_color: {
-      type: "string",
-      label: "Positive Comparison Color",
-      display: "color",
-      default: "#10b981",
-      section: "Series",
-      order: 59
-    },
-
-    negative_comparison_color: {
-      type: "string",
-      label: "Negative Comparison Color",
-      display: "color",
-      default: "#ef4444",
-      section: "Series",
-      order: 60
-    },
-
-    // RESTORED: DATA CHIPS
-    series_divider_data_chips: {
-      type: "string",
-      label: "─────────────────────────────── Data Chips ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 70
-    },
-
-    enable_data_chips: {
-      type: "boolean",
-      label: "Enable Data Chips (Conditional Badges)",
-      default: true,
-      section: "Series",
-      order: 71
-    },
-
-    data_chip_fields: {
-      type: "string",
-      label: "Apply Chips to Fields (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "products.brand,products.category",
-      section: "Series",
-      order: 72
-    },
-
-    chip_match_green: {
-      type: "string",
-      label: "Green Chip Match (String)",
-      default: "complete,yes,active",
-      placeholder: "Comma-separated values",
-      section: "Series",
-      order: 73
-    },
-
-    chip_match_red: {
-      type: "string",
-      label: "Red Chip Match (String)",
-      default: "cancelled,no,inactive,null",
-      placeholder: "Comma-separated values",
-      section: "Series",
-      order: 74
-    },
-
-    chip_match_yellow: {
-      type: "string",
-      label: "Yellow Chip Match (String)",
-      default: "warning,pending",
-      placeholder: "Comma-separated values",
-      section: "Series",
-      order: 75
-    },
-
-    chip_match_blue: {
-      type: "string",
-      label: "Blue Chip Match (String)",
-      default: "shipped,processing",
-      placeholder: "Comma-separated values",
-      section: "Series",
-      order: 76
-    },
-
-    // ========== SUBTOTALS & TOTALS ==========
-    subtotals_divider: {
-      type: "string",
-      label: "─────────────────────────────── Subtotals & Totals ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 80
-    },
-
-    enable_subtotals: {
-      type: "boolean",
-      label: "Enable Subtotals",
-      default: false,
-      section: "Series",
-      order: 81
-    },
-
-    subtotal_dimension: {
-      type: "string",
-      label: "Group By Dimension (for Subtotals)",
-      display: "select",
-      values: [{"None": ""}],
-      default: "",
-      section: "Series",
-      order: 82
-    },
-
-    show_grand_total: {
-      type: "boolean",
-      label: "Show Grand Total Row",
-      default: false,
-      section: "Series",
-      order: 83
-    },
-
-    subtotal_label: {
-      type: "string",
-      label: "Subtotal Label Format",
-      default: "{value}",
-      placeholder: "Use {value} for dimension value",
-      section: "Series",
-      order: 84
-    },
-
-    subtotal_position: {
-      type: "string",
-      label: "Subtotal Position",
-      display: "select",
-      values: [
-        {"Top (Collapsible)": "top"},
-        {"Bottom": "bottom"}
-      ],
-      default: "bottom",
-      section: "Series",
-      order: 85
-    },
-
-    subtotal_background_color: {
-      type: "string",
-      label: "Subtotal Background Color",
-      display: "color",
-      default: "#f0f0f0",
-      section: "Series",
-      order: 86
-    },
-
-    grand_total_label: {
-      type: "string",
-      label: "Grand Total Label",
-      default: "Grand Total",
-      section: "Series",
-      order: 87
-    },
-
-    show_grand_total_on_all_pages: {
-      type: "boolean",
-      label: "Show Grand Total on All Pages",
-      default: true,
-      section: "Series",
-      order: 88
-    },
-
-    series_divider_field_labels: {
-      type: "string",
-      label: "─────────────────────────────── Field Formatting ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 89
-    },
-
-    enable_custom_field_formatting: {
-      type: "boolean",
-      label: "Enable Custom Field Formatting",
-      default: false,
-      section: "Series",
-      order: 90
-    },
-
-    // ══════════════════════════════════════════════════════════════
-    // TAB: FORMATTING
-    // ══════════════════════════════════════════════════════════════
-
-    formatting_divider_theme: {
-      type: "string",
-      label: "─────────────────────────────── Theme ───────────────────────────────",
-      display: "divider",
-      section: "Formatting",
-      order: 0
-    },
-
-    table_theme: {
-      type: "string",
-      label: "Table Theme",
-      display: "select",
-      values: [
-        { "Modern": "modern" },
-        { "Classic": "classic" },
-        { "Minimal": "minimal" },
-        { "Striped": "striped" },
-        { "Bordered": "bordered" },
-        { "Compact": "compact" }
-      ],
-      default: "modern",
-      section: "Formatting",
-      order: 1
-    },
-
-    stripe_color: {
-      type: "string",
-      label: "Stripe Background Color",
-      display: "color",
-      default: "#f9fafb",
-      section: "Formatting",
-      order: 2
-    },
-
-    formatting_divider_headers: {
-      type: "string",
-      label: "─────────────────────────────── Headers ───────────────────────────────",
-      display: "divider",
-      section: "Formatting",
-      order: 10
-    },
-
-    header_font_family: {
-      type: "string",
-      label: "Header Font Family",
-      display: "select",
-      values: [
-        { "Default": "default" },
-        { "Arial": "Arial, sans-serif" },
-        { "Helvetica": "Helvetica, sans-serif" },
-        { "Times New Roman": "Times New Roman, serif" },
-        { "Courier": "Courier, monospace" },
-        { "Georgia": "Georgia, serif" },
-        { "Verdana": "Verdana, sans-serif" },
-        { "Roboto": "Roboto, sans-serif" }
-      ],
-      default: "default",
-      section: "Formatting",
-      order: 11
-    },
-
-    header_font_size: {
-      type: "number",
-      label: "Header Font Size (px)",
-      default: 12,
-      display: "number",
-      min: 8,
-      max: 32,
-      section: "Formatting",
-      order: 12
-    },
-
-    header_font_weight: {
-      type: "string",
-      label: "Header Font Weight",
-      display: "select",
-      values: [
-        { "Normal": "normal" },
-        { "Bold": "bold" },
-        { "Light": "300" },
-        { "Semi-Bold": "600" }
-      ],
-      default: "bold",
-      section: "Formatting",
-      order: 13
-    },
-
-    header_text_color: {
-      type: "string",
-      label: "Header Text Color",
-      display: "color",
-      default: "#1f2937",
-      section: "Formatting",
-      order: 14
-    },
-
-    header_bg_color: {
-      type: "string",
-      label: "Header Background Color",
-      display: "color",
-      default: "#f9fafb",
-      section: "Formatting",
-      order: 15
-    },
-
-    header_alignment: {
-      type: "string",
-      label: "Header Alignment",
-      display: "select",
-      values: [
-        { "Left": "left" },
-        { "Center": "center" },
-        { "Right": "right" }
-      ],
-      default: "left",
-      section: "Formatting",
-      order: 16
-    },
-
-    formatting_divider_cells: {
-      type: "string",
-      label: "─────────────────────────────── Cells ───────────────────────────────",
-      display: "divider",
-      section: "Formatting",
-      order: 20
-    },
-
-    cell_font_family: {
-      type: "string",
-      label: "Cell Font Family",
-      display: "select",
-      values: [
-        { "Default": "default" },
-        { "Arial": "Arial, sans-serif" },
-        { "Helvetica": "Helvetica, sans-serif" },
-        { "Times New Roman": "Times New Roman, serif" },
-        { "Courier": "Courier, monospace" },
-        { "Georgia": "Georgia, serif" },
-        { "Verdana": "Verdana, sans-serif" },
-        { "Roboto": "Roboto, sans-serif" }
-      ],
-      default: "default",
-      section: "Formatting",
-      order: 21
-    },
-
-    cell_font_size: {
-      type: "number",
-      label: "Cell Font Size (px)",
-      default: 11,
-      display: "number",
-      min: 8,
-      max: 32,
-      section: "Formatting",
-      order: 22
-    },
-
-    cell_text_color: {
-      type: "string",
-      label: "Cell Text Color",
-      display: "color",
-      default: "#374151",
-      section: "Formatting",
-      order: 23
-    },
-
-    cell_bg_color: {
-      type: "string",
-      label: "Cell Background Color",
-      display: "color",
-      default: "#ffffff",
-      section: "Formatting",
-      order: 24
-    },
-
-    cell_alignment: {
-      type: "string",
-      label: "Cell Alignment",
-      display: "select",
-      values: [
-        { "Auto": "auto" },
-        { "Left": "left" },
-        { "Center": "center" },
-        { "Right": "right" }
-      ],
-      default: "auto",
-      section: "Formatting",
-      order: 25
-    },
-
-    wrap_text: {
-      type: "boolean",
-      label: "Wrap Text in Cells",
-      default: false,
-      section: "Formatting",
-      order: 26
-    },
-
-    row_height: {
-      type: "number",
-      label: "Row Height (px)",
-      default: 36,
-      display: "number",
-      min: 24,
-      max: 200,
-      section: "Formatting",
-      order: 27
-    },
-
-    formatting_divider_borders: {
-      type: "string",
-      label: "─────────────────────────────── Borders & Spacing ───────────────────────────────",
-      display: "divider",
-      section: "Formatting",
-      order: 30
-    },
-
-    show_borders: {
-      type: "boolean",
-      label: "Show Borders",
-      default: true,
-      section: "Formatting",
-      order: 31
-    },
-
-    border_style: {
-      type: "string",
-      label: "Border Style",
-      display: "select",
-      values: [
-        { "Solid": "solid" },
-        { "Dashed": "dashed" },
-        { "Dotted": "dotted" },
-        { "None": "none" }
-      ],
-      default: "solid",
-      section: "Formatting",
-      order: 32
-    },
-
-    border_width: {
-      type: "number",
-      label: "Border Width (px)",
-      default: 1,
-      display: "number",
-      min: 0,
-      max: 5,
-      section: "Formatting",
-      order: 33
-    },
-
-    border_color: {
-      type: "string",
-      label: "Border Color",
-      display: "color",
-      default: "#e5e7eb",
-      section: "Formatting",
-      order: 34
-    },
-
-    show_gridlines: {
-      type: "boolean",
-      label: "Show Gridlines",
-      default: true,
-      section: "Formatting",
-      order: 35
-    },
-
-    column_spacing: {
-      type: "number",
-      label: "Column Spacing (px)",
-      default: 12,
-      display: "number",
-      min: 0,
-      max: 50,
-      section: "Formatting",
-      order: 36
-    },
-
-    row_spacing: {
-      type: "number",
-      label: "Row Spacing (px)",
-      default: 0,
-      display: "number",
-      min: 0,
-      max: 20,
-      section: "Formatting",
-      order: 37
-    },
-
-    formatting_divider_hover: {
-      type: "string",
-      label: "─────────────────────────────── Hover & Interaction ───────────────────────────────",
-      display: "divider",
-      section: "Formatting",
-      order: 40
-    },
-
-    enable_hover: {
-      type: "boolean",
-      label: "Enable Hover Effects",
-      default: true,
-      section: "Formatting",
-      order: 41
-    },
-
-    hover_highlight_type: {
-      type: "string",
-      label: "Hover Highlight Type",
-      display: "select",
-      values: [
-        { "Cell": "cell" },
-        { "Row": "row" },
-        { "Column": "column" },
-        { "Row & Column": "cross" }
-      ],
-      default: "row",
-      section: "Formatting",
-      order: 42
-    },
-
-    hover_bg_color: {
-      type: "string",
-      label: "Hover Background Color",
-      display: "color",
-      default: "#f3f4f6",
-      section: "Formatting",
-      order: 43
-    },
-
-    enable_tooltips: {
-      type: "boolean",
-      label: "Enable Tooltips",
-      default: true,
-      section: "Formatting",
-      order: 44
-    },
-
-    tooltip_show_label: {
-      type: "boolean",
-      label: "Show Field Label in Tooltip",
-      default: true,
-      section: "Formatting",
-      order: 45
-    },
-
-    formatting_divider_conditional: {
-      type: "string",
-      label: "─────────────────────────────── Conditional Formatting ───────────────────────────────",
-      display: "divider",
-      section: "Formatting",
-      order: 50
-    },
-
-    enable_row_conditional: {
-      type: "boolean",
-      label: "Enable Row Conditional Formatting",
-      default: false,
-      section: "Formatting",
-      order: 51
-    },
-
-    row_condition_field: {
-      type: "string",
-      label: "Row Condition Field",
-      display: "text",
-      default: "",
-      placeholder: "field_name",
-      section: "Formatting",
-      order: 52
-    },
-
-    row_condition_operator: {
-      type: "string",
-      label: "Row Condition Operator",
-      display: "select",
-      values: [
-        { "Greater Than": ">" },
-        { "Less Than": "<" },
-        { "Equal To": "==" },
-        { "Greater or Equal": ">=" },
-        { "Less or Equal": "<=" },
-        { "Not Equal": "!=" },
-        { "Contains": "contains" }
-      ],
-      default: ">",
-      section: "Formatting",
-      order: 53
-    },
-
-    row_condition_value: {
-      type: "string",
-      label: "Row Condition Value",
-      display: "text",
-      default: "",
-      section: "Formatting",
-      order: 54
-    },
-
-    row_condition_bg_color: {
-      type: "string",
-      label: "Row Condition Background Color",
-      display: "color",
-      default: "#fef3c7",
-      section: "Formatting",
-      order: 55
-    },
-
-    row_condition_text_color: {
-      type: "string",
-      label: "Row Condition Text Color",
-      display: "color",
-      default: "#92400e",
-      section: "Formatting",
-      order: 56
-    },
-
-    enable_column_conditional: {
-      type: "boolean",
-      label: "Enable Column Conditional Formatting",
-      default: false,
-      section: "Formatting",
-      order: 57
-    },
-
-    column_condition_field: {
-      type: "string",
-      label: "Column Condition Field",
-      display: "text",
-      default: "",
-      placeholder: "field_name",
-      section: "Formatting",
-      order: 58
-    },
-
-    column_condition_operator: {
-      type: "string",
-      label: "Column Condition Operator",
-      display: "select",
-      values: [
-        { "Greater Than": ">" },
-        { "Less Than": "<" },
-        { "Equal To": "==" },
-        { "Greater or Equal": ">=" },
-        { "Less or Equal": "<=" },
-        { "Not Equal": "!=" }
-      ],
-      default: ">",
-      section: "Formatting",
-      order: 59
-    },
-
-    column_condition_value: {
-      type: "string",
-      label: "Column Condition Value",
-      display: "text",
-      default: "",
-      section: "Formatting",
-      order: 60
-    },
-
-    column_condition_bg_color: {
-      type: "string",
-      label: "Column Condition Background Color",
-      display: "color",
-      default: "#dbeafe",
-      section: "Formatting",
-      order: 61
-    },
-
-    column_condition_text_color: {
-      type: "string",
-      label: "Column Condition Text Color",
-      display: "color",
-      default: "#1e40af",
-      section: "Formatting",
-      order: 62
-    }
+    plot_divider_display: { type: "string", label: "──────────────── Display Options ────────────────", display: "divider", section: "Plot", order: 10 },
+    show_row_numbers: { type: "boolean", label: "Show Row Numbers", default: false, section: "Plot", order: 11 },
+    show_headers: { type: "boolean", label: "Show Headers", default: true, section: "Plot", order: 12 },
+    plot_divider_pagination: { type: "string", label: "──────────────── Pagination ────────────────", display: "divider", section: "Plot", order: 20 },
+    enable_pagination: { type: "boolean", label: "Enable Pagination", default: true, section: "Plot", order: 21 },
+    page_size: { type: "number", label: "Page Size", default: 25, display: "number", section: "Plot", order: 22 },
+
+    // TAB: SERIES - HIERARCHY
+    hierarchy_divider: { type: "string", label: "──────────────── BO Hierarchy Mode ────────────────", display: "divider", section: "Series", order: 10 },
+    enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Series", order: 11 },
+    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels (comma-separated)", display: "text", default: "", placeholder: "brand,category", section: "Series", order: 12 },
+
+    // TAB: SERIES - SUBTOTALS
+    subtotals_divider: { type: "string", label: "──────────────── Standard Subtotals ────────────────", display: "divider", section: "Series", order: 20 },
+    enable_subtotals: { type: "boolean", label: "Enable Subtotals", default: false, section: "Series", order: 21 },
+    subtotal_dimension: { type: "string", label: "Group By Dimension", display: "select", values: [{"None": ""}], default: "", section: "Series", order: 22 },
+    subtotal_position: { type: "string", label: "Subtotal Position", display: "select", values: [{"Top": "top"}, {"Bottom": "bottom"}], default: "bottom", section: "Series", order: 23 },
+    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 24 },
+
+    // TAB: SERIES - GRAND TOTALS
+    totals_divider: { type: "string", label: "──────────────── Grand Totals ────────────────", display: "divider", section: "Series", order: 30 },
+    show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 31 },
+    grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Series", order: 32 },
+
+    // TAB: SERIES - DATA CHIPS
+    chips_divider: { type: "string", label: "──────────────── Data Chips ────────────────", display: "divider", section: "Series", order: 40 },
+    enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: true, section: "Series", order: 41 },
+    data_chip_fields: { type: "string", label: "Apply Chips to Fields", display: "text", default: "", section: "Series", order: 42 },
+    chip_match_green: { type: "string", label: "Green Match", default: "complete,yes", section: "Series", order: 43 },
+    chip_match_red: { type: "string", label: "Red Match", default: "cancelled,no", section: "Series", order: 44 },
+
+    // TAB: SERIES - CELL BARS
+    cell_bars_divider: { type: "string", label: "──────────────── Cell Bar Charts ────────────────", display: "divider", section: "Series", order: 50 },
+    enable_cell_bars_1: { type: "boolean", label: "Enable Cell Bar Set 1", default: false, section: "Series", order: 51 },
+    cell_bar_fields_1: { type: "string", label: "Cell Bar Fields 1 (comma-separated)", display: "text", default: "", section: "Series", order: 52 },
+    cell_bar_color_1: { type: "string", label: "Cell Bar Color 1", display: "color", default: "#3b82f6", section: "Series", order: 53 },
+
+    // TAB: SERIES - COMPARISON
+    comparison_divider: { type: "string", label: "──────────────── Comparison ────────────────", display: "divider", section: "Series", order: 60 },
+    enable_comparison: { type: "boolean", label: "Enable Comparison", default: false, section: "Series", order: 61 },
+    comparison_mode: { type: "string", label: "Comparison Mode", display: "select", values: [{ "Metric vs Metric": "metric" }, { "Period over Period": "period" }], default: "metric", section: "Series", order: 62 },
+    comparison_primary_field: { type: "string", label: "Primary Measure", display: "text", default: "", section: "Series", order: 63 },
+    comparison_secondary_field: { type: "string", label: "Secondary Measure", display: "text", default: "", section: "Series", order: 64 },
+
+    // TAB: SERIES - FIELD FORMATTING (Dynamic fields will appear after 70)
+    field_labels_divider: { type: "string", label: "──────────────── Field Formatting ────────────────", display: "divider", section: "Series", order: 70 },
+    enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 71 }
   },
 
   create: function(element, config) {
@@ -1384,164 +280,73 @@ const visObject = {
         },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    this.clearErrors();
-    if (!queryResponse || !data || data.length === 0) {
-      this.addError({ title: "No Data", message: "No data available to display" });
-      done();
-      return;
-    }
+        this.clearErrors();
+        if (!queryResponse || !data || data.length === 0) { done(); return; }
 
-    const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-    const dimensions = queryResponse.fields.dimension_like;
-    if (dimensions.length > 0) {
-      const dimensionValues = [{"None": ""}];
-      dimensions.forEach(dim => {
-        dimensionValues.push({[dim.label_short || dim.label]: dim.name});
-      });
-      this.options.subtotal_dimension.values = dimensionValues;
-    }
+        const dimensions = queryResponse.fields.dimension_like;
+        if (dimensions.length > 0) {
+          const dimensionValues = [{"None": ""}];
+          dimensions.forEach(dim => dimensionValues.push({[dim.label_short || dim.label]: dim.name}));
+          this.options.subtotal_dimension.values = dimensionValues;
+        }
+        this.trigger('registerOptions', this.options);
 
-    allFields.forEach((field, idx) => {
-      const fieldKey = field.name;
-      const baseOrder = 82 + (idx * 3);
-      const fieldLabel = field.label_short || field.label;
-      const dividerKey = `field_divider_${fieldKey}`;
-      if (!this.options[dividerKey]) {
-        this.options[dividerKey] = {
-          type: "string",
-          label: `━━━ ${fieldLabel} ━━━`,
-          display: "divider",
-          section: "Series",
-          order: baseOrder
-        };
-      }
-      const labelKey = `field_label_${fieldKey}`;
-      if (!this.options[labelKey]) {
-        this.options[labelKey] = {
-          type: "string",
-          label: "Label",
-          display: "text",
-          default: fieldLabel,
-          placeholder: fieldLabel,
-          section: "Series",
-          order: baseOrder + 1
-        };
-      }
-      const formatKey = `field_format_${fieldKey}`;
-      if (!this.options[formatKey]) {
-        this.options[formatKey] = {
-          type: "string",
-          label: "Value Format",
-          display: "text",
-          default: "",
-          placeholder: field.is_numeric
-            ? "$0,0.00 | 0.0% | 0,0 | $0.0,'k'"
-            : "%Y-%m-%d | %b %d, %Y | %m/%d/%y",
-          section: "Series",
-          order: baseOrder + 2
-        };
-      }
-    });
+        this.state.data = data;
+        const measures = queryResponse.fields.measure_like;
+        let filteredData = this.applyFilters(data, config);
+        if (this.state.sortField) filteredData = this.sortData(filteredData, this.state.sortField, this.state.sortDirection);
 
-    this.trigger('registerOptions', this.options);
-    this.state.data = data;
-    this.config = config;
-    this.queryResponse = queryResponse;
-
-    if (details) {
-      if (details.totals_enabled && queryResponse.totals_data) {
-        config.show_grand_total = true;
-      }
-      if (details.subtotals_enabled && queryResponse.subtotals_data) {
-        config.enable_subtotals = true;
-      }
-    }
-
-    const parsedConfig = this.parseConfig(config);
-
-    // AUTO-COLLAPSE ON DIMENSION CHANGE
-    if (parsedConfig.subtotal_dimension && this.state.lastSubtotalDimension !== parsedConfig.subtotal_dimension) {
-        this.state.collapsedGroups = {};
-        this.state.lastSubtotalDimension = parsedConfig.subtotal_dimension;
-        this.state.forceCollapseAll = true;
-    }
-
-    let filteredData = this.applyFilters(data, parsedConfig);
-
-    if (this.state.sortField) {
-      filteredData = this.sortData(filteredData, this.state.sortField, this.state.sortDirection);
-    }
-
-    if (parsedConfig.enable_subtotals && parsedConfig.subtotal_dimension) {
-      const measures = queryResponse.fields.measure_like;
-      const dimensions = queryResponse.fields.dimension_like;
-      filteredData = this.calculateSubtotals(filteredData, parsedConfig.subtotal_dimension, measures, parsedConfig, dimensions);
-
-      if (parsedConfig.subtotal_position === 'top') {
-        // Initial state or Dimension Change: collapse everything
-        if (!this.state.collapsedGroups || this.state.forceCollapseAll) {
+        // AUTO-COLLAPSE RESET
+        const currentKey = config.enable_bo_hierarchy ? config.hierarchy_dimensions : config.subtotal_dimension;
+        if (currentKey && this.state.lastSubtotalDimension !== currentKey) {
           this.state.collapsedGroups = {};
-          filteredData.forEach(row => {
-            if (row.__isSubtotal) {
-              this.state.collapsedGroups[row.__groupValue] = true;
-            }
-          });
-          this.state.forceCollapseAll = false;
+          this.state.lastSubtotalDimension = currentKey;
+          this.state.forceInitialCollapse = true;
         }
 
-        filteredData = filteredData.filter(row => {
-          if (row.__isSubtotal) {
-            row.__isCollapsed = this.state.collapsedGroups[row.__groupValue] || false;
+        // TRIGGER HIERARCHY OR STANDARD
+        if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
+          const hierarchyList = config.hierarchy_dimensions.split(',').map(f => f.trim());
+          filteredData = this.calculateSubtotals(filteredData, hierarchyList, measures, config, dimensions);
+          if (this.state.forceInitialCollapse) {
+            filteredData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
+            this.state.forceInitialCollapse = false;
+          }
+          filteredData = filteredData.filter(row => {
+            const pathParts = String(row.__isSubtotal ? row.__groupValue : row.__parentGroup || "").split('|');
+            let currentPath = "";
+            for (let i = 0; i < (row.__isSubtotal ? pathParts.length - 1 : pathParts.length); i++) {
+              currentPath = currentPath ? `${currentPath}|${pathParts[i]}` : pathParts[i];
+              if (this.state.collapsedGroups[currentPath]) return false;
+            }
             return true;
+          });
+        } else if (config.enable_subtotals && config.subtotal_dimension) {
+          filteredData = this.calculateSubtotals(filteredData, [config.subtotal_dimension], measures, config, dimensions);
+          if (config.subtotal_position === 'top') {
+            if (this.state.forceInitialCollapse) {
+              filteredData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
+              this.state.forceInitialCollapse = false;
+            }
+            filteredData = filteredData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
           }
-          if (row.__parentGroup !== undefined) {
-            return !this.state.collapsedGroups[row.__parentGroup];
-          }
-          return true;
-        });
-      }
-    }
+        }
 
-    // Add grand total row if enabled
-    if (parsedConfig.show_grand_total) {
-      console.log('[TABLE] Adding grand total row');
-      const measures = queryResponse.fields.measure_like;
-      const dimensions = queryResponse.fields.dimension_like;
+        if (config.show_grand_total) filteredData.push(this.calculateGrandTotal(data, measures, config, dimensions));
 
-      // ACTION 2 FIX: Change 'filteredData' to 'data' in the line below
-      // to prevent double-counting subtotals in the grand total.
-      const grandTotal = this.calculateGrandTotal(data, measures, parsedConfig, dimensions);
+        const totalPages = Math.max(1, Math.ceil(filteredData.filter(r => !r.__isGrandTotal).length / config.page_size));
+        if (this.state.currentPage > totalPages) this.state.currentPage = totalPages;
 
-      filteredData.push(grandTotal);
-    }
+        const startIdx = (this.state.currentPage - 1) * config.page_size;
+        let pageData = config.enable_pagination ? filteredData.filter(r => !r.__isGrandTotal).slice(startIdx, startIdx + config.page_size) : filteredData.filter(r => !r.__isGrandTotal);
+        if (config.show_grand_total && config.show_grand_total_on_all_pages) {
+          const gt = filteredData.find(r => r.__isGrandTotal);
+          if (gt) pageData.push(gt);
+        }
 
-    let grandTotalRow = null;
-    let dataWithoutGrandTotal = filteredData;
-
-    if (parsedConfig.show_grand_total && parsedConfig.show_grand_total_on_all_pages) {
-      const grandTotalIdx = filteredData.findIndex(row => row.__isGrandTotal);
-      if (grandTotalIdx >= 0) {
-        grandTotalRow = filteredData[grandTotalIdx];
-        dataWithoutGrandTotal = filteredData.filter(row => !row.__isGrandTotal);
-      }
-    }
-
-    // Total pages calculation based on CURRENT visible rows
-    const totalPages = Math.ceil(dataWithoutGrandTotal.length / parsedConfig.page_size);
-    if (this.state.currentPage > totalPages && totalPages > 0) this.state.currentPage = totalPages;
-
-    const startIdx = (this.state.currentPage - 1) * parsedConfig.page_size;
-    const endIdx = startIdx + parsedConfig.page_size;
-    let pageData = parsedConfig.enable_pagination ?
-      dataWithoutGrandTotal.slice(startIdx, endIdx) : dataWithoutGrandTotal;
-
-    if (grandTotalRow && parsedConfig.show_grand_total_on_all_pages) {
-      pageData = [...pageData, grandTotalRow];
-    }
-
-    this.renderTable(pageData, filteredData, totalPages, parsedConfig, queryResponse);
-    done();
-  },
+        this.renderTable(pageData, filteredData.length, totalPages, config, queryResponse);
+        done();
+      },
 
   parseConfig: function(config) {
     const parsed = { ...config };
@@ -1607,66 +412,35 @@ const visObject = {
     return parsed;
   },
 
-  calculateSubtotals: function(data, groupByField, measures, config, dimensions) {
-    if (!data || data.length === 0) return data;
-    const result = [];
-    const groups = {};
-    const subtotalPosition = config.subtotal_position || 'bottom';
-
-    data.forEach(row => {
-      let groupValue = row[groupByField];
-      if (groupValue && typeof groupValue === 'object') {
-        groupValue = groupValue.value || groupValue.rendered || 'null';
-      }
-      groupValue = groupValue || 'null';
-      if (!groups[groupValue]) groups[groupValue] = [];
-      groups[groupValue].push(row);
-    });
-
-    Object.keys(groups).forEach(groupValue => {
-      const groupRows = groups[groupValue];
-      const subtotalRow = {
-        __isSubtotal: true,
-        __groupValue: groupValue,
-        __groupField: groupByField,
-        __isCollapsed: false
+      calculateSubtotals: function(data, fields, measures, config, dimensions) {
+        const result = [];
+        const groupData = (rows, level, parentPath) => {
+          const field = fields[level];
+          const groups = {};
+          rows.forEach(row => {
+            let val = row[field];
+            let key = (val && typeof val === 'object') ? (val.value || val.rendered || 'null') : (val || 'null');
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(row);
+          });
+          Object.keys(groups).forEach(key => {
+            const currentPath = parentPath ? `${parentPath}|${key}` : key;
+            const sub = { __isSubtotal: true, __groupValue: currentPath, __level: level };
+            sub[fields[0]] = { value: key, rendered: key }; // Put text in the tree column
+          fields.forEach((f, i) => { if(i > 0) sub[f] = { value: '', rendered: '' }; }); // Clear others
+          measures.forEach(m => {
+            let sum = 0;
+            groups[key].forEach(r => { let v = r[m.name]; sum += Number((v && typeof v === 'object' ? v.value : v) || 0); });
+            sub[m.name] = { value: sum, rendered: sum.toLocaleString(undefined, {minimumFractionDigits: 2}) };
+          });
+          result.push(sub);
+          if (level < fields.length - 1) groupData(groups[key], level + 1, currentPath);
+          else groups[key].forEach(r => { r.__parentGroup = currentPath; r.__level = level + 1; result.push(r); });
+        });
       };
-
-      const labelTemplate = config.subtotal_label || '{value}';
-      const subtotalLabel = labelTemplate.replace('{value}', groupValue === 'null' ? '∅' : groupValue);
-      subtotalRow[groupByField] = { value: subtotalLabel, rendered: subtotalLabel };
-
-      dimensions.forEach(dim => {
-        if (dim.name !== groupByField) subtotalRow[dim.name] = { value: '', rendered: '' };
-      });
-
-      measures.forEach(measure => {
-        let sum = 0;
-        groupRows.forEach(row => {
-          let value = row[measure.name];
-          if (value && typeof value === 'object') value = value.value;
-          if (value !== null && value !== undefined && !isNaN(value)) sum += Number(value);
-        });
-        subtotalRow[measure.name] = {
-          value: sum,
-          rendered: sum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        };
-      });
-
-      if (subtotalPosition === 'top') {
-        result.push(subtotalRow);
-        groupRows.forEach(row => {
-          row.__parentGroup = groupValue;
-          row.__parentField = groupByField;
-          result.push(row);
-        });
-      } else {
-        groupRows.forEach(row => result.push(row));
-        result.push(subtotalRow);
-      }
-    });
-    return result;
-  },
+      groupData(data, 0, "");
+      return result;
+    },
 
 calculateGrandTotal: function(rawData, measures, config, dimensions) {
   const totalRow = { __isGrandTotal: true };
@@ -1800,29 +574,33 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
           return html + '</div></div>';
         },
 
-        renderBody: function(pageData, allFilteredData, config, queryResponse) {
+        renderBody: function(pageData, config, queryResponse) {
           const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-          const pageOffset = (this.state.currentPage - 1) * config.page_size;
+          const hierarchyDims = config.enable_bo_hierarchy ? config.hierarchy_dimensions.split(',').map(f => f.trim()) : [];
+          const mainTreeCol = hierarchyDims[0] || config.subtotal_dimension;
           let html = '<tbody>';
-          const toggleIdx = fields.findIndex(f => f.name === config.subtotal_dimension);
 
-          pageData.forEach((row, pageRowIdx) => {
-            const actualRowIdx = pageOffset + pageRowIdx;
-            const isSub = !!row.__isSubtotal;
-            const isGrand = !!row.__isGrandTotal;
-            const rowClass = isGrand ? 'grand-total-row' : (isSub ? `subtotal-row position-${config.subtotal_position}${row.__isCollapsed ? ' collapsed' : ''}` : 'detail-row');
-            html += `<tr data-row="${pageRowIdx}" class="${rowClass}" ${isSub ? `data-group="${row.__groupValue}"` : ''}>`;
+          pageData.forEach((row, i) => {
+            const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
+            const level = row.__level || 0;
+            html += `<tr class="${isGT?'grand-total-row':(isSub?'subtotal-row':'detail-row')}" data-group="${row.__groupValue || ''}" style="${isSub?'background:'+config.subtotal_background_color:''}">`;
+            if (config.show_row_numbers) html += `<td>${(isSub||isGT)?'':i+1}</td>`;
 
-            if (config.show_row_numbers) {
-              html += `<td class="row-number-cell">${(isSub || isGrand) ? '' : actualRowIdx + 1}</td>`;
-            }
+            fields.forEach(f => {
+              // Hide child columns in Hierarchy mode to keep it in ONE column
+              if (config.enable_bo_hierarchy && hierarchyDims.includes(f.name) && f.name !== mainTreeCol) return;
 
-            fields.forEach((field, colIdx) => {
-              let content = this.renderCellContent(row[field.name], field, config, row, actualRowIdx, allFilteredData);
-              if (isSub && config.subtotal_position === 'top' && colIdx === toggleIdx) {
-                content = `<span class="subtotal-toggle">${row.__isCollapsed ? '▶' : '▼'}</span>${content}`;
+              let content = this.renderCellContent(row[f.name], f, config, row);
+              let style = "";
+
+              if (f.name === mainTreeCol) {
+                style = `style="padding-left: ${(level * 20) + 12}px;"`;
+                if (isSub) {
+                  const icon = this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼';
+                  content = `<span class="subtotal-toggle">${icon}</span>${content}`;
+                }
               }
-              html += `<td class="${isSub && colIdx === toggleIdx ? 'subtotal-trigger-cell' : ''}">${content}</td>`;
+              html += `<td ${style}>${content}</td>`;
             });
             html += '</tr>';
           });
@@ -2042,80 +820,54 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
         attachEventListeners: function(config) {
           const self = this;
 
-          // RESTORED: Row Hover Effect
+          // Hover Effect
           this.container.querySelectorAll('tbody tr').forEach(row => {
-            row.addEventListener('mouseenter', () => {
-              row.style.backgroundColor = '#f3f4f6';
+            row.addEventListener('mouseenter', () => { row.style.backgroundColor = '#f3f4f6'; });
+              row.addEventListener('mouseleave', () => { row.style.backgroundColor = ''; });
             });
-            row.addEventListener('mouseleave', () => {
-              row.style.backgroundColor = '';
-            });
-          });
 
-          // Subtotal Toggle Logic
-          if (config.subtotal_position === 'top') {
-            this.container.querySelectorAll('tr.subtotal-row.position-top').forEach(row => {
+            // Subtotal/Hierarchy Toggle
+            this.container.querySelectorAll('.subtotal-row').forEach(row => {
               row.addEventListener('click', function() {
-                const g = this.dataset.group;
+                const groupPath = this.dataset.group;
                 if (!self.state.collapsedGroups) self.state.collapsedGroups = {};
-                if (this.classList.contains('collapsed')) delete self.state.collapsedGroups[g];
-                else self.state.collapsedGroups[g] = true;
 
-                // Re-render while staying on the current page
+                if (self.state.collapsedGroups[groupPath]) {
+                  delete self.state.collapsedGroups[groupPath];
+                } else {
+                  self.state.collapsedGroups[groupPath] = true;
+                }
+
                 self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
               });
             });
-          }
 
-          // Pagination Click Logic
-          this.container.querySelectorAll('.pagination-button').forEach(btn => {
-            btn.addEventListener('click', function() {
-              const totalPages = Math.ceil(self.state.data.length / config.page_size);
-              switch (this.dataset.action) {
-                case 'first': self.state.currentPage = 1; break;
-                case 'prev': self.state.currentPage = Math.max(1, self.state.currentPage - 1); break;
-                case 'next': self.state.currentPage = Math.min(totalPages, self.state.currentPage + 1); break;
-                case 'last': self.state.currentPage = totalPages; break;
-              }
-              self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
-            });
-          });
-
-          // Table-wide Filter (Enter Key)
-          const filterInput = this.container.querySelector('#table-filter-input');
-          if (filterInput) {
-            filterInput.addEventListener('keypress', (e) => {
-              if (e.key === 'Enter') {
-                self.state.tableFilter = filterInput.value;
-                self.state.currentPage = 1;
+            // Pagination
+            this.container.querySelectorAll('.pagination-button').forEach(btn => {
+              btn.addEventListener('click', function() {
+                const totalPages = Math.ceil(self.state.data.length / config.page_size);
+                switch (this.dataset.action) {
+                  case 'first': self.state.currentPage = 1; break;
+                  case 'prev': self.state.currentPage = Math.max(1, self.state.currentPage - 1); break;
+                  case 'next': self.state.currentPage = Math.min(totalPages, self.state.currentPage + 1); break;
+                  case 'last': self.state.currentPage = totalPages; break;
+                }
                 self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
-              }
+              });
             });
-          }
 
-          // Column Filters (Enter Key)
-          this.container.querySelectorAll('.column-filter').forEach(input => {
-            input.addEventListener('keypress', (e) => {
-              if (e.key === 'Enter') {
-                self.state.columnFilters[input.dataset.field] = input.value;
-                self.state.currentPage = 1;
-                self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
-              }
-            });
-            input.addEventListener('click', (e) => e.stopPropagation());
-          });
-
-          // Header Sorting
-          this.container.querySelectorAll('th.sortable').forEach(th => {
-            th.addEventListener('click', (e) => {
-              if (e.target.classList.contains('column-filter')) return;
-              const field = th.dataset.field;
-              self.state.sortDirection = (self.state.sortField === field && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
-              self.state.sortField = field;
-              self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
-            });
-          });
-        },
+            // Filters
+            const filterInput = this.container.querySelector('#table-filter-input');
+            if (filterInput) {
+              filterInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                  self.state.tableFilter = filterInput.value;
+                  self.state.currentPage = 1;
+                  self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
+                }
+              });
+            }
+          },
 
             escapeHtml: function(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; },
             trigger: function(event) {}
