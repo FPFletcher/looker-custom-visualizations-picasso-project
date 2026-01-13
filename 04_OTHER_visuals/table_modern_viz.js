@@ -586,7 +586,7 @@ const visObject = {
       label: "─────────────────────────────── Subtotals & Totals ───────────────────────────────",
       display: "divider",
       section: "Series",
-      order: 73
+      order: 80
     },
 
     enable_subtotals: {
@@ -594,7 +594,7 @@ const visObject = {
       label: "Enable Subtotals",
       default: false,
       section: "Series",
-      order: 74
+      order: 81
     },
 
     subtotal_dimension: {
@@ -604,7 +604,7 @@ const visObject = {
       values: [{"None": ""}],
       default: "",
       section: "Series",
-      order: 75
+      order: 82
     },
 
     show_grand_total: {
@@ -612,7 +612,7 @@ const visObject = {
       label: "Show Grand Total Row",
       default: false,
       section: "Series",
-      order: 76
+      order: 83
     },
 
     subtotal_label: {
@@ -621,7 +621,7 @@ const visObject = {
       default: "{value}",
       placeholder: "Use {value} for dimension value",
       section: "Series",
-      order: 77
+      order: 84
     },
 
     subtotal_position: {
@@ -634,7 +634,7 @@ const visObject = {
       ],
       default: "bottom",
       section: "Series",
-      order: 78
+      order: 85
     },
 
     subtotal_background_color: {
@@ -643,7 +643,7 @@ const visObject = {
       display: "color",
       default: "#f0f0f0",
       section: "Series",
-      order: 79
+      order: 86
     },
 
     grand_total_label: {
@@ -651,7 +651,7 @@ const visObject = {
       label: "Grand Total Label",
       default: "Grand Total",
       section: "Series",
-      order: 80
+      order: 87
     },
 
     show_grand_total_on_all_pages: {
@@ -659,7 +659,7 @@ const visObject = {
       label: "Show Grand Total on All Pages",
       default: true,
       section: "Series",
-      order: 81
+      order: 88
     },
 
     series_divider_field_labels: {
@@ -667,7 +667,7 @@ const visObject = {
       label: "─────────────────────────────── Field Formatting ───────────────────────────────",
       display: "divider",
       section: "Series",
-      order: 82
+      order: 89
     },
 
     enable_custom_field_formatting: {
@@ -675,7 +675,7 @@ const visObject = {
       label: "Enable Custom Field Formatting",
       default: false,
       section: "Series",
-      order: 83
+      order: 90
     },
 
     // ══════════════════════════════════════════════════════════════
