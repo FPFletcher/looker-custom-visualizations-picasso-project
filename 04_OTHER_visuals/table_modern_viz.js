@@ -517,31 +517,32 @@ const visObject = {
       order: 60
     },
 
-    /* series_divider_emojis: {
+    // RESTORED: DATA CHIPS
+    series_divider_data_chips: {
       type: "string",
-      label: "─────────────────────────────── Emojis ───────────────────────────────",
+      label: "─────────────────────────────── Data Chips ───────────────────────────────",
       display: "divider",
       section: "Series",
       order: 70
     },
 
-    enable_emojis: {
+    enable_data_chips: {
       type: "boolean",
-      label: "Enable Emoji Rendering",
-      default: false,
+      label: "Enable Data Chips (Conditional Badges)",
+      default: true,
       section: "Series",
       order: 71
     },
 
-    emoji_mapping: {
+    data_chip_fields: {
       type: "string",
-      label: "Emoji Mapping (JSON)",
-      display: "textarea",
-      default: '{"positive": "✅", "negative": "❌", "warning": "⚠️", "star": "⭐"}',
-      placeholder: '{"keyword": "emoji"}',
+      label: "Apply Chips to Fields (comma-separated)",
+      display: "text",
+      default: "",
+      placeholder: "dimension_name1,dimension_name2",
       section: "Series",
       order: 72
-    },*/
+    },
 
     // ========== SUBTOTALS & TOTALS ==========
     subtotals_divider: {
@@ -630,7 +631,7 @@ const visObject = {
       label: "─────────────────────────────── Field Formatting ───────────────────────────────",
       display: "divider",
       section: "Series",
-      order: 80
+      order: 82
     },
 
     enable_custom_field_formatting: {
@@ -638,7 +639,7 @@ const visObject = {
       label: "Enable Custom Field Formatting",
       default: false,
       section: "Series",
-      order: 81
+      order: 83
     },
 
     // ══════════════════════════════════════════════════════════════
@@ -1123,7 +1124,7 @@ const visObject = {
       section: "Formatting",
       order: 62
     }
-  },
+  }
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
