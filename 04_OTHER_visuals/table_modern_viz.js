@@ -1124,7 +1124,7 @@ const visObject = {
       section: "Formatting",
       order: 62
     }
-  }
+  },
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
