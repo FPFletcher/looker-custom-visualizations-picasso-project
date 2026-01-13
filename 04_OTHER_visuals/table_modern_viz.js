@@ -1819,67 +1819,77 @@ const visObject = {
     });
   },
 
-  renderTable: function(pageData, allFilteredData, totalPages, config, queryResponse) {
-    let html = '';
-    const existingStyle = document.getElementById('table-stripe-style');
-    if (existingStyle) existingStyle.remove();
-    const style = document.createElement('style');
-    style.id = 'table-stripe-style';
-    style.innerHTML = `:root {
-      --stripe-color: ${config.stripe_color || '#f9fafb'};
+renderTable: function(pageData, allFilteredData, totalPages, config, queryResponse) {
+  let html = '';
+  const existingStyle = document.getElementById('table-stripe-style');
+  if (existingStyle) existingStyle.remove();
+  const style = document.createElement('style');
+  style.id = 'table-stripe-style';
+  style.innerHTML = `:root {
+    --stripe-color: ${config.stripe_color || '#f9fafb'};
       --cell-font-size: ${config.cell_font_size || 11}px;
       --cell-text-color: ${config.cell_text_color || '#374151'};
-      --row-height: ${config.row_height || 36}px;
-      --row-spacing: ${config.row_spacing || 0}px;
-      --column-spacing: ${config.column_spacing || 12}px;
-      --wrap-text: ${config.wrap_text ? 'normal' : 'nowrap'};
-      --show-borders: ${config.show_borders ? config.border_width || 1 : 0}px;
-      --border-style: ${config.border_style || 'solid'};
-      --border-color: ${config.border_color || '#e5e7eb'};
-      --column-condition-bg-color: ${config.column_condition_bg_color || '#dbeafe'};
-      --column-condition-text-color: ${config.column_condition_text_color || '#1e40af'};
-      --row-condition-bg-color: ${config.row_condition_bg_color || '#fef3c7'};
-      --row-condition-text-color: ${config.row_condition_text_color || '#92400e'};
-      --subtotal-bg-color: ${config.subtotal_background_color || '#f0f0f0'};
-    }
-    .advanced-table tbody tr.subtotal-row { background-color: var(--subtotal-bg-color) !important; }`;
-    document.head.appendChild(style);
+        --row-height: ${config.row_height || 36}px;
+        --row-spacing: ${config.row_spacing || 0}px;
+        --column-spacing: ${config.column_spacing || 12}px;
+        --wrap-text: ${config.wrap_text ? 'normal' : 'nowrap'};
+        --show-borders: ${config.show_borders ? config.border_width || 1 : 0}px;
+        --border-style: ${config.border_style || 'solid'};
+        --border-color: ${config.border_color || '#e5e7eb'};
+          --column-condition-bg-color: ${config.column_condition_bg_color || '#dbeafe'};
+            --column-condition-text-color: ${config.column_condition_text_color || '#1e40af'};
+              --row-condition-bg-color: ${config.row_condition_bg_color || '#fef3c7'};
+                --row-condition-text-color: ${config.row_condition_text_color || '#92400e'};
+                  --subtotal-bg-color: ${config.subtotal_background_color || '#f0f0f0'};
+                  }
+                  .advanced-table tbody tr.subtotal-row { background-color: var(--subtotal-bg-color) !important; }`;
+                  document.head.appendChild(style);
 
-    if (config.enable_pagination && (config.pagination_position === 'top' || config.pagination_position === 'both')) {
-      html += this.renderPagination(allFilteredData.length, totalPages, config, 'top');
-    }
+                  if (config.enable_pagination && (config.pagination_position === 'top' || config.pagination_position === 'both')) {
+                    html += this.renderPagination(allFilteredData.length, totalPages, config, 'top');
+                  }
 
-    if (config.enable_table_filter) {
-      html += `<div class="filter-container"><input type="text" class="filter-input" placeholder="Search... (Enter)" value="${this.escapeHtml(this.state.tableFilter)}" id="table-filter-input" /></div>`;
-    }
+                  if (config.enable_table_filter) {
+                    html += `<div class="filter-container"><input type="text" class="filter-input" placeholder="Search... (Enter)" value="${this.escapeHtml(this.state.tableFilter)}" id="table-filter-input" /></div>`;
+                  }
 
-    html += '<div class="table-wrapper">';
-    html += `<table class="advanced-table ${config.table_theme}" style="${this.getTableStyles(config)}">`;
-    if (config.enable_column_groups && config.column_groups.length > 0) html += this.renderColumnGroups(config, queryResponse);
-    if (config.show_headers) html += this.renderHeaders(config, queryResponse);
-    html += this.renderBody(pageData, allFilteredData, config, queryResponse);
-    html += '</table></div>';
+                  html += '<div class="table-wrapper">';
+                  html += `<table class="advanced-table ${config.table_theme}" style="${this.getTableStyles(config)}">`;
+                  if (config.enable_column_groups && config.column_groups.length > 0) html += this.renderColumnGroups(config, queryResponse);
+                  if (config.show_headers) html += this.renderHeaders(config, queryResponse);
+                  html += this.renderBody(pageData, allFilteredData, config, queryResponse);
+                  html += '</table></div>';
 
-    if (config.enable_pagination && (config.pagination_position === 'bottom' || config.pagination_position === 'both')) {
-      html += this.renderPagination(allFilteredData.length, totalPages, config, 'bottom');
-    }
+                  if (config.enable_pagination && (config.pagination_position === 'bottom' || config.pagination_position === 'both')) {
+                    html += this.renderPagination(allFilteredData.length, totalPages, config, 'bottom');
+                  }
 
-    this.container.innerHTML = html;
-    this.attachEventListeners(config);
-  },
+                  this.container.innerHTML = html;
+                  this.attachEventListeners(config);
+                },
 
   renderPagination: function(totalRows, totalPages, config, position) {
-    const { currentPage } = this.state;
-    return `<div class="pagination-controls ${position}">
-      ${config.show_page_info ? `<div class="pagination-info">Showing ${(currentPage-1)*config.page_size+1}-${Math.min(currentPage*config.page_size, totalRows)} of ${totalRows}</div>` : ''}
-      <div class="pagination-buttons">
-        <button class="pagination-button" data-action="first" ${currentPage === 1 ? 'disabled' : ''}>⟨⟨</button>
-        <button class="pagination-button" data-action="prev" ${currentPage === 1 ? 'disabled' : ''}>⟨</button>
-        <span style="padding: 0 12px; display: flex; align-items: center;">Page ${currentPage} of ${totalPages}</span>
-        <button class="pagination-button" data-action="next" ${currentPage === totalPages ? 'disabled' : ''}>⟩</button>
-        <button class="pagination-button" data-action="last" ${currentPage === totalPages ? 'disabled' : ''}>⟩⟩</button>
-      </div></div>`;
-  },
+          const { currentPage } = this.state;
+          let html = `<div class="pagination-controls ${position}">`;
+
+          if (config.show_page_info) {
+            const startRow = (currentPage - 1) * config.page_size + 1;
+            const endRow = Math.min(currentPage * config.page_size, totalRows);
+            html += `<div class="pagination-info">Showing ${startRow}-${endRow} of ${totalRows} rows</div>`;
+          }
+
+          html += '<div class="pagination-buttons">';
+          html += `
+          <button class="pagination-button" data-action="first" ${currentPage === 1 ? 'disabled' : ''}>⟨⟨</button>
+          <button class="pagination-button" data-action="prev" ${currentPage === 1 ? 'disabled' : ''}>⟨</button>
+          <span style="padding: 0 12px; display: flex; align-items: center;">Page ${currentPage} of ${totalPages}</span>
+          <button class="pagination-button" data-action="next" ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}>⟩</button>
+          <button class="pagination-button" data-action="last" ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}>⟩⟩</button>
+          `;
+          html += '</div></div>';
+
+          return html;
+        },
 
   renderColumnGroups: function(config, queryResponse) {
     const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
