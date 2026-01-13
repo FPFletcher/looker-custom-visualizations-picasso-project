@@ -539,9 +539,45 @@ const visObject = {
       label: "Apply Chips to Fields (comma-separated)",
       display: "text",
       default: "",
-      placeholder: "dimension_name1,dimension_name2",
+      placeholder: "products.brand,products.category",
       section: "Series",
       order: 72
+    },
+
+    chip_match_green: {
+      type: "string",
+      label: "Green Chip Match (String)",
+      default: "complete,yes,active",
+      placeholder: "Comma-separated values",
+      section: "Series",
+      order: 73
+    },
+
+    chip_match_red: {
+      type: "string",
+      label: "Red Chip Match (String)",
+      default: "cancelled,no,inactive,null",
+      placeholder: "Comma-separated values",
+      section: "Series",
+      order: 74
+    },
+
+    chip_match_yellow: {
+      type: "string",
+      label: "Yellow Chip Match (String)",
+      default: "warning,pending",
+      placeholder: "Comma-separated values",
+      section: "Series",
+      order: 75
+    },
+
+    chip_match_blue: {
+      type: "string",
+      label: "Blue Chip Match (String)",
+      default: "shipped,processing",
+      placeholder: "Comma-separated values",
+      section: "Series",
+      order: 76
     },
 
     // ========== SUBTOTALS & TOTALS ==========
@@ -1307,17 +1343,19 @@ const visObject = {
   }
 
   /* DATA CHIP STYLES */
-  .data-chip {
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.9em;
-    font-weight: 600;
-    display: inline-block;
-  }
-  .chip-green { background-color: #dcfce7; color: #166534; }
-    .chip-red { background-color: #fee2e2; color: #991b1b; }
-      .chip-yellow { background-color: #fef9c3; color: #854d0e; }
-        .chip-blue { background-color: #dbeafe; color: #1e40af; }
+    .data-chip {
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.85em;
+      font-weight: 600;
+      display: inline-block;
+      text-align: center;
+    }
+    .chip-default { background-color: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+    .chip-green   { background-color: #dcfce7; color: #166534; }
+    .chip-red     { background-color: #fee2e2; color: #991b1b; }
+    .chip-yellow  { background-color: #fef9c3; color: #854d0e; }
+    .chip-blue    { background-color: #dbeafe; color: #1e40af; }
 
           @media print {
             .pagination-controls, .filter-container { display: none; }
@@ -1850,25 +1888,27 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
             rendered = this.formatValue(value, fieldFormat.format, field, rendered);
           }
 
-          // RESTORED: DATA CHIP LOGIC (Keyword based)
-          const valStr = String(value).toLowerCase();
-          let chipClass = "";
-          if (valStr === 'complete' || valStr === 'yes' || valStr === 'active') {
-            rendered = `✅ ${rendered}`;
-            chipClass = "chip-green";
-          } else if (valStr === 'cancelled' || valStr === 'no' || valStr === 'inactive' || valStr === 'null') {
-            rendered = `❌ ${rendered}`;
-            chipClass = "chip-red";
-          } else if (valStr.includes('warning') || valStr === 'pending') {
-            rendered = `⚠️ ${rendered}`;
-            chipClass = "chip-yellow";
-          } else if (valStr === 'shipped' || valStr === 'processing') {
-            chipClass = "chip-blue";
-          }
+          // UPDATED: DATA CHIP LOGIC
+          if (config.enable_data_chips && config.data_chip_fields) {
+            const targetFields = config.data_chip_fields.split(',').map(f => f.trim());
 
-          // Wrap in DataChip HTML if a match was found
-          if (chipClass !== "") {
-            rendered = `<span class="data-chip ${chipClass}">${rendered}</span>`;
+            if (targetFields.includes(field.name)) {
+              const valStr = String(value).toLowerCase().trim();
+              let chipClass = "chip-default"; // Default color if no match
+
+              // Helper function to check comma-separated matches
+              const isMatch = (matchSetting) => {
+                if (!matchSetting) return false;
+                return matchSetting.split(',').map(s => s.trim().toLowerCase()).includes(valStr);
+              };
+
+              if (isMatch(config.chip_match_green)) chipClass = "chip-green";
+              else if (isMatch(config.chip_match_red)) chipClass = "chip-red";
+              else if (isMatch(config.chip_match_yellow)) chipClass = "chip-yellow";
+              else if (isMatch(config.chip_match_blue)) chipClass = "chip-blue";
+
+              rendered = `<span class="data-chip ${chipClass}">${rendered}</span>`;
+            }
           }
 
           // Comparison Logic
@@ -1877,23 +1917,15 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
           }
 
           // Cell Bar Logic
-          let isCellBarField = false;
-          let cellBarSet = null;
           if (config.cellBarSets) {
             for (let i = 0; i < config.cellBarSets.length; i++) {
               if (config.cellBarSets[i].fields.includes(field.name)) {
-                isCellBarField = true;
-                cellBarSet = config.cellBarSets[i];
-                break;
+                return this.renderCellBar(value, rendered, config, drillLinks, config.cellBarSets[i], field.name);
               }
             }
           }
 
-          if (isCellBarField) {
-            return this.renderCellBar(value, rendered, config, drillLinks, cellBarSet, field.name);
-          }
-
-          // Drill Menu Wrap
+          // Standard Drill Menu Wrap
           if (drillLinks.length > 0) {
             const drillId = `drill-${Math.random().toString(36).substr(2, 9)}`;
             rendered = `<span class="drill-link" data-drill-id="${drillId}">${rendered}</span>`;
