@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.12.0 - Collapse Cell Fixed (No More Offset!)
- * Build: 2026-01-12-v16
+ * Version: 4.13.0 - Simple Text Collapse ([+]/[-])
+ * Build: 2026-01-12-v17
  */
 
 const visObject = {
@@ -590,7 +590,7 @@ const visObject = {
     subtotal_label: {
       type: "string",
       label: "Subtotal Label Format",
-      default: "{value}",
+      default: "Subtotal: {value}",
       placeholder: "Use {value} for dimension value",
       section: "Series",
       order: 77
@@ -1139,24 +1139,10 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.12.0 - Build 2026-01-12-v16');
-    console.log('[TABLE] ✅ FIXED: Dedicated collapse cell (NO OFFSET!)');
-    console.log('[TABLE] ✅ Arrows: ▶ collapsed, ▼ expanded');
+    console.log('[TABLE] Advanced Table v4.13.0 - Build 2026-01-12-v17');
+    console.log('[TABLE] ✅ Simple collapse: [+] expand, [-] collapse');
+    console.log('[TABLE] ✅ NO special characters, NO offset!');
     console.log('[TABLE] ========================================');
-
-          .subtotal-toggle {
-        font-family: monospace;
-        font-size: 12px;
-        color: #666;
-        vertical-align: middle;
-      }
-
-      /* Ensure the cell doesn't wrap the icon and text awkwardly */
-      .subtotal-trigger-cell {
-        white-space: nowrap !important;
-        display: flex;
-        align-items: center;
-      }
 
     element.innerHTML = `
       <style>
@@ -2311,6 +2297,9 @@ const visObject = {
     let html = `<thead><tr style="${styles}">`;
 
     // Add empty header for collapse cell if using top-positioned subtotals
+    if (config.subtotal_position === 'top' && config.enable_subtotals) {
+      html += `<th class="collapse-cell" style="width: 35px;"></th>`;
+    }
 
     if (config.show_row_numbers) {
       html += `<th class="row-number-cell">#</th>`;
@@ -2408,6 +2397,18 @@ const visObject = {
       html += `<tr ${dataAttrs}>`;
 
       // Add collapse indicator cell for top-positioned subtotals (before row numbers)
+      if (isSubtotalRow && config.subtotal_position === 'top') {
+        const isCollapsed = row.__isCollapsed;
+        const collapseIcon = isCollapsed ? '[+]' : '[-]';
+        console.log('[TABLE] Adding collapse cell WITH icon for subtotal:', row[fields[0].name]);
+        html += `<td class="collapse-cell" style="width: 35px; text-align: center; cursor: pointer; user-select: none; font-weight: bold; color: #666;">${collapseIcon}</td>`;
+      } else if (config.subtotal_position === 'top' && config.enable_subtotals) {
+        // Empty cell for detail rows AND grand total rows
+        console.log('[TABLE] Adding EMPTY collapse cell for row:', isGrandTotalRow ? 'GRAND TOTAL' : row[fields[0].name]);
+        html += `<td class="collapse-cell" style="width: 35px;"></td>`;
+      } else {
+        console.log('[TABLE] NOT adding collapse cell for row:', isGrandTotalRow ? 'GRAND TOTAL' : row[fields[0].name], 'config.subtotal_position:', config.subtotal_position, 'config.enable_subtotals:', config.enable_subtotals);
+      }
 
       if (config.show_row_numbers) {
         // Subtotal and grand total rows get empty row number
@@ -2421,33 +2422,36 @@ const visObject = {
 
       let leftOffset = 0;
       fields.forEach((field, colIdx) => {
-  const cellValue = row[field.name];
-  const isFrozen = colIdx < config.freeze_columns;
-  const frozenClass = isFrozen ? 'frozen-column' : '';
+        const cellValue = row[field.name];
+        const isFrozen = colIdx < config.freeze_columns;
+        const frozenClass = isFrozen ? 'frozen-column' : '';
 
-  // 1. Get the standard rendered content
-  let cellContent = isHierarchyField ?
-    this.renderHierarchyCell(cellValue, field, config, row, hierarchyLevel) :
-    this.renderCellContent(cellValue, field, config, row, actualRowIdx, allFilteredData);
+        // Check column conditional formatting
+        const hasColumnConditional = config.enable_column_conditional &&
+          config.column_condition_field === field.name &&
+          this.evaluateCondition(
+            cellValue,
+            config.column_condition_operator,
+            config.column_condition_value
+          );
 
-  // 2. NEW LOGIC: Prepend the toggle icon ONLY to the first column of the subtotal row
-  if (isSubtotalRow && config.subtotal_position === 'top' && colIdx === 0) {
-    const icon = row.__isCollapsed ? '▶' : '▼';
-    cellContent = `<span class="subtotal-toggle" style="margin-right: 8px; cursor: pointer; display: inline-block; width: 14px;">${icon}</span>${cellContent}`;
-  }
+        // Check if this is the hierarchy field
+        const isHierarchyField = config.enable_hierarchy && field.name === config.hierarchy_field;
 
-  html += `
-    <td
-      class="${frozenClass} ${isSubtotalRow && colIdx === 0 ? 'subtotal-trigger-cell' : ''}"
-      data-field="${field.name}"
-      data-row="${pageRowIdx}"
-      data-col="${colIdx}"
-      ${hasColumnConditional ? `data-column-conditional="true"` : ''}
-      style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
-    >
-      ${cellContent}
-    </td>
-  `;
+        html += `
+          <td
+            class="${frozenClass}"
+            data-field="${field.name}"
+            data-row="${pageRowIdx}"
+            data-col="${colIdx}"
+            ${hasColumnConditional ? `data-column-conditional="true"` : ''}
+            style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
+          >
+            ${isHierarchyField ?
+              this.renderHierarchyCell(cellValue, field, config, row, hierarchyLevel) :
+              this.renderCellContent(cellValue, field, config, row, actualRowIdx, allFilteredData)}
+          </td>
+        `;
 
         if (isFrozen) {
           leftOffset += 150;
