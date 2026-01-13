@@ -2022,46 +2022,56 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
               return operator === '==' ? String(value).toLowerCase() === String(compareValue).toLowerCase() : false;
             },
 
-            attachEventListeners: function(config) {
-              const self = this;
-              this.container.querySelectorAll('tr.subtotal-row.position-top').forEach(row => {
-                row.addEventListener('click', function() {
-                  const g = this.dataset.group;
-                  if (!self.state.collapsedGroups) self.state.collapsedGroups = {};
-                  if (this.classList.contains('collapsed')) delete self.state.collapsedGroups[g];
-                  else self.state.collapsedGroups[g] = true;
-                  self.state.currentPage = 1;
-                  self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
-                });
+        attachEventListeners: function(config) {
+          const self = this;
+          if (config.subtotal_position === 'top') {
+            this.container.querySelectorAll('tr.subtotal-row.position-top').forEach(row => {
+              row.addEventListener('click', function() {
+                const g = this.dataset.group;
+                if (!self.state.collapsedGroups) self.state.collapsedGroups = {};
+
+                if (this.classList.contains('collapsed')) {
+                  delete self.state.collapsedGroups[g];
+                } else {
+                  self.state.collapsedGroups[g] = true;
+                }
+
+                // FIX: Removed "self.state.currentPage = 1;" to keep you on the current page.
+                // The bounds-check logic inside updateAsync will automatically handle
+                // cases where a page disappears due to collapsing rows.
+
+                self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
               });
-              this.container.querySelectorAll('.pagination-button').forEach(btn => {
-                btn.addEventListener('click', function() {
-                  const totalPages = Math.ceil(self.state.data.length / config.page_size);
-                  switch (this.dataset.action) {
-                    case 'first': self.state.currentPage = 1; break;
-                    case 'prev': self.state.currentPage = Math.max(1, self.state.currentPage - 1); break;
-                    case 'next': self.state.currentPage = Math.min(totalPages, self.state.currentPage + 1); break;
-                    case 'last': self.state.currentPage = totalPages; break;
-                  }
-                  self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
-                });
-              });
-              const filterInput = this.container.querySelector('#table-filter-input');
-              if (filterInput) filterInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { self.state.tableFilter = filterInput.value; self.state.currentPage = 1; self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {}); } });
-              this.container.querySelectorAll('.column-filter').forEach(input => {
-                input.addEventListener('keypress', (e) => { if (e.key === 'Enter') { self.state.columnFilters[input.dataset.field] = input.value; self.state.currentPage = 1; self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {}); } });
-                input.addEventListener('click', (e) => e.stopPropagation());
-              });
-              this.container.querySelectorAll('th.sortable').forEach(th => {
-                th.addEventListener('click', (e) => {
-                  if (e.target.classList.contains('column-filter')) return;
-                  const field = th.dataset.field;
-                  self.state.sortDirection = (self.state.sortField === field && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
-                  self.state.sortField = field;
-                  self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
-                });
-              });
-            },
+            });
+          }
+          this.container.querySelectorAll('.pagination-button').forEach(btn => {
+            btn.addEventListener('click', function() {
+              const totalPages = Math.ceil(self.state.data.length / config.page_size);
+              switch (this.dataset.action) {
+                case 'first': self.state.currentPage = 1; break;
+                case 'prev': self.state.currentPage = Math.max(1, self.state.currentPage - 1); break;
+                case 'next': self.state.currentPage = Math.min(totalPages, self.state.currentPage + 1); break;
+                case 'last': self.state.currentPage = totalPages; break;
+              }
+              self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
+            });
+          });
+          const filterInput = this.container.querySelector('#table-filter-input');
+          if (filterInput) filterInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { self.state.tableFilter = filterInput.value; self.state.currentPage = 1; self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {}); } });
+          this.container.querySelectorAll('.column-filter').forEach(input => {
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') { self.state.columnFilters[input.dataset.field] = input.value; self.state.currentPage = 1; self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {}); } });
+            input.addEventListener('click', (e) => e.stopPropagation());
+          });
+          this.container.querySelectorAll('th.sortable').forEach(th => {
+            th.addEventListener('click', (e) => {
+              if (e.target.classList.contains('column-filter')) return;
+              const field = th.dataset.field;
+              self.state.sortDirection = (self.state.sortField === field && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
+              self.state.sortField = field;
+              self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
+            });
+          });
+        },
 
             escapeHtml: function(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; },
             trigger: function(event) {}
