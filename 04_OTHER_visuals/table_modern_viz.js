@@ -8,54 +8,87 @@ const visObject = {
   id: "advanced_table_visual",
   label: "Advanced Table",
   options: {
+    // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
-    plot_divider_display: { type: "string", label: "──────────────── Display Options ────────────────", display: "divider", section: "Plot", order: 10 },
+    // ══════════════════════════════════════════════════════════════
+    plot_divider_display: {
+      type: "string",
+      label: "─────────────────────────────── Display Options ───────────────────────────────",
+      display: "divider",
+      section: "Plot",
+      order: 10
+    },
     show_row_numbers: { type: "boolean", label: "Show Row Numbers", default: false, section: "Plot", order: 11 },
     show_headers: { type: "boolean", label: "Show Headers", default: true, section: "Plot", order: 12 },
-    plot_divider_pagination: { type: "string", label: "──────────────── Pagination ────────────────", display: "divider", section: "Plot", order: 20 },
+
+    plot_divider_pagination: {
+      type: "string",
+      label: "─────────────────────────────── Pagination ───────────────────────────────",
+      display: "divider",
+      section: "Plot",
+      order: 20
+    },
     enable_pagination: { type: "boolean", label: "Enable Pagination", default: true, section: "Plot", order: 21 },
     page_size: { type: "number", label: "Page Size", default: 25, display: "number", section: "Plot", order: 22 },
 
-    // TAB: SERIES - HIERARCHY
-    hierarchy_divider: { type: "string", label: "──────────────── BO Hierarchy Mode ────────────────", display: "divider", section: "Series", order: 10 },
-    enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Series", order: 11 },
-    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels (comma-separated)", display: "text", default: "", placeholder: "brand,category", section: "Series", order: 12 },
+    // ══════════════════════════════════════════════════════════════
+    // TAB: SERIES
+    // ══════════════════════════════════════════════════════════════
 
-    // TAB: SERIES - SUBTOTALS
-    subtotals_divider: { type: "string", label: "──────────────── Standard Subtotals ────────────────", display: "divider", section: "Series", order: 20 },
-    enable_subtotals: { type: "boolean", label: "Enable Subtotals", default: false, section: "Series", order: 21 },
-    subtotal_dimension: { type: "string", label: "Group By Dimension", display: "select", values: [{"None": ""}], default: "", section: "Series", order: 22 },
-    subtotal_position: { type: "string", label: "Subtotal Position", display: "select", values: [{"Top": "top"}, {"Bottom": "bottom"}], default: "bottom", section: "Series", order: 23 },
-    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 24 },
+    hierarchy_divider: {
+      type: "string",
+      label: "─────────────────────────────── BO Hierarchy Mode ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 100
+    },
+    enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Series", order: 101 },
+    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels (comma-separated)", display: "text", default: "", placeholder: "brand,category", section: "Series", order: 102 },
 
-    // TAB: SERIES - GRAND TOTALS
-    totals_divider: { type: "string", label: "──────────────── Grand Totals ────────────────", display: "divider", section: "Series", order: 30 },
-    show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 31 },
-    grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Series", order: 32 },
+    subtotals_divider: {
+      type: "string",
+      label: "─────────────────────────────── Standard Subtotals ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 200
+    },
+    enable_subtotals: { type: "boolean", label: "Enable Subtotals", default: false, section: "Series", order: 201 },
+    subtotal_dimension: { type: "string", label: "Group By Dimension", display: "select", values: [{"None": ""}], default: "", section: "Series", order: 202 },
+    subtotal_position: { type: "string", label: "Subtotal Position", display: "select", values: [{"Top": "top"}, {"Bottom": "bottom"}], default: "bottom", section: "Series", order: 203 },
+    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 204 },
 
-    // TAB: SERIES - DATA CHIPS
-    chips_divider: { type: "string", label: "──────────────── Data Chips ────────────────", display: "divider", section: "Series", order: 40 },
-    enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: true, section: "Series", order: 41 },
-    data_chip_fields: { type: "string", label: "Apply Chips to Fields", display: "text", default: "", section: "Series", order: 42 },
-    chip_match_green: { type: "string", label: "Green Match", default: "complete,yes", section: "Series", order: 43 },
-    chip_match_red: { type: "string", label: "Red Match", default: "cancelled,no", section: "Series", order: 44 },
+    totals_divider: {
+      type: "string",
+      label: "─────────────────────────────── Grand Totals ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 300
+    },
+    show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 301 },
+    grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Series", order: 302 },
 
-    // TAB: SERIES - CELL BARS
-    cell_bars_divider: { type: "string", label: "──────────────── Cell Bar Charts ────────────────", display: "divider", section: "Series", order: 50 },
-    enable_cell_bars_1: { type: "boolean", label: "Enable Cell Bar Set 1", default: false, section: "Series", order: 51 },
-    cell_bar_fields_1: { type: "string", label: "Cell Bar Fields 1 (comma-separated)", display: "text", default: "", section: "Series", order: 52 },
-    cell_bar_color_1: { type: "string", label: "Cell Bar Color 1", display: "color", default: "#3b82f6", section: "Series", order: 53 },
+    chips_divider: {
+      type: "string",
+      label: "─────────────────────────────── Data Chips ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 400
+    },
+    enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: true, section: "Series", order: 401 },
+    data_chip_fields: { type: "string", label: "Apply Chips to Fields", display: "text", default: "", section: "Series", order: 402 },
+    chip_match_green: { type: "string", label: "Green Match", default: "complete,yes", section: "Series", order: 403 },
+    chip_match_red: { type: "string", label: "Red Match", default: "cancelled,no", section: "Series", order: 404 },
+    chip_match_yellow: { type: "string", label: "Yellow Match", default: "warning,pending", section: "Series", order: 405 },
+    chip_match_blue: { type: "string", label: "Blue Match", default: "shipped,processing", section: "Series", order: 406 },
 
-    // TAB: SERIES - COMPARISON
-    comparison_divider: { type: "string", label: "──────────────── Comparison ────────────────", display: "divider", section: "Series", order: 60 },
-    enable_comparison: { type: "boolean", label: "Enable Comparison", default: false, section: "Series", order: 61 },
-    comparison_mode: { type: "string", label: "Comparison Mode", display: "select", values: [{ "Metric vs Metric": "metric" }, { "Period over Period": "period" }], default: "metric", section: "Series", order: 62 },
-    comparison_primary_field: { type: "string", label: "Primary Measure", display: "text", default: "", section: "Series", order: 63 },
-    comparison_secondary_field: { type: "string", label: "Secondary Measure", display: "text", default: "", section: "Series", order: 64 },
-
-    // TAB: SERIES - FIELD FORMATTING (Dynamic fields will appear after 70)
-    field_labels_divider: { type: "string", label: "──────────────── Field Formatting ────────────────", display: "divider", section: "Series", order: 70 },
-    enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 71 }
+    field_labels_divider: {
+      type: "string",
+      label: "─────────────────────────────── Field Formatting ───────────────────────────────",
+      display: "divider",
+      section: "Series",
+      order: 500
+    },
+    enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 501 }
   },
 
   create: function(element, config) {
@@ -279,11 +312,17 @@ const visObject = {
           };
         },
 
-  updateAsync: function(data, element, config, queryResponse, details, done) {
+      updateAsync: function(data, element, config, queryResponse, details, done) {
         this.clearErrors();
-        if (!queryResponse || !data || data.length === 0) { done(); return; }
+        // FIX: Safety check for queryResponse to prevent "dimension_like" crash
+        if (!queryResponse || !queryResponse.fields || !data || data.length === 0) {
+          done();
+          return;
+        }
 
         const dimensions = queryResponse.fields.dimension_like;
+        const measures = queryResponse.fields.measure_like;
+
         if (dimensions.length > 0) {
           const dimensionValues = [{"None": ""}];
           dimensions.forEach(dim => dimensionValues.push({[dim.label_short || dim.label]: dim.name}));
@@ -292,11 +331,9 @@ const visObject = {
         this.trigger('registerOptions', this.options);
 
         this.state.data = data;
-        const measures = queryResponse.fields.measure_like;
         let filteredData = this.applyFilters(data, config);
         if (this.state.sortField) filteredData = this.sortData(filteredData, this.state.sortField, this.state.sortDirection);
 
-        // AUTO-COLLAPSE RESET
         const currentKey = config.enable_bo_hierarchy ? config.hierarchy_dimensions : config.subtotal_dimension;
         if (currentKey && this.state.lastSubtotalDimension !== currentKey) {
           this.state.collapsedGroups = {};
@@ -304,7 +341,6 @@ const visObject = {
           this.state.forceInitialCollapse = true;
         }
 
-        // TRIGGER HIERARCHY OR STANDARD
         if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
           const hierarchyList = config.hierarchy_dimensions.split(',').map(f => f.trim());
           filteredData = this.calculateSubtotals(filteredData, hierarchyList, measures, config, dimensions);
@@ -339,7 +375,8 @@ const visObject = {
 
         const startIdx = (this.state.currentPage - 1) * config.page_size;
         let pageData = config.enable_pagination ? filteredData.filter(r => !r.__isGrandTotal).slice(startIdx, startIdx + config.page_size) : filteredData.filter(r => !r.__isGrandTotal);
-        if (config.show_grand_total && config.show_grand_total_on_all_pages) {
+
+        if (config.show_grand_total && (config.show_grand_total_on_all_pages !== false)) {
           const gt = filteredData.find(r => r.__isGrandTotal);
           if (gt) pageData.push(gt);
         }
@@ -426,8 +463,8 @@ const visObject = {
           Object.keys(groups).forEach(key => {
             const currentPath = parentPath ? `${parentPath}|${key}` : key;
             const sub = { __isSubtotal: true, __groupValue: currentPath, __level: level };
-            sub[fields[0]] = { value: key, rendered: key }; // Put text in the tree column
-          fields.forEach((f, i) => { if(i > 0) sub[f] = { value: '', rendered: '' }; }); // Clear others
+            sub[fields[0]] = { value: key, rendered: key };
+          fields.forEach((f, i) => { if(i > 0) sub[f] = { value: '', rendered: '' }; });
           measures.forEach(m => {
             let sum = 0;
             groups[key].forEach(r => { let v = r[m.name]; sum += Number((v && typeof v === 'object' ? v.value : v) || 0); });
@@ -576,7 +613,7 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
 
         renderBody: function(pageData, config, queryResponse) {
           const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-          const hierarchyDims = config.enable_bo_hierarchy ? config.hierarchy_dimensions.split(',').map(f => f.trim()) : [];
+          const hierarchyDims = config.enable_bo_hierarchy ? (config.hierarchy_dimensions || "").split(',').map(f => f.trim()) : [];
           const mainTreeCol = hierarchyDims[0] || config.subtotal_dimension;
           let html = '<tbody>';
 
@@ -584,10 +621,12 @@ renderTable: function(pageData, filteredData, totalPages, config, queryResponse)
             const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
             const level = row.__level || 0;
             html += `<tr class="${isGT?'grand-total-row':(isSub?'subtotal-row':'detail-row')}" data-group="${row.__groupValue || ''}" style="${isSub?'background:'+config.subtotal_background_color:''}">`;
-            if (config.show_row_numbers) html += `<td>${(isSub||isGT)?'':i+1}</td>`;
+
+            if (config.show_row_numbers) {
+              html += `<td class="row-number-cell">${(isSub||isGT)?'':i+1}</td>`;
+            }
 
             fields.forEach(f => {
-              // Hide child columns in Hierarchy mode to keep it in ONE column
               if (config.enable_bo_hierarchy && hierarchyDims.includes(f.name) && f.name !== mainTreeCol) return;
 
               let content = this.renderCellContent(row[f.name], f, config, row);
