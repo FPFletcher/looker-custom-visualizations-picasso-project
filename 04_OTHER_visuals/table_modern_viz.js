@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.12.0 - Collapse Cell Fixed (No More Offset!)
- * Build: 2026-01-12-v16
+ * Version: 4.13.0 - Simple Text Collapse ([+]/[-])
+ * Build: 2026-01-12-v17
  */
 
 const visObject = {
@@ -1139,9 +1139,9 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.12.0 - Build 2026-01-12-v16');
-    console.log('[TABLE] ✅ FIXED: Dedicated collapse cell (NO OFFSET!)');
-    console.log('[TABLE] ✅ Arrows: ▶ collapsed, ▼ expanded');
+    console.log('[TABLE] Advanced Table v4.13.0 - Build 2026-01-12-v17');
+    console.log('[TABLE] ✅ Simple collapse: [+] expand, [-] collapse');
+    console.log('[TABLE] ✅ NO special characters, NO offset!');
     console.log('[TABLE] ========================================');
 
     element.innerHTML = `
@@ -2298,7 +2298,7 @@ const visObject = {
 
     // Add empty header for collapse cell if using top-positioned subtotals
     if (config.subtotal_position === 'top' && config.enable_subtotals) {
-      html += `<th class="collapse-cell" style="width: 30px;"></th>`;
+      html += `<th class="collapse-cell" style="width: 35px;"></th>`;
     }
 
     if (config.show_row_numbers) {
@@ -2399,11 +2399,11 @@ const visObject = {
       // Add collapse indicator cell for top-positioned subtotals (before row numbers)
       if (isSubtotalRow && config.subtotal_position === 'top') {
         const isCollapsed = row.__isCollapsed;
-        const collapseIcon = isCollapsed ? '▶' : '▼';
-        html += `<td class="collapse-cell" style="width: 30px; text-align: center; cursor: pointer; user-select: none; font-size: 14px;">${collapseIcon}</td>`;
+        const collapseIcon = isCollapsed ? '[+]' : '[-]';
+        html += `<td class="collapse-cell" style="width: 35px; text-align: center; cursor: pointer; user-select: none; font-weight: bold; color: #666;">${collapseIcon}</td>`;
       } else if (config.subtotal_position === 'top' && config.enable_subtotals) {
         // Empty cell for detail rows
-        html += `<td class="collapse-cell" style="width: 30px;"></td>`;
+        html += `<td class="collapse-cell" style="width: 35px;"></td>`;
       }
 
       if (config.show_row_numbers) {
