@@ -1,7 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.12.0 - Collapse Cell Fixed (No More Offset!)
- * Build: 2026-01-12-v16
+ * Version: 4.12.1 - Collapse Inline Fix (No Offset)
+ * Build: 2026-01-13
  */
 
 const visObject = {
@@ -406,15 +406,6 @@ const visObject = {
       order: 30
     },
 
-    // Hierarchy is disabled in v4.x - Coming in v5.0 as SAP BO-style tree
-    // series_divider_hierarchy: {
-    //   type: "string",
-    //   label: "─────────────────────────────── Hierarchical Data ───────────────────────────────",
-    //   display: "divider",
-    //   section: "Series",
-    //   order: 40
-    // },
-
     series_divider_comparison: {
       type: "string",
       label: "─────────────────────────────── Comparison ───────────────────────────────",
@@ -649,9 +640,6 @@ const visObject = {
       section: "Series",
       order: 81
     },
-
-    // Dynamic field formatting options will be added here in updateAsync
-    // Each field gets: label, alignment, width, font options
 
     // ══════════════════════════════════════════════════════════════
     // TAB: FORMATTING
@@ -1139,24 +1127,9 @@ const visObject = {
 
   create: function(element, config) {
     console.log('[TABLE] ========================================');
-    console.log('[TABLE] Advanced Table v4.12.0 - Build 2026-01-12-v16');
-    console.log('[TABLE] ✅ FIXED: Dedicated collapse cell (NO OFFSET!)');
-    console.log('[TABLE] ✅ Arrows: ▶ collapsed, ▼ expanded');
+    console.log('[TABLE] Advanced Table v4.12.1 - Build 2026-01-13');
+    console.log('[TABLE] ✅ FIXED: Collapse symbol inline (NO OFFSET!)');
     console.log('[TABLE] ========================================');
-
-          .subtotal-toggle {
-        font-family: monospace;
-        font-size: 12px;
-        color: #666;
-        vertical-align: middle;
-      }
-
-      /* Ensure the cell doesn't wrap the icon and text awkwardly */
-      .subtotal-trigger-cell {
-        white-space: nowrap !important;
-        display: flex;
-        align-items: center;
-      }
 
     element.innerHTML = `
       <style>
@@ -1245,7 +1218,6 @@ const visObject = {
           background: #ffffff;
         }
 
-        /* Apply cell styles via CSS instead of inline */
         table.advanced-table tbody td {
           font-size: var(--cell-font-size, 11px);
           color: var(--cell-text-color, #374151);
@@ -1257,17 +1229,25 @@ const visObject = {
           border: var(--show-borders, 1px) var(--border-style, solid) var(--border-color, #e5e7eb);
         }
 
-        table.advanced-table tbody td[data-column-conditional="true"] {
-          background-color: var(--column-condition-bg-color, #dbeafe) !important;
-          color: var(--column-condition-text-color, #1e40af) !important;
+        .subtotal-toggle {
+          font-family: monospace;
+          font-size: 14px;
+          font-weight: bold;
+          color: #666;
+          cursor: pointer;
+          user-select: none;
+          display: inline-block;
+          width: 16px;
+          text-align: center;
+          margin-right: 4px;
         }
 
-        table.advanced-table tbody tr[data-row-conditional="true"] td {
-          background-color: var(--row-condition-bg-color, #fef3c7) !important;
-          color: var(--row-condition-text-color, #92400e) !important;
+        .subtotal-trigger-cell {
+          display: flex;
+          align-items: center;
+          white-space: nowrap !important;
         }
 
-        /* FROZEN HEADER - Critical positioning */
         table.advanced-table thead {
           position: sticky;
           top: 0;
@@ -1281,12 +1261,10 @@ const visObject = {
           background: inherit;
         }
 
-        /* Frozen columns within header have higher z-index */
         table.advanced-table thead th.frozen-column {
           z-index: 101;
         }
 
-        /* STRIPED THEME - Use CSS custom property with !important to override inline styles */
         table.advanced-table.striped tbody tr:nth-child(odd) {
           background: var(--stripe-color, #f9fafb) !important;
         }
@@ -1295,56 +1273,8 @@ const visObject = {
           background: #ffffff !important;
         }
 
-        /* Override cell background in striped mode */
         table.advanced-table.striped tbody tr td {
           background: inherit !important;
-        }
-
-        /* MINIMAL THEME */
-        table.advanced-table.minimal {
-          border: none;
-        }
-
-        table.advanced-table.minimal th,
-        table.advanced-table.minimal td {
-          border: none;
-          border-bottom: 1px solid #f3f4f6;
-        }
-
-        /* CLASSIC THEME */
-        table.advanced-table.classic {
-          border: 2px solid #d1d5db;
-        }
-
-        table.advanced-table.classic th {
-          background: #e5e7eb;
-          border: 1px solid #d1d5db;
-        }
-
-        table.advanced-table.classic td {
-          border: 1px solid #e5e7eb;
-        }
-
-        /* BORDERED THEME */
-        table.advanced-table.bordered {
-          border: 2px solid #374151;
-        }
-
-        table.advanced-table.bordered th {
-          background: #1f2937;
-          color: #ffffff;
-          border: 1px solid #4b5563;
-        }
-
-        table.advanced-table.bordered td {
-          border: 1px solid #d1d5db;
-        }
-
-        /* COMPACT THEME */
-        table.advanced-table.compact th,
-        table.advanced-table.compact td {
-          padding: 4px 8px !important;
-          font-size: 10px;
         }
 
         .column-group-header {
@@ -1437,14 +1367,6 @@ const visObject = {
           flex-shrink: 0;
         }
 
-        .hierarchy-toggle:hover {
-          color: #374151;
-        }
-
-        .hierarchy-content {
-          flex: 1;
-        }
-
         .comparison-container {
           display: flex;
           align-items: center;
@@ -1458,17 +1380,6 @@ const visObject = {
           display: flex;
           align-items: center;
           gap: 4px;
-        }
-
-        .comparison-arrow {
-          font-size: 0.9em;
-        }
-
-        .comparison-bar {
-          height: 6px;
-          border-radius: 3px;
-          transition: width 0.3s ease;
-          margin-top: 4px;
         }
 
         .highlight-match {
@@ -1494,11 +1405,6 @@ const visObject = {
           display: block;
         }
 
-        .tooltip-label {
-          font-weight: 600;
-          margin-bottom: 4px;
-        }
-
         .row-number-cell {
           background: #f9fafb;
           font-weight: 500;
@@ -1507,20 +1413,11 @@ const visObject = {
           border-right: 2px solid #e5e7eb;
         }
 
-        /* Subtotal and Grand Total Rows */
         .advanced-table tbody tr.subtotal-row {
           font-weight: 600;
           border-top: 2px solid #ddd;
           border-bottom: 1px solid #ddd;
           cursor: pointer;
-        }
-
-        .advanced-table tbody tr.subtotal-row.position-top {
-          cursor: pointer;
-        }
-
-        .advanced-table tbody tr.subtotal-row.collapsed + tr.detail-row {
-          display: none;
         }
 
         .advanced-table tbody tr.grand-total-row {
@@ -1573,21 +1470,14 @@ const visObject = {
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    console.log('[TABLE] Starting updateAsync');
     this.clearErrors();
-
-    // Validate data
     if (!queryResponse || !data || data.length === 0) {
       this.addError({ title: "No Data", message: "No data available to display" });
       done();
       return;
     }
 
-    // Dynamically add field formatting options (Label + Value Format only)
     const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-    console.log('[TABLE] Adding dynamic field formatting options for', allFields.length, 'fields');
-
-    // Populate subtotal dimension dropdown with available dimensions
     const dimensions = queryResponse.fields.dimension_like;
     if (dimensions.length > 0) {
       const dimensionValues = [{"None": ""}];
@@ -1598,12 +1488,9 @@ const visObject = {
     }
 
     allFields.forEach((field, idx) => {
-      // Keep field name as-is (don't replace dots/underscores) for config keys
       const fieldKey = field.name;
-      const baseOrder = 82 + (idx * 3); // 3 options per field (divider + label + format)
+      const baseOrder = 82 + (idx * 3);
       const fieldLabel = field.label_short || field.label;
-
-      // Grouped label for better UX
       const dividerKey = `field_divider_${fieldKey}`;
       if (!this.options[dividerKey]) {
         this.options[dividerKey] = {
@@ -1614,8 +1501,6 @@ const visObject = {
           order: baseOrder
         };
       }
-
-      // Label (for all fields)
       const labelKey = `field_label_${fieldKey}`;
       if (!this.options[labelKey]) {
         this.options[labelKey] = {
@@ -1628,8 +1513,6 @@ const visObject = {
           order: baseOrder + 1
         };
       }
-
-      // Value Format (for ALL fields - dimensions and measures)
       const formatKey = `field_format_${fieldKey}`;
       if (!this.options[formatKey]) {
         this.options[formatKey] = {
@@ -1646,73 +1529,33 @@ const visObject = {
       }
     });
 
-    // CRITICAL: Register the dynamically added options
     this.trigger('registerOptions', this.options);
-    console.log('[TABLE] Field formatting options registered');
-
-    // Trigger options update
-    this.trigger('registerOptions', this.options);
-
-    // Store data and config
     this.state.data = data;
     this.config = config;
     this.queryResponse = queryResponse;
 
-    console.log('[TABLE] Details parameter:', details);
-
-    // Link Looker's native Totals/Subtotals buttons to our viz features
-    // The 'details' parameter contains: details.totals_enabled, details.subtotals_enabled
     if (details) {
-      console.log('[TABLE] Details.totals_enabled:', details.totals_enabled);
-      console.log('[TABLE] Details.subtotals_enabled:', details.subtotals_enabled);
-
-      // If Looker's Totals button is enabled and we have totals_data, enable grand total
       if (details.totals_enabled && queryResponse.totals_data) {
         config.show_grand_total = true;
-        console.log('[TABLE] Looker Totals button enabled → Grand Total ON');
       }
-
-      // If Looker's Subtotals button is enabled and we have subtotals_data, enable subtotals
       if (details.subtotals_enabled && queryResponse.subtotals_data) {
         config.enable_subtotals = true;
-        console.log('[TABLE] Looker Subtotals button enabled → Subtotals ON');
       }
     }
 
-    // Parse configuration
     const parsedConfig = this.parseConfig(config);
-
-    console.log('[TABLE] Config parsed, freeze_header_row:', parsedConfig.freeze_header_row);
-    console.log('[TABLE] Table theme:', parsedConfig.table_theme);
-    console.log('[TABLE] Stripe color:', parsedConfig.stripe_color);
-    console.log('[TABLE] Totals data available:', !!queryResponse.totals_data);
-    console.log('[TABLE] Subtotals data available:', !!queryResponse.subtotals_data);
-    console.log('[TABLE] Row totals available:', !!queryResponse.row_totals);
-    if (queryResponse.totals_data) {
-      console.log('[TABLE] Totals data:', queryResponse.totals_data);
-    }
-    if (queryResponse.subtotals_data) {
-      console.log('[TABLE] Subtotals data:', queryResponse.subtotals_data);
-    }
-
-    // Apply filters
     let filteredData = this.applyFilters(data, parsedConfig);
 
-    // Apply sorting
     if (this.state.sortField) {
       filteredData = this.sortData(filteredData, this.state.sortField, this.state.sortDirection);
     }
 
-    // Apply subtotals if enabled
     if (parsedConfig.enable_subtotals && parsedConfig.subtotal_dimension) {
-      console.log('[TABLE] Calculating subtotals by:', parsedConfig.subtotal_dimension);
       const measures = queryResponse.fields.measure_like;
       const dimensions = queryResponse.fields.dimension_like;
       filteredData = this.calculateSubtotals(filteredData, parsedConfig.subtotal_dimension, measures, parsedConfig, dimensions);
 
-      // Apply collapse state from this.state
       if (parsedConfig.subtotal_position === 'top') {
-        // If no collapse state exists, start with all collapsed
         if (!this.state.collapsedGroups) {
           this.state.collapsedGroups = {};
           filteredData.forEach(row => {
@@ -1722,14 +1565,12 @@ const visObject = {
           });
         }
 
-        // Apply collapse state to rows
         filteredData = filteredData.filter(row => {
           if (row.__isSubtotal) {
             row.__isCollapsed = this.state.collapsedGroups[row.__groupValue] || false;
-            return true; // Always show subtotal row
+            return true;
           }
           if (row.__parentGroup !== undefined) {
-            // Hide detail row if parent is collapsed
             return !this.state.collapsedGroups[row.__parentGroup];
           }
           return true;
@@ -1737,27 +1578,17 @@ const visObject = {
       }
     }
 
-    // Add grand total row if enabled
     if (parsedConfig.show_grand_total) {
-      console.log('[TABLE] Adding grand total row');
       const measures = queryResponse.fields.measure_like;
       const dimensions = queryResponse.fields.dimension_like;
       const grandTotal = this.calculateGrandTotal(filteredData, measures, parsedConfig, dimensions);
       filteredData.push(grandTotal);
     }
 
-    // Process hierarchical data if enabled
-    if (parsedConfig.enable_hierarchy && parsedConfig.hierarchy_field) {
-      filteredData = this.processHierarchicalData(filteredData, parsedConfig, queryResponse);
-    }
-
-    // Calculate pagination
-    // Separate grand total if it exists and should be shown on all pages
     let grandTotalRow = null;
     let dataWithoutGrandTotal = filteredData;
 
     if (parsedConfig.show_grand_total && parsedConfig.show_grand_total_on_all_pages) {
-      // Find and extract grand total row
       const grandTotalIdx = filteredData.findIndex(row => row.__isGrandTotal);
       if (grandTotalIdx >= 0) {
         grandTotalRow = filteredData[grandTotalIdx];
@@ -1771,22 +1602,16 @@ const visObject = {
     let pageData = parsedConfig.enable_pagination ?
       dataWithoutGrandTotal.slice(startIdx, endIdx) : dataWithoutGrandTotal;
 
-    // Add grand total to every page if enabled
     if (grandTotalRow && parsedConfig.show_grand_total_on_all_pages) {
       pageData = [...pageData, grandTotalRow];
     }
 
-    // Render table
     this.renderTable(pageData, filteredData, totalPages, parsedConfig, queryResponse);
-
-    console.log('[TABLE] Render complete');
     done();
   },
 
   parseConfig: function(config) {
     const parsed = { ...config };
-
-    // Parse JSON configurations
     try {
       if (config.emoji_mapping) {
         parsed.emojis = JSON.parse(config.emoji_mapping);
@@ -1795,33 +1620,21 @@ const visObject = {
       parsed.emojis = {};
     }
 
-    // Extract custom field formatting (labels and value formats)
-    // Field names are stored as-is in config keys (e.g., field_label_order_items.created_year)
     parsed.fieldFormatting = {};
     if (config.enable_custom_field_formatting) {
       Object.keys(config).forEach(key => {
         if (key.startsWith('field_label_')) {
           const fieldName = key.replace('field_label_', '');
-          if (!parsed.fieldFormatting[fieldName]) {
-            parsed.fieldFormatting[fieldName] = {};
-          }
-          if (config[key] && config[key].trim() !== '') {
-            parsed.fieldFormatting[fieldName].label = config[key];
-          }
+          if (!parsed.fieldFormatting[fieldName]) parsed.fieldFormatting[fieldName] = {};
+          if (config[key] && config[key].trim() !== '') parsed.fieldFormatting[fieldName].label = config[key];
         } else if (key.startsWith('field_format_')) {
           const fieldName = key.replace('field_format_', '');
-          if (!parsed.fieldFormatting[fieldName]) {
-            parsed.fieldFormatting[fieldName] = {};
-          }
-          if (config[key] && config[key].trim() !== '') {
-            parsed.fieldFormatting[fieldName].format = config[key];
-          }
+          if (!parsed.fieldFormatting[fieldName]) parsed.fieldFormatting[fieldName] = {};
+          if (config[key] && config[key].trim() !== '') parsed.fieldFormatting[fieldName].format = config[key];
         }
       });
     }
-    console.log('[TABLE] Field formatting:', parsed.fieldFormatting);
 
-    // Parse cell bar sets
     parsed.cellBarSets = [];
     for (let i = 1; i <= 3; i++) {
       if (config[`enable_cell_bars_${i}`] && config[`cell_bar_fields_${i}`]) {
@@ -1834,7 +1647,6 @@ const visObject = {
       }
     }
 
-    // Parse column groups based on counts
     parsed.column_groups = [];
     const fields = this.queryResponse ?
       this.queryResponse.fields.dimension_like.concat(this.queryResponse.fields.measure_like) : [];
@@ -1852,7 +1664,6 @@ const visObject = {
       }
     }
 
-    // Handle remaining columns
     if (config.group_remaining_columns && currentIndex < fields.length) {
       const remainingFields = fields.slice(currentIndex).map(f => f.name);
       parsed.column_groups.push({
@@ -1860,89 +1671,56 @@ const visObject = {
         fields: remainingFields
       });
     }
-
     return parsed;
   },
 
-  // Calculate subtotals for grouped data
   calculateSubtotals: function(data, groupByField, measures, config, dimensions) {
     if (!data || data.length === 0) return data;
-
     const result = [];
     const groups = {};
     const subtotalPosition = config.subtotal_position || 'bottom';
 
-    console.log('[TABLE] Grouping by field:', groupByField);
-    console.log('[TABLE] All dimensions:', dimensions.map(d => d.name));
-
-    // Group data by the specified field
     data.forEach(row => {
       let groupValue = row[groupByField];
       if (groupValue && typeof groupValue === 'object') {
         groupValue = groupValue.value || groupValue.rendered || 'null';
       }
       groupValue = groupValue || 'null';
-
-      if (!groups[groupValue]) {
-        groups[groupValue] = [];
-      }
+      if (!groups[groupValue]) groups[groupValue] = [];
       groups[groupValue].push(row);
     });
 
-    // Process each group
     Object.keys(groups).forEach(groupValue => {
       const groupRows = groups[groupValue];
-
-      // Calculate subtotal row
       const subtotalRow = {
         __isSubtotal: true,
         __groupValue: groupValue,
         __groupField: groupByField,
-        __isCollapsed: false // Will be set based on state later
+        __isCollapsed: false
       };
 
-      // Set the grouping dimension value with subtotal label
-      const labelTemplate = config.subtotal_label || 'Subtotal: {value}';
+      const labelTemplate = config.subtotal_label || '{value}';
       const subtotalLabel = labelTemplate.replace('{value}', groupValue === 'null' ? '∅' : groupValue);
       subtotalRow[groupByField] = { value: subtotalLabel, rendered: subtotalLabel };
 
-      console.log('[TABLE] Created subtotal row, label in field:', groupByField, '=', subtotalLabel);
-
-      // Set ALL other dimensions (not the grouping field) to empty
       dimensions.forEach(dim => {
-        if (dim.name !== groupByField) {
-          subtotalRow[dim.name] = { value: '', rendered: '' };
-        }
+        if (dim.name !== groupByField) subtotalRow[dim.name] = { value: '', rendered: '' };
       });
 
-      // Calculate totals for each measure
       measures.forEach(measure => {
         let sum = 0;
-        let count = 0;
-
         groupRows.forEach(row => {
           let value = row[measure.name];
-          if (value && typeof value === 'object') {
-            value = value.value;
-          }
-          if (value !== null && value !== undefined && !isNaN(value)) {
-            sum += Number(value);
-            count++;
-          }
+          if (value && typeof value === 'object') value = value.value;
+          if (value !== null && value !== undefined && !isNaN(value)) sum += Number(value);
         });
-
-        // Store both value and rendered for subtotal
         subtotalRow[measure.name] = {
           value: sum,
-          rendered: sum.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-          })
+          rendered: sum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         };
       });
 
       if (subtotalPosition === 'top') {
-        // Subtotal at top, then detail rows (marked as children)
         result.push(subtotalRow);
         groupRows.forEach(row => {
           row.__parentGroup = groupValue;
@@ -1950,81 +1728,48 @@ const visObject = {
           result.push(row);
         });
       } else {
-        // Detail rows first, then subtotal at bottom
         groupRows.forEach(row => result.push(row));
         result.push(subtotalRow);
       }
     });
-
     return result;
   },
 
-  // Calculate grand total row
   calculateGrandTotal: function(data, measures, config, dimensions) {
     const totalRow = { __isGrandTotal: true };
     const label = config.grand_total_label || 'Grand Total';
-
-    // Set label in first dimension column
     if (dimensions.length > 0) {
       const firstDimField = dimensions[0].name;
       totalRow[firstDimField] = { value: label, rendered: label };
-
-      // Set all OTHER dimensions to empty
       dimensions.forEach((dim, idx) => {
-        if (idx > 0) { // Skip first dimension (has the label)
-          totalRow[dim.name] = { value: '', rendered: '' };
-        }
+        if (idx > 0) totalRow[dim.name] = { value: '', rendered: '' };
       });
     }
-
-    // Calculate totals for each measure
     measures.forEach(measure => {
       let sum = 0;
-      let count = 0;
-
       data.forEach(row => {
-        // Skip subtotal rows when calculating grand total
         if (row.__isSubtotal) return;
-
         let value = row[measure.name];
-        if (value && typeof value === 'object') {
-          value = value.value;
-        }
-        if (value !== null && value !== undefined && !isNaN(value)) {
-          sum += Number(value);
-          count++;
-        }
+        if (value && typeof value === 'object') value = value.value;
+        if (value !== null && value !== undefined && !isNaN(value)) sum += Number(value);
       });
-
       totalRow[measure.name] = {
         value: sum,
-        rendered: sum.toLocaleString('en-US', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        })
+        rendered: sum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       };
     });
-
     return totalRow;
   },
 
   applyFilters: function(data, config) {
     let filtered = [...data];
-
-    // Apply table-wide filter
     if (config.enable_table_filter && this.state.tableFilter) {
       const filterLower = this.state.tableFilter.toLowerCase();
-      filtered = filtered.filter(row => {
-        return Object.values(row).some(value => {
-          if (value && value.value !== undefined) {
-            return String(value.value).toLowerCase().includes(filterLower);
-          }
-          return String(value).toLowerCase().includes(filterLower);
-        });
-      });
+      filtered = filtered.filter(row => Object.values(row).some(value => {
+        const val = value && value.value !== undefined ? String(value.value) : String(value);
+        return val.toLowerCase().includes(filterLower);
+      }));
     }
-
-    // Apply column filters
     if (config.enable_column_filters) {
       Object.keys(this.state.columnFilters).forEach(field => {
         const filterValue = this.state.columnFilters[field];
@@ -2032,14 +1777,12 @@ const visObject = {
           const filterLower = filterValue.toLowerCase();
           filtered = filtered.filter(row => {
             const cellValue = row[field];
-            const value = cellValue && cellValue.value !== undefined ?
-              cellValue.value : cellValue;
+            const value = cellValue && cellValue.value !== undefined ? cellValue.value : cellValue;
             return String(value).toLowerCase().includes(filterLower);
           });
         }
       });
     }
-
     return filtered;
   },
 
@@ -2047,101 +1790,26 @@ const visObject = {
     return [...data].sort((a, b) => {
       let aVal = a[field];
       let bVal = b[field];
-
-      // Extract values from Looker cell objects
       if (aVal && aVal.value !== undefined) aVal = aVal.value;
       if (bVal && bVal.value !== undefined) bVal = bVal.value;
-
-      // Handle null/undefined
       if (aVal === null || aVal === undefined) return direction === 'asc' ? 1 : -1;
       if (bVal === null || bVal === undefined) return direction === 'asc' ? -1 : 1;
-
-      // Numeric comparison
       if (typeof aVal === 'number' && typeof bVal === 'number') {
         return direction === 'asc' ? aVal - bVal : bVal - aVal;
       }
-
-      // String comparison
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
-
-      if (direction === 'asc') {
-        return aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
-      } else {
-        return aStr > bStr ? -1 : aStr < bStr ? 1 : 0;
-      }
+      return direction === 'asc' ? (aStr < bStr ? -1 : aStr > bStr ? 1 : 0) : (aStr > bStr ? -1 : aStr < bStr ? 1 : 0);
     });
-  },
-
-  processHierarchicalData: function(data, config, queryResponse) {
-    if (!config.hierarchy_field) return data;
-
-    // Find hierarchy levels
-    const hierarchyField = config.hierarchy_field;
-    const childrenMap = new Map();
-
-    data.forEach((row, idx) => {
-      const value = row[hierarchyField];
-      const strValue = value && value.value !== undefined ? String(value.value) : String(value);
-      row._hierarchy_id = strValue;
-
-      // For date hierarchy
-      if (config.detect_date_hierarchy) {
-        const dateMatch = strValue.match(/(\d{4})-?(\d{2})?-?(\d{2})?/);
-        if (dateMatch) {
-          const year = dateMatch[1];
-          const month = dateMatch[2];
-          const day = dateMatch[3];
-
-          if (day) {
-            row._hierarchy_level = 2;
-            row._hierarchy_parent = `${year}-${month}`;
-            if (!childrenMap.has(`${year}-${month}`)) {
-              childrenMap.set(`${year}-${month}`, []);
-            }
-            childrenMap.get(`${year}-${month}`).push(strValue);
-          } else if (month) {
-            row._hierarchy_level = 1;
-            row._hierarchy_parent = year;
-            if (!childrenMap.has(year)) {
-              childrenMap.set(year, []);
-            }
-            childrenMap.get(year).push(strValue);
-          } else {
-            row._hierarchy_level = 0;
-            row._hierarchy_parent = null;
-          }
-        }
-      }
-    });
-
-    // Mark rows that have children
-    data.forEach(row => {
-      row._has_children = childrenMap.has(row._hierarchy_id);
-      row._children = childrenMap.get(row._hierarchy_id) || [];
-    });
-
-    return data;
   },
 
   renderTable: function(pageData, allFilteredData, totalPages, config, queryResponse) {
-    console.log('[TABLE] renderTable called');
-    console.log('[TABLE] - freeze_header_row:', config.freeze_header_row);
-    console.log('[TABLE] - table_theme:', config.table_theme);
-    console.log('[TABLE] - stripe_color:', config.stripe_color);
-
     let html = '';
-
-    // Set CSS variables for stripe color and cell styling
     const existingStyle = document.getElementById('table-stripe-style');
-    if (existingStyle) {
-      existingStyle.remove();
-    }
+    if (existingStyle) existingStyle.remove();
     const style = document.createElement('style');
     style.id = 'table-stripe-style';
-
-    // Build CSS with all variables
-    let cssVars = `:root {
+    style.innerHTML = `:root {
       --stripe-color: ${config.stripe_color || '#f9fafb'};
       --cell-font-size: ${config.cell_font_size || 11}px;
       --cell-text-color: ${config.cell_text_color || '#374151'};
@@ -2158,1033 +1826,243 @@ const visObject = {
       --row-condition-text-color: ${config.row_condition_text_color || '#92400e'};
       --subtotal-bg-color: ${config.subtotal_background_color || '#f0f0f0'};
     }
-
-    .advanced-table tbody tr.subtotal-row {
-      background-color: var(--subtotal-bg-color) !important;
-    }`;
-
-    style.innerHTML = cssVars;
+    .advanced-table tbody tr.subtotal-row { background-color: var(--subtotal-bg-color) !important; }`;
     document.head.appendChild(style);
-    console.log('[TABLE] Injected CSS variables');
 
-    // Top pagination
     if (config.enable_pagination && (config.pagination_position === 'top' || config.pagination_position === 'both')) {
       html += this.renderPagination(allFilteredData.length, totalPages, config, 'top');
     }
 
-    // Table-wide filter
     if (config.enable_table_filter) {
-      html += `
-        <div class="filter-container">
-          <input
-            type="text"
-            class="filter-input"
-            placeholder="Search across all columns... (Press Enter)"
-            value="${this.escapeHtml(this.state.tableFilter)}"
-            id="table-filter-input"
-          />
-        </div>
-      `;
+      html += `<div class="filter-container"><input type="text" class="filter-input" placeholder="Search... (Enter)" value="${this.escapeHtml(this.state.tableFilter)}" id="table-filter-input" /></div>`;
     }
 
-    // Table
     html += '<div class="table-wrapper">';
     html += `<table class="advanced-table ${config.table_theme}" style="${this.getTableStyles(config)}">`;
-    console.log('[TABLE] Table classes:', `advanced-table ${config.table_theme}`);
-
-    // Column groups
-    if (config.enable_column_groups && config.column_groups.length > 0) {
-      html += this.renderColumnGroups(config, queryResponse);
-    }
-
-    // Headers
-    if (config.show_headers) {
-      html += this.renderHeaders(config, queryResponse);
-    }
-
-    // Body
+    if (config.enable_column_groups && config.column_groups.length > 0) html += this.renderColumnGroups(config, queryResponse);
+    if (config.show_headers) html += this.renderHeaders(config, queryResponse);
     html += this.renderBody(pageData, allFilteredData, config, queryResponse);
-
     html += '</table></div>';
 
-    // Bottom pagination
     if (config.enable_pagination && (config.pagination_position === 'bottom' || config.pagination_position === 'both')) {
       html += this.renderPagination(allFilteredData.length, totalPages, config, 'bottom');
     }
 
     this.container.innerHTML = html;
-    console.log('[TABLE] HTML rendered, checking for frozen headers...');
-
-    // Check if headers are properly frozen
-    setTimeout(() => {
-      const thead = this.container.querySelector('thead');
-      if (thead) {
-        const computedStyle = window.getComputedStyle(thead);
-        console.log('[TABLE] thead computed position:', computedStyle.position);
-        console.log('[TABLE] thead computed top:', computedStyle.top);
-        console.log('[TABLE] thead computed z-index:', computedStyle.zIndex);
-      }
-
-      const stripeCheck = this.container.querySelector('tbody tr:nth-child(odd)');
-      if (stripeCheck) {
-        const stripeStyle = window.getComputedStyle(stripeCheck);
-        console.log('[TABLE] First odd row background:', stripeStyle.backgroundColor);
-        console.log('[TABLE] First odd row inline style:', stripeCheck.getAttribute('style'));
-      }
-
-      const stripeCheckEven = this.container.querySelector('tbody tr:nth-child(even)');
-      if (stripeCheckEven) {
-        const evenStyle = window.getComputedStyle(stripeCheckEven);
-        console.log('[TABLE] First even row background:', evenStyle.backgroundColor);
-      }
-
-      // Check if table has striped class
-      const table = this.container.querySelector('table');
-      console.log('[TABLE] Table classList:', table.className);
-      console.log('[TABLE] Has striped class:', table.classList.contains('striped'));
-
-      // Check CSS variable
-      const root = document.querySelector(':root');
-      const rootStyle = window.getComputedStyle(root);
-      console.log('[TABLE] CSS variable --stripe-color:', rootStyle.getPropertyValue('--stripe-color'));
-    }, 100);
-
-    // Attach event listeners
     this.attachEventListeners(config);
   },
 
   renderPagination: function(totalRows, totalPages, config, position) {
     const { currentPage } = this.state;
-
-    let html = `<div class="pagination-controls ${position}">`;
-
-    if (config.show_page_info) {
-      const startRow = (currentPage - 1) * config.page_size + 1;
-      const endRow = Math.min(currentPage * config.page_size, totalRows);
-      html += `<div class="pagination-info">Showing ${startRow}-${endRow} of ${totalRows} rows</div>`;
-    }
-
-    html += '<div class="pagination-buttons">';
-    html += `
-      <button class="pagination-button" data-action="first" ${currentPage === 1 ? 'disabled' : ''}>⟨⟨</button>
-      <button class="pagination-button" data-action="prev" ${currentPage === 1 ? 'disabled' : ''}>⟨</button>
-      <span style="padding: 0 12px; display: flex; align-items: center;">Page ${currentPage} of ${totalPages}</span>
-      <button class="pagination-button" data-action="next" ${currentPage === totalPages ? 'disabled' : ''}>⟩</button>
-      <button class="pagination-button" data-action="last" ${currentPage === totalPages ? 'disabled' : ''}>⟩⟩</button>
-    `;
-    html += '</div></div>';
-
-    return html;
+    return `<div class="pagination-controls ${position}">
+      ${config.show_page_info ? `<div class="pagination-info">Showing ${(currentPage-1)*config.page_size+1}-${Math.min(currentPage*config.page_size, totalRows)} of ${totalRows}</div>` : ''}
+      <div class="pagination-buttons">
+        <button class="pagination-button" data-action="first" ${currentPage === 1 ? 'disabled' : ''}>⟨⟨</button>
+        <button class="pagination-button" data-action="prev" ${currentPage === 1 ? 'disabled' : ''}>⟨</button>
+        <span style="padding: 0 12px; display: flex; align-items: center;">Page ${currentPage} of ${totalPages}</span>
+        <button class="pagination-button" data-action="next" ${currentPage === totalPages ? 'disabled' : ''}>⟩</button>
+        <button class="pagination-button" data-action="last" ${currentPage === totalPages ? 'disabled' : ''}>⟩⟩</button>
+      </div></div>`;
   },
 
   renderColumnGroups: function(config, queryResponse) {
     const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-    const groups = config.column_groups;
-
     let html = '<thead><tr>';
-
-    if (config.show_row_numbers) {
-      html += '<th rowspan="2" class="row-number-cell">#</th>';
-    }
-
+    if (config.show_row_numbers) html += '<th rowspan="2" class="row-number-cell">#</th>';
     const groupedFields = new Set();
-    groups.forEach(group => {
+    config.column_groups.forEach(group => {
       html += `<th colspan="${group.fields.length}" class="column-group-header" style="background: ${config.group_header_bg_color};">${this.escapeHtml(group.name)}</th>`;
       group.fields.forEach(f => groupedFields.add(f));
     });
-
-    // Ungrouped fields
-    fields.forEach(field => {
-      if (!groupedFields.has(field.name)) {
-        html += '<th rowspan="2"></th>';
-      }
-    });
-
+    fields.forEach(field => { if (!groupedFields.has(field.name)) html += '<th rowspan="2"></th>'; });
     html += '</tr></thead>';
     return html;
   },
 
   renderHeaders: function(config, queryResponse) {
     const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-    const styles = this.getHeaderStyles(config);
-
-    let html = `<thead><tr style="${styles}">`;
-
-    // Add empty header for collapse cell if using top-positioned subtotals
-
-    if (config.show_row_numbers) {
-      html += `<th class="row-number-cell">#</th>`;
-    }
-
+    let html = `<thead><tr style="${this.getHeaderStyles(config)}">`;
+    if (config.show_row_numbers) html += `<th class="row-number-cell">#</th>`;
     let leftOffset = 0;
     fields.forEach((field, idx) => {
       const isFrozen = idx < config.freeze_columns;
-      const frozenClass = isFrozen ? 'frozen-column' : '';
-      const sortIndicator = this.state.sortField === field.name ?
-        (this.state.sortDirection === 'asc' ? '▲' : '▼') : '';
-
-      // Get custom label if available
-      const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name]
-        ? config.fieldFormatting[field.name]
-        : {};
-
-      const displayLabel = fieldFormat.label || (field.label_short || field.label);
-
-      html += `
-        <th
-          class="sortable ${frozenClass}"
-          data-field="${field.name}"
-          style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
-        >
-          ${this.escapeHtml(displayLabel)}
-          ${sortIndicator ? `<span class="sort-indicator">${sortIndicator}</span>` : ''}
-          ${config.enable_column_filters ? `
-            <input
-              type="text"
-              class="column-filter"
-              data-field="${field.name}"
-              placeholder="Filter... (Enter)"
-              value="${this.escapeHtml(this.state.columnFilters[field.name] || '')}"
-            />
-          ` : ''}
-        </th>
-      `;
-
-      if (isFrozen) {
-        leftOffset += 150;
-      }
+      const displayLabel = (config.fieldFormatting && config.fieldFormatting[field.name]?.label) || (field.label_short || field.label);
+      html += `<th class="sortable ${isFrozen ? 'frozen-column' : ''}" data-field="${field.name}" style="${isFrozen ? `left: ${leftOffset}px;` : ''}">
+        ${this.escapeHtml(displayLabel)}
+        ${this.state.sortField === field.name ? `<span class="sort-indicator">${this.state.sortDirection === 'asc' ? '▲' : '▼'}</span>` : ''}
+        ${config.enable_column_filters ? `<input type="text" class="column-filter" data-field="${field.name}" value="${this.escapeHtml(this.state.columnFilters[field.name] || '')}"/>` : ''}
+      </th>`;
+      if (isFrozen) leftOffset += 150;
     });
-
-    html += '</tr></thead>';
-    return html;
+    return html + '</tr></thead>';
   },
 
   renderBody: function(pageData, allFilteredData, config, queryResponse) {
     const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-
-    // Get the index offset for the current page
     const pageOffset = (this.state.currentPage - 1) * config.page_size;
-
     let html = '<tbody>';
 
     pageData.forEach((row, pageRowIdx) => {
-      const actualRowIdx = pageOffset + pageRowIdx; // Actual index in allFilteredData
-      const hierarchyLevel = row._hierarchy_level || 0;
+      const actualRowIdx = pageOffset + pageRowIdx;
+      const isSubtotalRow = !!row.__isSubtotal;
+      const isGrandTotalRow = !!row.__isGrandTotal;
+      const isCollapsed = !!row.__isCollapsed;
+      const rowClass = isGrandTotalRow ? 'grand-total-row' : (isSubtotalRow ? `subtotal-row position-${config.subtotal_position}${isCollapsed ? ' collapsed' : ''}` : 'detail-row');
 
-      // Determine row type
-      const isSubtotalRow = row.__isSubtotal || false;
-      const isGrandTotalRow = row.__isGrandTotal || false;
-      const isDetailRow = row.__parentGroup !== undefined;
-      const isCollapsed = row.__isCollapsed || false;
-      const subtotalPosition = config.subtotal_position || 'bottom';
-
-      let rowClass = '';
-      if (isGrandTotalRow) {
-        rowClass = 'grand-total-row';
-      } else if (isSubtotalRow) {
-        rowClass = `subtotal-row position-${subtotalPosition}${isCollapsed ? ' collapsed' : ''}`;
-      } else if (isDetailRow) {
-        rowClass = 'detail-row';
-      }
-
-      // Check row conditional formatting but don't apply inline styles
-      const hasRowConditional = config.enable_row_conditional &&
-        config.row_condition_field &&
-        this.evaluateCondition(
-          row[config.row_condition_field],
-          config.row_condition_operator,
-          config.row_condition_value
-        );
-
-      const dataAttrs = [
-        `data-row="${pageRowIdx}"`,
-        `data-hierarchy-level="${hierarchyLevel}"`,
-        rowClass ? `class="${rowClass}"` : '',
-        hasRowConditional ? `data-row-conditional="true"` : '',
-        isSubtotalRow && subtotalPosition === 'top' ? `data-group="${row.__groupValue}"` : '',
-        isDetailRow ? `data-parent-group="${row.__parentGroup}"` : ''
-      ].filter(Boolean).join(' ');
-
+      const dataAttrs = [`data-row="${pageRowIdx}"`, `class="${rowClass}"`, isSubtotalRow ? `data-group="${row.__groupValue}"` : ''].filter(Boolean).join(' ');
       html += `<tr ${dataAttrs}>`;
 
-      // Add collapse indicator cell for top-positioned subtotals (before row numbers)
-
       if (config.show_row_numbers) {
-        // Subtotal and grand total rows get empty row number
-        if (isSubtotalRow || isGrandTotalRow) {
-          html += `<td class="row-number-cell"></td>`;
-        } else {
-          const globalRowNum = actualRowIdx + 1;
-          html += `<td class="row-number-cell">${globalRowNum}</td>`;
-        }
+        html += `<td class="row-number-cell">${(isSubtotalRow || isGrandTotalRow) ? '' : actualRowIdx + 1}</td>`;
       }
 
       let leftOffset = 0;
       fields.forEach((field, colIdx) => {
-  const cellValue = row[field.name];
-  const isFrozen = colIdx < config.freeze_columns;
-  const frozenClass = isFrozen ? 'frozen-column' : '';
+        const cellValue = row[field.name];
+        let cellContent = this.renderCellContent(cellValue, field, config, row, actualRowIdx, allFilteredData);
 
-  // 1. Get the standard rendered content
-  let cellContent = isHierarchyField ?
-    this.renderHierarchyCell(cellValue, field, config, row, hierarchyLevel) :
-    this.renderCellContent(cellValue, field, config, row, actualRowIdx, allFilteredData);
-
-  // 2. NEW LOGIC: Prepend the toggle icon ONLY to the first column of the subtotal row
-  if (isSubtotalRow && config.subtotal_position === 'top' && colIdx === 0) {
-    const icon = row.__isCollapsed ? '▶' : '▼';
-    cellContent = `<span class="subtotal-toggle" style="margin-right: 8px; cursor: pointer; display: inline-block; width: 14px;">${icon}</span>${cellContent}`;
-  }
-
-  html += `
-    <td
-      class="${frozenClass} ${isSubtotalRow && colIdx === 0 ? 'subtotal-trigger-cell' : ''}"
-      data-field="${field.name}"
-      data-row="${pageRowIdx}"
-      data-col="${colIdx}"
-      ${hasColumnConditional ? `data-column-conditional="true"` : ''}
-      style="${isFrozen ? `left: ${leftOffset}px;` : ''}"
-    >
-      ${cellContent}
-    </td>
-  `;
-
-        if (isFrozen) {
-          leftOffset += 150;
+        // Prepend toggle icon ONLY into first content cell of top-positioned subtotal rows
+        if (isSubtotalRow && config.subtotal_position === 'top' && colIdx === 0) {
+          const icon = isCollapsed ? '▶' : '▼';
+          cellContent = `<span class="subtotal-toggle">${icon}</span>${cellContent}`;
         }
-      });
 
+        const isFrozen = colIdx < config.freeze_columns;
+        html += `<td class="${isFrozen ? 'frozen-column' : ''} ${isSubtotalRow && colIdx === 0 ? 'subtotal-trigger-cell' : ''}" style="${isFrozen ? `left: ${leftOffset}px;` : ''}">
+          ${cellContent}
+        </td>`;
+        if (isFrozen) leftOffset += 150;
+      });
       html += '</tr>';
     });
-
-    html += '</tbody>';
-    return html;
+    return html + '</tbody>';
   },
 
-  renderHierarchyCell: function(cellValue, field, config, row, level) {
-    const indent = level * config.hierarchy_indent;
-    const hasChildren = row._has_children || false;
-    const rowId = row._hierarchy_id || '';
-    const isExpanded = this.state.expandedRows.has(rowId);
-
-    let content = '';
-    if (config.show_hierarchy_icons && hasChildren) {
-      const icon = isExpanded ? '▼' : '▶';
-      content = `
-        <div class="hierarchy-cell" style="padding-left: ${indent}px;">
-          <span class="hierarchy-toggle" data-row-id="${this.escapeHtml(rowId)}">${icon}</span>
-          <span class="hierarchy-content">${this.renderCellContent(cellValue, field, config, row, undefined, undefined)}</span>
-        </div>
-      `;
-    } else {
-      content = `
-        <div class="hierarchy-cell" style="padding-left: ${indent + (config.show_hierarchy_icons ? 22 : 0)}px;">
-          <span class="hierarchy-content">${this.renderCellContent(cellValue, field, config, row, undefined, undefined)}</span>
-        </div>
-      `;
-    }
-
-    return content;
-  },
-
-  // Format a value using custom format string
   formatValue: function(value, customFormat, field, renderedValue) {
     if (value === null || value === undefined) return '';
-
-    // PRIORITY 1: Custom format overrides everything
     if (customFormat && customFormat.trim() !== '') {
-      // For dates - support strftime-style formats
-      if (customFormat.includes('%')) {
-        try {
-          const date = new Date(value);
-          if (isNaN(date.getTime())) return String(value);
-          return customFormat
-            .replace(/%Y/g, date.getFullYear())
-            .replace(/%y/g, String(date.getFullYear()).slice(-2))
-            .replace(/%m/g, String(date.getMonth() + 1).padStart(2, '0'))
-            .replace(/%d/g, String(date.getDate()).padStart(2, '0'))
-            .replace(/%b/g, date.toLocaleString('default', { month: 'short' }))
-            .replace(/%B/g, date.toLocaleString('default', { month: 'long' }))
-            .replace(/%H/g, String(date.getHours()).padStart(2, '0'))
-            .replace(/%M/g, String(date.getMinutes()).padStart(2, '0'))
-            .replace(/%S/g, String(date.getSeconds()).padStart(2, '0'));
-        } catch (e) {
-          return String(value);
-        }
-      }
-
-      // For numbers - custom format implementation
-      if (!isNaN(value)) {
-        const num = Number(value);
-
-        // Currency formats: $, €, £
-        if (customFormat.includes('$') || customFormat.includes('€') || customFormat.includes('£')) {
-          const currency = customFormat.match(/[$€£]/)?.[0] || '';
+        if (!isNaN(value)) {
+          const num = Number(value);
           const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-          let scaledValue = num;
-          let scaledSuffix = '';
-
-          // Handle thousands/millions abbreviations
-          if (customFormat.includes('," k"') || customFormat.includes(",'k'")) {
-            scaledValue = num / 1000;
-            scaledSuffix = ' k';
-          } else if (customFormat.includes('," M"') || customFormat.includes(",'M'")) {
-            scaledValue = num / 1000000;
-            scaledSuffix = ' M';
-          } else if (customFormat.includes('," B"') || customFormat.includes(",'B'")) {
-            scaledValue = num / 1000000000;
-            scaledSuffix = ' B';
-          }
-
-          const formattedNumber = Math.abs(scaledValue).toLocaleString('en-US', {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals,
-            useGrouping: customFormat.includes(',')
-          });
-
-          const sign = scaledValue < 0 ? '-' : '';
-          return `${sign}${currency}${formattedNumber}${scaledSuffix}`;
+          return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: customFormat.includes(',') });
         }
-
-        // Percentage format
-        if (customFormat.includes('%')) {
-          const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-          return (num * 100).toFixed(decimals) + '%';
-        }
-
-        // Standard number format with decimals
-        const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-        const useGrouping = customFormat.includes(',');
-        return num.toLocaleString('en-US', {
-          minimumFractionDigits: decimals,
-          maximumFractionDigits: decimals,
-          useGrouping: useGrouping
-        });
-      }
-
-      // Fallback for non-numeric, non-date values
-      return String(value);
+        return String(value);
     }
-
-    // PRIORITY 2: Use LookML rendered value (default)
-    if (renderedValue !== null && renderedValue !== undefined) {
-      return renderedValue;
-    }
-
-    // PRIORITY 3: Fallback to raw value
-    return String(value);
+    return renderedValue !== null ? renderedValue : String(value);
   },
 
   renderCellContent: function(cellValue, field, config, row, rowIdx, data) {
-    // Extract actual value and drill links
-    let value = cellValue;
-    let rendered = cellValue;
-    let drillLinks = [];
-
+    let value = cellValue, rendered = cellValue, drillLinks = [];
     if (cellValue && typeof cellValue === 'object') {
-      value = cellValue.value !== undefined ? cellValue.value : cellValue;
-      rendered = cellValue.rendered || cellValue.value || cellValue;
+      value = cellValue.value;
+      rendered = cellValue.rendered || cellValue.value;
       drillLinks = cellValue.links || [];
     }
+    if (value === null || value === undefined) return '∅';
 
-    // Fix [object Object] display for null/empty values
-    if (value === null || value === undefined) {
-      rendered = '∅';
-    } else if (value === '' || (typeof rendered === 'string' && rendered.trim() === '')) {
-      // For truly empty strings (like in subtotal/total dimension cells), show empty
-      rendered = '';
-    } else if (typeof rendered === 'object' && rendered !== null) {
-      // If rendered is still an object, try to extract a sensible string
-      rendered = String(value);
-      if (rendered === '[object Object]') {
-        rendered = '∅';
-      }
-    }
-
-    // Apply custom format if available
     const fieldFormat = config.fieldFormatting && config.fieldFormatting[field.name];
-    if (fieldFormat && fieldFormat.format && value !== null && value !== undefined && value !== '') {
-      // Pass the rendered value as fallback
-      const formattedValue = this.formatValue(value, fieldFormat.format, field, rendered);
-      if (formattedValue !== '') {
-        rendered = formattedValue;
-      }
+    if (fieldFormat && fieldFormat.format && value !== '') {
+      rendered = this.formatValue(value, fieldFormat.format, field, rendered);
     }
 
-    // PRIORITY 1: Check for comparison first (generates its own HTML with value)
-    let isComparisonField = config.enable_comparison && config.comparison_primary_field === field.name;
-    let comparisonHtml = null;
-
-    if (isComparisonField) {
-      comparisonHtml = this.renderComparison(row, config, drillLinks, rowIdx, data);
+    if (config.enable_comparison && config.comparison_primary_field === field.name) {
+       return this.renderComparison(row, config, drillLinks, rowIdx, data);
     }
 
-    // PRIORITY 2: Check for cell bars (can wrap comparison or regular value)
-    let isCellBarField = false;
-    let cellBarSet = null;
-    for (let i = 0; i < config.cellBarSets.length; i++) {
-      if (config.cellBarSets[i].fields.includes(field.name)) {
-        isCellBarField = true;
-        cellBarSet = config.cellBarSets[i];
-        break;
-      }
-    }
-
-    if (isCellBarField) {
-      // If it's also a comparison field, use the comparison HTML as the "rendered" value
-      const displayValue = isComparisonField ? comparisonHtml : rendered;
-      // Don't apply filter highlighting to cell bars - it breaks the HTML
-      return this.renderCellBar(value, displayValue, config, drillLinks, cellBarSet, field.name);
-    }
-
-    // If comparison but no cell bar, return comparison
-    if (isComparisonField) {
-      // Don't apply filter highlighting to comparison HTML - it breaks the structure
-      return comparisonHtml;
-    }
-
-    // Check for emojis
-    if (config.enable_emojis && config.emojis[value]) {
-      rendered = `${config.emojis[value]} ${rendered}`;
-    }
-
-    // Wrap with drill links if available
-    if (drillLinks && drillLinks.length > 0) {
+    if (drillLinks.length > 0) {
       const drillId = `drill-${Math.random().toString(36).substr(2, 9)}`;
       rendered = `<span class="drill-link" data-drill-id="${drillId}">${rendered}</span>`;
-
       setTimeout(() => {
         const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
-        if (elem) {
-          elem.addEventListener('click', (e) => {
-            LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e });
-          });
-        }
+        if (elem) elem.addEventListener('click', (e) => LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e }));
       }, 0);
     }
-
-    // Highlight filter matches - ONLY for plain text cells (not comparison/cell bars)
-    if (this.state.tableFilter && config.enable_table_filter) {
-      const regex = new RegExp(`(${this.escapeRegex(this.state.tableFilter)})`, 'gi');
-      rendered = String(rendered).replace(regex, '<span class="highlight-match">$1</span>');
-    }
-
     return rendered;
-  },
-
-  renderCellBar: function(value, rendered, config, drillLinks, barSet, fieldName) {
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return rendered;
-
-    // Find min/max values for THIS field across the dataset
-    const allValues = this.state.data.map(row => {
-      const cell = row[fieldName];
-      const val = cell && cell.value !== undefined ? cell.value : cell;
-      return parseFloat(val);
-    }).filter(v => !isNaN(v));
-
-    const maxValue = Math.max(...allValues);
-    const minValue = Math.min(...allValues, 0);
-    const range = maxValue - minValue;
-
-    const widthPercent = range > 0 ? ((numValue - minValue) / range) * config.cell_bar_max_width : 0;
-
-    const drillId = drillLinks && drillLinks.length > 0 ? `drill-${Math.random().toString(36).substr(2, 9)}` : null;
-
-    // Create gradient or solid color
-    let barColor;
-    if (barSet.gradient) {
-      barColor = `linear-gradient(90deg, ${barSet.color}, ${barSet.gradientEnd})`;
-    } else {
-      barColor = barSet.color;
-    }
-
-    // Use rendered value which could be comparison HTML
-    const html = `
-      <div class="cell-bar-container">
-        <div class="cell-bar-background">
-          <div class="cell-bar-fill" style="width: ${widthPercent}%; background: ${barColor};"></div>
-        </div>
-        ${config.cell_bar_show_value ?
-          `<div class="cell-bar-value${drillId ? ' drill-link' : ''}" ${drillId ? `data-drill-id="${drillId}"` : ''}>${rendered}</div>` :
-          ''}
-      </div>
-    `;
-
-    if (drillId) {
-      setTimeout(() => {
-        const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
-        if (elem) {
-          elem.addEventListener('click', (e) => {
-            LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e });
-          });
-        }
-      }, 0);
-    }
-
-    return html;
   },
 
   renderComparison: function(row, config, drillLinks, rowIdx, data) {
     const primaryCell = row[config.comparison_primary_field];
+    if (!primaryCell) return '';
+    const primary = parseFloat(primaryCell.value !== undefined ? primaryCell.value : primaryCell);
+    const primaryRendered = primaryCell.rendered || primary;
+    if (isNaN(primary)) return String(primaryRendered);
 
-    if (!primaryCell) {
-      return '';
-    }
-
-    const primaryValue = primaryCell.value !== undefined ? primaryCell.value : primaryCell;
-    const primaryRendered = primaryCell.rendered || primaryValue;
-    const primary = parseFloat(primaryValue);
-
-    if (isNaN(primary)) {
-      return String(primaryRendered);
-    }
-
-    let secondary, comparisonLabel;
-
-    // METRIC VS METRIC MODE
+    let secondary = 0;
     if (config.comparison_mode === 'metric') {
       const secondaryCell = row[config.comparison_secondary_field];
-
-      if (!secondaryCell) {
-        return String(primaryRendered);
+      if (secondaryCell) secondary = parseFloat(secondaryCell.value !== undefined ? secondaryCell.value : secondaryCell);
+    } else if (config.comparison_mode === 'period' && data && rowIdx !== undefined) {
+      const compareRow = data[rowIdx - config.comparison_period_offset];
+      if (compareRow && compareRow[config.comparison_primary_field]) {
+        secondary = parseFloat(compareRow[config.comparison_primary_field].value || compareRow[config.comparison_primary_field]);
       }
-
-      const secondaryValue = secondaryCell.value !== undefined ? secondaryCell.value : secondaryCell;
-      secondary = parseFloat(secondaryValue);
-      comparisonLabel = config.comparison_label || 'vs Metric';
-    }
-    // PERIOD OVER PERIOD MODE
-    else if (config.comparison_mode === 'period') {
-      if (rowIdx === undefined || !data) {
-        return String(primaryRendered);
-      }
-
-      // Handle negative offset (previous rows)
-      const offset = config.comparison_period_offset;
-      const compareRowIdx = rowIdx - offset;
-
-      if (compareRowIdx < 0 || compareRowIdx >= data.length) {
-        // Out of bounds
-        return String(primaryRendered);
-      }
-
-      const compareRow = data[compareRowIdx];
-
-      if (!compareRow) {
-        return String(primaryRendered);
-      }
-
-      const compareCell = compareRow[config.comparison_primary_field];
-      if (!compareCell) {
-        return String(primaryRendered);
-      }
-
-      const compareValue = compareCell.value !== undefined ? compareCell.value : compareCell;
-      secondary = parseFloat(compareValue);
-      comparisonLabel = config.comparison_label || `vs ${offset > 0 ? '+' : ''}${offset}`;
     }
 
-    if (isNaN(secondary) || secondary === 0) {
-      return String(primaryRendered);
-    }
-
+    if (isNaN(secondary) || secondary === 0) return String(primaryRendered);
     const diff = primary - secondary;
-    const percentDiff = (diff / Math.abs(secondary)) * 100;
-    const isPositive = diff >= 0;
-    const color = isPositive ? config.positive_comparison_color : config.negative_comparison_color;
-    const arrow = config.show_comparison_arrows ? (isPositive ? '↑' : '↓') : '';
-
-    let comparisonText = '';
-    if (config.comparison_type === 'percentage' || config.comparison_type === 'both') {
-      comparisonText = `${diff > 0 ? '+' : ''}${percentDiff.toFixed(1)}%`;
-    }
-    if (config.comparison_type === 'absolute' || config.comparison_type === 'both') {
-      if (comparisonText) comparisonText += ` (${diff > 0 ? '+' : ''}${diff.toFixed(0)})`;
-      else comparisonText = `${diff > 0 ? '+' : ''}${diff.toFixed(0)}`;
-    }
-
-    const drillId = primaryCell.links && primaryCell.links.length > 0 ? `drill-${Math.random().toString(36).substr(2, 9)}` : null;
-    const links = primaryCell.links || [];
-
-    let html = `
-      <div class="comparison-container">
-        <span${drillId ? ` class="drill-link" data-drill-id="${drillId}"` : ''}>${primaryRendered}</span>
-        <span class="comparison-value" style="color: ${color};" title="${comparisonLabel}">
-          ${arrow} ${comparisonText}
-        </span>
-    `;
-
-    if (config.comparison_type === 'bar' || config.comparison_type === 'both') {
-      const barWidth = Math.min(Math.abs(percentDiff), 100);
-      html += `
-        <div style="width: 100%; max-width: 60px;">
-          <div class="comparison-bar" style="width: ${barWidth}%; background-color: ${color};"></div>
-        </div>
-      `;
-    }
-
-    html += '</div>';
-
-    if (drillId) {
-      setTimeout(() => {
-        const elem = document.querySelector(`[data-drill-id="${drillId}"]`);
-        if (elem) {
-          elem.addEventListener('click', (e) => {
-            LookerCharts.Utils.openDrillMenu({ links: links, event: e });
-          });
-        }
-      }, 0);
-    }
-
-    return html;
+    const isPos = diff >= 0;
+    const color = isPos ? config.positive_comparison_color : config.negative_comparison_color;
+    return `<div class="comparison-container"><span>${primaryRendered}</span><span style="color:${color}; font-size:0.85em;">${config.show_comparison_arrows ? (isPos?'↑':'↓') : ''} ${Math.abs((diff/Math.abs(secondary))*100).toFixed(1)}%</span></div>`;
   },
 
-  getTableStyles: function(config) {
-    let styles = '';
-
-    if (config.table_theme !== 'minimal' && config.show_borders) {
-      styles += `border: ${config.border_width}px ${config.border_style} ${config.border_color};`;
-    }
-
-    return styles;
-  },
-
-  getHeaderStyles: function(config) {
-    let styles = '';
-
-    if (config.header_font_family !== 'default') {
-      styles += `font-family: ${config.header_font_family};`;
-    }
-    styles += `font-size: ${config.header_font_size}px;`;
-    styles += `font-weight: ${config.header_font_weight};`;
-    styles += `color: ${config.header_text_color};`;
-    styles += `background-color: ${config.header_bg_color};`;
-    styles += `text-align: ${config.header_alignment};`;
-    styles += `padding: ${config.row_spacing}px ${config.column_spacing}px;`;
-
-    if (config.table_theme !== 'minimal' && config.show_borders) {
-      styles += `border: ${config.border_width}px ${config.border_style} ${config.border_color};`;
-    }
-
-    return styles;
-  },
-
-  getCellStyles: function(config) {
-    let styles = '';
-
-    if (config.cell_font_family !== 'default') {
-      styles += `font-family: ${config.cell_font_family};`;
-    }
-    styles += `font-size: ${config.cell_font_size}px;`;
-    styles += `color: ${config.cell_text_color};`;
-    styles += `background-color: ${config.cell_bg_color};`;
-    styles += `height: ${config.row_height}px;`;
-    styles += `padding: ${config.row_spacing}px ${config.column_spacing}px;`;
-
-    if (config.wrap_text) {
-      styles += 'white-space: normal; word-wrap: break-word;';
-    } else {
-      styles += 'white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
-    }
-
-    if (config.cell_alignment !== 'auto') {
-      styles += `text-align: ${config.cell_alignment};`;
-    }
-
-    if (config.table_theme !== 'minimal' && config.show_gridlines && config.show_borders) {
-      styles += `border: ${config.border_width}px ${config.border_style} ${config.border_color};`;
-    }
-
-    return styles;
-  },
-
-  getRowConditionalStyles: function(row, config, baseStyles) {
-    if (!config.enable_row_conditional || !config.row_condition_field) {
-      return baseStyles;
-    }
-
-    const cellValue = row[config.row_condition_field];
-    const value = cellValue && cellValue.value !== undefined ? cellValue.value : cellValue;
-
-    if (this.evaluateCondition(value, config.row_condition_operator, config.row_condition_value)) {
-      return `${baseStyles}; background-color: ${config.row_condition_bg_color}; color: ${config.row_condition_text_color};`;
-    }
-
-    return baseStyles;
-  },
-
-  getColumnConditionalStyles: function(row, fieldName, config, baseStyles) {
-    if (!config.enable_column_conditional || !config.column_condition_field ||
-        config.column_condition_field !== fieldName) {
-      return baseStyles;
-    }
-
-    const cellValue = row[fieldName];
-    const value = cellValue && cellValue.value !== undefined ? cellValue.value : cellValue;
-
-    if (this.evaluateCondition(value, config.column_condition_operator, config.column_condition_value)) {
-      return `${baseStyles}; background-color: ${config.column_condition_bg_color}; color: ${config.column_condition_text_color};`;
-    }
-
-    return baseStyles;
-  },
+  getTableStyles: function(config) { return (config.table_theme !== 'minimal' && config.show_borders) ? `border: ${config.border_width}px ${config.border_style} ${config.border_color};` : ''; },
+  getHeaderStyles: function(config) { return `font-size:${config.header_font_size}px; font-weight:${config.header_font_weight}; color:${config.header_text_color}; background-color:${config.header_bg_color}; text-align:${config.header_alignment};`; },
 
   evaluateCondition: function(value, operator, compareValue) {
-    const numValue = parseFloat(value);
-    const numCompare = parseFloat(compareValue);
-
+    const numValue = parseFloat(value), numCompare = parseFloat(compareValue);
     if (!isNaN(numValue) && !isNaN(numCompare)) {
       switch (operator) {
-        case '>': return numValue > numCompare;
-        case '<': return numValue < numCompare;
-        case '>=': return numValue >= numCompare;
-        case '<=': return numValue <= numCompare;
+        case '>': return numValue > numCompare; case '<': return numValue < numCompare;
         case '==': return numValue === numCompare;
-        case '!=': return numValue !== numCompare;
       }
     }
-
-    const strValue = String(value).toLowerCase();
-    const strCompare = String(compareValue).toLowerCase();
-
-    switch (operator) {
-      case '==': return strValue === strCompare;
-      case '!=': return strValue !== strCompare;
-      case 'contains': return strValue.includes(strCompare);
-      default: return false;
-    }
+    return operator === '==' ? String(value).toLowerCase() === String(compareValue).toLowerCase() : false;
   },
 
   attachEventListeners: function(config) {
     const self = this;
-
-    // Subtotal row collapse/expand (only for top position)
     if (config.subtotal_position === 'top') {
-      // Click on entire subtotal row OR the collapse cell
-      this.container.querySelectorAll('tr.subtotal-row.position-top').forEach(subtotalRow => {
-        subtotalRow.addEventListener('click', function(e) {
-          // Only toggle if clicking the row itself, not other interactive elements
-          const isCollapsed = this.classList.contains('collapsed');
+      this.container.querySelectorAll('tr.subtotal-row.position-top').forEach(row => {
+        row.addEventListener('click', function() {
           const groupValue = this.dataset.group;
-
-          // Toggle collapsed state in the actual data
-          if (!self.state.collapsedGroups) {
-            self.state.collapsedGroups = {};
-          }
-
-          if (isCollapsed) {
-            // Expand: remove from collapsed groups
-            delete self.state.collapsedGroups[groupValue];
-          } else {
-            // Collapse: add to collapsed groups
-            self.state.collapsedGroups[groupValue] = true;
-          }
-
-          // Re-render to apply collapse state across all pages
-          console.log('[TABLE] Toggling group:', groupValue, isCollapsed ? 'expanding' : 'collapsing');
+          if (!self.state.collapsedGroups) self.state.collapsedGroups = {};
+          if (this.classList.contains('collapsed')) delete self.state.collapsedGroups[groupValue];
+          else self.state.collapsedGroups[groupValue] = true;
           self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
         });
       });
     }
-
-    // Pagination buttons
     this.container.querySelectorAll('.pagination-button').forEach(btn => {
       btn.addEventListener('click', function() {
-        const action = this.dataset.action;
         const totalPages = Math.ceil(self.state.data.length / config.page_size);
-
-        switch (action) {
+        switch (this.dataset.action) {
           case 'first': self.state.currentPage = 1; break;
           case 'prev': self.state.currentPage = Math.max(1, self.state.currentPage - 1); break;
           case 'next': self.state.currentPage = Math.min(totalPages, self.state.currentPage + 1); break;
           case 'last': self.state.currentPage = totalPages; break;
         }
-
-        console.log('[TABLE] Pagination clicked, re-rendering...');
-        // Direct call to updateAsync
         self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
       });
     });
-
-    // Table filter with Enter key
-    const tableFilterInput = this.container.querySelector('#table-filter-input');
-
-    const applyTableFilter = function() {
-      console.log('[TABLE] Applying table filter:', tableFilterInput.value);
-      self.state.tableFilter = tableFilterInput.value;
-      self.state.currentPage = 1;
-      console.log('[TABLE] Table filter state updated, calling updateAsync directly...');
-      // Direct call to updateAsync
-      self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {
-        console.log('[TABLE] Filter update complete');
-      });
-    };
-
-    if (tableFilterInput) {
-      console.log('[TABLE] Table filter input found, attaching Enter key listener');
-      tableFilterInput.addEventListener('keypress', function(e) {
-        console.log('[TABLE] Key pressed in table filter:', e.key);
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          console.log('[TABLE] Enter pressed, applying filter...');
-          applyTableFilter();
-        }
-      });
-    } else {
-      console.warn('[TABLE] Table filter input NOT found');
-    }
-
-    // Column filters with Enter key
+    const filterInput = this.container.querySelector('#table-filter-input');
+    if (filterInput) filterInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { self.state.tableFilter = filterInput.value; self.state.currentPage = 1; self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {}); } });
     this.container.querySelectorAll('.column-filter').forEach(input => {
-      const field = input.dataset.field;
-      console.log('[TABLE] Attaching column filter listener for:', field);
-
-      const applyColumnFilter = function() {
-        console.log('[TABLE] Applying column filter for', field, ':', input.value);
-        self.state.columnFilters[field] = input.value;
-        self.state.currentPage = 1;
-        console.log('[TABLE] Column filter applied for', field, ':', input.value);
-        console.log('[TABLE] Current filter state:', self.state.columnFilters);
-        // Direct call to updateAsync
-        self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {
-          console.log('[TABLE] Column filter update complete');
-        });
-      };
-
-      // Enter key
-      input.addEventListener('keypress', function(e) {
-        console.log('[TABLE] Key pressed in column filter for', field, ':', e.key);
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('[TABLE] Enter pressed in column filter, applying...');
-          applyColumnFilter();
-        }
-      });
-
-      // Stop propagation on click to prevent header sorting
-      input.addEventListener('click', function(e) {
-        e.stopPropagation();
-      });
+      input.addEventListener('keypress', (e) => { if (e.key === 'Enter') { self.state.columnFilters[input.dataset.field] = input.value; self.state.currentPage = 1; self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {}); } });
+      input.addEventListener('click', (e) => e.stopPropagation());
     });
-
-    // Sortable headers - use addEventListener instead of onclick
     this.container.querySelectorAll('th.sortable').forEach(th => {
-      th.addEventListener('click', function(e) {
-        // Don't sort if clicking on filter input
-        if (e.target.classList.contains('column-filter')) {
-          return;
-        }
-
-        const field = this.dataset.field;
-        console.log('[TABLE] Sort clicked on field:', field);
-
-        if (self.state.sortField === field) {
-          self.state.sortDirection = self.state.sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-          self.state.sortField = field;
-          self.state.sortDirection = 'asc';
-        }
-
-        console.log('[TABLE] New sort state:', self.state.sortField, self.state.sortDirection);
-        // Direct call to updateAsync
-        self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {
-          console.log('[TABLE] Sort update complete');
-        });
-      });
-    });
-
-    // Hover effects
-    if (config.enable_hover) {
-      this.container.querySelectorAll('tbody td').forEach(td => {
-        td.addEventListener('mouseenter', function() {
-          const row = this.dataset.row;
-          const col = this.dataset.col;
-
-          if (config.hover_highlight_type === 'row' || config.hover_highlight_type === 'cross') {
-            self.container.querySelectorAll(`td[data-row="${row}"]`).forEach(cell => {
-              cell.style.backgroundColor = config.hover_bg_color;
-            });
-          }
-
-          if (config.hover_highlight_type === 'column' || config.hover_highlight_type === 'cross') {
-            self.container.querySelectorAll(`td[data-col="${col}"]`).forEach(cell => {
-              cell.style.backgroundColor = config.hover_bg_color;
-            });
-          }
-
-          if (config.hover_highlight_type === 'cell') {
-            this.style.backgroundColor = config.hover_bg_color;
-          }
-        });
-
-        td.addEventListener('mouseleave', function() {
-          self.container.querySelectorAll('tbody td').forEach(cell => {
-            cell.style.backgroundColor = '';
-          });
-        });
-      });
-    }
-
-    // Tooltips
-    if (config.enable_tooltips) {
-      this.container.querySelectorAll('tbody td').forEach(td => {
-        td.addEventListener('mouseenter', function(e) {
-          const field = this.dataset.field;
-          const fieldObj = self.queryResponse.fields.dimension_like.concat(self.queryResponse.fields.measure_like)
-            .find(f => f.name === field);
-
-          if (fieldObj && config.tooltip_show_label) {
-            const rect = this.getBoundingClientRect();
-            self.tooltip.querySelector('.tooltip-label').textContent = fieldObj.label_short || fieldObj.label;
-            self.tooltip.querySelector('.tooltip-value').textContent = this.textContent.trim();
-            self.tooltip.style.left = rect.left + 'px';
-            self.tooltip.style.top = (rect.bottom + 5) + 'px';
-            self.tooltip.classList.add('visible');
-          }
-        });
-
-        td.addEventListener('mouseleave', function() {
-          self.tooltip.classList.remove('visible');
-        });
-      });
-    }
-
-    // Hierarchy toggles
-    this.container.querySelectorAll('.hierarchy-toggle').forEach(toggle => {
-      toggle.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const rowId = this.dataset.rowId;
-        if (self.state.expandedRows.has(rowId)) {
-          self.state.expandedRows.delete(rowId);
-        } else {
-          self.state.expandedRows.add(rowId);
-        }
-        console.log('[TABLE] Hierarchy toggle clicked, re-rendering...');
-        // Direct call to updateAsync
-        self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {
-          console.log('[TABLE] Hierarchy update complete');
-        });
+      th.addEventListener('click', (e) => {
+        if (e.target.classList.contains('column-filter')) return;
+        const field = th.dataset.field;
+        self.state.sortDirection = (self.state.sortField === field && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
+        self.state.sortField = field;
+        self.updateAsync(self.state.data, self.container.parentElement, self.config, self.queryResponse, {}, () => {});
       });
     });
   },
 
-  escapeHtml: function(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  },
-
-  escapeRegex: function(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  },
-
-  trigger: function(event) {
-    // Legacy function - no longer used
-    // All interactions now call updateAsync directly
-    console.log('[TABLE] Legacy trigger called (should not happen):', event);
-  }
+  escapeHtml: function(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; },
+  trigger: function(event) {}
 };
 
 looker.plugins.visualizations.add(visObject);
