@@ -8,151 +8,36 @@ const visObject = {
   id: "advanced_table_visual",
   label: "Advanced Table",
   options: {
-    // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
-    // ══════════════════════════════════════════════════════════════
-    plot_divider_display: {
-      type: "string",
-      label: "─────────────────────────────── Display Options ───────────────────────────────",
-      display: "divider",
-      section: "Plot",
-      order: 0
-    },
+    plot_divider_display: { type: "string", label: "──────────────── Display Options ────────────────", display: "divider", section: "Plot", order: 0 },
     show_row_numbers: { type: "boolean", label: "Show Row Numbers", default: false, section: "Plot", order: 1 },
     show_headers: { type: "boolean", label: "Show Headers", default: true, section: "Plot", order: 2 },
-
-    plot_divider_pagination: {
-      type: "string",
-      label: "─────────────────────────────── Pagination ───────────────────────────────",
-      display: "divider",
-      section: "Plot",
-      order: 10
-    },
     enable_pagination: { type: "boolean", label: "Enable Pagination", default: true, section: "Plot", order: 11 },
     page_size: { type: "number", label: "Page Size", default: 25, display: "number", min: 5, max: 1000, section: "Plot", order: 12 },
-    pagination_position: {
-      type: "string",
-      label: "Pagination Position",
-      display: "select",
-      values: [{ "Top": "top" }, { "Bottom": "bottom" }, { "Both": "both" }],
-      default: "bottom",
-      section: "Plot",
-      order: 13
-    },
-    show_page_info: { type: "boolean", label: "Show Page Info", default: true, section: "Plot", order: 14 },
+    pagination_position: { type: "string", label: "Pagination Position", display: "select", values: [{ "Top": "top" }, { "Bottom": "bottom" }, { "Both": "both" }], default: "bottom", section: "Plot", order: 13 },
 
-    // ══════════════════════════════════════════════════════════════
-    // TAB: SERIES
-    // ══════════════════════════════════════════════════════════════
+    // TAB: SERIES - HIERARCHY (FORCED TO TOP)
+    hierarchy_divider: { type: "string", label: "──────────────── BO Hierarchy Mode ────────────────", display: "divider", section: "Series", order: -100 },
+    enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Series", order: -99 },
+    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels (comma-separated)", display: "text", default: "", placeholder: "products.brand,products.category", section: "Series", order: -98 },
 
-    // SECTION 1: BO HIERARCHY
-    hierarchy_divider: {
-      type: "string",
-      label: "─────────────────────────────── BO Hierarchy Mode ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 100
-    },
-    enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Series", order: 101 },
-    hierarchy_dimensions: {
-      type: "string",
-      label: "Hierarchy Levels (comma-separated)",
-      display: "text",
-      default: "",
-      placeholder: "products.brand,products.category",
-      section: "Series",
-      order: 102
-    },
+    // TAB: SERIES - SUBTOTALS
+    subtotals_divider: { type: "string", label: "──────────────── Standard Subtotals ────────────────", display: "divider", section: "Series", order: -90 },
+    enable_subtotals: { type: "boolean", label: "Enable Subtotals (Standard)", default: false, section: "Series", order: -89 },
+    subtotal_dimension: { type: "string", label: "Group By Dimension (Standard)", display: "select", values: [{"None": ""}], default: "", section: "Series", order: -88 },
+    subtotal_position: { type: "string", label: "Subtotal Position", display: "select", values: [{"Top (Collapsible)": "top"}, {"Bottom": "bottom"}], default: "bottom", section: "Series", order: -87 },
+    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: -86 },
 
-    // SECTION 2: STANDARD SUBTOTALS
-    subtotals_divider: {
-      type: "string",
-      label: "─────────────────────────────── Standard Subtotals ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 200
-    },
-    enable_subtotals: { type: "boolean", label: "Enable Subtotals (Standard)", default: false, section: "Series", order: 201 },
-    subtotal_dimension: {
-      type: "string",
-      label: "Group By Dimension (Standard)",
-      display: "select",
-      values: [{"None": ""}],
-      default: "",
-      section: "Series",
-      order: 202
-    },
-    subtotal_position: {
-      type: "string",
-      label: "Subtotal Position",
-      display: "select",
-      values: [{"Top (Collapsible)": "top"}, {"Bottom": "bottom"}],
-      default: "bottom",
-      section: "Series",
-      order: 203
-    },
-    subtotal_label: { type: "string", label: "Subtotal Label Format", default: "{value}", section: "Series", order: 204 },
-    subtotal_background_color: { type: "string", label: "Subtotal Background Color", display: "color", default: "#f0f0f0", section: "Series", order: 205 },
+    // TAB: SERIES - DATA CHIPS
+    chips_divider: { type: "string", label: "──────────────── Data Chips ────────────────", display: "divider", section: "Series", order: -70 },
+    enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: true, section: "Series", order: -69 },
+    data_chip_fields: { type: "string", label: "Apply Chips to Fields (comma-separated)", display: "text", default: "", section: "Series", order: -68 },
+    chip_match_green: { type: "string", label: "Green Match", default: "complete,yes,active", section: "Series", order: -67 },
+    chip_match_red: { type: "string", label: "Red Match", default: "cancelled,no,inactive,null", section: "Series", order: -66 },
 
-    // SECTION 3: GRAND TOTALS
-    totals_divider: {
-      type: "string",
-      label: "─────────────────────────────── Grand Totals ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 300
-    },
-    show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 301 },
-    grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Series", order: 302 },
-    show_grand_total_on_all_pages: { type: "boolean", label: "Show Grand Total on All Pages", default: true, section: "Series", order: 303 },
-
-    // SECTION 4: DATA CHIPS
-    chips_divider: {
-      type: "string",
-      label: "─────────────────────────────── Data Chips ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 400
-    },
-    enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: true, section: "Series", order: 401 },
-    data_chip_fields: { type: "string", label: "Apply Chips to Fields (comma-separated)", display: "text", default: "", section: "Series", order: 402 },
-    chip_match_green: { type: "string", label: "Green Match", default: "complete,yes,active", section: "Series", order: 403 },
-    chip_match_red: { type: "string", label: "Red Match", default: "cancelled,no,inactive,null", section: "Series", order: 404 },
-    chip_match_yellow: { type: "string", label: "Yellow Match", default: "warning,pending", section: "Series", order: 405 },
-    chip_match_blue: { type: "string", label: "Blue Match", default: "shipped,processing", section: "Series", order: 406 },
-
-    // SECTION 5: FIELD FORMATTING (Dynamic fields will start at order 500+)
-    field_labels_divider: {
-      type: "string",
-      label: "─────────────────────────────── Field Formatting ───────────────────────────────",
-      display: "divider",
-      section: "Series",
-      order: 500
-    },
-    enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 501 },
-
-    // ══════════════════════════════════════════════════════════════
-    // TAB: FORMATTING
-    // ══════════════════════════════════════════════════════════════
-    formatting_divider_theme: {
-      type: "string",
-      label: "─────────────────────────────── Theme ───────────────────────────────",
-      display: "divider",
-      section: "Formatting",
-      order: 0
-    },
-    table_theme: {
-      type: "string",
-      label: "Table Theme",
-      display: "select",
-      values: [{ "Modern": "modern" }, { "Striped": "striped" }, { "Compact": "compact" }],
-      default: "modern",
-      section: "Formatting",
-      order: 1
-    },
-    cell_font_size: { type: "number", label: "Cell Font Size (px)", default: 11, section: "Formatting", order: 22 },
-    row_height: { type: "number", label: "Row Height (px)", default: 36, section: "Formatting", order: 27 },
-    column_spacing: { type: "number", label: "Column Spacing (px)", default: 12, section: "Formatting", order: 36 }
+    // TAB: SERIES - FIELD FORMATTING (FORCED TO BOTTOM)
+    field_labels_divider: { type: "string", label: "──────────────── Field Formatting ────────────────", display: "divider", section: "Series", order: 500 },
+    enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 501 }
   },
 
   create: function(element, config) {
