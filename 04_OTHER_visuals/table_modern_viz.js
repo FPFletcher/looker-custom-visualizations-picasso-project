@@ -1591,10 +1591,16 @@ const visObject = {
       }
     }
 
+    // Add grand total row if enabled
     if (parsedConfig.show_grand_total) {
+      console.log('[TABLE] Adding grand total row');
       const measures = queryResponse.fields.measure_like;
       const dimensions = queryResponse.fields.dimension_like;
-      const grandTotal = this.calculateGrandTotal(filteredData, measures, parsedConfig, dimensions);
+
+      // ACTION 2 FIX: Change 'filteredData' to 'data' in the line below
+      // to prevent double-counting subtotals in the grand total.
+      const grandTotal = this.calculateGrandTotal(data, measures, parsedConfig, dimensions);
+
       filteredData.push(grandTotal);
     }
 
@@ -1751,31 +1757,22 @@ const visObject = {
     return result;
   },
 
-  calculateGrandTotal: function(data, measures, config, dimensions) {
-    const totalRow = { __isGrandTotal: true };
-    const label = config.grand_total_label || 'Grand Total';
-    if (dimensions.length > 0) {
-      const firstDimField = dimensions[0].name;
-      totalRow[firstDimField] = { value: label, rendered: label };
-      dimensions.forEach((dim, idx) => {
-        if (idx > 0) totalRow[dim.name] = { value: '', rendered: '' };
-      });
+calculateGrandTotal: function(rawData, measures, config, dimensions) {
+  const total = { __isGrandTotal: true };
+  if (dimensions.length > 0) total[dimensions[0].name] = { value: config.grand_total_label, rendered: config.grand_total_label };
+measures.forEach(m => {
+  let sum = 0;
+  rawData.forEach(r => {
+    // Sum only from the original data, skipping any subtotal rows
+    if(!r.__isSubtotal) {
+      let v = r[m.name];
+      sum += Number((v && typeof v === 'object' ? v.value : v) || 0);
     }
-    measures.forEach(measure => {
-      let sum = 0;
-      data.forEach(row => {
-        if (row.__isSubtotal) return;
-        let value = row[measure.name];
-        if (value && typeof value === 'object') value = value.value;
-        if (value !== null && value !== undefined && !isNaN(value)) sum += Number(value);
-      });
-      totalRow[measure.name] = {
-        value: sum,
-        rendered: sum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      };
-    });
-    return totalRow;
-  },
+  });
+  total[m.name] = { value: sum, rendered: sum.toLocaleString(undefined, {minimumFractionDigits: 2}) };
+});
+return total;
+},
 
   applyFilters: function(data, config) {
     let filtered = [...data];
@@ -1819,54 +1816,44 @@ const visObject = {
     });
   },
 
-renderTable: function(pageData, allFilteredData, totalPages, config, queryResponse) {
-  let html = '';
-  const existingStyle = document.getElementById('table-stripe-style');
-  if (existingStyle) existingStyle.remove();
-  const style = document.createElement('style');
-  style.id = 'table-stripe-style';
-  style.innerHTML = `:root {
-    --stripe-color: ${config.stripe_color || '#f9fafb'};
-      --cell-font-size: ${config.cell_font_size || 11}px;
-      --cell-text-color: ${config.cell_text_color || '#374151'};
-        --row-height: ${config.row_height || 36}px;
-        --row-spacing: ${config.row_spacing || 0}px;
-        --column-spacing: ${config.column_spacing || 12}px;
-        --wrap-text: ${config.wrap_text ? 'normal' : 'nowrap'};
-        --show-borders: ${config.show_borders ? config.border_width || 1 : 0}px;
-        --border-style: ${config.border_style || 'solid'};
-        --border-color: ${config.border_color || '#e5e7eb'};
-          --column-condition-bg-color: ${config.column_condition_bg_color || '#dbeafe'};
-            --column-condition-text-color: ${config.column_condition_text_color || '#1e40af'};
-              --row-condition-bg-color: ${config.row_condition_bg_color || '#fef3c7'};
-                --row-condition-text-color: ${config.row_condition_text_color || '#92400e'};
-                  --subtotal-bg-color: ${config.subtotal_background_color || '#f0f0f0'};
-                  }
-                  .advanced-table tbody tr.subtotal-row { background-color: var(--subtotal-bg-color) !important; }`;
-                  document.head.appendChild(style);
+  renderTable: function(pageData, totalRows, totalPages, config, queryResponse) {
+    const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
 
-                  if (config.enable_pagination && (config.pagination_position === 'top' || config.pagination_position === 'both')) {
-                    html += this.renderPagination(allFilteredData.length, totalPages, config, 'top');
-                  }
+    // UI: Full Pagination Controls
+    let html = `<div class="pagination-controls"><span>Visible Rows: ${totalRows}</span><div>
+    <button class="p-btn" data-action="first" ${this.state.currentPage===1?'disabled':''}>«</button>
+    <button class="p-btn" data-action="prev" ${this.state.currentPage===1?'disabled':''}>‹</button>
+    <span style="margin:0 10px;">Page ${this.state.currentPage} of ${totalPages}</span>
+    <button class="p-btn" data-action="next" ${this.state.currentPage===totalPages?'disabled':''}>›</button>
+    <button class="p-btn" data-action="last" ${this.state.currentPage===totalPages?'disabled':''}>»</button>
+    </div></div>`;
 
-                  if (config.enable_table_filter) {
-                    html += `<div class="filter-container"><input type="text" class="filter-input" placeholder="Search... (Enter)" value="${this.escapeHtml(this.state.tableFilter)}" id="table-filter-input" /></div>`;
-                  }
+    html += `<div class="table-wrapper"><table class="advanced-table ${config.table_theme}" style="--cell-font-size:${config.cell_font_size}px; --row-height:${config.row_height}px; --column-spacing:${config.column_spacing}px;">
+    <thead><tr>${config.show_row_numbers ? '<th>#</th>':''}${fields.map(f => `<th>${f.label_short || f.label}</th>`).join('')}</tr></thead><tbody>`;
 
-                  html += '<div class="table-wrapper">';
-                  html += `<table class="advanced-table ${config.table_theme}" style="${this.getTableStyles(config)}">`;
-                  if (config.enable_column_groups && config.column_groups.length > 0) html += this.renderColumnGroups(config, queryResponse);
-                  if (config.show_headers) html += this.renderHeaders(config, queryResponse);
-                  html += this.renderBody(pageData, allFilteredData, config, queryResponse);
-                  html += '</table></div>';
+    // Logic: Find the index of the grouped dimension to place the toggle icon correctly
+    const toggleIdx = fields.findIndex(f => f.name === config.subtotal_dimension);
 
-                  if (config.enable_pagination && (config.pagination_position === 'bottom' || config.pagination_position === 'both')) {
-                    html += this.renderPagination(allFilteredData.length, totalPages, config, 'bottom');
-                  }
+    pageData.forEach((row, i) => {
+      const isSub = !!row.__isSubtotal, isGrand = !!row.__isGrandTotal;
+      html += `<tr class="${isSub?'subtotal-row':''} ${isGrand?'grand-total-row':''}" data-group="${row.__groupValue || ''}" style="${isSub?`background:${config.subtotal_background_color}`:''}">`;
+      if (config.show_row_numbers) html += `<td>${(isSub||isGrand)?'':(this.state.currentPage-1)*config.page_size+i+1}</td>`;
 
-                  this.container.innerHTML = html;
-                  this.attachEventListeners(config);
-                },
+      fields.forEach((f, idx) => {
+        let content = (row[f.name] && typeof row[f.name] === 'object') ? (row[f.name].rendered || row[f.name].value || '∅') : (row[f.name] || '∅');
+
+        // Dynamic Placement: Prepend toggle only if we are in the grouping dimension column
+        if (isSub && config.subtotal_position === 'top' && idx === toggleIdx) {
+          content = `<span class="subtotal-toggle">${row.__isCollapsed ? '▶' : '▼'}</span>${content}`;
+        }
+
+        html += `<td class="${isSub && idx === toggleIdx ? 'subtotal-trigger-cell' : ''}">${content}</td>`;
+      });
+      html += '</tr>';
+    });
+    this.container.innerHTML = html + '</tbody></table></div>';
+    this.attachListeners(config, totalPages);
+  },
 
   renderPagination: function(totalRows, totalPages, config, position) {
           const { currentPage } = this.state;
