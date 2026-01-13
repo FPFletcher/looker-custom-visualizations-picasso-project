@@ -2400,10 +2400,14 @@ const visObject = {
       if (isSubtotalRow && config.subtotal_position === 'top') {
         const isCollapsed = row.__isCollapsed;
         const collapseIcon = isCollapsed ? '[+]' : '[-]';
+        console.log('[TABLE] Adding collapse cell WITH icon for subtotal:', row[fields[0].name]);
         html += `<td class="collapse-cell" style="width: 35px; text-align: center; cursor: pointer; user-select: none; font-weight: bold; color: #666;">${collapseIcon}</td>`;
       } else if (config.subtotal_position === 'top' && config.enable_subtotals) {
-        // Empty cell for detail rows
+        // Empty cell for detail rows AND grand total rows
+        console.log('[TABLE] Adding EMPTY collapse cell for row:', isGrandTotalRow ? 'GRAND TOTAL' : row[fields[0].name]);
         html += `<td class="collapse-cell" style="width: 35px;"></td>`;
+      } else {
+        console.log('[TABLE] NOT adding collapse cell for row:', isGrandTotalRow ? 'GRAND TOTAL' : row[fields[0].name], 'config.subtotal_position:', config.subtotal_position, 'config.enable_subtotals:', config.enable_subtotals);
       }
 
       if (config.show_row_numbers) {
