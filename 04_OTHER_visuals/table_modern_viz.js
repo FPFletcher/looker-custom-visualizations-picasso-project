@@ -1,6 +1,6 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.17.0 - FULL INTEGRATION + STABILITY FIX
+ * Version: 4.18.0 - FULL RESTORE + FIXED 3-GROUP COLUMN LOGIC + GRADIENTS
  * Build: 2026-01-14
  */
 
@@ -32,11 +32,13 @@ const visObject = {
     enable_cell_bars_1: { type: "boolean", label: "Enable Set 1", default: false, section: "Series", order: 1 },
     cell_bar_fields_1: { type: "string", label: "Fields 1", display: "text", default: "", section: "Series", order: 2 },
     cell_bar_color_1: { type: "string", label: "Color 1", display: "color", default: "#3b82f6", section: "Series", order: 3 },
-    use_gradient_1: { type: "boolean", label: "Use Gradient", default: false, section: "Series", order: 4 },
-    gradient_end_1: { type: "string", label: "End Color", display: "color", default: "#93c5fd", section: "Series", order: 5 },
+    use_gradient_1: { type: "boolean", label: "Use Gradient 1", default: false, section: "Series", order: 4 },
+    gradient_end_1: { type: "string", label: "Gradient End 1", display: "color", default: "#93c5fd", section: "Series", order: 5 },
     enable_cell_bars_2: { type: "boolean", label: "Enable Set 2", default: false, section: "Series", order: 6 },
     cell_bar_fields_2: { type: "string", label: "Fields 2", display: "text", default: "", section: "Series", order: 7 },
     cell_bar_color_2: { type: "string", label: "Color 2", display: "color", default: "#10b981", section: "Series", order: 8 },
+    use_gradient_2: { type: "boolean", label: "Use Gradient 2", default: false, section: "Series", order: 9 },
+    gradient_end_2: { type: "string", label: "Gradient End 2", display: "color", default: "#6ee7b7", section: "Series", order: 10 },
 
     grouping_divider: { type: "string", label: "──────────────── Column Grouping ────────────────", display: "divider", section: "Series", order: 20 },
     enable_column_groups: { type: "boolean", label: "Enable Grouping", default: false, section: "Series", order: 21 },
@@ -44,15 +46,17 @@ const visObject = {
     column_group_1_count: { type: "number", label: "Group 1 Count", default: 1, section: "Series", order: 23 },
     column_group_2_name: { type: "string", label: "Group 2 Name", default: "", section: "Series", order: 24 },
     column_group_2_count: { type: "number", label: "Group 2 Count", default: 1, section: "Series", order: 25 },
-    group_remaining_columns: { type: "boolean", label: "Group Remaining", default: false, section: "Series", order: 26 },
-    remaining_columns_name: { type: "string", label: "Remaining Name", default: "Other", section: "Series", order: 27 },
-    group_header_bg_color: { type: "string", label: "Header BG Color", display: "color", default: "#8dc6ff", section: "Series", order: 28 },
+    column_group_3_name: { type: "string", label: "Group 3 Name", default: "", section: "Series", order: 26 },
+    column_group_3_count: { type: "number", label: "Group 3 Count", default: 1, section: "Series", order: 27 },
+    group_remaining_columns: { type: "boolean", label: "Group Remaining Columns", default: false, section: "Series", order: 28 },
+    remaining_columns_name: { type: "string", label: "Remaining Name", default: "Other", section: "Series", order: 29 },
+    group_header_bg_color: { type: "string", label: "Group Header BG Color", display: "color", default: "#8dc6ff", section: "Series", order: 30 },
 
     comparison_divider: { type: "string", label: "──────────────── Comparison ────────────────", display: "divider", section: "Series", order: 50 },
     enable_comparison: { type: "boolean", label: "Enable Comparison", default: false, section: "Series", order: 51 },
     comparison_mode: { type: "string", label: "Mode", display: "select", values: [{ "Metric vs Metric": "metric" }, { "Period over Period": "period" }], default: "metric", section: "Series", order: 52 },
-    comparison_primary_field: { type: "string", label: "Primary Measure", display: "text", default: "", section: "Series", order: 53 },
-    comparison_secondary_field: { type: "string", label: "Secondary Measure", display: "text", default: "", section: "Series", order: 54 },
+    comparison_primary_field: { type: "string", label: "Primary Field", display: "text", default: "", section: "Series", order: 53 },
+    comparison_secondary_field: { type: "string", label: "Secondary Field", display: "text", default: "", section: "Series", order: 54 },
     comparison_period_offset: { type: "number", label: "Period Offset", default: -1, section: "Series", order: 55 },
     show_comparison_arrows: { type: "boolean", label: "Show Arrows", default: true, section: "Series", order: 56 },
     positive_comparison_color: { type: "string", label: "Pos Color", display: "color", default: "#10b981", section: "Series", order: 57 },
@@ -70,11 +74,11 @@ const visObject = {
     show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 83 },
     subtotal_position: { type: "string", label: "Position", display: "select", values: [{"Top": "top"}, {"Bottom": "bottom"}], default: "bottom", section: "Series", order: 84 },
     subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 85 },
-    grand_total_label: { type: "string", label: "Label", default: "Grand Total", section: "Series", order: 86 },
+    grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Series", order: 86 },
 
-    formatting_divider_theme: { type: "string", label: "──────────────── Theme ────────────────", display: "divider", section: "Formatting", order: 0 },
-    table_theme: { type: "string", label: "Table Theme", display: "select", values: [{ "Modern": "modern" }, { "Compact": "compact" }, { "Striped": "striped" }], default: "modern", section: "Formatting", order: 1 },
-    stripe_color: { type: "string", label: "Stripe BG Color", display: "color", default: "#f9fafb", section: "Formatting", order: 2 },
+    formatting_divider_theme: { type: "string", label: "──────────────── Theme ────────────────", display: "divider", section: "Formatting", order: 10 },
+    table_theme: { type: "string", label: "Table Theme", display: "select", values: [{ "Modern": "modern" }, { "Compact": "compact" }, { "Striped": "striped" }], default: "modern", section: "Formatting", order: 11 },
+    stripe_color: { type: "string", label: "Stripe BG Color", display: "color", default: "#f9fafb", section: "Formatting", order: 12 },
     cell_font_size: { type: "number", label: "Cell Size (px)", default: 11, section: "Formatting", order: 20 },
     row_height: { type: "number", label: "Row Height (px)", default: 36, section: "Formatting", order: 21 },
     enable_hover: { type: "boolean", label: "Enable Hover", default: true, section: "Formatting", order: 40 },
@@ -82,20 +86,21 @@ const visObject = {
   },
 
   create: function(element, config) {
+    console.log('[TABLE] Advanced Table v4.18.0 - Master Stability Build');
     element.innerHTML = `
       <style>
-        #advanced-table-container { width: 100%; height: 100%; overflow: auto; font-family: sans-serif; position: relative; }
+        #advanced-table-container { width: 100%; height: 100%; overflow: auto; font-family: -apple-system, sans-serif; position: relative; }
         .pagination-controls { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #fff; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
-        .pagination-button { padding: 4px 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; border-radius: 4px; transition: 0.2s; }
+        .pagination-button { padding: 4px 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; border-radius: 4px; }
         .pagination-button:disabled { opacity: 0.3; cursor: not-allowed; }
         table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; }
         table.advanced-table thead { position: sticky; top: 0; z-index: 100; background: #f9fafb; }
         table.advanced-table tbody td { border: 1px solid #eee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 12px; }
-        .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; display: inline-block; width: 14px; text-align: center; user-select: none; }
+        .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; user-select: none; display: inline-block; width: 14px; text-align: center; }
         .subtotal-row { font-weight: 600; cursor: pointer; }
         .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
         .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid #d1d5db; }
-        .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; }
+        .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; text-align: center; }
         .chip-green { background-color: #dcfce7; color: #166534; } .chip-red { background-color: #fee2e2; color: #991b1b; }
         .cell-bar-container { display: flex; align-items: center; gap: 8px; width: 100%; }
         .cell-bar-bg { flex: 1; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
@@ -104,7 +109,7 @@ const visObject = {
       <div id="advanced-table-container"></div>
     `;
     this.container = element.querySelector("#advanced-table-container");
-    this.state = { currentPage: 1, collapsedGroups: {}, lastSubtotalDimension: null, data: [] };
+    this.state = { currentPage: 1, sortField: null, sortDirection: 'asc', collapsedGroups: {}, lastSubtotalDimension: null, data: [] };
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
@@ -131,8 +136,8 @@ const visObject = {
     }
 
     let processedData = [...data];
+    if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
-    // ROUTE: BO HIERARCHY
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
       const hierarchyList = config.hierarchy_dimensions.split(',').map(f => f.trim());
       processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures);
@@ -141,9 +146,7 @@ const visObject = {
         this.state.forceInitialCollapse = false;
       }
       processedData = this.applyHierarchyFilter(processedData);
-    }
-    // ROUTE: STANDARD SUBTOTALS
-    else if (config.enable_subtotals && config.subtotal_dimension) {
+    } else if (config.enable_subtotals && config.subtotal_dimension) {
       processedData = this.calculateStandardSubtotals(processedData, config.subtotal_dimension, measures, config, dims);
       if (config.subtotal_position === 'top') {
         if (this.state.forceInitialCollapse) {
@@ -247,19 +250,21 @@ const visObject = {
 
     let html = `<style>:root { --cell-font-size:${config.cell_font_size}px; --row-height:${config.row_height}px; --stripe-color:${config.stripe_color}; }</style>`;
     html += `<table class="advanced-table ${config.table_theme}">`;
+
     if (config.enable_column_groups) html += this.renderColumnGroups(config, fields);
 
-    // Header
+    // Header Logic
     html += '<thead><tr style="background:#f9fafb">';
     if (config.show_row_numbers) html += '<th>#</th>';
     fields.forEach((f, idx) => {
       if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
       const sticky = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:101; background:#f9fafb;' : '';
-      html += `<th style="${sticky}">${f.label_short || f.label}</th>`;
+      const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+      html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${f.label_short || f.label}${sortIcon}</th>`;
     });
     html += '</tr></thead><tbody>';
 
-    // Body
+    // Body Logic
     processedData.forEach((row, i) => {
       const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
       const level = row.__level || 0;
@@ -281,7 +286,7 @@ const visObject = {
       html += "</tr>";
     });
 
-    html += '</tbody></table>';
+    html += "</tbody></table>";
     this.container.innerHTML = html;
     this.attachEventListeners(config);
   },
@@ -308,7 +313,7 @@ const visObject = {
     if (cell && typeof cell === 'object') { val = cell.value; rendered = cell.rendered || cell.value; }
     if (val === null || val === undefined) return '∅';
 
-    // Data Chip logic
+    // Data Chip Logic
     if (config.enable_data_chips && (config.data_chip_fields || "").split(',').includes(field.name)) {
       const s = String(val).toLowerCase();
       if ((config.chip_match_green || "").split(',').map(x=>x.trim().toLowerCase()).includes(s)) rendered = `<span class="data-chip chip-green">${rendered}</span>`;
@@ -320,15 +325,22 @@ const visObject = {
       rendered = this.renderComparison(row, config, rowIdx, data, rendered);
     }
 
-    // Cell Bar Logic
+    // Cell Bar Logic + Gradient Support
     if (config.enable_cell_bars_1 && (config.cell_bar_fields_1 || "").split(',').map(x=>x.trim()).includes(field.name)) {
-        const num = parseFloat(val);
-        const maxVal = Math.max(...data.map(r => parseFloat(r[field.name]?.value || 0)));
-        const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
-        rendered = `<div class="cell-bar-container"><div class="cell-bar-bg"><div class="cell-bar-fill" style="width:${width}%; background:${config.cell_bar_color_1};"></div></div><span>${rendered}</span></div>`;
+        rendered = this.generateCellBar(val, rendered, config.cell_bar_color_1, config.use_gradient_1, config.gradient_end_1, data, field.name);
+    } else if (config.enable_cell_bars_2 && (config.cell_bar_fields_2 || "").split(',').map(x=>x.trim()).includes(field.name)) {
+        rendered = this.generateCellBar(val, rendered, config.cell_bar_color_2, config.use_gradient_2, config.gradient_end_2, data, field.name);
     }
 
     return rendered;
+  },
+
+  generateCellBar: function(val, rendered, color, useGrad, endColor, data, fieldName) {
+      const num = parseFloat(val);
+      const maxVal = Math.max(...data.map(r => parseFloat(r[fieldName]?.value || 0)));
+      const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
+      const barStyle = useGrad ? `linear-gradient(to right, ${color}, ${endColor})` : color;
+      return `<div class="cell-bar-container"><div class="cell-bar-bg"><div class="cell-bar-fill" style="width:${width}%; background:${barStyle};"></div></div><span>${rendered}</span></div>`;
   },
 
   renderComparison: function(row, config, rowIdx, data, primaryRendered) {
@@ -351,6 +363,16 @@ const visObject = {
     return `<span>${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
   },
 
+  sortData: function(data, field, direction) {
+    return [...data].sort((a, b) => {
+      let aVal = a[field]?.value ?? a[field];
+      let bVal = b[field]?.value ?? b[field];
+      if (aVal === bVal) return 0;
+      const res = aVal > bVal ? 1 : -1;
+      return direction === 'asc' ? res : -res;
+    });
+  },
+
   attachEventListeners: function(config) {
     const self = this;
     this.container.onclick = (e) => {
@@ -359,6 +381,14 @@ const visObject = {
             const g = row.dataset.group;
             if (self.state.collapsedGroups[g]) delete self.state.collapsedGroups[g];
             else self.state.collapsedGroups[g] = true;
+            self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
+            return;
+        }
+        const th = e.target.closest('th.sortable');
+        if (th) {
+            const f = th.dataset.field;
+            self.state.sortDirection = (self.state.sortField === f && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
+            self.state.sortField = f;
             self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
         }
     };
