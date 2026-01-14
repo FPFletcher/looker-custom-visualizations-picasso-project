@@ -1,6 +1,6 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.19.0 - Smart Comparison + Bold Params + Divider Fix
+ * Version: 4.20.0 - Peer-Level Scaling + Multi-Level Formatting Fixes
  * Build: 2026-01-14
  */
 
@@ -20,6 +20,7 @@ const visObject = {
     pagination_position: { type: "string", label: "Position", display: "select", values: [{ "Top": "top" }, { "Bottom": "bottom" }, { "Both": "both" }], default: "bottom", section: "Plot", order: 13 },
     plot_divider_freezing: { type: "string", label: "━━━ Freezing ━━━", display: "divider", section: "Plot", order: 20 },
     freeze_columns: { type: "number", label: "Freeze Left Columns", default: 0, section: "Plot", order: 21 },
+    freeze_header_row: { type: "boolean", label: "Freeze Header Row", default: true, section: "Plot", order: 22 },
 
     // ══════════════════════════════════════════════════════════════
     // TAB: SERIES
@@ -38,8 +39,7 @@ const visObject = {
     enable_cell_bars_2: { type: "boolean", label: "Enable Set 2", default: false, section: "Series", order: 6 },
     cell_bar_fields_2: { type: "string", label: "Fields 2", display: "text", default: "", section: "Series", order: 7 },
     cell_bar_color_2: { type: "string", label: "Color 2", display: "color", default: "#10b981", section: "Series", order: 8 },
-    use_gradient_2: { type: "boolean", label: "Use Gradient 2", default: false, section: "Series", order: 9 },
-    gradient_end_2: { type: "string", label: "Gradient End 2", display: "color", default: "#6ee7b7", section: "Series", order: 10 },
+    cell_bar_max_width: { type: "number", label: "Max Bar Width (%)", default: 100, section: "Series", order: 10 },
 
     grouping_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
     enable_column_groups: { type: "boolean", label: "Enable Grouping", default: false, section: "Series", order: 21 },
@@ -47,11 +47,9 @@ const visObject = {
     column_group_1_count: { type: "number", label: "Group 1 Count", default: 1, section: "Series", order: 23 },
     column_group_2_name: { type: "string", label: "Group 2 Name", default: "", section: "Series", order: 24 },
     column_group_2_count: { type: "number", label: "Group 2 Count", default: 1, section: "Series", order: 25 },
-    column_group_3_name: { type: "string", label: "Group 3 Name", default: "", section: "Series", order: 26 },
-    column_group_3_count: { type: "number", label: "Group 3 Count", default: 1, section: "Series", order: 27 },
-    group_remaining_columns: { type: "boolean", label: "Group Remaining Columns", default: false, section: "Series", order: 28 },
-    remaining_columns_name: { type: "string", label: "Remaining Name", default: "Other", section: "Series", order: 29 },
-    group_header_bg_color: { type: "string", label: "Group Header BG Color", display: "color", default: "#8dc6ff", section: "Series", order: 30 },
+    group_remaining_columns: { type: "boolean", label: "Group Remaining Columns", default: false, section: "Series", order: 26 },
+    remaining_columns_name: { type: "string", label: "Remaining Name", default: "Other", section: "Series", order: 27 },
+    group_header_bg_color: { type: "string", label: "Group Header BG Color", display: "color", default: "#8dc6ff", section: "Series", order: 28 },
 
     comparison_divider: { type: "string", label: "━━━ Comparison ━━━", display: "divider", section: "Series", order: 50 },
     enable_comparison: { type: "boolean", label: "Enable Comparison", default: false, section: "Series", order: 51 },
@@ -63,12 +61,6 @@ const visObject = {
     positive_comparison_color: { type: "string", label: "Pos Color", display: "color", default: "#10b981", section: "Series", order: 57 },
     negative_comparison_color: { type: "string", label: "Neg Color", display: "color", default: "#ef4444", section: "Series", order: 58 },
 
-    chips_divider: { type: "string", label: "━━━ Data Chips ━━━", display: "divider", section: "Series", order: 70 },
-    enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: true, section: "Series", order: 71 },
-    data_chip_fields: { type: "string", label: "Fields (comma-sep)", display: "text", default: "", section: "Series", order: 72 },
-    chip_match_green: { type: "string", label: "Green Match", default: "complete,yes", section: "Series", order: 73 },
-    chip_match_red: { type: "string", label: "Red Match", default: "cancelled,no", section: "Series", order: 74 },
-
     subtotals_divider: { type: "string", label: "━━━ Subtotals & Totals ━━━", display: "divider", section: "Series", order: 80 },
     enable_subtotals: { type: "boolean", label: "Enable Subtotals", default: false, section: "Series", order: 81 },
     subtotal_dimension: { type: "string", label: "Group Dimension", display: "select", values: [{"None": ""}], default: "", section: "Series", order: 82 },
@@ -78,13 +70,35 @@ const visObject = {
     subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 86 },
     grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Series", order: 87 },
 
+    field_formatting_divider: { type: "string", label: "━━━ Field Formatting ━━━", display: "divider", section: "Series", order: 100 },
+    enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 101 },
+
+    // ══════════════════════════════════════════════════════════════
+    // TAB: FORMATTING
+    // ══════════════════════════════════════════════════════════════
     formatting_divider_theme: { type: "string", label: "━━━ Theme ━━━", display: "divider", section: "Formatting", order: 0 },
     table_theme: { type: "string", label: "Table Theme", display: "select", values: [{ "Modern": "modern" }, { "Compact": "compact" }, { "Striped": "striped" }], default: "modern", section: "Formatting", order: 1 },
-    stripe_color: { type: "string", label: "Stripe BG Color", display: "color", default: "#f9fafb", section: "Formatting", order: 2 },
-    cell_font_size: { type: "number", label: "Cell Size (px)", default: 11, section: "Formatting", order: 20 },
-    row_height: { type: "number", label: "Row Height (px)", default: 36, section: "Formatting", order: 21 },
-    enable_hover: { type: "boolean", label: "Enable Hover", default: true, section: "Formatting", order: 40 },
-    hover_bg_color: { type: "string", label: "Hover BG Color", display: "color", default: "#f3f4f6", section: "Formatting", order: 41 }
+    stripe_color: { type: "string", label: "Stripe color", display: "color", default: "#f9fafb", section: "Formatting", order: 2 },
+
+    formatting_divider_headers: { type: "string", label: "━━━ Headers ━━━", display: "divider", section: "Formatting", order: 10 },
+    header_font_size: { type: "number", label: "Header Font Size (px)", default: 12, section: "Formatting", order: 11 },
+    header_text_color: { type: "string", label: "Header Text Color", display: "color", default: "#1f2937", section: "Formatting", order: 12 },
+    header_bg_color: { type: "string", label: "Header Background Color", display: "color", default: "#f9fafb", section: "Formatting", order: 13 },
+
+    formatting_divider_cells: { type: "string", label: "━━━ Cells ━━━", display: "divider", section: "Formatting", order: 20 },
+    cell_font_size: { type: "number", label: "Cell Size (px)", default: 11, section: "Formatting", order: 21 },
+    cell_text_color: { type: "string", label: "Cell Text Color", display: "color", default: "#374151", section: "Formatting", order: 22 },
+    row_height: { type: "number", label: "Row Height (px)", default: 36, section: "Formatting", order: 23 },
+    column_spacing: { type: "number", label: "Col Spacing (px)", default: 12, section: "Formatting", order: 24 },
+    wrap_text: { type: "boolean", label: "Wrap Text", default: false, section: "Formatting", order: 25 },
+
+    formatting_divider_borders: { type: "string", label: "━━━ Borders ━━━", display: "divider", section: "Formatting", order: 30 },
+    show_borders: { type: "boolean", label: "Show Borders", default: true, section: "Formatting", order: 31 },
+    border_color: { type: "string", label: "Border Color", display: "color", default: "#e5e7eb", section: "Formatting", order: 32 },
+
+    formatting_divider_hover: { type: "string", label: "━━━ Hover ━━━", display: "divider", section: "Formatting", order: 40 },
+    enable_hover: { type: "boolean", label: "Enable Hover", default: true, section: "Formatting", order: 41 },
+    hover_bg_color: { type: "string", label: "Hover Color", display: "color", default: "#f3f4f6", section: "Formatting", order: 42 }
   },
 
   create: function(element, config) {
@@ -100,11 +114,21 @@ const visObject = {
     const dims = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
 
+    // Build options dynamically
     if (dims.length > 0) {
       this.options.subtotal_dimension.values = [{"None": ""}, ...dims.map(d => ({[d.label_short || d.label]: d.name}))];
     }
-    this.trigger('registerOptions', this.options);
+    dims.concat(measures).forEach((field, idx) => {
+      const baseOrder = 110 + (idx * 3);
+      const fieldKey = field.name;
+      if (!this.options[`field_label_${fieldKey}`]) {
+        this.options[`field_divider_${fieldKey}`] = { type: "string", label: `━━━ ${field.label_short || field.label} ━━━`, display: "divider", section: "Series", order: baseOrder };
+        this.options[`field_label_${fieldKey}`] = { type: "string", label: "Label", display: "text", default: field.label_short || field.label, section: "Series", order: baseOrder + 1 };
+        this.options[`field_format_${fieldKey}`] = { type: "string", label: "Value Format", display: "text", default: "", section: "Series", order: baseOrder + 2 };
+      }
+    });
 
+    this.trigger('registerOptions', this.options);
     this.state.data = data;
     this.queryResponse = queryResponse;
 
@@ -121,7 +145,7 @@ const visObject = {
 
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
       const hierarchyList = config.hierarchy_dimensions.split(',').map(f => f.trim());
-      processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures);
+      processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
       if (this.state.forceInitialCollapse) {
         processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
         this.state.forceInitialCollapse = false;
@@ -144,7 +168,7 @@ const visObject = {
     done();
   },
 
-  calculateSubtotalsRecursive: function(data, fields, measures) {
+  calculateSubtotalsRecursive: function(data, fields, measures, config) {
     const result = [];
     const groupData = (rows, level, parentPath) => {
       const field = fields[level];
@@ -158,18 +182,21 @@ const visObject = {
 
       Object.keys(groups).forEach(key => {
         const currentPath = parentPath ? `${parentPath}|${key}` : key;
-        const sub = { __isSubtotal: true, __groupValue: currentPath, __level: level };
+        const sub = { __isSubtotal: true, __groupValue: currentPath, __level: level, __parentPath: parentPath };
         sub[fields[0]] = { value: key, rendered: key };
         fields.slice(1).forEach(f => sub[f] = { value: '', rendered: '' });
 
         measures.forEach(m => {
           let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
-          sub[m.name] = { value: sum, rendered: sum.toLocaleString(undefined, {minimumFractionDigits:2}) };
+          sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
         });
 
         result.push(sub);
-        if (level < fields.length - 1) groupData(groups[key], level + 1, currentPath);
-        else groups[key].forEach(r => { r.__parentGroup = currentPath; r.__level = level + 1; result.push(r); });
+        if (level < fields.length - 1) {
+            groupData(groups[key], level + 1, currentPath);
+        } else {
+            groups[key].forEach(r => { r.__parentGroup = currentPath; r.__parentPath = currentPath; r.__level = level + 1; result.push(r); });
+        }
       });
     };
     groupData(data, 0, "");
@@ -191,7 +218,7 @@ const visObject = {
       dims.forEach(d => { if(d.name !== field) sub[d.name] = { value: '', rendered: '' }; });
       measures.forEach(m => {
         let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
-        sub[m.name] = { value: sum, rendered: sum.toLocaleString(undefined, {minimumFractionDigits:2}) };
+        sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
       });
       if (config.subtotal_position === 'top') {
         result.push(sub);
@@ -202,6 +229,18 @@ const visObject = {
       }
     });
     return result;
+  },
+
+  formatMeasure: function(value, field, config) {
+      const customFormat = config[`field_format_${field.name}`];
+      if (customFormat) {
+          const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+          let res = value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+          if (customFormat.includes('$')) res = '$' + res;
+          return res;
+      }
+      // Fallback to LookML rendering logic if available
+      return value.toLocaleString();
   },
 
   applyHierarchyFilter: function(data) {
@@ -218,11 +257,11 @@ const visObject = {
   },
 
   calculateGrandTotal: function(rawData, measures, config, dimensions) {
-    const total = { __isGrandTotal: true };
+    const total = { __isGrandTotal: true, __level: -1 };
     if (dimensions.length > 0) total[dimensions[0].name] = { value: config.grand_total_label, rendered: config.grand_total_label };
     measures.forEach(m => {
       let sum = rawData.reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
-      total[m.name] = { value: sum, rendered: sum.toLocaleString(undefined, {minimumFractionDigits:2}) };
+      total[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
     });
     return total;
   },
@@ -233,31 +272,34 @@ const visObject = {
     const mainTreeCol = hDims[0] || config.subtotal_dimension;
 
     let html = `<style>
-        table.advanced-table tbody td { font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 12px; border:1px solid #eee; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        table.advanced-table tbody td { font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text?'normal':'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
+        table.advanced-table thead th { font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; }
         .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
         .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
-        table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; }
-        table.advanced-table thead { position: sticky; top: 0; z-index: 100; background: #f9fafb; }
+        table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color}; }
+        table.advanced-table thead { position: sticky; top: 0; z-index: 100; }
         .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
-        .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid #d1d5db; }
+        .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid ${config.border_color}; }
         .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; text-align: center; }
         .chip-green { background-color: #dcfce7; color: #166534; } .chip-red { background-color: #fee2e2; color: #991b1b; }
         .cell-bar-container { display: flex; align-items: center; gap: 8px; width: 100%; }
         .cell-bar-bg { flex: 1; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
         .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
         .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; user-select: none; display: inline-block; width: 14px; text-align: center; }
+        table.advanced-table.striped tbody tr:nth-child(odd):not(.subtotal-row):not(.grand-total-row) { background-color: ${config.stripe_color} !important; }
     </style>`;
 
     html += `<table class="advanced-table ${config.table_theme}">`;
     if (config.enable_column_groups) html += this.renderColumnGroups(config, fields);
 
-    html += '<thead><tr style="background:#f9fafb">';
-    if (config.show_row_numbers) html += '<th>#</th>';
+    html += '<thead><tr>';
+    if (config.show_row_numbers) html += `<th ${config.enable_column_groups?'rowspan="2"':''}>#</th>`;
     fields.forEach((f, idx) => {
       if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
-      const sticky = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:101; background:#f9fafb;' : '';
+      const sticky = (idx < config.freeze_columns && config.freeze_header_row) ? 'position:sticky; left:0; z-index:101;' : '';
       const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
-      html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${f.label_short || f.label}${sortIcon}</th>`;
+      const label = config[`field_label_${f.name}`] || f.label_short || f.label;
+      html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${label}${sortIcon}</th>`;
     });
     html += '</tr></thead><tbody>';
 
@@ -290,7 +332,6 @@ const visObject = {
 
   renderColumnGroups: function(config, fields) {
     let html = '<thead><tr>';
-    if (config.show_row_numbers) html += '<th rowspan="2"></th>';
     let currentIdx = 0;
     for (let i = 1; i <= 3; i++) {
       const name = config[`column_group_${i}_name`], count = config[`column_group_${i}_count`];
@@ -317,7 +358,7 @@ const visObject = {
       else if ((config.chip_match_red || "").split(',').map(x=>x.trim().toLowerCase()).includes(s)) rendered = `<span class="data-chip chip-red">${rendered}</span>`;
     }
 
-    // Smart Comparison Logic
+    // Smart Peer-Based Comparison Logic
     if (config.enable_comparison && config.comparison_primary_field === field.name) {
       const isLastOfSubgroup = this.isLastElementOfGroup(rowIdx, data, config);
       if (!row.__isGrandTotal && !isLastOfSubgroup) {
@@ -325,12 +366,12 @@ const visObject = {
       }
     }
 
-    // Cell Bar Logic - FIX: Exclude Grand Total
+    // Level-Aware Cell Bar Logic
     if (!row.__isGrandTotal) {
         if (config.enable_cell_bars_1 && (config.cell_bar_fields_1 || "").split(',').map(x=>x.trim()).includes(field.name)) {
-            rendered = this.generateCellBar(val, rendered, config.cell_bar_color_1, config.use_gradient_1, config.gradient_end_1, data, field.name);
+            rendered = this.generateCellBar(val, rendered, config.cell_bar_color_1, config.use_gradient_1, config.gradient_end_1, data, field.name, row.__level);
         } else if (config.enable_cell_bars_2 && (config.cell_bar_fields_2 || "").split(',').map(x=>x.trim()).includes(field.name)) {
-            rendered = this.generateCellBar(val, rendered, config.cell_bar_color_2, config.use_gradient_2, config.gradient_end_2, data, field.name);
+            rendered = this.generateCellBar(val, rendered, config.cell_bar_color_2, false, null, data, field.name, row.__level);
         }
     }
 
@@ -343,18 +384,18 @@ const visObject = {
     const next = data[idx + 1];
     if (next.__isGrandTotal) return true;
     if (config.enable_bo_hierarchy) {
-        // In BO mode, if the next row level is lower, this was the last of the child group
-        return next.__level < curr.__level;
+        // Peer check: row only compares if next row has same parent path AND same level
+        return next.__parentPath !== curr.__parentPath || next.__level !== curr.__level;
     }
-    // In Standard mode, if next is a subtotal, current detail row is the last in that group
     if (!curr.__isSubtotal && next.__isSubtotal) return true;
     return false;
   },
 
-  generateCellBar: function(val, rendered, color, useGrad, endColor, data, fieldName) {
+  generateCellBar: function(val, rendered, color, useGrad, endColor, data, fieldName, level) {
       const num = parseFloat(val);
-      const allVals = data.filter(r => !r.__isGrandTotal).map(r => parseFloat(r[fieldName]?.value || 0));
-      const maxVal = Math.max(...allVals, 1);
+      // Scale only against peer rows (same level)
+      const peers = data.filter(r => !r.__isGrandTotal && r.__level === level);
+      const maxVal = Math.max(...peers.map(r => parseFloat(r[fieldName]?.value || 0)), 1);
       const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
       const barStyle = useGrad ? `linear-gradient(to right, ${color}, ${endColor})` : color;
       return `<div class="cell-bar-container"><div class="cell-bar-bg"><div class="cell-bar-fill" style="width:${width}%; background:${barStyle};"></div></div><span>${rendered}</span></div>`;
@@ -362,19 +403,20 @@ const visObject = {
 
   renderComparison: function(row, config, rowIdx, data, primaryRendered) {
     const primary = parseFloat(row[config.comparison_primary_field]?.value || 0);
-    let secondary = 0;
-    if (config.comparison_mode === 'metric') {
-      secondary = parseFloat(row[config.comparison_secondary_field]?.value || 0);
-    } else {
-        const isSub = !!row.__isSubtotal;
-        const level = row.__level || 0;
-        // FIX: Expansion-stable comparison. Filter to rows of the same type/level.
-        const likeRows = data.filter(r => !!r.__isSubtotal === isSub && (r.__level === level || !isSub) && !r.__isGrandTotal);
-        const currIdx = likeRows.indexOf(row);
-        const compRow = likeRows[currIdx - (config.comparison_period_offset || -1)];
-        secondary = parseFloat(compRow?.[config.comparison_primary_field]?.value || 0);
-    }
+    const isSub = !!row.__isSubtotal;
+    const level = row.__level;
+    const parentPath = row.__parentPath;
+
+    // Peer subset: same type, same level, same parent branch
+    const peers = data.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
+    const currPeerIdx = peers.indexOf(row);
+    const offset = config.comparison_period_offset || -1;
+    const compRow = peers[currPeerIdx - offset];
+
+    if (!compRow) return primaryRendered;
+    const secondary = parseFloat(compRow[config.comparison_primary_field]?.value || 0);
     if (isNaN(secondary) || secondary === 0) return primaryRendered;
+
     const diff = primary - secondary;
     const pct = ((diff / Math.abs(secondary)) * 100).toFixed(1);
     const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
