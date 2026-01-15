@@ -1,6 +1,6 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.25.0 - Core 4.20 Stability + Restored Filters, Fonts & Pagination
+ * Version: 4.26.0 - 4.20 Base + 4.23 Features (Fonts, Filters, Pagination)
  * Build: 2026-01-15
  */
 
@@ -30,7 +30,7 @@ const visObject = {
     // ══════════════════════════════════════════════════════════════
     hierarchy_divider: { type: "string", label: "━━━ BO Hierarchy Mode ━━━", display: "divider", section: "Series", order: -10 },
     enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Series", order: -9 },
-    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels", display: "text", default: "", placeholder: "brand,category", section: "Series", order: -8 },
+    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels", display: "text", default: "", section: "Series", order: -8 },
     bo_hierarchy_bold: { type: "boolean", label: "Bold Font for Hierarchy", default: true, section: "Series", order: -7 },
 
     cell_bars_divider: { type: "string", label: "━━━ Cell Bar Charts ━━━", display: "divider", section: "Series", order: 0 },
@@ -38,10 +38,7 @@ const visObject = {
     cell_bar_fields_1: { type: "string", label: "Fields 1", display: "text", default: "", section: "Series", order: 2 },
     cell_bar_color_1: { type: "string", label: "Color 1", display: "color", default: "#3b82f6", section: "Series", order: 3 },
     use_gradient_1: { type: "boolean", label: "Use Gradient 1", default: false, section: "Series", order: 4 },
-    gradient_end_1: { type: "string", label: "Gradient End 1", display: "color", default: "#93c5fd", section: "Series", order: 5 },
-    enable_cell_bars_2: { type: "boolean", label: "Enable Set 2", default: false, section: "Series", order: 6 },
-    cell_bar_fields_2: { type: "string", label: "Fields 2", display: "text", default: "", section: "Series", order: 7 },
-    cell_bar_color_2: { type: "string", label: "Color 2", display: "color", default: "#10b981", section: "Series", order: 8 },
+    gradient_end_1: { type: "string", label: "End 1", display: "color", default: "#93c5fd", section: "Series", order: 5 },
     cell_bar_max_width: { type: "number", label: "Max Bar Width (%)", default: 100, section: "Series", order: 10 },
 
     grouping_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
@@ -50,7 +47,7 @@ const visObject = {
     column_group_1_count: { type: "number", label: "Group 1 Count", default: 1, section: "Series", order: 23 },
     column_group_2_name: { type: "string", label: "Group 2 Name", default: "", section: "Series", order: 24 },
     column_group_2_count: { type: "number", label: "Group 2 Count", default: 1, section: "Series", order: 25 },
-    group_header_bg_color: { type: "string", label: "Group Header BG Color", display: "color", default: "#8dc6ff", section: "Series", order: 30 },
+    group_header_bg_color: { type: "string", label: "Header BG Color", display: "color", default: "#8dc6ff", section: "Series", order: 30 },
 
     comparison_divider: { type: "string", label: "━━━ Comparison ━━━", display: "divider", section: "Series", order: 50 },
     enable_comparison: { type: "boolean", label: "Enable Comparison", default: false, section: "Series", order: 51 },
@@ -65,12 +62,11 @@ const visObject = {
     subtotals_divider: { type: "string", label: "━━━ Subtotals & Totals ━━━", display: "divider", section: "Series", order: 80 },
     enable_subtotals: { type: "boolean", label: "Enable Subtotals", default: false, section: "Series", order: 81 },
     subtotal_dimension: { type: "string", label: "Group Dimension", display: "select", values: [{"None": ""}], default: "", section: "Series", order: 82 },
-    standard_subtotal_bold: { type: "boolean", label: "Bold Font for Subtotals", default: true, section: "Series", order: 83 },
+    standard_subtotal_bold: { type: "boolean", label: "Bold Subtotals", default: true, section: "Series", order: 83 },
     show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 84 },
     subtotal_position: { type: "string", label: "Position", display: "select", values: [{"Top": "top"}, {"Bottom": "bottom"}], default: "bottom", section: "Series", order: 85 },
     subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 86 },
 
-    field_formatting_divider: { type: "string", label: "━━━ Field Formatting ━━━", display: "divider", section: "Series", order: 100 },
     enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 101 },
 
     // ══════════════════════════════════════════════════════════════
@@ -79,29 +75,25 @@ const visObject = {
     formatting_divider_theme: { type: "string", label: "━━━ Theme ━━━", display: "divider", section: "Formatting", order: 0 },
     table_theme: { type: "string", label: "Table Theme", display: "select", values: [{ "Modern": "modern" }, { "Compact": "compact" }, { "Striped": "striped" }], default: "modern", section: "Formatting", order: 1 },
     stripe_color: { type: "string", label: "Stripe color", display: "color", default: "#f9fafb", section: "Formatting", order: 2 },
-
     formatting_divider_headers: { type: "string", label: "━━━ Headers ━━━", display: "divider", section: "Formatting", order: 10 },
     header_font_family: { type: "string", label: "Font", display: "select", values: [{"Sans-Serif": "sans-serif"}, {"Serif": "serif"}, {"Monospace": "monospace"}], default: "sans-serif", section: "Formatting", order: 11 },
-    header_font_size: { type: "number", label: "Header Size (px)", default: 12, section: "Formatting", order: 12 },
-    header_text_color: { type: "string", label: "Header Text Color", display: "color", default: "#1f2937", section: "Formatting", order: 13 },
-    header_bg_color: { type: "string", label: "Header Background Color", display: "color", default: "#f9fafb", section: "Formatting", order: 14 },
-
+    header_font_size: { type: "number", label: "Size (px)", default: 12, section: "Formatting", order: 12 },
+    header_text_color: { type: "string", label: "Text Color", display: "color", default: "#1f2937", section: "Formatting", order: 13 },
+    header_bg_color: { type: "string", label: "BG Color", display: "color", default: "#f9fafb", section: "Formatting", order: 14 },
     formatting_divider_cells: { type: "string", label: "━━━ Cells ━━━", display: "divider", section: "Formatting", order: 20 },
     cell_font_family: { type: "string", label: "Font", display: "select", values: [{"Sans-Serif": "sans-serif"}, {"Serif": "serif"}, {"Monospace": "monospace"}], default: "sans-serif", section: "Formatting", order: 21 },
-    cell_font_size: { type: "number", label: "Cell Size (px)", default: 11, section: "Formatting", order: 22 },
-    cell_text_color: { type: "string", label: "Cell Text Color", display: "color", default: "#374151", section: "Formatting", order: 23 },
+    cell_font_size: { type: "number", label: "Size (px)", default: 11, section: "Formatting", order: 22 },
+    cell_text_color: { type: "string", label: "Text Color", display: "color", default: "#374151", section: "Formatting", order: 23 },
     row_height: { type: "number", label: "Row Height (px)", default: 36, section: "Formatting", order: 24 },
     column_spacing: { type: "number", label: "Col Spacing (px)", default: 12, section: "Formatting", order: 25 },
-
-    formatting_divider_hover: { type: "string", label: "━━━ Hover ━━━", display: "divider", section: "Formatting", order: 40 },
-    enable_hover: { type: "boolean", label: "Enable Hover", default: true, section: "Formatting", order: 41 },
-    hover_bg_color: { type: "string", label: "Hover Color", display: "color", default: "#f3f4f6", section: "Formatting", order: 42 }
+    enable_hover: { type: "boolean", label: "Enable Hover", default: true, section: "Formatting", order: 40 },
+    hover_bg_color: { type: "string", label: "Hover Color", display: "color", default: "#f3f4f6", section: "Formatting", order: 41 }
   },
 
   create: function(element, config) {
     this.container = element.appendChild(document.createElement("div"));
     this.container.id = "advanced-table-container";
-    this.state = { currentPage: 1, sortField: null, sortDirection: 'asc', tableFilter: '', columnFilters: {}, collapsedGroups: {}, lastSubtotalDimension: null, data: [] };
+    this.state = { currentPage: 1, tableFilter: '', columnFilters: {}, collapsedGroups: {}, sortField: null, sortDirection: 'asc', data: [] };
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
@@ -141,10 +133,10 @@ const visObject = {
     let processedData = this.applyFilters(data, config);
     if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
-    // 2. SUBTOTALS / BO HIERARCHY
+    // 2. HIERARCHY / SUBTOTALS
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
-      const hierarchyList = config.hierarchy_dimensions.split(',').map(f => f.trim());
-      processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
+      const hList = config.hierarchy_dimensions.split(',').map(f => f.trim());
+      processedData = this.calculateSubtotalsRecursive(processedData, hList, measures, config);
       if (this.state.forceInitialCollapse) {
         processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
         this.state.forceInitialCollapse = false;
@@ -163,7 +155,7 @@ const visObject = {
 
     if (config.show_grand_total) processedData.push(this.calculateGrandTotal(data, measures, config, dims));
 
-    // 3. DYNAMIC PAGINATION
+    // 3. PAGINATION (DYNAMIC SLICING)
     const totalVisibleRows = processedData.length;
     const dataWithoutGT = processedData.filter(r => !r.__isGrandTotal);
     const gtRow = processedData.find(r => r.__isGrandTotal);
@@ -179,35 +171,32 @@ const visObject = {
   },
 
   formatValue: function(value, fieldName, row, config) {
-    const customFormat = config[`field_format_${fieldName}`];
-    // Custom format override
-    if (customFormat && customFormat.trim() !== '') {
-        const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+    const custom = config[`field_format_${fieldName}`];
+    if (custom && custom.trim() !== '') {
+        const decimals = (custom.match(/0\.([0#]+)/) || [])[1]?.length || 0;
         let res = Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-        if (customFormat.includes('$')) res = '$' + res;
+        if (custom.includes('$')) res = '$' + res;
         return res;
     }
-    // Default to LookML rendered value if detail row
     if (row[fieldName] && typeof row[fieldName] === 'object' && row[fieldName].rendered !== undefined) {
         return row[fieldName].rendered;
     }
-    // Numeric fallback
     return isNaN(value) ? (value || '∅') : Number(value).toLocaleString();
   },
 
   applyFilters: function(data, config) {
-    let filtered = [...data];
+    let f = [...data];
     if (config.enable_table_filter && this.state.tableFilter) {
       const s = this.state.tableFilter.toLowerCase();
-      filtered = filtered.filter(row => Object.values(row).some(v => String(v?.value || v).toLowerCase().includes(s)));
+      f = f.filter(r => Object.values(r).some(v => String(v?.value || v).toLowerCase().includes(s)));
     }
     if (config.enable_column_filters) {
-      Object.keys(this.state.columnFilters).forEach(f => {
-        const val = this.state.columnFilters[f].toLowerCase();
-        if (val) filtered = filtered.filter(row => String(row[f]?.value || row[f]).toLowerCase().includes(val));
+      Object.keys(this.state.columnFilters).forEach(key => {
+        const v = this.state.columnFilters[key].toLowerCase();
+        if (v) f = f.filter(r => String(r[key]?.value || r[key]).toLowerCase().includes(v));
       });
     }
-    return filtered;
+    return f;
   },
 
   calculateSubtotalsRecursive: function(data, fields, measures, config) {
@@ -288,7 +277,7 @@ const visObject = {
     });
   },
 
-  renderTable: function(pageData, totalVisibleRows, totalPages, config, queryResponse) {
+  renderTable: function(pageData, totalVisible, totalPages, config, queryResponse) {
     let html = '';
     const styleId = 'dynamic-table-style';
     if (document.getElementById(styleId)) document.getElementById(styleId).remove();
@@ -307,7 +296,7 @@ const visObject = {
     document.head.appendChild(styleTag);
 
     if (config.enable_pagination && (config.pagination_position === 'top' || config.pagination_position === 'both')) {
-      html += this.renderPagination(totalVisibleRows, totalPages, config, 'top');
+      html += this.renderPagination(totalVisible, totalPages, config, 'top');
     }
     if (config.enable_table_filter) {
       html += `<div style="padding:12px; background:#f9fafb; border-bottom:1px solid #ddd;"><input type="text" id="table-filter-input" placeholder="Search..." value="${this.state.tableFilter || ''}" style="width:100%; padding:8px;"></div>`;
@@ -320,7 +309,7 @@ const visObject = {
     html += '</table></div>';
 
     if (config.enable_pagination && (config.pagination_position === 'bottom' || config.pagination_position === 'both')) {
-      html += this.renderPagination(totalVisibleRows, totalPages, config, 'bottom');
+      html += this.renderPagination(totalVisible, totalPages, config, 'bottom');
     }
     this.container.innerHTML = html;
     this.attachEventListeners(config);
@@ -450,7 +439,7 @@ const visObject = {
 
   renderPagination: function(totalRows, totalPages, config, pos) {
     const curr = this.state.currentPage;
-    return `<div class="pagination-controls ${pos}"><div class="pagination-info">Showing ${totalRows} rows</div><div class="pagination-buttons">
+    return `<div class="pagination-controls ${pos}"><div class="pagination-info">Showing ${totalRows} visible rows</div><div class="pagination-buttons">
       <button class="pagination-button" data-action="first" ${curr===1?'disabled':''}>⟨⟨</button>
       <button class="pagination-button" data-action="prev" ${curr===1?'disabled':''}>⟨</button>
       <span style="padding:0 10px;">Page ${curr} of ${totalPages}</span>
