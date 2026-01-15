@@ -1,6 +1,6 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.24.0 - MASTER RESTORE: Formatting, Bars, Comparison & Logic Fix
+ * Version: 4.25.0 - Core 4.20 Stability + Restored Filters, Fonts & Pagination
  * Build: 2026-01-15
  */
 
@@ -30,7 +30,7 @@ const visObject = {
     // ══════════════════════════════════════════════════════════════
     hierarchy_divider: { type: "string", label: "━━━ BO Hierarchy Mode ━━━", display: "divider", section: "Series", order: -10 },
     enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Series", order: -9 },
-    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels", display: "text", default: "", section: "Series", order: -8 },
+    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels", display: "text", default: "", placeholder: "brand,category", section: "Series", order: -8 },
     bo_hierarchy_bold: { type: "boolean", label: "Bold Font for Hierarchy", default: true, section: "Series", order: -7 },
 
     cell_bars_divider: { type: "string", label: "━━━ Cell Bar Charts ━━━", display: "divider", section: "Series", order: 0 },
@@ -38,26 +38,26 @@ const visObject = {
     cell_bar_fields_1: { type: "string", label: "Fields 1", display: "text", default: "", section: "Series", order: 2 },
     cell_bar_color_1: { type: "string", label: "Color 1", display: "color", default: "#3b82f6", section: "Series", order: 3 },
     use_gradient_1: { type: "boolean", label: "Use Gradient 1", default: false, section: "Series", order: 4 },
-    gradient_end_1: { type: "string", label: "End 1", display: "color", default: "#93c5fd", section: "Series", order: 5 },
+    gradient_end_1: { type: "string", label: "Gradient End 1", display: "color", default: "#93c5fd", section: "Series", order: 5 },
     enable_cell_bars_2: { type: "boolean", label: "Enable Set 2", default: false, section: "Series", order: 6 },
     cell_bar_fields_2: { type: "string", label: "Fields 2", display: "text", default: "", section: "Series", order: 7 },
     cell_bar_color_2: { type: "string", label: "Color 2", display: "color", default: "#10b981", section: "Series", order: 8 },
-    cell_bar_max_width: { type: "number", label: "Max Width (%)", default: 100, section: "Series", order: 10 },
+    cell_bar_max_width: { type: "number", label: "Max Bar Width (%)", default: 100, section: "Series", order: 10 },
 
     grouping_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
-    enable_column_groups: { type: "boolean", label: "Enable Column Grouping", default: false, section: "Series", order: 21 },
+    enable_column_groups: { type: "boolean", label: "Enable Grouping", default: false, section: "Series", order: 21 },
     column_group_1_name: { type: "string", label: "Group 1 Name", default: "", section: "Series", order: 22 },
     column_group_1_count: { type: "number", label: "Group 1 Count", default: 1, section: "Series", order: 23 },
     column_group_2_name: { type: "string", label: "Group 2 Name", default: "", section: "Series", order: 24 },
     column_group_2_count: { type: "number", label: "Group 2 Count", default: 1, section: "Series", order: 25 },
-    group_header_bg_color: { type: "string", label: "Header BG Color", display: "color", default: "#8dc6ff", section: "Series", order: 30 },
+    group_header_bg_color: { type: "string", label: "Group Header BG Color", display: "color", default: "#8dc6ff", section: "Series", order: 30 },
 
     comparison_divider: { type: "string", label: "━━━ Comparison ━━━", display: "divider", section: "Series", order: 50 },
     enable_comparison: { type: "boolean", label: "Enable Comparison", default: false, section: "Series", order: 51 },
     comparison_mode: { type: "string", label: "Mode", display: "select", values: [{ "Metric vs Metric": "metric" }, { "Period over Period": "period" }], default: "metric", section: "Series", order: 52 },
     comparison_primary_field: { type: "string", label: "Primary Field", display: "text", default: "", section: "Series", order: 53 },
     comparison_secondary_field: { type: "string", label: "Secondary Field", display: "text", default: "", section: "Series", order: 54 },
-    comparison_period_offset: { type: "number", label: "Offset", default: -1, section: "Series", order: 55 },
+    comparison_period_offset: { type: "number", label: "Period Offset", default: -1, section: "Series", order: 55 },
     show_comparison_arrows: { type: "boolean", label: "Show Arrows", default: true, section: "Series", order: 56 },
     positive_comparison_color: { type: "string", label: "Pos Color", display: "color", default: "#10b981", section: "Series", order: 57 },
     negative_comparison_color: { type: "string", label: "Neg Color", display: "color", default: "#ef4444", section: "Series", order: 58 },
@@ -65,12 +65,13 @@ const visObject = {
     subtotals_divider: { type: "string", label: "━━━ Subtotals & Totals ━━━", display: "divider", section: "Series", order: 80 },
     enable_subtotals: { type: "boolean", label: "Enable Subtotals", default: false, section: "Series", order: 81 },
     subtotal_dimension: { type: "string", label: "Group Dimension", display: "select", values: [{"None": ""}], default: "", section: "Series", order: 82 },
-    standard_subtotal_bold: { type: "boolean", label: "Bold Font", default: true, section: "Series", order: 83 },
-    show_grand_total: { type: "boolean", label: "Show Grand Total", default: false, section: "Series", order: 84 },
+    standard_subtotal_bold: { type: "boolean", label: "Bold Font for Subtotals", default: true, section: "Series", order: 83 },
+    show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 84 },
     subtotal_position: { type: "string", label: "Position", display: "select", values: [{"Top": "top"}, {"Bottom": "bottom"}], default: "bottom", section: "Series", order: 85 },
-    subtotal_background_color: { type: "string", label: "BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 86 },
+    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 86 },
 
-    enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Formatting", default: false, section: "Series", order: 101 },
+    field_formatting_divider: { type: "string", label: "━━━ Field Formatting ━━━", display: "divider", section: "Series", order: 100 },
+    enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 101 },
 
     // ══════════════════════════════════════════════════════════════
     // TAB: FORMATTING
@@ -78,20 +79,29 @@ const visObject = {
     formatting_divider_theme: { type: "string", label: "━━━ Theme ━━━", display: "divider", section: "Formatting", order: 0 },
     table_theme: { type: "string", label: "Table Theme", display: "select", values: [{ "Modern": "modern" }, { "Compact": "compact" }, { "Striped": "striped" }], default: "modern", section: "Formatting", order: 1 },
     stripe_color: { type: "string", label: "Stripe color", display: "color", default: "#f9fafb", section: "Formatting", order: 2 },
-    header_font_family: { type: "string", label: "Header Font", display: "select", values: [{"Sans-Serif": "sans-serif"}, {"Serif": "serif"}, {"Monospace": "monospace"}], default: "sans-serif", section: "Formatting", order: 11 },
+
+    formatting_divider_headers: { type: "string", label: "━━━ Headers ━━━", display: "divider", section: "Formatting", order: 10 },
+    header_font_family: { type: "string", label: "Font", display: "select", values: [{"Sans-Serif": "sans-serif"}, {"Serif": "serif"}, {"Monospace": "monospace"}], default: "sans-serif", section: "Formatting", order: 11 },
     header_font_size: { type: "number", label: "Header Size (px)", default: 12, section: "Formatting", order: 12 },
-    cell_font_family: { type: "string", label: "Cell Font", display: "select", values: [{"Sans-Serif": "sans-serif"}, {"Serif": "serif"}, {"Monospace": "monospace"}], default: "sans-serif", section: "Formatting", order: 21 },
+    header_text_color: { type: "string", label: "Header Text Color", display: "color", default: "#1f2937", section: "Formatting", order: 13 },
+    header_bg_color: { type: "string", label: "Header Background Color", display: "color", default: "#f9fafb", section: "Formatting", order: 14 },
+
+    formatting_divider_cells: { type: "string", label: "━━━ Cells ━━━", display: "divider", section: "Formatting", order: 20 },
+    cell_font_family: { type: "string", label: "Font", display: "select", values: [{"Sans-Serif": "sans-serif"}, {"Serif": "serif"}, {"Monospace": "monospace"}], default: "sans-serif", section: "Formatting", order: 21 },
     cell_font_size: { type: "number", label: "Cell Size (px)", default: 11, section: "Formatting", order: 22 },
-    row_height: { type: "number", label: "Row Height (px)", default: 36, section: "Formatting", order: 23 },
-    column_spacing: { type: "number", label: "Col Spacing (px)", default: 12, section: "Formatting", order: 24 },
-    enable_hover: { type: "boolean", label: "Enable Hover", default: true, section: "Formatting", order: 40 },
-    hover_bg_color: { type: "string", label: "Hover Color", display: "color", default: "#f3f4f6", section: "Formatting", order: 41 }
+    cell_text_color: { type: "string", label: "Cell Text Color", display: "color", default: "#374151", section: "Formatting", order: 23 },
+    row_height: { type: "number", label: "Row Height (px)", default: 36, section: "Formatting", order: 24 },
+    column_spacing: { type: "number", label: "Col Spacing (px)", default: 12, section: "Formatting", order: 25 },
+
+    formatting_divider_hover: { type: "string", label: "━━━ Hover ━━━", display: "divider", section: "Formatting", order: 40 },
+    enable_hover: { type: "boolean", label: "Enable Hover", default: true, section: "Formatting", order: 41 },
+    hover_bg_color: { type: "string", label: "Hover Color", display: "color", default: "#f3f4f6", section: "Formatting", order: 42 }
   },
 
   create: function(element, config) {
     this.container = element.appendChild(document.createElement("div"));
     this.container.id = "advanced-table-container";
-    this.state = { currentPage: 1, tableFilter: '', columnFilters: {}, collapsedGroups: {}, sortField: null, sortDirection: 'asc', data: [] };
+    this.state = { currentPage: 1, sortField: null, sortDirection: 'asc', tableFilter: '', columnFilters: {}, collapsedGroups: {}, lastSubtotalDimension: null, data: [] };
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
@@ -100,13 +110,13 @@ const visObject = {
 
     const dims = queryResponse.fields.dimension_like || [];
     const measures = queryResponse.fields.measure_like || [];
-    const allMeta = dims.concat(measures);
+    const allMetadata = dims.concat(measures);
 
-    // Register Dynamic Meta
+    // Register Dynamic Options
     if (dims.length > 0) {
       this.options.subtotal_dimension.values = [{"None": ""}, ...dims.map(d => ({[d.label_short || d.label]: d.name}))];
     }
-    allMeta.forEach((field, idx) => {
+    allMetadata.forEach((field, idx) => {
       const baseOrder = 110 + (idx * 3);
       if (!this.options[`field_label_${field.name}`]) {
         this.options[`field_divider_${field.name}`] = { type: "string", label: `━━━ ${field.label_short || field.label} ━━━`, display: "divider", section: "Series", order: baseOrder };
@@ -119,7 +129,6 @@ const visObject = {
     this.state.data = data;
     this.queryResponse = queryResponse;
 
-    // Reset state on grouping change
     const currentKey = config.enable_bo_hierarchy ? config.hierarchy_dimensions : config.subtotal_dimension;
     if (currentKey && this.state.lastSubtotalDimension !== currentKey) {
         this.state.collapsedGroups = {};
@@ -128,9 +137,11 @@ const visObject = {
         this.state.currentPage = 1;
     }
 
+    // 1. FILTERING
     let processedData = this.applyFilters(data, config);
     if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
+    // 2. SUBTOTALS / BO HIERARCHY
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
       const hierarchyList = config.hierarchy_dimensions.split(',').map(f => f.trim());
       processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
@@ -152,34 +163,51 @@ const visObject = {
 
     if (config.show_grand_total) processedData.push(this.calculateGrandTotal(data, measures, config, dims));
 
+    // 3. DYNAMIC PAGINATION
     const totalVisibleRows = processedData.length;
-    const dataNoGT = processedData.filter(r => !r.__isGrandTotal);
+    const dataWithoutGT = processedData.filter(r => !r.__isGrandTotal);
     const gtRow = processedData.find(r => r.__isGrandTotal);
-    const totalPages = Math.max(1, Math.ceil(dataNoGT.length / config.page_size));
+    const totalPages = Math.max(1, Math.ceil(dataWithoutGT.length / config.page_size));
     if (this.state.currentPage > totalPages) this.state.currentPage = totalPages;
-    const start = (this.state.currentPage - 1) * config.page_size;
+    const startIdx = (this.state.currentPage - 1) * config.page_size;
 
-    let pageData = config.enable_pagination ? dataNoGT.slice(start, start + config.page_size) : dataNoGT;
+    let pageData = config.enable_pagination ? dataWithoutGT.slice(startIdx, startIdx + config.page_size) : dataWithoutGT;
     if (gtRow && config.show_grand_total_on_all_pages !== false) pageData.push(gtRow);
 
     this.renderTable(pageData, totalVisibleRows, totalPages, config, queryResponse);
     done();
   },
 
-  // UNIFIED FORMATTING (FIXES ROW FORMATTING BUG)
   formatValue: function(value, fieldName, row, config) {
-    const custom = config[`field_format_${fieldName}`];
-    // Priority 1: Custom Format (Applies to both Subtotal and Row)
-    if (custom && custom.trim() !== '') {
-        const decimals = (custom.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+    const customFormat = config[`field_format_${fieldName}`];
+    // Custom format override
+    if (customFormat && customFormat.trim() !== '') {
+        const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
         let res = Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-        if (custom.includes('$')) res = '$' + res;
+        if (customFormat.includes('$')) res = '$' + res;
         return res;
     }
-    // Priority 2: LookML Rendered Value (for detail rows)
-    if (row[fieldName] && row[fieldName].rendered !== undefined) return row[fieldName].rendered;
-    // Priority 3: Default Locale
+    // Default to LookML rendered value if detail row
+    if (row[fieldName] && typeof row[fieldName] === 'object' && row[fieldName].rendered !== undefined) {
+        return row[fieldName].rendered;
+    }
+    // Numeric fallback
     return isNaN(value) ? (value || '∅') : Number(value).toLocaleString();
+  },
+
+  applyFilters: function(data, config) {
+    let filtered = [...data];
+    if (config.enable_table_filter && this.state.tableFilter) {
+      const s = this.state.tableFilter.toLowerCase();
+      filtered = filtered.filter(row => Object.values(row).some(v => String(v?.value || v).toLowerCase().includes(s)));
+    }
+    if (config.enable_column_filters) {
+      Object.keys(this.state.columnFilters).forEach(f => {
+        const val = this.state.columnFilters[f].toLowerCase();
+        if (val) filtered = filtered.filter(row => String(row[f]?.value || row[f]).toLowerCase().includes(val));
+      });
+    }
+    return filtered;
   },
 
   calculateSubtotalsRecursive: function(data, fields, measures, config) {
@@ -260,7 +288,7 @@ const visObject = {
     });
   },
 
-  renderTable: function(pageData, totalVisible, totalPages, config, queryResponse) {
+  renderTable: function(pageData, totalVisibleRows, totalPages, config, queryResponse) {
     let html = '';
     const styleId = 'dynamic-table-style';
     if (document.getElementById(styleId)) document.getElementById(styleId).remove();
@@ -279,7 +307,7 @@ const visObject = {
     document.head.appendChild(styleTag);
 
     if (config.enable_pagination && (config.pagination_position === 'top' || config.pagination_position === 'both')) {
-      html += this.renderPagination(totalVisible, totalPages, config, 'top');
+      html += this.renderPagination(totalVisibleRows, totalPages, config, 'top');
     }
     if (config.enable_table_filter) {
       html += `<div style="padding:12px; background:#f9fafb; border-bottom:1px solid #ddd;"><input type="text" id="table-filter-input" placeholder="Search..." value="${this.state.tableFilter || ''}" style="width:100%; padding:8px;"></div>`;
@@ -292,7 +320,7 @@ const visObject = {
     html += '</table></div>';
 
     if (config.enable_pagination && (config.pagination_position === 'bottom' || config.pagination_position === 'both')) {
-      html += this.renderPagination(totalVisible, totalPages, config, 'bottom');
+      html += this.renderPagination(totalVisibleRows, totalPages, config, 'bottom');
     }
     this.container.innerHTML = html;
     this.attachEventListeners(config);
@@ -312,13 +340,12 @@ const visObject = {
 
       fields.forEach((f, idx) => {
         if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
-        let stickyStyle = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
+        let sticky = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
         let indent = (f.name === mainTreeCol) ? `padding-left: ${(level * 20) + 12}px;` : '';
 
         let val = row[f.name]?.value ?? row[f.name];
         let content = this.formatValue(val, f.name, row, config);
 
-        // Smart Peer Comparison & Level-Aware Bars
         if (!isGT) {
            if (config.enable_comparison && config.comparison_primary_field === f.name && !this.isLastElementOfGroup(i, pageData, config)) {
                content = this.renderComparison(row, config, i, pageData, content);
@@ -329,7 +356,7 @@ const visObject = {
         }
 
         if (isSub && f.name === mainTreeCol) content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
-        html += `<td style="${stickyStyle} ${indent}">${content}</td>`;
+        html += `<td style="${sticky} ${indent}">${content}</td>`;
       });
       html += "</tr>";
     });
@@ -350,7 +377,7 @@ const visObject = {
       const maxVal = Math.max(...peers.map(r => parseFloat(r[fieldName]?.value || r[fieldName] || 0)), 1);
       const width = Math.min(100, Math.max(0, (num / maxVal) * (maxWidth || 100)));
       const barStyle = useGrad ? `linear-gradient(to right, ${color}, ${endColor})` : color;
-      return `<div class="cell-bar-container"><div class="cell-bar-bg"><div class="cell-bar-fill" style="width:${width}%; background:${barStyle};"></div></div><span>${rendered}</span></div>`;
+      return `<div class="cell-bar-container" style="display:flex; align-items:center; gap:8px;"><div class="cell-bar-bg" style="flex:1; height:16px; background:#eee; border-radius:2px; overflow:hidden;"><div class="cell-bar-fill" style="width:${width}%; height:100%; background:${barStyle};"></div></div><span>${rendered}</span></div>`;
   },
 
   renderComparison: function(row, config, idx, data, primaryRendered) {
@@ -414,31 +441,16 @@ const visObject = {
     }
   },
 
-  applyFilters: function(data, config) {
-    let f = [...data];
-    if (config.enable_table_filter && this.state.tableFilter) {
-      const s = this.state.tableFilter.toLowerCase();
-      f = f.filter(r => Object.values(r).some(v => String(v?.value || v).toLowerCase().includes(s)));
-    }
-    if (config.enable_column_filters) {
-      Object.keys(this.state.columnFilters).forEach(key => {
-        const v = this.state.columnFilters[key].toLowerCase();
-        if (v) f = f.filter(r => String(r[key]?.value || r[key]).toLowerCase().includes(v));
-      });
-    }
-    return f;
-  },
-
-  sortData: function(data, field, direction) {
+  sortData: function(data, field, dir) {
     return [...data].sort((a, b) => {
       let aVal = a[field]?.value ?? a[field], bVal = b[field]?.value ?? b[field];
-      return direction === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
+      return dir === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
     });
   },
 
   renderPagination: function(totalRows, totalPages, config, pos) {
     const curr = this.state.currentPage;
-    return `<div class="pagination-controls ${pos}"><div class="pagination-info">Showing ${totalRows} visible rows</div><div class="pagination-buttons">
+    return `<div class="pagination-controls ${pos}"><div class="pagination-info">Showing ${totalRows} rows</div><div class="pagination-buttons">
       <button class="pagination-button" data-action="first" ${curr===1?'disabled':''}>⟨⟨</button>
       <button class="pagination-button" data-action="prev" ${curr===1?'disabled':''}>⟨</button>
       <span style="padding:0 10px;">Page ${curr} of ${totalPages}</span>
