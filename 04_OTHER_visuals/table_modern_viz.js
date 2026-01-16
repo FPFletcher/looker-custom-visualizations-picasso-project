@@ -1,20 +1,24 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.23.0 - Bug Fixes: Hover, Comparison, Pagination, Filters
+ * Version: 4.24.0 - Critical Fixes: Pagination, Filters, Formatting, Comparison
  * Build: 2026-01-16
  *
- * BUG FIXES (v4.23):
- * ✅ Row conditional formatting now preserved on hover (stores original background)
- * ✅ Conditional value formatting now applies to detail rows (fixed value extraction)
- * ✅ Comparison logic fixed - shows comparisons even when categories expanded
- * ✅ Pagination redesigned - bottom-right layout with row count + First/Last buttons
- * ✅ Series tab order fixed - conditional formatting at order 200 (after dynamic fields)
- * ✅ Column filter click no longer triggers sort (added stopPropagation on mousedown/focus)
+ * CRITICAL FIXES (v4.24):
+ * ✅ Pagination shows GRAND total row count (not just current page)
+ * ✅ Column filter click definitively fixed (checks event.target.classList)
+ * ✅ Subtotals revert to LookML format when custom format removed
+ * ✅ Custom value format now applies to BOTH rows AND subtotals
+ * ✅ Comparison logic fixed for expanded hierarchy (looks ahead for next same-level subtotal)
  *
- * FEATURES (v4.22):
- * - Cell-level & row-level conditional formatting
- * - Value formatting with LookML inheritance (Custom > LookML > Default)
- * - Font family controls, filtering, dynamic pagination
+ * Format Priority Logic:
+ * - Custom format specified → Apply to ALL rows
+ * - No custom format + Subtotal → Use LookML default via formatMeasure
+ * - No custom format + Detail row → Use Looker's rendered (has LookML formatting)
+ *
+ * PREVIOUS FIXES (v4.23):
+ * - Row conditional formatting preserved on hover
+ * - Better pagination layout with First/Last buttons
+ * - Series tab order fixed
  */
 
 const visObject = {
@@ -231,6 +235,9 @@ const visObject = {
     }
 
     if (config.show_grand_total) processedData.push(this.calculateGrandTotal(data, measures, config, dims));
+
+    // Store total row count BEFORE pagination
+    this.state.totalRowCount = processedData.length;
 
     // Dynamic pagination
     let paginatedData = processedData;
@@ -554,12 +561,12 @@ const visObject = {
       const totalPages = this.state.totalPages;
       const pageSize = config.page_size || 25;
       const startRow = ((currentPage - 1) * pageSize) + 1;
-      const endRow = Math.min(currentPage * pageSize, processedData.length);
-      const totalRows = processedData.length;
+      const endRow = Math.min(currentPage * pageSize, paginatedData.length);
+      const totalRows = this.state.totalRowCount || paginatedData.length; // Use GRAND total
 
       const paginationHTML = `
         <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9fafb; border-radius: 4px;">
-          <span style="font-size: 13px; color: ${config.cell_text_color};">Showing ${startRow}-${endRow} of ${totalRows} rows</span>
+          <span style="font-size: 13px; color: ${config.cell_text_color}; font-weight: 600;">Total: ${totalRows} rows</span>
           <div style="display: flex; gap: 8px; align-items: center;">
             <button class="pagination-btn" data-page="first" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">|◄</button>
             <button class="pagination-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">◄ Prev</button>
@@ -606,11 +613,22 @@ const visObject = {
     }
     if (val === null || val === undefined) return '∅';
 
-    // CRITICAL FIX: Apply value formatting to ALL cells (rows AND subtotals)
-    // Check if this is a measure field and should be formatted
-    if (field.is_measure || field.type === 'number' || field.type === 'count') {
-      // Use formatMeasure which respects: Custom Format > LookML Format > Default
-      rendered = this.formatMeasure(val, field, config);
+    // Formatting priority for measures:
+    // 1. If custom format specified in config → apply to ALL rows
+    // 2. If subtotal/grand total → apply formatMeasure (uses LookML default)
+    // 3. If detail row with no custom format → use Looker's rendered (has LookML formatting)
+    const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
+    const hasCustomFormat = config[`field_format_${field.name}`];
+
+    if ((field.is_measure || field.type === 'number' || field.type === 'count')) {
+      if (hasCustomFormat) {
+        // Custom format specified - apply to ALL rows (detail AND subtotals)
+        rendered = this.formatMeasure(val, field, config);
+      } else if (isSubtotalOrGrandTotal) {
+        // No custom format, but this is subtotal/grand total - use formatMeasure for LookML default
+        rendered = this.formatMeasure(val, field, config);
+      }
+      // Otherwise: detail row with no custom format → keep Looker's rendered value (has LookML formatting)
     }
 
     // Data Chip logic
@@ -646,9 +664,26 @@ const visObject = {
     const next = data[idx + 1];
     if (next.__isGrandTotal) return true;
 
-    // For hierarchy mode: check if next row is at same level with same parent
+    // For hierarchy mode with subtotals
     if (config.enable_bo_hierarchy) {
-      // Only hide comparison if next row is completely different branch or different level
+      // If current is a subtotal, look ahead to find next subtotal at same level
+      if (curr.__isSubtotal) {
+        // Find next subtotal at same level with same parent
+        for (let i = idx + 1; i < data.length; i++) {
+          const futureRow = data[i];
+          if (futureRow.__isGrandTotal) return true;
+          if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
+            // Found next subtotal at same level - check if same parent
+            if (futureRow.__parentPath === curr.__parentPath) {
+              return false; // There's another subtotal to compare with
+            } else {
+              return true; // Different parent, can't compare
+            }
+          }
+        }
+        return true; // No more subtotals at this level
+      }
+      // For detail rows, check immediate next row
       if (next.__level !== curr.__level) return true;
       if (next.__parentPath !== curr.__parentPath) return true;
       return false;
@@ -722,6 +757,10 @@ const visObject = {
       }
       const th = e.target.closest('th.sortable');
       if (th) {
+        // Don't sort if clicking on column filter input
+        if (e.target.classList.contains('column-filter')) {
+          return;
+        }
         const f = th.dataset.field;
         self.state.sortDirection = (self.state.sortField === f && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
         self.state.sortField = f;
