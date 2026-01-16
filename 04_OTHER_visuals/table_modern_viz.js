@@ -1,19 +1,20 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.22.0 - Full Conditional Formatting + Fixed Value Formatting
+ * Version: 4.23.0 - Bug Fixes: Hover, Comparison, Pagination, Filters
  * Build: 2026-01-16
  *
- * NEW FEATURES:
- * - Cell-level conditional formatting (color cells based on value rules)
- * - Row-level conditional formatting (color entire rows based on field values)
- * - Fixed value formatting to apply to BOTH detail rows AND subtotals
- * - LookML format inheritance: Custom Format > LookML Format > Default
+ * BUG FIXES (v4.23):
+ * ✅ Row conditional formatting now preserved on hover (stores original background)
+ * ✅ Conditional value formatting now applies to detail rows (fixed value extraction)
+ * ✅ Comparison logic fixed - shows comparisons even when categories expanded
+ * ✅ Pagination redesigned - bottom-right layout with row count + First/Last buttons
+ * ✅ Series tab order fixed - conditional formatting at order 200 (after dynamic fields)
+ * ✅ Column filter click no longer triggers sort (added stopPropagation on mousedown/focus)
  *
- * PREVIOUS FEATURES (v4.21):
- * - Font family controls (header_font_family, cell_font_family)
- * - Table-level filtering (searches across all columns)
- * - Column-level filtering (individual filters per column)
- * - Dynamic pagination (respects subtotal grouping)
+ * FEATURES (v4.22):
+ * - Cell-level & row-level conditional formatting
+ * - Value formatting with LookML inheritance (Custom > LookML > Default)
+ * - Font family controls, filtering, dynamic pagination
  */
 
 const visObject = {
@@ -89,17 +90,17 @@ const visObject = {
     field_formatting_divider: { type: "string", label: "━━━ Field Formatting ━━━", display: "divider", section: "Series", order: 100 },
     enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 101 },
 
-    conditional_formatting_divider: { type: "string", label: "━━━ Conditional Formatting ━━━", display: "divider", section: "Series", order: 110 },
-    enable_conditional_formatting: { type: "boolean", label: "Enable Conditional Formatting", default: false, section: "Series", order: 111 },
-    conditional_field: { type: "string", label: "Target Field", display: "text", default: "", section: "Series", order: 112 },
-    conditional_rule_1_operator: { type: "string", label: "Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 113 },
-    conditional_rule_1_value: { type: "number", label: "Rule 1 Value", default: 0, section: "Series", order: 114 },
-    conditional_rule_1_bg: { type: "string", label: "Rule 1 BG Color", display: "color", default: "#dcfce7", section: "Series", order: 115 },
-    conditional_rule_1_text: { type: "string", label: "Rule 1 Text Color", display: "color", default: "#166534", section: "Series", order: 116 },
-    conditional_rule_2_operator: { type: "string", label: "Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 117 },
-    conditional_rule_2_value: { type: "number", label: "Rule 2 Value", default: 0, section: "Series", order: 118 },
-    conditional_rule_2_bg: { type: "string", label: "Rule 2 BG Color", display: "color", default: "#fee2e2", section: "Series", order: 119 },
-    conditional_rule_2_text: { type: "string", label: "Rule 2 Text Color", display: "color", default: "#991b1b", section: "Series", order: 120 },
+    conditional_formatting_divider: { type: "string", label: "━━━ Conditional Formatting ━━━", display: "divider", section: "Series", order: 200 },
+    enable_conditional_formatting: { type: "boolean", label: "Enable Conditional Formatting", default: false, section: "Series", order: 201 },
+    conditional_field: { type: "string", label: "Target Field", display: "text", default: "", section: "Series", order: 202 },
+    conditional_rule_1_operator: { type: "string", label: "Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 203 },
+    conditional_rule_1_value: { type: "number", label: "Rule 1 Value", default: 0, section: "Series", order: 204 },
+    conditional_rule_1_bg: { type: "string", label: "Rule 1 BG Color", display: "color", default: "#dcfce7", section: "Series", order: 205 },
+    conditional_rule_1_text: { type: "string", label: "Rule 1 Text Color", display: "color", default: "#166534", section: "Series", order: 206 },
+    conditional_rule_2_operator: { type: "string", label: "Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 207 },
+    conditional_rule_2_value: { type: "number", label: "Rule 2 Value", default: 0, section: "Series", order: 208 },
+    conditional_rule_2_bg: { type: "string", label: "Rule 2 BG Color", display: "color", default: "#fee2e2", section: "Series", order: 209 },
+    conditional_rule_2_text: { type: "string", label: "Rule 2 Text Color", display: "color", default: "#991b1b", section: "Series", order: 210 },
 
     // ══════════════════════════════════════════════════════════════
     // TAB: FORMATTING
@@ -498,7 +499,7 @@ const visObject = {
       const sticky = (idx < config.freeze_columns && config.freeze_header_row) ? 'position:sticky; left:0; z-index:101;' : '';
       const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
       const label = config[`field_label_${f.name}`] || f.label_short || f.label;
-      const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" placeholder="Filter..." onclick="event.stopPropagation();">` : '';
+      const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" placeholder="Filter..." onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onfocus="event.stopPropagation();">` : '';
       html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${label}${sortIcon}${columnFilter}</th>`;
     });
     html += '</tr></thead><tbody>';
@@ -527,7 +528,8 @@ const visObject = {
 
         // Cell-level conditional formatting
         if (config.enable_conditional_formatting && config.conditional_field === f.name && !isSub && !isGT) {
-          const cellValue = row[f.name]?.value || row[f.name];
+          const cellData = row[f.name];
+          const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
           const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
                           this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
           const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') ||
@@ -546,15 +548,25 @@ const visObject = {
 
     html += "</tbody></table>";
 
-    // Pagination controls
+    // Pagination controls - Better format
     if (config.enable_pagination && this.state.totalPages > 1) {
       const currentPage = this.state.currentPage || 1;
       const totalPages = this.state.totalPages;
+      const pageSize = config.page_size || 25;
+      const startRow = ((currentPage - 1) * pageSize) + 1;
+      const endRow = Math.min(currentPage * pageSize, processedData.length);
+      const totalRows = processedData.length;
+
       const paginationHTML = `
-        <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: center; align-items: center; gap: 8px;">
-          <button class="pagination-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px;">← Prev</button>
-          <span style="font-size: 13px; color: ${config.cell_text_color};">Page ${currentPage} of ${totalPages}</span>
-          <button class="pagination-btn" data-page="next" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px;">Next →</button>
+        <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9fafb; border-radius: 4px;">
+          <span style="font-size: 13px; color: ${config.cell_text_color};">Showing ${startRow}-${endRow} of ${totalRows} rows</span>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="pagination-btn" data-page="first" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">|◄</button>
+            <button class="pagination-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">◄ Prev</button>
+            <span style="font-size: 13px; color: ${config.cell_text_color}; padding: 0 8px;">Page ${currentPage} of ${totalPages}</span>
+            <button class="pagination-btn" data-page="next" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''}">Next ►</button>
+            <button class="pagination-btn" data-page="last" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''}">►|</button>
+          </div>
         </div>
       `;
 
@@ -633,11 +645,24 @@ const visObject = {
     const curr = data[idx];
     const next = data[idx + 1];
     if (next.__isGrandTotal) return true;
+
+    // For hierarchy mode: check if next row is at same level with same parent
     if (config.enable_bo_hierarchy) {
-      // Peer check: row only compares if next row has same parent path AND same level
-      return next.__parentPath !== curr.__parentPath || next.__level !== curr.__level;
+      // Only hide comparison if next row is completely different branch or different level
+      if (next.__level !== curr.__level) return true;
+      if (next.__parentPath !== curr.__parentPath) return true;
+      return false;
     }
-    if (!curr.__isSubtotal && next.__isSubtotal) return true;
+
+    // For standard subtotals: Only hide if this is last detail row before subtotal
+    if (config.enable_subtotals) {
+      // If current is detail and next is subtotal, this is last of group
+      if (!curr.__isSubtotal && next.__isSubtotal) return true;
+      // If current is subtotal and next is different subtotal, this is last
+      if (curr.__isSubtotal && next.__isSubtotal && curr.__groupValue !== next.__groupValue) return true;
+      return false;
+    }
+
     return false;
   },
 
@@ -705,8 +730,9 @@ const visObject = {
     };
     if (config.enable_hover) {
       this.container.querySelectorAll('tbody tr:not(.subtotal-row):not(.grand-total-row)').forEach(tr => {
+        const originalBg = tr.style.backgroundColor || '';
         tr.onmouseenter = () => tr.style.backgroundColor = config.hover_bg_color;
-        tr.onmouseleave = () => tr.style.backgroundColor = '';
+        tr.onmouseleave = () => tr.style.backgroundColor = originalBg;
       });
     }
 
@@ -742,10 +768,14 @@ const visObject = {
       this.container.querySelectorAll('.pagination-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           const action = e.target.dataset.page;
-          if (action === 'prev' && self.state.currentPage > 1) {
+          if (action === 'first') {
+            self.state.currentPage = 1;
+          } else if (action === 'prev' && self.state.currentPage > 1) {
             self.state.currentPage--;
           } else if (action === 'next' && self.state.currentPage < self.state.totalPages) {
             self.state.currentPage++;
+          } else if (action === 'last') {
+            self.state.currentPage = self.state.totalPages;
           }
           self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
         });
