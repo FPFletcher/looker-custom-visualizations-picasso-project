@@ -1,19 +1,7 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.22.0 - Full Conditional Formatting + Fixed Value Formatting
- * Build: 2026-01-16
- *
- * NEW FEATURES:
- * - Cell-level conditional formatting (color cells based on value rules)
- * - Row-level conditional formatting (color entire rows based on field values)
- * - Fixed value formatting to apply to BOTH detail rows AND subtotals
- * - LookML format inheritance: Custom Format > LookML Format > Default
- *
- * PREVIOUS FEATURES (v4.21):
- * - Font family controls (header_font_family, cell_font_family)
- * - Table-level filtering (searches across all columns)
- * - Column-level filtering (individual filters per column)
- * - Dynamic pagination (respects subtotal grouping)
+ * Version: 4.20.0 - Peer-Level Scaling + Multi-Level Formatting Fixes
+ * Build: 2026-01-14
  */
 
 const visObject = {
@@ -30,10 +18,6 @@ const visObject = {
     enable_pagination: { type: "boolean", label: "Enable Pagination", default: true, section: "Plot", order: 11 },
     page_size: { type: "number", label: "Page Size", default: 25, display: "number", section: "Plot", order: 12 },
     pagination_position: { type: "string", label: "Position", display: "select", values: [{ "Top": "top" }, { "Bottom": "bottom" }, { "Both": "both" }], default: "bottom", section: "Plot", order: 13 },
-    dynamic_pagination: { type: "boolean", label: "Dynamic Pagination (Respects Subtotals)", default: true, section: "Plot", order: 14 },
-    plot_divider_filtering: { type: "string", label: "━━━ Filtering ━━━", display: "divider", section: "Plot", order: 15 },
-    enable_table_filter: { type: "boolean", label: "Enable Table-Level Filter", default: false, section: "Plot", order: 16 },
-    enable_column_filters: { type: "boolean", label: "Enable Column Filters", default: false, section: "Plot", order: 17 },
     plot_divider_freezing: { type: "string", label: "━━━ Freezing ━━━", display: "divider", section: "Plot", order: 20 },
     freeze_columns: { type: "number", label: "Freeze Left Columns", default: 0, section: "Plot", order: 21 },
     freeze_header_row: { type: "boolean", label: "Freeze Header Row", default: true, section: "Plot", order: 22 },
@@ -79,27 +63,15 @@ const visObject = {
 
     subtotals_divider: { type: "string", label: "━━━ Subtotals & Totals ━━━", display: "divider", section: "Series", order: 80 },
     enable_subtotals: { type: "boolean", label: "Enable Subtotals", default: false, section: "Series", order: 81 },
-    subtotal_dimension: { type: "string", label: "Group Dimension", display: "select", values: [{ "None": "" }], default: "", section: "Series", order: 82 },
+    subtotal_dimension: { type: "string", label: "Group Dimension", display: "select", values: [{"None": ""}], default: "", section: "Series", order: 82 },
     standard_subtotal_bold: { type: "boolean", label: "Bold Font for Subtotals", default: true, section: "Series", order: 83 },
     show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 84 },
-    subtotal_position: { type: "string", label: "Position", display: "select", values: [{ "Top": "top" }, { "Bottom": "bottom" }], default: "bottom", section: "Series", order: 85 },
+    subtotal_position: { type: "string", label: "Position", display: "select", values: [{"Top": "top"}, {"Bottom": "bottom"}], default: "bottom", section: "Series", order: 85 },
     subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 86 },
     grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Series", order: 87 },
 
     field_formatting_divider: { type: "string", label: "━━━ Field Formatting ━━━", display: "divider", section: "Series", order: 100 },
     enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: false, section: "Series", order: 101 },
-
-    conditional_formatting_divider: { type: "string", label: "━━━ Conditional Formatting ━━━", display: "divider", section: "Series", order: 110 },
-    enable_conditional_formatting: { type: "boolean", label: "Enable Conditional Formatting", default: false, section: "Series", order: 111 },
-    conditional_field: { type: "string", label: "Target Field", display: "text", default: "", section: "Series", order: 112 },
-    conditional_rule_1_operator: { type: "string", label: "Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 113 },
-    conditional_rule_1_value: { type: "number", label: "Rule 1 Value", default: 0, section: "Series", order: 114 },
-    conditional_rule_1_bg: { type: "string", label: "Rule 1 BG Color", display: "color", default: "#dcfce7", section: "Series", order: 115 },
-    conditional_rule_1_text: { type: "string", label: "Rule 1 Text Color", display: "color", default: "#166534", section: "Series", order: 116 },
-    conditional_rule_2_operator: { type: "string", label: "Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 117 },
-    conditional_rule_2_value: { type: "number", label: "Rule 2 Value", default: 0, section: "Series", order: 118 },
-    conditional_rule_2_bg: { type: "string", label: "Rule 2 BG Color", display: "color", default: "#fee2e2", section: "Series", order: 119 },
-    conditional_rule_2_text: { type: "string", label: "Rule 2 Text Color", display: "color", default: "#991b1b", section: "Series", order: 120 },
 
     // ══════════════════════════════════════════════════════════════
     // TAB: FORMATTING
@@ -109,14 +81,11 @@ const visObject = {
     stripe_color: { type: "string", label: "Stripe color", display: "color", default: "#f9fafb", section: "Formatting", order: 2 },
 
     formatting_divider_headers: { type: "string", label: "━━━ Headers ━━━", display: "divider", section: "Formatting", order: 10 },
-    header_font_family: { type: "string", label: "Header Font Family", display: "text", default: "inherit", section: "Formatting", order: 10.5 },
-    header_font_weight: { type: "string", label: "Header Font Weight", display: "select", values: [{ "Normal": "normal" }, { "Bold": "bold" }, { "600": "600" }, { "700": "700" }], default: "bold", section: "Formatting", order: 10.6 },
     header_font_size: { type: "number", label: "Header Font Size (px)", default: 12, section: "Formatting", order: 11 },
     header_text_color: { type: "string", label: "Header Text Color", display: "color", default: "#1f2937", section: "Formatting", order: 12 },
     header_bg_color: { type: "string", label: "Header Background Color", display: "color", default: "#f9fafb", section: "Formatting", order: 13 },
 
     formatting_divider_cells: { type: "string", label: "━━━ Cells ━━━", display: "divider", section: "Formatting", order: 20 },
-    cell_font_family: { type: "string", label: "Cell Font Family", display: "text", default: "inherit", section: "Formatting", order: 20.5 },
     cell_font_size: { type: "number", label: "Cell Size (px)", default: 11, section: "Formatting", order: 21 },
     cell_text_color: { type: "string", label: "Cell Text Color", display: "color", default: "#374151", section: "Formatting", order: 22 },
     row_height: { type: "number", label: "Row Height (px)", default: 36, section: "Formatting", order: 23 },
@@ -129,26 +98,16 @@ const visObject = {
 
     formatting_divider_hover: { type: "string", label: "━━━ Hover ━━━", display: "divider", section: "Formatting", order: 40 },
     enable_hover: { type: "boolean", label: "Enable Hover", default: true, section: "Formatting", order: 41 },
-    hover_bg_color: { type: "string", label: "Hover Color", display: "color", default: "#f3f4f6", section: "Formatting", order: 42 },
-
-    formatting_divider_row_formatting: { type: "string", label: "━━━ Row Conditional Formatting ━━━", display: "divider", section: "Formatting", order: 50 },
-    enable_row_conditional_formatting: { type: "boolean", label: "Enable Row Formatting", default: false, section: "Formatting", order: 51 },
-    row_conditional_field: { type: "string", label: "Row Condition Field", display: "text", default: "", section: "Formatting", order: 52 },
-    row_rule_1_operator: { type: "string", label: "Row Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }, { "Contains": "contains" }], default: "", section: "Formatting", order: 53 },
-    row_rule_1_value: { type: "string", label: "Row Rule 1 Value", display: "text", default: "", section: "Formatting", order: 54 },
-    row_rule_1_bg: { type: "string", label: "Row Rule 1 BG", display: "color", default: "#dcfce7", section: "Formatting", order: 55 },
-    row_rule_2_operator: { type: "string", label: "Row Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }, { "Contains": "contains" }], default: "", section: "Formatting", order: 56 },
-    row_rule_2_value: { type: "string", label: "Row Rule 2 Value", display: "text", default: "", section: "Formatting", order: 57 },
-    row_rule_2_bg: { type: "string", label: "Row Rule 2 BG", display: "color", default: "#fee2e2", section: "Formatting", order: 58 }
+    hover_bg_color: { type: "string", label: "Hover Color", display: "color", default: "#f3f4f6", section: "Formatting", order: 42 }
   },
 
-  create: function (element, config) {
+  create: function(element, config) {
     this.container = element.appendChild(document.createElement("div"));
     this.container.id = "advanced-table-container";
     this.state = { currentPage: 1, sortField: null, sortDirection: 'asc', collapsedGroups: {}, lastSubtotalDimension: null, data: [] };
   },
 
-  updateAsync: function (data, element, config, queryResponse, details, done) {
+  updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
     if (!queryResponse || !queryResponse.fields || !data || data.length === 0) { done(); return; }
 
@@ -157,7 +116,7 @@ const visObject = {
 
     // Build options dynamically
     if (dims.length > 0) {
-      this.options.subtotal_dimension.values = [{ "None": "" }, ...dims.map(d => ({ [d.label_short || d.label]: d.name }))];
+      this.options.subtotal_dimension.values = [{"None": ""}, ...dims.map(d => ({[d.label_short || d.label]: d.name}))];
     }
     dims.concat(measures).forEach((field, idx) => {
       const baseOrder = 110 + (idx * 3);
@@ -175,39 +134,13 @@ const visObject = {
 
     const currentKey = config.enable_bo_hierarchy ? config.hierarchy_dimensions : config.subtotal_dimension;
     if (currentKey && this.state.lastSubtotalDimension !== currentKey) {
-      this.state.collapsedGroups = {};
-      this.state.lastSubtotalDimension = currentKey;
-      this.state.forceInitialCollapse = true;
-      this.state.currentPage = 1;
+        this.state.collapsedGroups = {};
+        this.state.lastSubtotalDimension = currentKey;
+        this.state.forceInitialCollapse = true;
+        this.state.currentPage = 1;
     }
 
     let processedData = [...data];
-
-    // Apply table filter
-    if (config.enable_table_filter && this.state.tableFilter) {
-      const filterText = this.state.tableFilter;
-      const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-      processedData = processedData.filter(row => {
-        return allFields.some(field => {
-          const cellValue = String(row[field.name]?.value || row[field.name] || '').toLowerCase();
-          return cellValue.includes(filterText);
-        });
-      });
-    }
-
-    // Apply column filters
-    if (config.enable_column_filters && this.state.columnFilters) {
-      Object.keys(this.state.columnFilters).forEach(fieldName => {
-        const filterText = this.state.columnFilters[fieldName];
-        if (filterText) {
-          processedData = processedData.filter(row => {
-            const cellValue = String(row[fieldName]?.value || row[fieldName] || '').toLowerCase();
-            return cellValue.includes(filterText);
-          });
-        }
-      });
-    }
-
     if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
@@ -231,48 +164,11 @@ const visObject = {
 
     if (config.show_grand_total) processedData.push(this.calculateGrandTotal(data, measures, config, dims));
 
-    // Dynamic pagination
-    let paginatedData = processedData;
-    if (config.enable_pagination) {
-      const pageSize = config.page_size || 25;
-      const currentPage = this.state.currentPage || 1;
-
-      if (config.dynamic_pagination && config.enable_subtotals) {
-        // Smart pagination: keep subtotal + detail rows together
-        let chunks = [];
-        let currentChunk = [];
-
-        processedData.forEach(row => {
-          if (row.__isSubtotal && currentChunk.length > 0) {
-            chunks.push(currentChunk);
-            currentChunk = [row];
-          } else {
-            currentChunk.push(row);
-          }
-        });
-        if (currentChunk.length > 0) chunks.push(currentChunk);
-
-        // Paginate chunks
-        const totalPages = Math.ceil(chunks.length / pageSize);
-        this.state.totalPages = totalPages;
-        const startIdx = (currentPage - 1) * pageSize;
-        const endIdx = startIdx + pageSize;
-        paginatedData = chunks.slice(startIdx, endIdx).flat();
-      } else {
-        // Standard pagination
-        const totalPages = Math.ceil(processedData.length / pageSize);
-        this.state.totalPages = totalPages;
-        const startIdx = (currentPage - 1) * pageSize;
-        const endIdx = startIdx + pageSize;
-        paginatedData = processedData.slice(startIdx, endIdx);
-      }
-    }
-
-    this.renderTable(paginatedData, config, queryResponse);
+    this.renderTable(processedData, config, queryResponse);
     done();
   },
 
-  calculateSubtotalsRecursive: function (data, fields, measures, config) {
+  calculateSubtotalsRecursive: function(data, fields, measures, config) {
     const result = [];
     const groupData = (rows, level, parentPath) => {
       const field = fields[level];
@@ -297,9 +193,9 @@ const visObject = {
 
         result.push(sub);
         if (level < fields.length - 1) {
-          groupData(groups[key], level + 1, currentPath);
+            groupData(groups[key], level + 1, currentPath);
         } else {
-          groups[key].forEach(r => { r.__parentGroup = currentPath; r.__parentPath = currentPath; r.__level = level + 1; result.push(r); });
+            groups[key].forEach(r => { r.__parentGroup = currentPath; r.__parentPath = currentPath; r.__level = level + 1; result.push(r); });
         }
       });
     };
@@ -307,7 +203,7 @@ const visObject = {
     return result;
   },
 
-  calculateStandardSubtotals: function (data, field, measures, config, dims) {
+  calculateStandardSubtotals: function(data, field, measures, config, dims) {
     const result = [];
     const groups = {};
     data.forEach(row => {
@@ -319,7 +215,7 @@ const visObject = {
     Object.keys(groups).forEach(key => {
       const sub = { __isSubtotal: true, __groupValue: key, __level: 0 };
       sub[field] = { value: key, rendered: key };
-      dims.forEach(d => { if (d.name !== field) sub[d.name] = { value: '', rendered: '' }; });
+      dims.forEach(d => { if(d.name !== field) sub[d.name] = { value: '', rendered: '' }; });
       measures.forEach(m => {
         let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
         sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
@@ -335,103 +231,19 @@ const visObject = {
     return result;
   },
 
-  formatMeasure: function (value, field, config) {
-    // Priority: Custom format > LookML format
-    const customFormat = config[`field_format_${field.name}`];
-
-    if (customFormat) {
-      // Custom format specified - parse and apply
-      return this.applyCustomFormat(value, customFormat);
-    }
-
-    // Use LookML format from field metadata
-    if (field.value_format) {
-      return this.applyCustomFormat(value, field.value_format);
-    }
-
-    // Fallback to basic locale formatting
-    if (typeof value === 'number') {
-      return value.toLocaleString('en-US');
-    }
-    return String(value);
+  formatMeasure: function(value, field, config) {
+      const customFormat = config[`field_format_${field.name}`];
+      if (customFormat) {
+          const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+          let res = value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+          if (customFormat.includes('$')) res = '$' + res;
+          return res;
+      }
+      // Fallback to LookML rendering logic if available
+      return value.toLocaleString();
   },
 
-  applyCustomFormat: function (value, formatString) {
-    if (!formatString || value === null || value === undefined) return String(value);
-
-    const num = parseFloat(value);
-    if (isNaN(num)) return String(value);
-
-    // Parse decimal places from format like "$0.00" or "0.00%" or "#,##0.0"
-    const decimalMatch = formatString.match(/\.([0#]+)/);
-    const decimals = decimalMatch ? decimalMatch[1].length : 0;
-
-    // Format number with proper decimals
-    let formatted = num.toLocaleString('en-US', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals
-    });
-
-    // Apply prefix/suffix
-    if (formatString.includes('$') || formatString.startsWith('$')) {
-      formatted = '$' + formatted;
-    }
-    if (formatString.includes('%')) {
-      formatted = formatted + '%';
-    }
-    if (formatString.includes('€')) {
-      formatted = '€' + formatted;
-    }
-    if (formatString.includes('£')) {
-      formatted = '£' + formatted;
-    }
-
-    return formatted;
-  },
-
-  evaluateConditionalRule: function (cellValue, config, rulePrefix, colorType = 'bg') {
-    const operator = config[`${rulePrefix}_operator`];
-    if (!operator) return null;
-
-    const ruleValue = config[`${rulePrefix}_value`];
-    const numericCell = parseFloat(cellValue);
-    const numericRule = parseFloat(ruleValue);
-
-    let matches = false;
-
-    if (operator === 'contains') {
-      matches = String(cellValue).toLowerCase().includes(String(ruleValue).toLowerCase());
-    } else if (!isNaN(numericCell) && !isNaN(numericRule)) {
-      // Numeric comparison
-      switch (operator) {
-        case '>': matches = numericCell > numericRule; break;
-        case '>=': matches = numericCell >= numericRule; break;
-        case '<': matches = numericCell < numericRule; break;
-        case '<=': matches = numericCell <= numericRule; break;
-        case '=': matches = numericCell === numericRule; break;
-        case '!=': matches = numericCell !== numericRule; break;
-      }
-    } else {
-      // String comparison
-      switch (operator) {
-        case '=': matches = String(cellValue) === String(ruleValue); break;
-        case '!=': matches = String(cellValue) !== String(ruleValue); break;
-      }
-    }
-
-    if (matches) {
-      // For row rules, only return bg color
-      if (rulePrefix.startsWith('row_rule')) {
-        return config[`${rulePrefix}_bg`];
-      }
-      // For cell rules, return the requested color type
-      return config[`${rulePrefix}_${colorType}`];
-    }
-
-    return null;
-  },
-
-  applyHierarchyFilter: function (data) {
+  applyHierarchyFilter: function(data) {
     return data.filter(row => {
       const pathParts = String(row.__isSubtotal ? row.__groupValue : row.__parentGroup || "").split('|');
       let currentPath = "";
@@ -444,7 +256,7 @@ const visObject = {
     });
   },
 
-  calculateGrandTotal: function (rawData, measures, config, dimensions) {
+  calculateGrandTotal: function(rawData, measures, config, dimensions) {
     const total = { __isGrandTotal: true, __level: -1 };
     if (dimensions.length > 0) total[dimensions[0].name] = { value: config.grand_total_label, rendered: config.grand_total_label };
     measures.forEach(m => {
@@ -454,14 +266,14 @@ const visObject = {
     return total;
   },
 
-  renderTable: function (processedData, config, queryResponse) {
+  renderTable: function(processedData, config, queryResponse) {
     const fields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
     const hDims = config.enable_bo_hierarchy ? (config.hierarchy_dimensions || "").split(',').map(f => f.trim()) : [];
     const mainTreeCol = hDims[0] || config.subtotal_dimension;
 
     let html = `<style>
-        table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
-        table.advanced-table thead th { font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; }
+        table.advanced-table tbody td { font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text?'normal':'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
+        table.advanced-table thead th { font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; }
         .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
         .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
         table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color}; }
@@ -475,66 +287,35 @@ const visObject = {
         .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
         .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; user-select: none; display: inline-block; width: 14px; text-align: center; }
         table.advanced-table.striped tbody tr:nth-child(odd):not(.subtotal-row):not(.grand-total-row) { background-color: ${config.stripe_color} !important; }
-        .table-filter-container { margin-bottom: 12px; padding: 8px; background: #f9fafb; border-radius: 4px; }
-        .table-filter-input { width: 300px; padding: 8px 12px; border: 1px solid ${config.border_color}; border-radius: 4px; font-size: 13px; }
-        .column-filter { width: 100%; padding: 4px 6px; margin-top: 4px; border: 1px solid ${config.border_color}; border-radius: 3px; font-size: 11px; box-sizing: border-box; }
-        .column-filter:focus { outline: none; border-color: #3b82f6; }
     </style>`;
-
-    // Table-level filter
-    if (config.enable_table_filter) {
-      html += `<div class="table-filter-container">
-        <input type="text" class="table-filter-input" placeholder="Filter table (press Enter)..." />
-      </div>`;
-    }
 
     html += `<table class="advanced-table ${config.table_theme}">`;
     if (config.enable_column_groups) html += this.renderColumnGroups(config, fields);
 
     html += '<thead><tr>';
-    if (config.show_row_numbers) html += `<th ${config.enable_column_groups ? 'rowspan="2"' : ''}>#</th>`;
+    if (config.show_row_numbers) html += `<th ${config.enable_column_groups?'rowspan="2"':''}>#</th>`;
     fields.forEach((f, idx) => {
       if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
       const sticky = (idx < config.freeze_columns && config.freeze_header_row) ? 'position:sticky; left:0; z-index:101;' : '';
       const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
       const label = config[`field_label_${f.name}`] || f.label_short || f.label;
-      const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" placeholder="Filter..." onclick="event.stopPropagation();">` : '';
-      html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${label}${sortIcon}${columnFilter}</th>`;
+      html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${label}${sortIcon}</th>`;
     });
     html += '</tr></thead><tbody>';
 
     processedData.forEach((row, i) => {
       const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
       const level = row.__level || 0;
-      let bg = isSub ? `background:${config.subtotal_background_color};` : '';
+      const bg = isSub ? `background:${config.subtotal_background_color};` : '';
       const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
-      // Row-level conditional formatting
-      if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
-        const rowFieldValue = row[config.row_conditional_field]?.value || row[config.row_conditional_field];
-        const rowBg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1') ||
-                      this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_2');
-        if (rowBg) bg = `background:${rowBg};`;
-      }
-
-      html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
-      if (config.show_row_numbers) html += `<td>${(isSub || isGT) ? '' : i + 1}</td>`;
+      html += `<tr class="${isGT?'grand-total-row':(isSub?'subtotal-row ' + modeClass:'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
+      if (config.show_row_numbers) html += `<td>${(isSub||isGT)?'':i+1}</td>`;
 
       fields.forEach((f, idx) => {
         if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
         let style = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
         if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
-
-        // Cell-level conditional formatting
-        if (config.enable_conditional_formatting && config.conditional_field === f.name && !isSub && !isGT) {
-          const cellValue = row[f.name]?.value || row[f.name];
-          const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
-                          this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
-          const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') ||
-                            this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'text');
-          if (bgColor) style += `background:${bgColor};`;
-          if (textColor) style += `color:${textColor};`;
-        }
 
         let content = this.renderCellContent(row[f.name], f, config, row, i, processedData);
         if (isSub && f.name === mainTreeCol) content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
@@ -545,32 +326,11 @@ const visObject = {
     });
 
     html += "</tbody></table>";
-
-    // Pagination controls
-    if (config.enable_pagination && this.state.totalPages > 1) {
-      const currentPage = this.state.currentPage || 1;
-      const totalPages = this.state.totalPages;
-      const paginationHTML = `
-        <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: center; align-items: center; gap: 8px;">
-          <button class="pagination-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px;">← Prev</button>
-          <span style="font-size: 13px; color: ${config.cell_text_color};">Page ${currentPage} of ${totalPages}</span>
-          <button class="pagination-btn" data-page="next" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px;">Next →</button>
-        </div>
-      `;
-
-      if (config.pagination_position === 'top' || config.pagination_position === 'both') {
-        html = paginationHTML + html;
-      }
-      if (config.pagination_position === 'bottom' || config.pagination_position === 'both') {
-        html += paginationHTML;
-      }
-    }
-
     this.container.innerHTML = html;
     this.attachEventListeners(config);
   },
 
-  renderColumnGroups: function (config, fields) {
+  renderColumnGroups: function(config, fields) {
     let html = '<thead><tr>';
     let currentIdx = 0;
     for (let i = 1; i <= 3; i++) {
@@ -586,26 +346,16 @@ const visObject = {
     return html + '</tr></thead>';
   },
 
-  renderCellContent: function (cell, field, config, row, rowIdx, data) {
+  renderCellContent: function(cell, field, config, row, rowIdx, data) {
     let val = cell, rendered = cell;
-    if (cell && typeof cell === 'object') {
-      val = cell.value;
-      rendered = cell.rendered || cell.value;
-    }
+    if (cell && typeof cell === 'object') { val = cell.value; rendered = cell.rendered || cell.value; }
     if (val === null || val === undefined) return '∅';
-
-    // CRITICAL FIX: Apply value formatting to ALL cells (rows AND subtotals)
-    // Check if this is a measure field and should be formatted
-    if (field.is_measure || field.type === 'number' || field.type === 'count') {
-      // Use formatMeasure which respects: Custom Format > LookML Format > Default
-      rendered = this.formatMeasure(val, field, config);
-    }
 
     // Data Chip logic
     if (config.enable_data_chips && (config.data_chip_fields || "").split(',').includes(field.name)) {
       const s = String(val).toLowerCase();
-      if ((config.chip_match_green || "").split(',').map(x => x.trim().toLowerCase()).includes(s)) rendered = `<span class="data-chip chip-green">${rendered}</span>`;
-      else if ((config.chip_match_red || "").split(',').map(x => x.trim().toLowerCase()).includes(s)) rendered = `<span class="data-chip chip-red">${rendered}</span>`;
+      if ((config.chip_match_green || "").split(',').map(x=>x.trim().toLowerCase()).includes(s)) rendered = `<span class="data-chip chip-green">${rendered}</span>`;
+      else if ((config.chip_match_red || "").split(',').map(x=>x.trim().toLowerCase()).includes(s)) rendered = `<span class="data-chip chip-red">${rendered}</span>`;
     }
 
     // Smart Peer-Based Comparison Logic
@@ -618,40 +368,40 @@ const visObject = {
 
     // Level-Aware Cell Bar Logic
     if (!row.__isGrandTotal) {
-      if (config.enable_cell_bars_1 && (config.cell_bar_fields_1 || "").split(',').map(x => x.trim()).includes(field.name)) {
-        rendered = this.generateCellBar(val, rendered, config.cell_bar_color_1, config.use_gradient_1, config.gradient_end_1, data, field.name, row.__level);
-      } else if (config.enable_cell_bars_2 && (config.cell_bar_fields_2 || "").split(',').map(x => x.trim()).includes(field.name)) {
-        rendered = this.generateCellBar(val, rendered, config.cell_bar_color_2, false, null, data, field.name, row.__level);
-      }
+        if (config.enable_cell_bars_1 && (config.cell_bar_fields_1 || "").split(',').map(x=>x.trim()).includes(field.name)) {
+            rendered = this.generateCellBar(val, rendered, config.cell_bar_color_1, config.use_gradient_1, config.gradient_end_1, data, field.name, row.__level);
+        } else if (config.enable_cell_bars_2 && (config.cell_bar_fields_2 || "").split(',').map(x=>x.trim()).includes(field.name)) {
+            rendered = this.generateCellBar(val, rendered, config.cell_bar_color_2, false, null, data, field.name, row.__level);
+        }
     }
 
     return rendered;
   },
 
-  isLastElementOfGroup: function (idx, data, config) {
+  isLastElementOfGroup: function(idx, data, config) {
     if (idx >= data.length - 1) return true;
     const curr = data[idx];
     const next = data[idx + 1];
     if (next.__isGrandTotal) return true;
     if (config.enable_bo_hierarchy) {
-      // Peer check: row only compares if next row has same parent path AND same level
-      return next.__parentPath !== curr.__parentPath || next.__level !== curr.__level;
+        // Peer check: row only compares if next row has same parent path AND same level
+        return next.__parentPath !== curr.__parentPath || next.__level !== curr.__level;
     }
     if (!curr.__isSubtotal && next.__isSubtotal) return true;
     return false;
   },
 
-  generateCellBar: function (val, rendered, color, useGrad, endColor, data, fieldName, level) {
-    const num = parseFloat(val);
-    // Scale only against peer rows (same level)
-    const peers = data.filter(r => !r.__isGrandTotal && r.__level === level);
-    const maxVal = Math.max(...peers.map(r => parseFloat(r[fieldName]?.value || 0)), 1);
-    const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
-    const barStyle = useGrad ? `linear-gradient(to right, ${color}, ${endColor})` : color;
-    return `<div class="cell-bar-container"><div class="cell-bar-bg"><div class="cell-bar-fill" style="width:${width}%; background:${barStyle};"></div></div><span>${rendered}</span></div>`;
+  generateCellBar: function(val, rendered, color, useGrad, endColor, data, fieldName, level) {
+      const num = parseFloat(val);
+      // Scale only against peer rows (same level)
+      const peers = data.filter(r => !r.__isGrandTotal && r.__level === level);
+      const maxVal = Math.max(...peers.map(r => parseFloat(r[fieldName]?.value || 0)), 1);
+      const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
+      const barStyle = useGrad ? `linear-gradient(to right, ${color}, ${endColor})` : color;
+      return `<div class="cell-bar-container"><div class="cell-bar-bg"><div class="cell-bar-fill" style="width:${width}%; background:${barStyle};"></div></div><span>${rendered}</span></div>`;
   },
 
-  renderComparison: function (row, config, rowIdx, data, primaryRendered) {
+  renderComparison: function(row, config, rowIdx, data, primaryRendered) {
     const primary = parseFloat(row[config.comparison_primary_field]?.value || 0);
     const isSub = !!row.__isSubtotal;
     const level = row.__level;
@@ -674,7 +424,7 @@ const visObject = {
     return `<span>${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
   },
 
-  sortData: function (data, field, direction) {
+  sortData: function(data, field, direction) {
     return [...data].sort((a, b) => {
       let aVal = a[field]?.value ?? a[field];
       let bVal = b[field]?.value ?? b[field];
@@ -684,76 +434,34 @@ const visObject = {
     });
   },
 
-  attachEventListeners: function (config) {
+  attachEventListeners: function(config) {
     const self = this;
     this.container.onclick = (e) => {
-      const row = e.target.closest('.subtotal-row');
-      if (row) {
-        const g = row.dataset.group;
-        if (self.state.collapsedGroups[g]) delete self.state.collapsedGroups[g];
-        else self.state.collapsedGroups[g] = true;
-        self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
-        return;
-      }
-      const th = e.target.closest('th.sortable');
-      if (th) {
-        const f = th.dataset.field;
-        self.state.sortDirection = (self.state.sortField === f && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
-        self.state.sortField = f;
-        self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
-      }
+        const row = e.target.closest('.subtotal-row');
+        if (row) {
+            const g = row.dataset.group;
+            if (self.state.collapsedGroups[g]) delete self.state.collapsedGroups[g];
+            else self.state.collapsedGroups[g] = true;
+            self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
+            return;
+        }
+        const th = e.target.closest('th.sortable');
+        if (th) {
+            const f = th.dataset.field;
+            self.state.sortDirection = (self.state.sortField === f && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
+            self.state.sortField = f;
+            self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
+        }
     };
     if (config.enable_hover) {
-      this.container.querySelectorAll('tbody tr:not(.subtotal-row):not(.grand-total-row)').forEach(tr => {
-        tr.onmouseenter = () => tr.style.backgroundColor = config.hover_bg_color;
-        tr.onmouseleave = () => tr.style.backgroundColor = '';
-      });
-    }
-
-    // Table filter
-    if (config.enable_table_filter) {
-      const tableFilterInput = this.container.querySelector('.table-filter-input');
-      if (tableFilterInput) {
-        tableFilterInput.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-            self.state.tableFilter = e.target.value.toLowerCase();
-            self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
-          }
+        this.container.querySelectorAll('tbody tr:not(.subtotal-row):not(.grand-total-row)').forEach(tr => {
+            tr.onmouseenter = () => tr.style.backgroundColor = config.hover_bg_color;
+            tr.onmouseleave = () => tr.style.backgroundColor = '';
         });
-      }
-    }
-
-    // Column filters
-    if (config.enable_column_filters) {
-      this.container.querySelectorAll('.column-filter').forEach(input => {
-        input.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-            const field = e.target.dataset.field;
-            if (!self.state.columnFilters) self.state.columnFilters = {};
-            self.state.columnFilters[field] = e.target.value.toLowerCase();
-            self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
-          }
-        });
-      });
-    }
-
-    // Pagination buttons
-    if (config.enable_pagination) {
-      this.container.querySelectorAll('.pagination-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const action = e.target.dataset.page;
-          if (action === 'prev' && self.state.currentPage > 1) {
-            self.state.currentPage--;
-          } else if (action === 'next' && self.state.currentPage < self.state.totalPages) {
-            self.state.currentPage++;
-          }
-          self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
-        });
-      });
     }
   },
-  trigger: function (event) { },
-  clearErrors: function () { }
+  trigger: function(event) {},
+  clearErrors: function() {}
 };
 
 looker.plugins.visualizations.add(visObject);
