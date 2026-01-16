@@ -1,24 +1,22 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.24.0 - Critical Fixes: Pagination, Filters, Formatting, Comparison
+ * Version: 4.24.1 - HOTFIX: Variable Scope Bug (paginatedData)
  * Build: 2026-01-16
  *
- * CRITICAL FIXES (v4.24):
- * ✅ Pagination shows GRAND total row count (not just current page)
- * ✅ Column filter click definitively fixed (checks event.target.classList)
- * ✅ Subtotals revert to LookML format when custom format removed
- * ✅ Custom value format now applies to BOTH rows AND subtotals
- * ✅ Comparison logic fixed for expanded hierarchy (looks ahead for next same-level subtotal)
+ * CRITICAL HOTFIX (v4.24.1):
+ * ✅ Fixed "paginatedData is not defined" error breaking all interactivity
+ * ✅ Changed paginatedData → processedData in renderTable function
+ * ✅ Expand/collapse, BO hierarchy toggle now working again
  *
- * Format Priority Logic:
- * - Custom format specified → Apply to ALL rows
- * - No custom format + Subtotal → Use LookML default via formatMeasure
- * - No custom format + Detail row → Use Looker's rendered (has LookML formatting)
+ * Root Cause: renderTable() received processedData as parameter but tried to reference
+ * paginatedData (which was only in scope in updateAsync). This broke all re-renders.
  *
- * PREVIOUS FIXES (v4.23):
- * - Row conditional formatting preserved on hover
- * - Better pagination layout with First/Last buttons
- * - Series tab order fixed
+ * FIXES (v4.24):
+ * - Pagination shows grand total row count
+ * - Column filter click doesn't trigger sort
+ * - Subtotals revert to LookML format when custom format removed
+ * - Custom value format applies to rows AND subtotals
+ * - Comparison shows for expanded hierarchy categories
  */
 
 const visObject = {
@@ -561,8 +559,8 @@ const visObject = {
       const totalPages = this.state.totalPages;
       const pageSize = config.page_size || 25;
       const startRow = ((currentPage - 1) * pageSize) + 1;
-      const endRow = Math.min(currentPage * pageSize, paginatedData.length);
-      const totalRows = this.state.totalRowCount || paginatedData.length; // Use GRAND total
+      const endRow = Math.min(currentPage * pageSize, processedData.length);
+      const totalRows = this.state.totalRowCount || processedData.length; // Use GRAND total
 
       const paginationHTML = `
         <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9fafb; border-radius: 4px;">
