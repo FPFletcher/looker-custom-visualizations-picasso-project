@@ -1,12 +1,13 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.30.2 - FIX: Subtotal LookML Formatting Parity
+ * Version: 4.30.3 - New Features: Gradient Set 2, Multi-Field Logic, Robust Hover, Chips Customization
  * Build: 2026-01-17
- * * CRITICAL FIXES (v4.30.2):
- * ✅ Fixed Subtotal/Grand Total default formatting
- * - Now uses `LookerCharts.Utils.formatValue()` when Custom Format box is empty.
- * - This ensures calculated subtotals exactly match LookML formatting (including currency, 'k' thousands, etc.)
- * - Matches Detail row rendering perfectly.
+ * * UPDATES (v4.30.3):
+ * ✅ Added Gradient options for Cell Bars Set 2.
+ * ✅ Fixed Hover: Uses cssText to perfectly restore row state after hover.
+ * ✅ Column Conditional Formatting: Overrides row formatting, supports comma-separated fields.
+ * ✅ Row Conditional Formatting: Supports comma-separated fields (checks if ANY match).
+ * ✅ Data Chips: Added Yellow option + Customizable Colors for all 3 states.
  */
 
 const visObject = {
@@ -45,9 +46,12 @@ const visObject = {
     cell_bar_color_1: { type: "string", label: "Color 1", display: "color", default: "#3b82f6", section: "Series", order: 3 },
     use_gradient_1: { type: "boolean", label: "Use Gradient 1", default: false, section: "Series", order: 4 },
     gradient_end_1: { type: "string", label: "Gradient End 1", display: "color", default: "#93c5fd", section: "Series", order: 5 },
+
     enable_cell_bars_2: { type: "boolean", label: "Enable Set 2", default: false, section: "Series", order: 6 },
     cell_bar_fields_2: { type: "string", label: "Fields 2", display: "text", default: "", section: "Series", order: 7 },
     cell_bar_color_2: { type: "string", label: "Color 2", display: "color", default: "#10b981", section: "Series", order: 8 },
+    use_gradient_2: { type: "boolean", label: "Use Gradient 2", default: false, section: "Series", order: 8.5 },
+    gradient_end_2: { type: "string", label: "Gradient End 2", display: "color", default: "#6ee7b7", section: "Series", order: 9 },
     cell_bar_max_width: { type: "number", label: "Max Bar Width (%)", default: 100, section: "Series", order: 10 },
 
     grouping_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
@@ -82,17 +86,39 @@ const visObject = {
     field_formatting_divider: { type: "string", label: "━━━ Field Formatting ━━━", display: "divider", section: "Series", order: 100 },
     enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: true, section: "Series", order: 101 },
 
-    conditional_formatting_divider: { type: "string", label: "━━━ Conditional Formatting ━━━", display: "divider", section: "Series", order: 200 },
-    enable_conditional_formatting: { type: "boolean", label: "Enable Conditional Formatting", default: false, section: "Series", order: 201 },
-    conditional_field: { type: "string", label: "Target Field", display: "text", default: "", section: "Series", order: 202 },
-    conditional_rule_1_operator: { type: "string", label: "Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 203 },
-    conditional_rule_1_value: { type: "number", label: "Rule 1 Value", default: 0, section: "Series", order: 204 },
-    conditional_rule_1_bg: { type: "string", label: "Rule 1 BG Color", display: "color", default: "#dcfce7", section: "Series", order: 205 },
-    conditional_rule_1_text: { type: "string", label: "Rule 1 Text Color", display: "color", default: "#166534", section: "Series", order: 206 },
-    conditional_rule_2_operator: { type: "string", label: "Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 207 },
-    conditional_rule_2_value: { type: "number", label: "Rule 2 Value", default: 0, section: "Series", order: 208 },
-    conditional_rule_2_bg: { type: "string", label: "Rule 2 BG Color", display: "color", default: "#fee2e2", section: "Series", order: 209 },
-    conditional_rule_2_text: { type: "string", label: "Rule 2 Text Color", display: "color", default: "#991b1b", section: "Series", order: 210 },
+    // ══════════════════════════════════════════════════════════════
+    // TAB: DATA CHIPS
+    // ══════════════════════════════════════════════════════════════
+    chips_divider: { type: "string", label: "━━━ Data Chips ━━━", display: "divider", section: "Series", order: 150 },
+    enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: false, section: "Series", order: 151 },
+    data_chip_fields: { type: "string", label: "Apply to Fields (comma-sep)", default: "", section: "Series", order: 152 },
+
+    chip_match_green: { type: "string", label: "Green Match Values", default: "Complete,Success,Yes", section: "Series", order: 153 },
+    chip_bg_green: { type: "string", label: "Green Chip BG", display: "color", default: "#dcfce7", section: "Series", order: 154 },
+    chip_text_green: { type: "string", label: "Green Chip Text", display: "color", default: "#166534", section: "Series", order: 155 },
+
+    chip_match_yellow: { type: "string", label: "Yellow Match Values", default: "Pending,Warning,Maybe", section: "Series", order: 156 },
+    chip_bg_yellow: { type: "string", label: "Yellow Chip BG", display: "color", default: "#fef9c3", section: "Series", order: 157 },
+    chip_text_yellow: { type: "string", label: "Yellow Chip Text", display: "color", default: "#854d0e", section: "Series", order: 158 },
+
+    chip_match_red: { type: "string", label: "Red Match Values", default: "Failed,Error,No", section: "Series", order: 159 },
+    chip_bg_red: { type: "string", label: "Red Chip BG", display: "color", default: "#fee2e2", section: "Series", order: 160 },
+    chip_text_red: { type: "string", label: "Red Chip Text", display: "color", default: "#991b1b", section: "Series", order: 161 },
+
+    // ══════════════════════════════════════════════════════════════
+    // TAB: CONDITIONAL FORMATTING (COLUMN & ROW)
+    // ══════════════════════════════════════════════════════════════
+    conditional_formatting_divider: { type: "string", label: "━━━ Column Conditional Formatting ━━━", display: "divider", section: "Series", order: 200 },
+    enable_conditional_formatting: { type: "boolean", label: "Enable Column Formatting", default: false, section: "Series", order: 201 },
+    conditional_field: { type: "string", label: "Target Fields (comma-sep)", display: "text", default: "", section: "Series", order: 202 },
+    conditional_rule_1_operator: { type: "string", label: "Col Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 203 },
+    conditional_rule_1_value: { type: "number", label: "Col Rule 1 Value", default: 0, section: "Series", order: 204 },
+    conditional_rule_1_bg: { type: "string", label: "Col Rule 1 BG Color", display: "color", default: "#dcfce7", section: "Series", order: 205 },
+    conditional_rule_1_text: { type: "string", label: "Col Rule 1 Text Color", display: "color", default: "#166534", section: "Series", order: 206 },
+    conditional_rule_2_operator: { type: "string", label: "Col Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 207 },
+    conditional_rule_2_value: { type: "number", label: "Col Rule 2 Value", default: 0, section: "Series", order: 208 },
+    conditional_rule_2_bg: { type: "string", label: "Col Rule 2 BG Color", display: "color", default: "#fee2e2", section: "Series", order: 209 },
+    conditional_rule_2_text: { type: "string", label: "Col Rule 2 Text Color", display: "color", default: "#991b1b", section: "Series", order: 210 },
 
     // ══════════════════════════════════════════════════════════════
     // TAB: FORMATTING
@@ -126,7 +152,7 @@ const visObject = {
 
     formatting_divider_row_formatting: { type: "string", label: "━━━ Row Conditional Formatting ━━━", display: "divider", section: "Formatting", order: 50 },
     enable_row_conditional_formatting: { type: "boolean", label: "Enable Row Formatting", default: false, section: "Formatting", order: 51 },
-    row_conditional_field: { type: "string", label: "Row Condition Field", display: "text", default: "", section: "Formatting", order: 52 },
+    row_conditional_field: { type: "string", label: "Row Condition Fields (comma-sep)", display: "text", default: "", section: "Formatting", order: 52 },
     row_rule_1_operator: { type: "string", label: "Row Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }, { "Contains": "contains" }], default: "", section: "Formatting", order: 53 },
     row_rule_1_value: { type: "string", label: "Row Rule 1 Value", display: "text", default: "", section: "Formatting", order: 54 },
     row_rule_1_bg: { type: "string", label: "Row Rule 1 BG", display: "color", default: "#dcfce7", section: "Formatting", order: 55 },
@@ -331,7 +357,6 @@ const visObject = {
     return result;
   },
 
-
   formatMeasure: function (value, field, config) {
     // 1. Custom Format (User entered specific string in Viz Config)
     // Applies ONLY if Toggle is ON AND String is not empty
@@ -378,11 +403,11 @@ const visObject = {
     if (absVal >= 1000000) {
       // Millions: Divide by 1M, 1 Decimal Place (e.g. 1.2 M)
       formatted = (num / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-      suffix = 'M';
+      suffix = ' M';
     } else if (absVal >= 1000) {
       // Thousands: Divide by 1k, 0 Decimals (e.g. 150 k) - Matches your request "$#,##0,"k""
       formatted = (num / 1000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-      suffix = 'k';
+      suffix = ' k';
     } else {
       // Standard: 0 Decimals for normal numbers (or 2 for small currency if you prefer)
       // Matching your pattern "#,##0" -> 0 decimals
@@ -419,7 +444,6 @@ const visObject = {
 
     return formatted;
   },
-
 
   evaluateConditionalRule: function (cellValue, config, rulePrefix, colorType = 'bg') {
     const operator = config[`${rulePrefix}_operator`];
@@ -501,7 +525,9 @@ const visObject = {
         .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
         .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid ${config.border_color}; }
         .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; text-align: center; }
-        .chip-green { background-color: #dcfce7; color: #166534; } .chip-red { background-color: #fee2e2; color: #991b1b; }
+        .chip-green { background-color: ${config.chip_bg_green}; color: ${config.chip_text_green}; }
+        .chip-red { background-color: ${config.chip_bg_red}; color: ${config.chip_text_red}; }
+        .chip-yellow { background-color: ${config.chip_bg_yellow}; color: ${config.chip_text_yellow}; }
         .cell-bar-container { display: flex; align-items: center; gap: 8px; width: 100%; }
         .cell-bar-bg { flex: 1; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
         .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
@@ -542,12 +568,21 @@ const visObject = {
       let bg = '';
       const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
-      // Row-level conditional formatting
+      // Row-level conditional formatting (Multi-field support)
       if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
-        const rowFieldValue = row[config.row_conditional_field]?.value || row[config.row_conditional_field];
-        const rowBg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1') ||
-                      this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_2');
-        if (rowBg) bg = `background:${rowBg};`;
+        const rowFields = config.row_conditional_field.split(',').map(s => s.trim());
+
+        // Check if ANY field in the comma-separated list matches the rule
+        for (const fieldName of rowFields) {
+          const rowFieldValue = row[fieldName]?.value || row[fieldName];
+          const rowBg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1') ||
+                        this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_2');
+
+          if (rowBg) {
+            bg = `background:${rowBg};`;
+            break; // Stop at first match
+          }
+        }
       }
 
       // Apply subtotal background ONLY if no row-level conditional formatting was applied
@@ -563,23 +598,24 @@ const visObject = {
         let style = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
         if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
-        // Cell-level conditional formatting - applies to ALL rows including subtotals and grand totals
-        if (config.enable_conditional_formatting && config.conditional_field === f.name) {
-          const cellData = row[f.name];
-          const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
-          const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
-                          this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
-          const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') ||
-                            this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'text');
+        // Column-level conditional formatting (Cell Highlights)
+        // Multi-field support: Check if current field name exists in the comma-separated list
+        if (config.enable_conditional_formatting && config.conditional_field) {
+          const targetFields = config.conditional_field.split(',').map(s => s.trim());
 
-          // Debug logging
-          if (isSub || isGT) {
-            console.log(`[CONDITIONAL] ${isSub ? 'Subtotal' : 'GrandTotal'} row ${i}, field ${f.name}, value:`, cellValue,
-                       'bgColor:', bgColor, 'textColor:', textColor);
+          if (targetFields.includes(f.name)) {
+            const cellData = row[f.name];
+            const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
+
+            const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
+                            this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
+            const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') ||
+                              this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'text');
+
+            // Apply Override Priority: Cell formatting overrides Row formatting via !important
+            if (bgColor) style += `background:${bgColor} !important;`;
+            if (textColor) style += `color:${textColor};`;
           }
-
-          if (bgColor) style += `background:${bgColor} !important;`; // Add !important to override row bg
-          if (textColor) style += `color:${textColor};`;
         }
 
         let content = this.renderCellContent(row[f.name], f, config, row, i, processedData);
@@ -702,11 +738,21 @@ const visObject = {
       console.log(`[FORMAT] ${field.name} - Detail row using Looker rendered:`, rendered);
     }
 
-    // Data Chip logic
+    // Data Chip logic (Expanded with Yellow and Custom Colors)
     if (config.enable_data_chips && (config.data_chip_fields || "").split(',').includes(field.name)) {
       const s = String(val).toLowerCase();
-      if ((config.chip_match_green || "").split(',').map(x => x.trim().toLowerCase()).includes(s)) rendered = `<span class="data-chip chip-green">${rendered}</span>`;
-      else if ((config.chip_match_red || "").split(',').map(x => x.trim().toLowerCase()).includes(s)) rendered = `<span class="data-chip chip-red">${rendered}</span>`;
+
+      const greenMatches = (config.chip_match_green || "").toLowerCase().split(',').map(m => m.trim());
+      const yellowMatches = (config.chip_match_yellow || "").toLowerCase().split(',').map(m => m.trim());
+      const redMatches = (config.chip_match_red || "").toLowerCase().split(',').map(m => m.trim());
+
+      if (greenMatches.includes(s)) {
+        rendered = `<span class="data-chip chip-green">${rendered}</span>`;
+      } else if (yellowMatches.includes(s)) {
+        rendered = `<span class="data-chip chip-yellow">${rendered}</span>`;
+      } else if (redMatches.includes(s)) {
+        rendered = `<span class="data-chip chip-red">${rendered}</span>`;
+      }
     }
 
     // Smart Peer-Based Comparison Logic
@@ -722,7 +768,8 @@ const visObject = {
       if (config.enable_cell_bars_1 && (config.cell_bar_fields_1 || "").split(',').map(x => x.trim()).includes(field.name)) {
         rendered = this.generateCellBar(val, rendered, config.cell_bar_color_1, config.use_gradient_1, config.gradient_end_1, data, field.name, row.__level);
       } else if (config.enable_cell_bars_2 && (config.cell_bar_fields_2 || "").split(',').map(x => x.trim()).includes(field.name)) {
-        rendered = this.generateCellBar(val, rendered, config.cell_bar_color_2, false, null, data, field.name, row.__level);
+        // Set 2 now uses Gradient options
+        rendered = this.generateCellBar(val, rendered, config.cell_bar_color_2, config.use_gradient_2, config.gradient_end_2, data, field.name, row.__level);
       }
     }
 
@@ -855,9 +902,18 @@ const visObject = {
     };
     if (config.enable_hover) {
       this.container.querySelectorAll('tbody tr:not(.subtotal-row):not(.grand-total-row)').forEach(tr => {
-        const originalBg = tr.style.backgroundColor || '';
-        tr.onmouseenter = () => tr.style.backgroundColor = config.hover_bg_color;
-        tr.onmouseleave = () => tr.style.backgroundColor = originalBg;
+        // Fix: Save the EXACT full CSS string to restore properly (including gradients, multiple backgrounds, etc.)
+        const originalCssText = tr.style.cssText;
+
+        tr.onmouseenter = () => {
+          // Temporarily set background color, respecting !important if needed
+          tr.style.backgroundColor = config.hover_bg_color;
+        };
+
+        tr.onmouseleave = () => {
+          // Restore the exact previous state
+          tr.style.cssText = originalCssText;
+        };
       });
     }
 
