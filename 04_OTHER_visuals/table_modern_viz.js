@@ -1,13 +1,13 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.30.3 - New Features: Gradient Set 2, Multi-Field Logic, Robust Hover, Chips Customization
+ * Version: 4.30.4 - Fixes: Stripe Priority, Col Format UI Move, Default Chips, Debugging
  * Build: 2026-01-17
- * * UPDATES (v4.30.3):
- * ✅ Added Gradient options for Cell Bars Set 2.
- * ✅ Fixed Hover: Uses cssText to perfectly restore row state after hover.
- * ✅ Column Conditional Formatting: Overrides row formatting, supports comma-separated fields.
- * ✅ Row Conditional Formatting: Supports comma-separated fields (checks if ANY match).
- * ✅ Data Chips: Added Yellow option + Customizable Colors for all 3 states.
+ * * UPDATES (v4.30.4):
+ * ✅ Stripe Mode: Removed !important so conditional formatting overrides it.
+ * ✅ UI: Moved Column Conditional Formatting to 'Formatting' tab (under Row formatting).
+ * ✅ Rules: Confirmed Rule 1 overwrites Rule 2 logic.
+ * ✅ Data Chips: Added customizable Default Color for non-matching values.
+ * ✅ Debug: Added [COL-FORMAT] logs to diagnose column highlighting issues.
  */
 
 const visObject = {
@@ -93,6 +93,9 @@ const visObject = {
     enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: false, section: "Series", order: 151 },
     data_chip_fields: { type: "string", label: "Apply to Fields (comma-sep)", default: "", section: "Series", order: 152 },
 
+    chip_default_bg: { type: "string", label: "Default Chip BG", display: "color", default: "#e5e7eb", section: "Series", order: 152.1 },
+    chip_default_text: { type: "string", label: "Default Chip Text", display: "color", default: "#1f2937", section: "Series", order: 152.2 },
+
     chip_match_green: { type: "string", label: "Chip 01 Match Values", default: "Complete,Success,Yes", section: "Series", order: 153 },
     chip_bg_green: { type: "string", label: "Chip 01 BG", display: "color", default: "#dcfce7", section: "Series", order: 154 },
     chip_text_green: { type: "string", label: "Chip 01 Text", display: "color", default: "#166534", section: "Series", order: 155 },
@@ -104,21 +107,6 @@ const visObject = {
     chip_match_red: { type: "string", label: "Chip 03 Match Values", default: "Failed,Error,No", section: "Series", order: 159 },
     chip_bg_red: { type: "string", label: "Chip 03 BG", display: "color", default: "#fee2e2", section: "Series", order: 160 },
     chip_text_red: { type: "string", label: "Chip 03 Text", display: "color", default: "#991b1b", section: "Series", order: 161 },
-
-    // ══════════════════════════════════════════════════════════════
-    // TAB: CONDITIONAL FORMATTING (COLUMN & ROW)
-    // ══════════════════════════════════════════════════════════════
-    conditional_formatting_divider: { type: "string", label: "━━━ Column Conditional Formatting ━━━", display: "divider", section: "Series", order: 200 },
-    enable_conditional_formatting: { type: "boolean", label: "Enable Column Formatting", default: false, section: "Series", order: 201 },
-    conditional_field: { type: "string", label: "Target Fields (comma-sep)", display: "text", default: "", section: "Series", order: 202 },
-    conditional_rule_1_operator: { type: "string", label: "Col Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 203 },
-    conditional_rule_1_value: { type: "number", label: "Col Rule 1 Value", default: 0, section: "Series", order: 204 },
-    conditional_rule_1_bg: { type: "string", label: "Col Rule 1 BG Color", display: "color", default: "#dcfce7", section: "Series", order: 205 },
-    conditional_rule_1_text: { type: "string", label: "Col Rule 1 Text Color", display: "color", default: "#166534", section: "Series", order: 206 },
-    conditional_rule_2_operator: { type: "string", label: "Col Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Series", order: 207 },
-    conditional_rule_2_value: { type: "number", label: "Col Rule 2 Value", default: 0, section: "Series", order: 208 },
-    conditional_rule_2_bg: { type: "string", label: "Col Rule 2 BG Color", display: "color", default: "#fee2e2", section: "Series", order: 209 },
-    conditional_rule_2_text: { type: "string", label: "Col Rule 2 Text Color", display: "color", default: "#991b1b", section: "Series", order: 210 },
 
     // ══════════════════════════════════════════════════════════════
     // TAB: FORMATTING
@@ -158,7 +146,20 @@ const visObject = {
     row_rule_1_bg: { type: "string", label: "Row Rule 1 BG", display: "color", default: "#dcfce7", section: "Formatting", order: 55 },
     row_rule_2_operator: { type: "string", label: "Row Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }, { "Contains": "contains" }], default: "", section: "Formatting", order: 56 },
     row_rule_2_value: { type: "string", label: "Row Rule 2 Value", display: "text", default: "", section: "Formatting", order: 57 },
-    row_rule_2_bg: { type: "string", label: "Row Rule 2 BG", display: "color", default: "#fee2e2", section: "Formatting", order: 58 }
+    row_rule_2_bg: { type: "string", label: "Row Rule 2 BG", display: "color", default: "#fee2e2", section: "Formatting", order: 58 },
+
+    // MOVED: Column Conditional Formatting (Now under Formatting tab, Order 60+)
+    conditional_formatting_divider: { type: "string", label: "━━━ Column Conditional Formatting ━━━", display: "divider", section: "Formatting", order: 60 },
+    enable_conditional_formatting: { type: "boolean", label: "Enable Column Formatting", default: false, section: "Formatting", order: 61 },
+    conditional_field: { type: "string", label: "Target Fields (comma-sep)", display: "text", default: "", section: "Formatting", order: 62 },
+    conditional_rule_1_operator: { type: "string", label: "Col Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Formatting", order: 63 },
+    conditional_rule_1_value: { type: "number", label: "Col Rule 1 Value", default: 0, section: "Formatting", order: 64 },
+    conditional_rule_1_bg: { type: "string", label: "Col Rule 1 BG Color", display: "color", default: "#dcfce7", section: "Formatting", order: 65 },
+    conditional_rule_1_text: { type: "string", label: "Col Rule 1 Text Color", display: "color", default: "#166534", section: "Formatting", order: 66 },
+    conditional_rule_2_operator: { type: "string", label: "Col Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Formatting", order: 67 },
+    conditional_rule_2_value: { type: "number", label: "Col Rule 2 Value", default: 0, section: "Formatting", order: 68 },
+    conditional_rule_2_bg: { type: "string", label: "Col Rule 2 BG Color", display: "color", default: "#fee2e2", section: "Formatting", order: 69 },
+    conditional_rule_2_text: { type: "string", label: "Col Rule 2 Text Color", display: "color", default: "#991b1b", section: "Formatting", order: 70 },
   },
 
   create: function (element, config) {
@@ -515,6 +516,7 @@ const visObject = {
     const hDims = config.enable_bo_hierarchy ? (config.hierarchy_dimensions || "").split(',').map(f => f.trim()) : [];
     const mainTreeCol = hDims[0] || config.subtotal_dimension;
 
+    // FIX: Removed !important from striped class to allow inline Conditional Formatting to overwrite it
     let html = `<style>
         table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
         table.advanced-table thead th { font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; }
@@ -532,7 +534,10 @@ const visObject = {
         .cell-bar-bg { flex: 1; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
         .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
         .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; user-select: none; display: inline-block; width: 14px; text-align: center; }
-        table.advanced-table.striped tbody tr:nth-child(odd):not(.subtotal-row):not(.grand-total-row) { background-color: ${config.stripe_color} !important; }
+
+        /* Removed !important from stripe to allow overwrites */
+        table.advanced-table.striped tbody tr:nth-child(odd):not(.subtotal-row):not(.grand-total-row) { background-color: ${config.stripe_color}; }
+
         .table-filter-container { margin-bottom: 12px; padding: 8px; background: #f9fafb; border-radius: 4px; }
         .table-filter-input { width: 300px; padding: 8px 12px; border: 1px solid ${config.border_color}; border-radius: 4px; font-size: 13px; }
         .column-filter { width: 100%; padding: 4px 6px; margin-top: 4px; border: 1px solid ${config.border_color}; border-radius: 3px; font-size: 11px; box-sizing: border-box; }
@@ -569,6 +574,7 @@ const visObject = {
       const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
       // Row-level conditional formatting (Multi-field support)
+      // Rule 1 has priority over Rule 2 via short-circuit evaluation (rule1 || rule2)
       if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
         const rowFields = config.row_conditional_field.split(',').map(s => s.trim());
 
@@ -599,7 +605,7 @@ const visObject = {
         if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
         // Column-level conditional formatting (Cell Highlights)
-        // Multi-field support: Check if current field name exists in the comma-separated list
+        // Rule 1 has priority over Rule 2 via short-circuit evaluation
         if (config.enable_conditional_formatting && config.conditional_field) {
           const targetFields = config.conditional_field.split(',').map(s => s.trim());
 
@@ -607,14 +613,17 @@ const visObject = {
             const cellData = row[f.name];
             const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
 
+            // Log matching for debugging
+            if (i === 0) console.log(`[COL-FORMAT] Checking field '${f.name}' value '${cellValue}' against rules.`);
+
             const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
                             this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
             const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') ||
                               this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'text');
 
-            // Apply Override Priority: Cell formatting overrides Row formatting via !important
+            // Apply Override Priority: Cell formatting overrides Row formatting AND Stripe Mode via !important
             if (bgColor) style += `background:${bgColor} !important;`;
-            if (textColor) style += `color:${textColor};`;
+            if (textColor) style += `color:${textColor} !important;`;
           }
         }
 
@@ -700,45 +709,17 @@ const visObject = {
     const customFormat = config[`field_format_${field.name}`];
     const hasCustomFormat = !!(config.enable_custom_field_formatting && customFormat && customFormat.trim() !== '');
 
-    // ALWAYS log for first 3 rows and ALL subtotals to debug
-    if (rowIdx < 3 || isSubtotalOrGrandTotal) {
-      console.log(`[FORMAT-DEBUG] Row ${rowIdx}, Field ${field.name}:`, JSON.stringify({
-        fieldType: field.type,
-        isMeasure: field.is_measure,
-        isSubtotal: row.__isSubtotal,
-        isGrandTotal: row.__isGrandTotal,
-        enableCustomFieldFormatting: config.enable_custom_field_formatting,
-        customFormat: customFormat,
-        hasCustomFormat: hasCustomFormat,
-        value: val,
-        lookerRendered: cell?.rendered
-      }, null, 2));
-    }
-
     // FORCE APPLY: If custom formatting is enabled and exists for this field,
     // apply it to ALL rows regardless of field type (measure, dimension, sum, average, etc.)
     if (hasCustomFormat) {
       rendered = this.formatMeasure(val, field, config);
-
-      if (rowIdx < 3 || isSubtotalOrGrandTotal) {
-        console.log(`[FORMAT] ${field.name} - Custom format FORCE APPLIED to ALL:`, customFormat, '→', rendered,
-                    isSubtotalOrGrandTotal ? '(subtotal/GT)' : '(detail)');
-      }
     }
     // Otherwise, only re-format subtotals/grand totals using LookML format
     else if (isSubtotalOrGrandTotal && (field.is_measure || field.type === 'number' || field.type === 'count')) {
       rendered = this.formatMeasure(val, field, config);
-
-      if (rowIdx < 3 || isSubtotalOrGrandTotal) {
-        console.log(`[FORMAT] ${field.name} - Subtotal/GT using LookML format:`, rendered);
-      }
-    }
-    // Detail rows with no custom format keep Looker's original rendered value
-    else if (rowIdx < 3) {
-      console.log(`[FORMAT] ${field.name} - Detail row using Looker rendered:`, rendered);
     }
 
-    // Data Chip logic (Expanded with Yellow and Custom Colors)
+    // Data Chip logic (Expanded with Yellow, Custom Colors, and Default fallback)
     if (config.enable_data_chips && (config.data_chip_fields || "").split(',').includes(field.name)) {
       const s = String(val).toLowerCase();
 
@@ -752,6 +733,9 @@ const visObject = {
         rendered = `<span class="data-chip chip-yellow">${rendered}</span>`;
       } else if (redMatches.includes(s)) {
         rendered = `<span class="data-chip chip-red">${rendered}</span>`;
+      } else {
+        // DEFAULT CHIP (No match found)
+        rendered = `<span class="data-chip" style="background-color: ${config.chip_default_bg}; color: ${config.chip_default_text};">${rendered}</span>`;
       }
     }
 
@@ -868,34 +852,34 @@ const visObject = {
   },
 
   sortData: function (data, field, direction) {
-            const isAsc = direction === 'asc';
-            return [...data].sort((a, b) => {
-              // 1. Extract raw values safely
-              const cellA = a[field];
-              const cellB = b[field];
-              let valA = (cellA && typeof cellA === 'object' && cellA.value !== undefined) ? cellA.value : cellA;
-              let valB = (cellB && typeof cellB === 'object' && cellB.value !== undefined) ? cellB.value : cellB;
+    const isAsc = direction === 'asc';
+    return [...data].sort((a, b) => {
+      // 1. Extract raw values safely
+      const cellA = a[field];
+      const cellB = b[field];
+      let valA = (cellA && typeof cellA === 'object' && cellA.value !== undefined) ? cellA.value : cellA;
+      let valB = (cellB && typeof cellB === 'object' && cellB.value !== undefined) ? cellB.value : cellB;
 
-              // 2. Handle Nulls (Always push to bottom regardless of sort dir)
-              if (valA === null || valA === undefined) return 1;
-              if (valB === null || valB === undefined) return -1;
+      // 2. Handle Nulls (Always push to bottom regardless of sort dir)
+      if (valA === null || valA === undefined) return 1;
+      if (valB === null || valB === undefined) return -1;
 
-              // 3. Numeric Sort: Use strictly if BOTH are valid numbers (e.g. Measures)
-              // This prevents "10" < "2" in strictly numeric columns
-              if (typeof valA === 'number' && typeof valB === 'number') {
-                return isAsc ? valA - valB : valB - valA;
-              }
+      // 3. Numeric Sort: Use strictly if BOTH are valid numbers (e.g. Measures)
+      // This prevents "10" < "2" in strictly numeric columns
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return isAsc ? valA - valB : valB - valA;
+      }
 
-              // 4. String/Mixed Sort: Use localeCompare for Dimensions/Mixed types
-              // {numeric: true} handles "Group 2" before "Group 10" naturally
-              // sensitivity: 'base' ignores case differences
-              const strA = String(valA);
-              const strB = String(valB);
-              const comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+      // 4. String/Mixed Sort: Use localeCompare for Dimensions/Mixed types
+      // {numeric: true} handles "Group 2" before "Group 10" naturally
+      // sensitivity: 'base' ignores case differences
+      const strA = String(valA);
+      const strB = String(valB);
+      const comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
 
-              return isAsc ? comparison : -comparison;
-            });
-          },
+      return isAsc ? comparison : -comparison;
+    });
+  },
 
   attachEventListeners: function (config) {
     const self = this;
