@@ -331,32 +331,42 @@ const visObject = {
   },
 
   calculateStandardSubtotals: function (data, field, measures, config, dims) {
-    const result = [];
-    const groups = {};
-    data.forEach(row => {
-      let val = row[field];
-      let key = (val && typeof val === 'object') ? (val.value || 'null') : (val || 'null');
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(row);
+  const result = [];
+  const groups = {};
+  const groupOrder = []; // ✅ Fix: Track insertion order to prevent JS from auto-sorting integer keys (like "686")
+
+  data.forEach(row => {
+    let val = row[field];
+    let key = (val && typeof val === 'object') ? (val.value || 'null') : (val || 'null');
+
+    if (!groups[key]) {
+      groups[key] = [];
+      groupOrder.push(key); // Record the key in the correct sort order
+    }
+    groups[key].push(row);
+  });
+
+  // ✅ Fix: Iterate using the preserved order, NOT Object.keys()
+  groupOrder.forEach(key => {
+    const sub = { __isSubtotal: true, __groupValue: key, __level: 0 };
+    sub[field] = { value: key, rendered: key };
+    dims.forEach(d => { if (d.name !== field) sub[d.name] = { value: '', rendered: '' }; });
+
+    measures.forEach(m => {
+      let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
+      sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
     });
-    Object.keys(groups).forEach(key => {
-      const sub = { __isSubtotal: true, __groupValue: key, __level: 0 };
-      sub[field] = { value: key, rendered: key };
-      dims.forEach(d => { if (d.name !== field) sub[d.name] = { value: '', rendered: '' }; });
-      measures.forEach(m => {
-        let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
-        sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
-      });
-      if (config.subtotal_position === 'top') {
-        result.push(sub);
-        groups[key].forEach(r => { r.__parentGroup = key; result.push(r); });
-      } else {
-        groups[key].forEach(r => result.push(r));
-        result.push(sub);
-      }
-    });
-    return result;
-  },
+
+    if (config.subtotal_position === 'top') {
+      result.push(sub);
+      groups[key].forEach(r => { r.__parentGroup = key; result.push(r); });
+    } else {
+      groups[key].forEach(r => result.push(r));
+      result.push(sub);
+    }
+  });
+  return result;
+},
 
   formatMeasure: function (value, field, config) {
     // 1. Custom Format (User entered specific string in Viz Config)
@@ -516,22 +526,29 @@ const visObject = {
     const hDims = config.enable_bo_hierarchy ? (config.hierarchy_dimensions || "").split(',').map(f => f.trim()) : [];
     const mainTreeCol = hDims[0] || config.subtotal_dimension;
 
-    // FIX: Removed !important from striped class to allow inline Conditional Formatting to overwrite it
+    // ✅ FIX: Define CSS variables based on the 'Freeze Header Row' toggle
+    const headerPosition = config.freeze_header_row ? 'sticky' : 'relative';
+    const headerZIndex = config.freeze_header_row ? '100' : 'auto';
+
+    // ✅ FIX: Injected ${headerPosition} and ${headerZIndex} into the CSS below
     let html = `<style>
-        table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
-        table.advanced-table thead th { font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; }
-        .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
-        .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
-        table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color}; }
-        table.advanced-table thead { position: sticky; top: 0; z-index: 100; }
-        .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
-        .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid ${config.border_color}; }
-        .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; text-align: center; }
-        .chip-green { background-color: ${config.chip_bg_green}; color: ${config.chip_text_green}; }
-        .chip-red { background-color: ${config.chip_bg_red}; color: ${config.chip_text_red}; }
-        .chip-yellow { background-color: ${config.chip_bg_yellow}; color: ${config.chip_text_yellow}; }
-        .cell-bar-container { display: flex; align-items: center; gap: 8px; width: 100%; }
-        .cell-bar-bg { flex: 1; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
+    table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
+    table.advanced-table thead th { font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; }
+    .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
+    .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
+    table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color}; }
+
+      /* DYNAMIC HEADER POSITIONING */
+      table.advanced-table thead { position: ${headerPosition}; top: 0; z-index: ${headerZIndex}; }
+
+    .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
+      .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid ${config.border_color}; }
+      .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; text-align: center; }
+      .chip-green { background-color: ${config.chip_bg_green}; color: ${config.chip_text_green}; }
+      .chip-red { background-color: ${config.chip_bg_red}; color: ${config.chip_text_red}; }
+      .chip-yellow { background-color: ${config.chip_bg_yellow}; color: ${config.chip_text_yellow}; }
+      .cell-bar-container { display: flex; align-items: center; gap: 8px; width: 100%; }
+      .cell-bar-bg { flex: 1; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
         .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
         .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; user-select: none; display: inline-block; width: 14px; text-align: center; }
 
@@ -539,145 +556,149 @@ const visObject = {
         table.advanced-table.striped tbody tr:nth-child(odd):not(.subtotal-row):not(.grand-total-row) { background-color: ${config.stripe_color}; }
 
         .table-filter-container { margin-bottom: 12px; padding: 8px; background: #f9fafb; border-radius: 4px; }
-        .table-filter-input { width: 300px; padding: 8px 12px; border: 1px solid ${config.border_color}; border-radius: 4px; font-size: 13px; }
-        .column-filter { width: 100%; padding: 4px 6px; margin-top: 4px; border: 1px solid ${config.border_color}; border-radius: 3px; font-size: 11px; box-sizing: border-box; }
-        .column-filter:focus { outline: none; border-color: #3b82f6; }
-    </style>`;
+          .table-filter-input { width: 300px; padding: 8px 12px; border: 1px solid ${config.border_color}; border-radius: 4px; font-size: 13px; }
+          .column-filter { width: 100%; padding: 4px 6px; margin-top: 4px; border: 1px solid ${config.border_color}; border-radius: 3px; font-size: 11px; box-sizing: border-box; }
+          .column-filter:focus { outline: none; border-color: #3b82f6; }
+            </style>`;
 
-    // Table-level filter
-    if (config.enable_table_filter) {
-      html += `<div class="table-filter-container">
-        <input type="text" class="table-filter-input" placeholder="Filter table (press Enter)..." />
-      </div>`;
-    }
+            // Table-level filter
+            if (config.enable_table_filter) {
+              html += `<div class="table-filter-container">
+              <input type="text" class="table-filter-input" placeholder="Filter table (press Enter)..." />
+              </div>`;
+            }
 
-    html += `<table class="advanced-table ${config.table_theme}">`;
-    if (config.enable_column_groups) html += this.renderColumnGroups(config, fields);
+            html += `<table class="advanced-table ${config.table_theme}">`;
+            if (config.enable_column_groups) html += this.renderColumnGroups(config, fields);
 
-    html += '<thead><tr>';
-    if (config.show_row_numbers) html += `<th ${config.enable_column_groups ? 'rowspan="2"' : ''}>#</th>`;
-    fields.forEach((f, idx) => {
-      if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
-      const sticky = (idx < config.freeze_columns && config.freeze_header_row) ? 'position:sticky; left:0; z-index:101;' : '';
-      const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
-      const label = config[`field_label_${f.name}`] || f.label_short || f.label;
-      const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
-      const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
-      html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${label}${sortIcon}${columnFilter}</th>`;
-    });
-    html += '</tr></thead><tbody>';
+            html += '<thead><tr>';
+            if (config.show_row_numbers) html += `<th ${config.enable_column_groups ? 'rowspan="2"' : ''}>#</th>`;
+            fields.forEach((f, idx) => {
+              if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
+              const sticky = (idx < config.freeze_columns && config.freeze_header_row) ? 'position:sticky; left:0; z-index:101;' : '';
+              const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+              const label = config[`field_label_${f.name}`] || f.label_short || f.label;
+              const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
+              const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
+              html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${label}${sortIcon}${columnFilter}</th>`;
+            });
+            html += '</tr></thead><tbody>';
 
-    processedData.forEach((row, i) => {
-      const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
-      const level = row.__level || 0;
-      let bg = '';
-      const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
+            processedData.forEach((row, i) => {
+              const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
+              const level = row.__level || 0;
+              let bg = '';
+              const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
-      // Row-level conditional formatting (Multi-field support)
-      // Rule 1 has priority over Rule 2 via short-circuit evaluation (rule1 || rule2)
-      if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
-        const rowFields = config.row_conditional_field.split(',').map(s => s.trim());
+              // Row-level conditional formatting (Multi-field support)
+              // Rule 1 has priority over Rule 2 via short-circuit evaluation
+              if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
+                const rowFields = config.row_conditional_field.split(',').map(s => s.trim());
 
-        // Check if ANY field in the comma-separated list matches the rule
-        for (const fieldName of rowFields) {
-          const rowFieldValue = row[fieldName]?.value || row[fieldName];
-          const rowBg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1') ||
-                        this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_2');
+                // Check if ANY field in the comma-separated list matches the rule
+                for (const fieldName of rowFields) {
+                  const rowFieldValue = row[fieldName]?.value || row[fieldName];
+                  const rowBg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1') ||
+                  this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_2');
 
-          if (rowBg) {
-            bg = `background:${rowBg};`;
-            break; // Stop at first match
-          }
-        }
-      }
+                  if (rowBg) {
+                    bg = `background:${rowBg};`;
+                    break; // Stop at first match
+                  }
+                }
+              }
 
-      // Apply subtotal background ONLY if no row-level conditional formatting was applied
-      if (isSub && !bg) {
-        bg = `background:${config.subtotal_background_color};`;
-      }
+              // Apply subtotal background ONLY if no row-level conditional formatting was applied
+              if (isSub && !bg) {
+                bg = `background:${config.subtotal_background_color};`;
+              }
 
-      html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
-      if (config.show_row_numbers) html += `<td>${(isSub || isGT) ? '' : i + 1}</td>`;
+              html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
+              if (config.show_row_numbers) html += `<td>${(isSub || isGT) ? '' : i + 1}</td>`;
 
-      fields.forEach((f, idx) => {
-        if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
-        let style = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
-        if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
+              fields.forEach((f, idx) => {
+                if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
+                let style = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
+                if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
-        // Column-level conditional formatting (Cell Highlights)
-        // Rule 1 has priority over Rule 2 via short-circuit evaluation
-        if (config.enable_conditional_formatting && config.conditional_field) {
-          const targetFields = config.conditional_field.split(',').map(s => s.trim());
+                // Column-level conditional formatting (Cell Highlights)
+                // Rule 1 has priority over Rule 2 via short-circuit evaluation
+                if (config.enable_conditional_formatting && config.conditional_field) {
+                  const targetFields = config.conditional_field.split(',').map(s => s.trim());
 
-          if (targetFields.includes(f.name)) {
-            const cellData = row[f.name];
-            const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
+                  if (targetFields.includes(f.name)) {
+                    const cellData = row[f.name];
+                    const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
 
-            // Log matching for debugging
-            if (i === 0) console.log(`[COL-FORMAT] Checking field '${f.name}' value '${cellValue}' against rules.`);
+                    // Log matching for debugging
+                    if (i === 0) console.log(`[COL-FORMAT] Checking field '${f.name}' value '${cellValue}' against rules.`);
 
-            const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
-                            this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
-            const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') ||
-                              this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'text');
+                    const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
+                    this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
+                    const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') ||
+                    this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'text');
 
-            // Apply Override Priority: Cell formatting overrides Row formatting AND Stripe Mode via !important
-            if (bgColor) style += `background:${bgColor} !important;`;
-            if (textColor) style += `color:${textColor} !important;`;
-          }
-        }
+                    // Apply Override Priority: Cell formatting overrides Row formatting AND Stripe Mode via !important
+                    if (bgColor) style += `background:${bgColor} !important;`;
+                    if (textColor) style += `color:${textColor} !important;`;
+                  }
+                }
 
-        let content = this.renderCellContent(row[f.name], f, config, row, i, processedData);
-        if (isSub && f.name === mainTreeCol) content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
+                let content = this.renderCellContent(row[f.name], f, config, row, i, processedData);
+                if (isSub && f.name === mainTreeCol) content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
 
-        // Add drill link support
-        const cellData = row[f.name];
-        const hasLinks = cellData && cellData.links && cellData.links.length > 0;
-        if (hasLinks) {
-          style += 'cursor:pointer;';
-          html += `<td style="${style}" class="has-drill-links" data-links='${JSON.stringify(cellData.links)}'>${content}</td>`;
-        } else {
-          html += `<td style="${style}">${content}</td>`;
-        }
-      });
-      html += "</tr>";
-    });
+                // Add drill link support
+                const cellData = row[f.name];
+                const hasLinks = cellData && cellData.links && cellData.links.length > 0;
+                if (hasLinks) {
+                  style += 'cursor:pointer;';
+                  html += `<td style="${style}" class="has-drill-links" data-links='${JSON.stringify(cellData.links)}'>${content}</td>`;
+                } else {
+                  html += `<td style="${style}">${content}</td>`;
+                }
+              });
+              html += "</tr>";
+            });
 
-    html += "</tbody></table>";
+            html += "</tbody></table>";
 
-    // Pagination controls - Better format
-    if (config.enable_pagination && this.state.totalPages > 1) {
-      const currentPage = this.state.currentPage || 1;
-      const totalPages = this.state.totalPages;
-      const pageSize = config.page_size || 25;
-      const startRow = ((currentPage - 1) * pageSize) + 1;
-      const endRow = Math.min(currentPage * pageSize, processedData.length);
-      const totalRows = this.state.totalRowCount || processedData.length; // Use GRAND total
+            // Pagination controls - Better format
+            if (config.enable_pagination && this.state.totalPages > 1) {
+              const currentPage = this.state.currentPage || 1;
+              const totalPages = this.state.totalPages;
+              const pageSize = config.page_size || 25;
+              const startRow = ((currentPage - 1) * pageSize) + 1;
+              const endRow = Math.min(currentPage * pageSize, processedData.length);
+              const totalRows = this.state.totalRowCount || processedData.length; // Use GRAND total
 
-      const paginationHTML = `
-        <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9fafb; border-radius: 4px;">
-          <span style="font-size: 13px; color: ${config.cell_text_color}; font-weight: 600;">Total: ${totalRows} rows</span>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <button class="pagination-btn" data-page="first" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">|◄</button>
-            <button class="pagination-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">◄ Prev</button>
-            <span style="font-size: 13px; color: ${config.cell_text_color}; padding: 0 8px;">Page ${currentPage} of ${totalPages}</span>
-            <button class="pagination-btn" data-page="next" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''}">Next ►</button>
-            <button class="pagination-btn" data-page="last" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''}">►|</button>
-          </div>
-        </div>
-      `;
+              const paginationHTML = `
+              <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9fafb; border-radius: 4px;">
+              <span style="font-size: 13px; color: ${config.cell_text_color}; font-weight: 600;">Total: ${totalRows} rows</span>
+              <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="pagination-btn" data-page="first" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">|◄</button>
+              <button class="pagination-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">◄ Prev</button>
+              <span style="font-size: 13px; color: ${config.cell_text_color}; padding: 0 8px;">Page ${currentPage} of ${totalPages}</span>
+              <button class="pagination-btn" data-page="next" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''}">Next ►</button>
+              <button class="pagination-btn" data-page="last" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''}">►|</button>
+              </div>
+              </div>
+              `;
 
-      if (config.pagination_position === 'top' || config.pagination_position === 'both') {
-        html = paginationHTML + html;
-      }
-      if (config.pagination_position === 'bottom' || config.pagination_position === 'both') {
-        html += paginationHTML;
-      }
-    }
+              if (config.pagination_position === 'top' || config.pagination_position === 'both') {
+                html = paginationHTML + html;
+              }
+              if (config.pagination_position === 'bottom' || config.pagination_position === 'both') {
+                html += paginationHTML;
+              }
+            }
 
-    this.container.innerHTML = html;
-    this.attachEventListeners(config);
-  },
+            this.container.innerHTML = html;
+            this.attachEventListeners(config);
+          },
+
+
+
+
 
   renderColumnGroups: function (config, fields) {
     let html = '<thead><tr>';
