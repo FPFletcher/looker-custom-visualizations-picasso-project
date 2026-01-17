@@ -378,11 +378,11 @@ const visObject = {
     if (absVal >= 1000000) {
       // Millions: Divide by 1M, 1 Decimal Place (e.g. 1.2 M)
       formatted = (num / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-      suffix = ' M';
+      suffix = 'M';
     } else if (absVal >= 1000) {
       // Thousands: Divide by 1k, 0 Decimals (e.g. 150 k) - Matches your request "$#,##0,"k""
       formatted = (num / 1000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-      suffix = ' k';
+      suffix = 'k';
     } else {
       // Standard: 0 Decimals for normal numbers (or 2 for small currency if you prefer)
       // Matching your pattern "#,##0" -> 0 decimals
