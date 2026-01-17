@@ -1,4 +1,5 @@
 /**
+ * All is working but the comparison logic that got taken out
  * Advanced Table Visualization for Looker
  * Version: 4.30.4 - FINAL FIXES: Col Format Types, Stripe Priority, UI Move
  * Build: 2026-01-17

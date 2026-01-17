@@ -395,10 +395,10 @@ const visObject = {
 
     if (absVal >= 1000000) {
       formatted = (num / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-      suffix = ' M';
+      suffix = 'M';
     } else if (absVal >= 1000) {
       formatted = (num / 1000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-      suffix = ' k';
+      suffix = 'k';
     } else {
       formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
@@ -697,55 +697,63 @@ const visObject = {
   },
 
   // ✅ RESTORED: Robust Logic for Subtotal Comparison Checks from v4.30.0
-  isLastElementOfGroup: function (idx, data, config) {
-    if (idx >= data.length - 1) return true;
-    const curr = data[idx];
-    const next = data[idx + 1];
-    if (next.__isGrandTotal) return true;
+          isLastElementOfGroup: function (idx, data, config) {
+            if (idx >= data.length - 1) return true;
+            const curr = data[idx];
+            const next = data[idx + 1];
+            if (next.__isGrandTotal) return true;
 
-    // For REGULAR subtotals (non-BO mode)
-    if (!config.enable_bo_hierarchy && curr.__isSubtotal) {
-      // Check if there's another subtotal at the same level
-      for (let i = idx + 1; i < data.length; i++) {
-        const futureRow = data[i];
-        if (futureRow.__isGrandTotal) return true;
-        if (futureRow.__isSubtotal) {
-          // Found another subtotal - they can be compared
-          return false;
-        }
-      }
-      return true; // No more subtotals found
-    }
-
-    // For hierarchy mode with subtotals
-    if (config.enable_bo_hierarchy) {
-      if (curr.__isSubtotal) {
-        for (let i = idx + 1; i < data.length; i++) {
-          const futureRow = data[i];
-          if (futureRow.__isGrandTotal) return true;
-          if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
-            if (futureRow.__parentPath === curr.__parentPath) {
-              return false;
-            } else {
-              return true;
+            // For REGULAR subtotals (non-BO mode)
+            if (!config.enable_bo_hierarchy && curr.__isSubtotal) {
+              // Check if there's another subtotal at the same level
+              // with the same group dimension value
+              for (let i = idx + 1; i < data.length; i++) {
+                const futureRow = data[i];
+                if (futureRow.__isGrandTotal) return true;
+                if (futureRow.__isSubtotal) {
+                  // Found another subtotal - they can be compared
+                  return false;
+                }
+              }
+              return true; // No more subtotals found
             }
-          }
-        }
-        return true;
-      }
-      if (next.__level !== curr.__level) return true;
-      if (next.__parentPath !== curr.__parentPath) return true;
-      return false;
-    }
 
-    if (config.enable_subtotals) {
-      if (!curr.__isSubtotal && next.__isSubtotal) return true;
-      if (curr.__isSubtotal && next.__isSubtotal && curr.__groupValue !== next.__groupValue) return true;
-      return false;
-    }
+            // For hierarchy mode with subtotals
+            if (config.enable_bo_hierarchy) {
+              // If current is a subtotal, look ahead to find next subtotal at same level
+              if (curr.__isSubtotal) {
+                // Find next subtotal at same level with same parent
+                for (let i = idx + 1; i < data.length; i++) {
+                  const futureRow = data[i];
+                  if (futureRow.__isGrandTotal) return true;
+                  if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
+                    // Found next subtotal at same level - check if same parent
+                    if (futureRow.__parentPath === curr.__parentPath) {
+                      return false; // There's another subtotal to compare with
+                    } else {
+                      return true; // Different parent, can't compare
+                    }
+                  }
+                }
+                return true; // No more subtotals at this level
+              }
+              // For detail rows, check immediate next row
+              if (next.__level !== curr.__level) return true;
+              if (next.__parentPath !== curr.__parentPath) return true;
+              return false;
+            }
 
-    return false;
-  },
+            // For standard subtotals: Only hide if this is last detail row before subtotal
+            if (config.enable_subtotals) {
+              // If current is detail and next is subtotal, this is last of group
+              if (!curr.__isSubtotal && next.__isSubtotal) return true;
+              // If current is subtotal and next is different subtotal, this is last
+              if (curr.__isSubtotal && next.__isSubtotal && curr.__groupValue !== next.__groupValue) return true;
+              return false;
+            }
+
+            return false;
+          },
 
   generateCellBar: function (val, rendered, color, useGrad, endColor, data, fieldName, level) {
     const num = parseFloat(val);
@@ -757,27 +765,27 @@ const visObject = {
   },
 
   renderComparison: function (row, config, rowIdx, data, primaryRendered) {
-    const primary = parseFloat(row[config.comparison_primary_field]?.value || 0);
-    const isSub = !!row.__isSubtotal;
-    const level = row.__level;
-    const parentPath = row.__parentPath;
+            const primary = parseFloat(row[config.comparison_primary_field]?.value || 0);
+            const isSub = !!row.__isSubtotal;
+            const level = row.__level;
+            const parentPath = row.__parentPath;
 
-    // Peer subset: same type, same level, same parent branch
-    const peers = data.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
-    const currPeerIdx = peers.indexOf(row);
-    const offset = config.comparison_period_offset || -1;
-    const compRow = peers[currPeerIdx - offset];
+            // Peer subset: same type, same level, same parent branch
+            const peers = data.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
+            const currPeerIdx = peers.indexOf(row);
+            const offset = config.comparison_period_offset || -1;
+            const compRow = peers[currPeerIdx - offset];
 
-    if (!compRow) return primaryRendered;
-    const secondary = parseFloat(compRow[config.comparison_primary_field]?.value || 0);
-    if (isNaN(secondary) || secondary === 0) return primaryRendered;
+            if (!compRow) return primaryRendered;
+            const secondary = parseFloat(compRow[config.comparison_primary_field]?.value || 0);
+            if (isNaN(secondary) || secondary === 0) return primaryRendered;
 
-    const diff = primary - secondary;
-    const pct = ((diff / Math.abs(secondary)) * 100).toFixed(1);
-    const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
-    const arrow = config.show_comparison_arrows ? (diff >= 0 ? '↑' : '↓') : '';
-    return `<span>${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
-  },
+            const diff = primary - secondary;
+            const pct = ((diff / Math.abs(secondary)) * 100).toFixed(1);
+            const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
+            const arrow = config.show_comparison_arrows ? (diff >= 0 ? '↑' : '↓') : '';
+            return `<span>${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
+          },
 
   sortData: function (data, field, direction) {
     const isAsc = direction === 'asc';
