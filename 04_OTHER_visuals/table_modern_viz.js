@@ -1,6 +1,6 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.33.0 - FIX: Detail Row Formatting + UI Alignment
+ * Version: 4.34.0 - RESTORED 4.31 + DETAIL ROW FORMATTING FIX
  * Build: 2026-01-17
  */
 
@@ -46,7 +46,7 @@ const visObject = {
     use_gradient_2: { type: "boolean", label: "Use Gradient 2", default: false, section: "Series", order: 9 },
     gradient_end_2: { type: "string", label: "Gradient End 2", display: "color", default: "#6ee7b7", section: "Series", order: 10 },
 
-    column_group_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
+    grouping_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
     enable_column_groups: { type: "boolean", label: "Enable Grouping", default: false, section: "Series", order: 21 },
     column_group_1_name: { type: "string", label: "Group 1 Name", default: "", section: "Series", order: 22 },
     column_group_1_count: { type: "number", label: "Group 1 Count", default: 1, section: "Series", order: 23 },
@@ -55,14 +55,6 @@ const visObject = {
     group_remaining_columns: { type: "boolean", label: "Group Remaining Columns", default: false, section: "Series", order: 26 },
     remaining_columns_name: { type: "string", label: "Remaining Name", default: "Other", section: "Series", order: 27 },
     group_header_bg_color: { type: "string", label: "Group Header BG Color", display: "color", default: "#8dc6ff", section: "Series", order: 28 },
-
-    comparison_divider: { type: "string", label: "━━━ Comparison ━━━", display: "divider", section: "Series", order: 50 },
-    enable_comparison: { type: "boolean", label: "Enable Comparison", default: false, section: "Series", order: 51 },
-    comparison_primary_field: { type: "string", label: "Primary Field", display: "text", default: "", section: "Series", order: 53 },
-    comparison_period_offset: { type: "number", label: "Period Offset", default: -1, section: "Series", order: 55 },
-    show_comparison_arrows: { type: "boolean", label: "Show Arrows", default: true, section: "Series", order: 56 },
-    positive_comparison_color: { type: "string", label: "Pos Color", display: "color", default: "#10b981", section: "Series", order: 57 },
-    negative_comparison_color: { type: "string", label: "Neg Color", display: "color", default: "#ef4444", section: "Series", order: 58 },
 
     subtotals_divider: { type: "string", label: "━━━ Subtotals & Totals ━━━", display: "divider", section: "Series", order: 80 },
     enable_subtotals: { type: "boolean", label: "Enable Subtotals", default: false, section: "Series", order: 81 },
@@ -131,6 +123,7 @@ const visObject = {
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     this.clearErrors();
+    console.log("[UI-TRACE] updateAsync started with data length:", data.length);
     if (!queryResponse || !queryResponse.fields || !data || data.length === 0) { done(); return; }
 
     const dims = queryResponse.fields.dimension_like;
@@ -154,34 +147,8 @@ const visObject = {
     this.queryResponse = queryResponse;
 
     let processedData = [...data];
-
-    // Filters
-    if (config.enable_table_filter && this.state.tableFilter) {
-      const filterText = this.state.tableFilter;
-      const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
-      processedData = processedData.filter(row => {
-        return allFields.some(field => {
-          const cellValue = String(row[field.name]?.value || row[field.name] || '').toLowerCase();
-          return cellValue.includes(filterText);
-        });
-      });
-    }
-
-    if (config.enable_column_filters && this.state.columnFilters) {
-      Object.keys(this.state.columnFilters).forEach(fieldName => {
-        const filterText = this.state.columnFilters[fieldName];
-        if (filterText) {
-          processedData = processedData.filter(row => {
-            const cellValue = String(row[fieldName]?.value || row[fieldName] || '').toLowerCase();
-            return cellValue.includes(filterText);
-          });
-        }
-      });
-    }
-
     if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
-    // Data Processing Pipeline
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
       const hierarchyList = config.hierarchy_dimensions.split(',').map(f => f.trim());
       processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
@@ -192,7 +159,6 @@ const visObject = {
 
     if (config.show_grand_total) processedData.push(this.calculateGrandTotal(data, measures, config, dims));
 
-    this.state.totalRowCount = processedData.length;
     this.renderTable(processedData, config, queryResponse);
     done();
   },
@@ -251,11 +217,10 @@ const visObject = {
 
   formatMeasure: function (value, field, config) {
     const customFormat = config[`field_format_${field.name}`];
-    // DEBUG LOGGING
-    console.log(`[FORMAT-TRACE] Field: ${field.name}, Value: ${value}, CustomFmt Option: ${customFormat}`);
-
     if (customFormat && config.enable_custom_field_formatting) {
-      return this.applyCustomFormat(value, customFormat);
+      const res = this.applyCustomFormat(value, customFormat);
+      console.log(`[FORMAT-LOG] Formatted ${field.name}: ${value} -> ${res} (Using Custom: ${customFormat})`);
+      return res;
     }
     if (field.value_format) {
       return this.applyCustomFormat(value, field.value_format);
@@ -345,7 +310,6 @@ const visObject = {
         if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
         let cellStyle = (f.name === mainTreeCol) ? `padding-left: ${(row.__level * 20) + 12}px;` : '';
 
-        // Column Formatting Specificity Fix
         const targetCols = (config.conditional_field || "").split(',').map(x => x.trim());
         if (config.enable_conditional_formatting && targetCols.includes(f.name)) {
           const cellVal = row[f.name]?.value ?? row[f.name];
@@ -391,9 +355,16 @@ const visObject = {
     const customFmt = config[`field_format_${field.name}`];
     const hasCustomFmt = !!(config.enable_custom_field_formatting && customFmt && customFmt.trim() !== '');
 
-    // FIX: Force detail row to use custom format if it exists
+    // DEBUG: Log first 5 rows and all subtotals
+    if (idx < 5 || isSubGT) {
+      console.log(`[DEBUG-DATA] Field: ${field.name}, Row: ${idx}, Subtotal: ${isSubGT}, hasCustomFmt: ${hasCustomFmt}, Current Render: ${rendered}`);
+    }
+
     if (field.is_measure || field.type === 'number' || field.type === 'count') {
-      if (hasCustomFmt || isSubGT) {
+      if (hasCustomFmt) {
+         // CRITICAL: Ignore Looker pre-rendered value if custom format is active
+         rendered = this.formatMeasure(val, field, config);
+      } else if (isSubGT) {
          rendered = this.formatMeasure(val, field, config);
       }
     }
