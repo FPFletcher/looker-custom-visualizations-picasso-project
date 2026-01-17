@@ -332,37 +332,37 @@ const visObject = {
   },
 
   formatMeasure: function (value, field, config) {
-    // FIX: Check if global custom formatting toggle is enabled
-    const isCustomFormattingEnabled = config.enable_custom_field_formatting;
-    const customFormat = config[`field_format_${field.name}`];
+  // 1. Check Custom Format Toggle & User Input
+  const isCustomFormattingEnabled = config.enable_custom_field_formatting;
+  const customFormat = config[`field_format_${field.name}`];
 
-    // 1. Custom Format (User entered specific string in Viz Config)
-    // Applies if Toggle is ON AND String is not empty
-    if (isCustomFormattingEnabled && customFormat && customFormat.trim() !== '') {
-      return this.applyCustomFormat(value, customFormat);
-    }
+  // IF Toggle is ON AND the user typed a specific format -> Use Custom Logic
+  if (isCustomFormattingEnabled && customFormat && customFormat.trim() !== '') {
+    return this.applyCustomFormat(value, customFormat);
+  }
 
-    // 2. LookML Format (Native Looker format)
-    // Applies if Toggle is OFF OR (Toggle is ON and String is empty)
-    if (field.value_format) {
-      // Attempt to use Looker's native formatter for best fidelity (thousands separators, currency, etc)
-      try {
-        if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.formatValue) {
-          return LookerCharts.Utils.formatValue(value, field.value_format);
-        }
-      } catch (e) {
-        console.warn('LookerCharts formatValue failed, falling back to manual format', e);
+  // 2. Fallback to LookML (Native Looker) Format
+  // IF Toggle is OFF OR (Toggle is ON but text box is empty)
+  if (field.value_format) {
+    // TRY: Use Looker's native utility to match Detail rows exactly (handles "k", "M", currency, etc.)
+    try {
+      if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.formatValue) {
+        return LookerCharts.Utils.formatValue(value, field.value_format);
       }
-      // Fallback to manual simple formatter if native fails
-      return this.applyCustomFormat(value, field.value_format);
+    } catch (e) {
+      // Continue to fallback if LookerCharts util is missing
     }
 
-    // 3. Fallback: Basic locale formatting
-    if (typeof value === 'number') {
-      return value.toLocaleString('en-US');
-    }
-    return String(value);
-  },
+    // FALLBACK: If Looker util fails, use internal simple formatter
+    return this.applyCustomFormat(value, field.value_format);
+  }
+
+  // 3. Final Fallback: Standard numbers
+  if (typeof value === 'number') {
+    return value.toLocaleString('en-US');
+  }
+  return String(value);
+},
 
   applyCustomFormat: function (value, formatString) {
     if (!formatString || value === null || value === undefined) return String(value);
