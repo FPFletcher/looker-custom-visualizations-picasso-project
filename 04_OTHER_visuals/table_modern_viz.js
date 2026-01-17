@@ -2,10 +2,11 @@
  * Advanced Table Visualization for Looker
  * Version: 4.30.0 - FINAL FIX: Field Formatting + Drill Links
  * Build: 2026-01-17
- * * MODIFIED WITH v4.37.0 FORMATTING LOGIC:
- * - Updated applyCustomFormat (Forced Scaling 'k')
- * - Updated formatMeasure
- * - Updated renderCellContent (Parity Fix logic)
+ * * CRITICAL FIXES (v4.30 + v4.37 Logic):
+ * ✅ Fixed hasCustomFormat boolean issue
+ * ✅ Added drill link support
+ * ✅ FIELD FORMATTING PARITY FIX: Detail rows now respect Custom Formatting
+ * ✅ FORCED SCALING: Added logic to manually divide by 1000 if 'k' format is used
  */
 
 const visObject = {
@@ -332,16 +333,21 @@ const visObject = {
 
   formatMeasure: function (value, field, config) {
     const customFormat = config[`field_format_${field.name}`];
+
+    // 1. Force custom format if enabled (v4.37 logic)
     if (customFormat && config.enable_custom_field_formatting) {
       const res = this.applyCustomFormat(value, customFormat);
       console.log(`[FORMAT-FORCE] ${field.name}: ${value} -> ${res} (Custom)`);
       return res;
     }
+
+    // 2. Fallback to LookML format (v4.37 logic)
     if (field.value_format) {
       const res = this.applyCustomFormat(value, field.value_format);
       console.log(`[FORMAT-LOOKML] ${field.name}: ${value} -> ${res} (LookML)`);
       return res;
     }
+
     return (typeof value === 'number') ? value.toLocaleString('en-US') : String(value);
   },
 
@@ -350,6 +356,7 @@ const visObject = {
     const num = parseFloat(value);
     if (isNaN(num)) return String(value);
 
+    // v4.37 Logic: Check for K/M and force decimals
     const isKMB = formatString.toLowerCase().includes('k') || formatString.toLowerCase().includes('m');
     const decimalMatch = formatString.match(/\.([0#]+)/);
     const decimals = decimalMatch ? decimalMatch[1].length : (isKMB ? 1 : 0);
@@ -357,7 +364,7 @@ const visObject = {
     let formatted = num;
     let suffix = "";
 
-    // FORCE SCALING: If format has 'k', always scale by 1000 to match LookML behavior
+    // v4.37 Logic: Force Scaling (dividing by 1000 for 'k')
     if (formatString.toLowerCase().includes('k')) {
       formatted = num / 1000;
       suffix = " k";
@@ -607,6 +614,8 @@ const visObject = {
     // PARITY FIX: Only re-format measures for Subtotals or when Custom Formatting is active.
     // Expanded rows (Detail rows) keep Looker's original cell.rendered by default.
     if (field.is_measure || field.type === 'number' || field.type === 'count') {
+        // v4.37 Logic: If custom format is active OR it's a subtotal, force the format
+        // This effectively overrides the "restrictive gate" mentioned in logs
         if (hasCustomFormat || isSubtotalOrGrandTotal) {
             rendered = this.formatMeasure(val, field, config);
         }
