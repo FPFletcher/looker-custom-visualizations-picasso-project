@@ -1,25 +1,20 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.26.0 - Conditional Formatting Fixes
- * Build: 2026-01-17
+ * Version: 4.25.0 - Final Fixes: CSP Compliance, Filters, Formatting
+ * Build: 2026-01-16
  *
- * CRITICAL FIXES (v4.26):
- * ✅ Conditional formatting now applies to ALL rows (detail + subtotals + grand total)
- * ✅ When custom format is disabled, subtotals properly revert to LookML formatting
- * ✅ Enhanced debug logging for subtotals and grand totals
- *
- * Previous fixes (v4.25):
+ * CRITICAL FIXES (v4.25):
  * ✅ Fixed CSP violations - removed inline event handlers (onclick, onmousedown, onfocus)
  * ✅ Column filters now persist values after Enter key
  * ✅ Column filters properly attached via addEventListener (CSP compliant)
  * ✅ Empty custom format (empty string) now correctly treated as "no custom format"
+ * ✅ Added debug logging for format decisions (first 3 rows + subtotals)
  *
  * Format Logic (with empty string fix):
  * - hasCustomFormat checks: customFormat && customFormat.trim() !== ''
  * - Custom format present → Apply to ALL rows (detail + subtotals)
  * - No custom format + Subtotal → Use LookML via formatMeasure
  * - No custom format + Detail → Use Looker's rendered (has LookML)
- * - Conditional formatting → Apply to ALL rows (detail + subtotals + grand total)
  *
  * Debug Console Logs:
  * [FILTER] Column filter applied: fieldName = value
@@ -539,8 +534,8 @@ const visObject = {
         let style = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
         if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
-        // Cell-level conditional formatting - applies to ALL rows including subtotals and grand totals
-        if (config.enable_conditional_formatting && config.conditional_field === f.name) {
+        // Cell-level conditional formatting
+        if (config.enable_conditional_formatting && config.conditional_field === f.name && !isSub && !isGT) {
           const cellData = row[f.name];
           const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
           const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
@@ -641,8 +636,8 @@ const visObject = {
         // No custom format, but this is subtotal/grand total - use formatMeasure for LookML default
         rendered = this.formatMeasure(val, field, config);
 
-        if (rowIdx < 3 || isSubtotalOrGrandTotal) {
-          console.log(`[FORMAT] ${field.name} - Subtotal/GT using LookML format:`, rendered);
+        if (rowIdx < 3) {
+          console.log(`[FORMAT] ${field.name} - Subtotal LookML format:`, rendered);
         }
       } else {
         // Detail row with no custom format → keep Looker's rendered value
