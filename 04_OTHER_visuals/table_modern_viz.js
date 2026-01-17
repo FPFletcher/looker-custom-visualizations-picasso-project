@@ -1,11 +1,12 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.30.1 - FIX: Subtotal Formatting Respects Toggle
+ * Version: 4.30.2 - FIX: Subtotal LookML Formatting Parity
  * Build: 2026-01-17
- * * CRITICAL FIXES (v4.30.1):
- * ✅ Fixed `formatMeasure` to respect `enable_custom_field_formatting` toggle.
- * Previously, subtotals applied custom formats even if the global toggle was OFF.
- * Now, if toggle is OFF, subtotals correctly fall back to LookML/Looker defaults.
+ * * CRITICAL FIXES (v4.30.2):
+ * ✅ Fixed Subtotal/Grand Total default formatting
+ * - Now uses `LookerCharts.Utils.formatValue()` when Custom Format box is empty.
+ * - This ensures calculated subtotals exactly match LookML formatting (including currency, 'k' thousands, etc.)
+ * - Matches Detail row rendering perfectly.
  */
 
 const visObject = {
@@ -335,17 +336,28 @@ const visObject = {
     const isCustomFormattingEnabled = config.enable_custom_field_formatting;
     const customFormat = config[`field_format_${field.name}`];
 
-    // Only apply custom format if the toggle is ON and a format string exists
+    // 1. Custom Format (User entered specific string in Viz Config)
+    // Applies if Toggle is ON AND String is not empty
     if (isCustomFormattingEnabled && customFormat && customFormat.trim() !== '') {
       return this.applyCustomFormat(value, customFormat);
     }
 
-    // Fallback: Use LookML format from field metadata if available
+    // 2. LookML Format (Native Looker format)
+    // Applies if Toggle is OFF OR (Toggle is ON and String is empty)
     if (field.value_format) {
+      // Attempt to use Looker's native formatter for best fidelity (thousands separators, currency, etc)
+      try {
+        if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.formatValue) {
+          return LookerCharts.Utils.formatValue(value, field.value_format);
+        }
+      } catch (e) {
+        console.warn('LookerCharts formatValue failed, falling back to manual format', e);
+      }
+      // Fallback to manual simple formatter if native fails
       return this.applyCustomFormat(value, field.value_format);
     }
 
-    // Fallback: Basic locale formatting
+    // 3. Fallback: Basic locale formatting
     if (typeof value === 'number') {
       return value.toLocaleString('en-US');
     }
