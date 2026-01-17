@@ -1,28 +1,28 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.29.0 - Debug Logging Enhanced
+ * Version: 4.30.0 - FINAL FIX: Field Formatting + Drill Links
  * Build: 2026-01-17
  *
- * DEBUG UPDATE (v4.29):
- * 🔍 Added [FORMAT-DEBUG] logs for EVERY field on first 3 rows + ALL subtotals
- * 🔍 Shows: fieldType, isMeasure, isSubtotal, enableCustomFieldFormatting, customFormat, hasCustomFormat, value, lookerRendered
- * 🔍 This will help us identify exactly what's happening with the formatting logic
+ * CRITICAL FIXES (v4.30):
+ * ✅ Fixed hasCustomFormat boolean issue - was returning empty string "" instead of false
+ * ✅ Added drill link support - cells with drill links now clickable with cursor pointer
+ * ✅ Drill links open Looker's native drill menu on click
  *
- * Previous fix (v4.28):
- * ✅ Custom field formatting now respects enable_custom_field_formatting toggle
- * ✅ When toggle is OFF: subtotals use LookML, details use Looker's rendered
- * ✅ When toggle is ON + format specified: applied to ALL rows (detail + subtotals)
+ * Field Formatting Now Works Correctly:
+ * - Toggle OFF + No Format → Subtotals use LookML, Details use Looker rendered
+ * - Toggle ON + Format Set → Apply custom format to ALL rows
+ * - Toggle ON + No Format → Subtotals use LookML, Details use Looker rendered
  *
- * Format Logic:
- * - enable_custom_field_formatting OFF → All use LookML/Looker defaults
- * - enable_custom_field_formatting ON + format set → Apply to ALL rows
- * - enable_custom_field_formatting ON + no format → Subtotals use LookML, details use Looker
+ * Drill Links:
+ * - Cells with drill links get cursor:pointer style
+ * - Click opens native Looker drill menu
+ * - Works on all cells (dimensions, measures, pivots)
  *
- * Debug Console Logs:
- * [FORMAT-DEBUG] Shows complete state for debugging
- * [FORMAT] Shows which formatting path was taken
+ * Debug Logs (can be removed in production):
+ * [FORMAT-DEBUG] Shows complete state with JSON.stringify
  * [CONDITIONAL] Shows conditional formatting evaluation
  * [FILTER] Shows column filter actions
+ * [DRILL] Shows drill link errors (if any)
  */
 
 const visObject = {
@@ -565,7 +565,15 @@ const visObject = {
         let content = this.renderCellContent(row[f.name], f, config, row, i, processedData);
         if (isSub && f.name === mainTreeCol) content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
 
-        html += `<td style="${style}">${content}</td>`;
+        // Add drill link support
+        const cellData = row[f.name];
+        const hasLinks = cellData && cellData.links && cellData.links.length > 0;
+        if (hasLinks) {
+          style += 'cursor:pointer;';
+          html += `<td style="${style}" class="has-drill-links" data-links='${JSON.stringify(cellData.links)}'>${content}</td>`;
+        } else {
+          html += `<td style="${style}">${content}</td>`;
+        }
       });
       html += "</tr>";
     });
@@ -636,7 +644,8 @@ const visObject = {
     // 3. If subtotal/grand total with no custom format → use LookML via formatMeasure
     const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
     const customFormat = config[`field_format_${field.name}`];
-    const hasCustomFormat = config.enable_custom_field_formatting && customFormat && customFormat.trim() !== '';
+    // CRITICAL FIX: Use !! to ensure boolean, not empty string
+    const hasCustomFormat = !!(config.enable_custom_field_formatting && customFormat && customFormat.trim() !== '');
 
     // ALWAYS log for first 3 rows and ALL subtotals to debug
     if (rowIdx < 3 || isSubtotalOrGrandTotal) {
@@ -899,6 +908,23 @@ const visObject = {
         });
       });
     }
+
+    // Drill links - Add click handler for cells with drill links
+    this.container.querySelectorAll('td.has-drill-links').forEach(td => {
+      td.addEventListener('click', (e) => {
+        try {
+          const linksJson = td.dataset.links;
+          if (linksJson) {
+            const links = JSON.parse(linksJson);
+            if (links && links.length > 0) {
+              LookerCharts.Utils.openDrillMenu({ links: links, event: e });
+            }
+          }
+        } catch (err) {
+          console.error('[DRILL] Error opening drill menu:', err);
+        }
+      });
+    });
   },
   trigger: function (event) { },
   clearErrors: function () { }
