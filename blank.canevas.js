@@ -1,13 +1,13 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.30.4 - FINAL FIXES: Col Format Types, Stripe Priority, UI Move
+ * Version: 4.30.4 - Fixes: Stripe Priority, Col Format UI Move, Default Chips, Debugging
  * Build: 2026-01-17
- * * UPDATES:
- * ✅ Fixed Column Rules: Changed input type from 'number' to 'string' so text (e.g. "Accessories") works.
- * ✅ Stripe Mode: Removed !important so Row/Col formatting can overwrite it.
- * ✅ UI: Moved Column Formatting to 'Formatting' tab.
- * ✅ Data Chips: Added Customizable Default Chip Color.
- * ✅ Debug: Added [COL-FORMAT] logs.
+ * * UPDATES (v4.30.4):
+ * ✅ Stripe Mode: Removed !important so conditional formatting overrides it.
+ * ✅ UI: Moved Column Conditional Formatting to 'Formatting' tab (under Row formatting).
+ * ✅ Rules: Confirmed Rule 1 overwrites Rule 2 logic.
+ * ✅ Data Chips: Added customizable Default Color for non-matching values.
+ * ✅ Debug: Added [COL-FORMAT] logs to diagnose column highlighting issues.
  */
 
 const visObject = {
@@ -93,7 +93,6 @@ const visObject = {
     enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: false, section: "Series", order: 151 },
     data_chip_fields: { type: "string", label: "Apply to Fields (comma-sep)", default: "", section: "Series", order: 152 },
 
-    // NEW: Default Chip Color
     chip_default_bg: { type: "string", label: "Default Chip BG", display: "color", default: "#e5e7eb", section: "Series", order: 152.1 },
     chip_default_text: { type: "string", label: "Default Chip Text", display: "color", default: "#1f2937", section: "Series", order: 152.2 },
 
@@ -149,18 +148,16 @@ const visObject = {
     row_rule_2_value: { type: "string", label: "Row Rule 2 Value", display: "text", default: "", section: "Formatting", order: 57 },
     row_rule_2_bg: { type: "string", label: "Row Rule 2 BG", display: "color", default: "#fee2e2", section: "Formatting", order: 58 },
 
-    // ════ MOVED to Formatting Tab & FIXED Input Types ════
+    // MOVED: Column Conditional Formatting (Now under Formatting tab, Order 60+)
     conditional_formatting_divider: { type: "string", label: "━━━ Column Conditional Formatting ━━━", display: "divider", section: "Formatting", order: 60 },
     enable_conditional_formatting: { type: "boolean", label: "Enable Column Formatting", default: false, section: "Formatting", order: 61 },
     conditional_field: { type: "string", label: "Target Fields (comma-sep)", display: "text", default: "", section: "Formatting", order: 62 },
-    conditional_rule_1_operator: { type: "string", label: "Col Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }, { "Contains": "contains" }], default: "", section: "Formatting", order: 63 },
-    // FIXED: Changed type from 'number' to 'string' to allow text input
-    conditional_rule_1_value: { type: "string", label: "Col Rule 1 Value", display: "text", default: "", section: "Formatting", order: 64 },
+    conditional_rule_1_operator: { type: "string", label: "Col Rule 1 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Formatting", order: 63 },
+    conditional_rule_1_value: { type: "number", label: "Col Rule 1 Value", default: 0, section: "Formatting", order: 64 },
     conditional_rule_1_bg: { type: "string", label: "Col Rule 1 BG Color", display: "color", default: "#dcfce7", section: "Formatting", order: 65 },
     conditional_rule_1_text: { type: "string", label: "Col Rule 1 Text Color", display: "color", default: "#166534", section: "Formatting", order: 66 },
-    conditional_rule_2_operator: { type: "string", label: "Col Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }, { "Contains": "contains" }], default: "", section: "Formatting", order: 67 },
-    // FIXED: Changed type from 'number' to 'string'
-    conditional_rule_2_value: { type: "string", label: "Col Rule 2 Value", display: "text", default: "", section: "Formatting", order: 68 },
+    conditional_rule_2_operator: { type: "string", label: "Col Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }], default: "", section: "Formatting", order: 67 },
+    conditional_rule_2_value: { type: "number", label: "Col Rule 2 Value", default: 0, section: "Formatting", order: 68 },
     conditional_rule_2_bg: { type: "string", label: "Col Rule 2 BG Color", display: "color", default: "#fee2e2", section: "Formatting", order: 69 },
     conditional_rule_2_text: { type: "string", label: "Col Rule 2 Text Color", display: "color", default: "#991b1b", section: "Formatting", order: 70 },
   },
@@ -178,6 +175,7 @@ const visObject = {
     const dims = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
 
+    // Build options dynamically
     if (dims.length > 0) {
       this.options.subtotal_dimension.values = [{ "None": "" }, ...dims.map(d => ({ [d.label_short || d.label]: d.name }))];
     }
@@ -253,14 +251,17 @@ const visObject = {
 
     if (config.show_grand_total) processedData.push(this.calculateGrandTotal(data, measures, config, dims));
 
+    // Store total row count BEFORE pagination
     this.state.totalRowCount = processedData.length;
 
+    // Dynamic pagination
     let paginatedData = processedData;
     if (config.enable_pagination) {
       const pageSize = config.page_size || 25;
       const currentPage = this.state.currentPage || 1;
 
       if (config.dynamic_pagination && config.enable_subtotals) {
+        // Smart pagination: keep subtotal + detail rows together
         let chunks = [];
         let currentChunk = [];
 
@@ -274,12 +275,14 @@ const visObject = {
         });
         if (currentChunk.length > 0) chunks.push(currentChunk);
 
+        // Paginate chunks
         const totalPages = Math.ceil(chunks.length / pageSize);
         this.state.totalPages = totalPages;
         const startIdx = (currentPage - 1) * pageSize;
         const endIdx = startIdx + pageSize;
         paginatedData = chunks.slice(startIdx, endIdx).flat();
       } else {
+        // Standard pagination
         const totalPages = Math.ceil(processedData.length / pageSize);
         this.state.totalPages = totalPages;
         const startIdx = (currentPage - 1) * pageSize;
@@ -327,43 +330,47 @@ const visObject = {
     return result;
   },
 
-  // ✅ Fixed Subtotal Sorting ("686" bug)
   calculateStandardSubtotals: function (data, field, measures, config, dims) {
-    const result = [];
-    const groups = {};
-    const groupOrder = []; // Preserve order to avoid auto-sorting integers
+  const result = [];
+  const groups = {};
+  const groupOrder = []; // ✅ Fix: Track insertion order to prevent JS from auto-sorting integer keys (like "686")
 
-    data.forEach(row => {
-      let val = row[field];
-      let key = (val && typeof val === 'object') ? (val.value || 'null') : (val || 'null');
-      if (!groups[key]) {
-        groups[key] = [];
-        groupOrder.push(key);
-      }
-      groups[key].push(row);
+  data.forEach(row => {
+    let val = row[field];
+    let key = (val && typeof val === 'object') ? (val.value || 'null') : (val || 'null');
+
+    if (!groups[key]) {
+      groups[key] = [];
+      groupOrder.push(key); // Record the key in the correct sort order
+    }
+    groups[key].push(row);
+  });
+
+  // ✅ Fix: Iterate using the preserved order, NOT Object.keys()
+  groupOrder.forEach(key => {
+    const sub = { __isSubtotal: true, __groupValue: key, __level: 0 };
+    sub[field] = { value: key, rendered: key };
+    dims.forEach(d => { if (d.name !== field) sub[d.name] = { value: '', rendered: '' }; });
+
+    measures.forEach(m => {
+      let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
+      sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
     });
 
-    groupOrder.forEach(key => {
-      const sub = { __isSubtotal: true, __groupValue: key, __level: 0 };
-      sub[field] = { value: key, rendered: key };
-      dims.forEach(d => { if (d.name !== field) sub[d.name] = { value: '', rendered: '' }; });
-      measures.forEach(m => {
-        let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
-        sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
-      });
-      if (config.subtotal_position === 'top') {
-        result.push(sub);
-        groups[key].forEach(r => { r.__parentGroup = key; result.push(r); });
-      } else {
-        groups[key].forEach(r => result.push(r));
-        result.push(sub);
-      }
-    });
-    return result;
-  },
+    if (config.subtotal_position === 'top') {
+      result.push(sub);
+      groups[key].forEach(r => { r.__parentGroup = key; result.push(r); });
+    } else {
+      groups[key].forEach(r => result.push(r));
+      result.push(sub);
+    }
+  });
+  return result;
+},
 
   formatMeasure: function (value, field, config) {
-    // 1. Custom Format
+    // 1. Custom Format (User entered specific string in Viz Config)
+    // Applies ONLY if Toggle is ON AND String is not empty
     if (config.enable_custom_field_formatting && config[`field_format_${field.name}`]) {
       const customFormat = config[`field_format_${field.name}`];
       if (customFormat && customFormat.trim() !== '') {
@@ -371,51 +378,81 @@ const visObject = {
       }
     }
 
-    // 2. LookML Native
+    // 2. Try Looker's Native Utils (For strict parity if available)
     if (field.value_format) {
       try {
         if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.formatValue) {
+          // If the utility works, return it. If it throws or returns undefined, fall through.
           const ret = LookerCharts.Utils.formatValue(value, field.value_format);
           if (ret) return ret;
         }
-      } catch (e) {}
+      } catch (e) {
+        // Fall through to smart default
+      }
     }
 
-    // 3. Smart Default
+    // 3. SMART DEFAULT FALLBACK (User Requested Logic)
+    // Use this if LookML parity fails or isn't available.
+    // Logic: [>=1M] 0.0 M; [>=1k] 0 k; Standard
+
+    // Detect if field is likely currency (LookML has '$' or label mentions price/revenue/etc)
     const isCurrency = (field.value_format && field.value_format.indexOf('$') > -1) ||
                        (field.label_short || field.label || '').match(/price|amount|revenue|sales|margin|\$/i);
+
     return this.applySmartFormat(value, isCurrency);
   },
 
   applySmartFormat: function (value, isCurrency) {
     const num = Number(value);
     if (isNaN(num)) return String(value);
+
     const absVal = Math.abs(num);
     let formatted = '';
     let suffix = '';
 
+    // LOGIC: [>=1000000]#,##0.0,,"M";[>=1000]#,##0,"k";#,##0
     if (absVal >= 1000000) {
+      // Millions: Divide by 1M, 1 Decimal Place (e.g. 1.2 M)
       formatted = (num / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
       suffix = ' M';
     } else if (absVal >= 1000) {
+      // Thousands: Divide by 1k, 0 Decimals (e.g. 150 k) - Matches your request "$#,##0,"k""
       formatted = (num / 1000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
       suffix = ' k';
     } else {
+      // Standard: 0 Decimals for normal numbers (or 2 for small currency if you prefer)
+      // Matching your pattern "#,##0" -> 0 decimals
       formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
 
-    return isCurrency ? '$' + formatted + suffix : formatted + suffix;
+    if (isCurrency) {
+      return '$' + formatted + suffix;
+    }
+    return formatted + suffix;
   },
 
   applyCustomFormat: function (value, formatString) {
+    // This is used ONLY when you type a custom format string in the config box
     if (!formatString || value === null || value === undefined) return String(value);
     const num = parseFloat(value);
     if (isNaN(num)) return String(value);
+
+    // Simple parser for standard formats like "$0.00" or "0%"
     const decimalMatch = formatString.match(/\.([0#]+)/);
     const decimals = decimalMatch ? decimalMatch[1].length : 0;
-    let formatted = num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-    if (formatString.includes('$') || formatString.startsWith('$')) formatted = '$' + formatted;
-    if (formatString.includes('%')) formatted = formatted + '%';
+
+    let formatted = num.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
+
+    if (formatString.includes('$') || formatString.startsWith('$')) {
+      formatted = '$' + formatted;
+    }
+    if (formatString.includes('%')) {
+      formatted = formatted + '%';
+    }
+
     return formatted;
   },
 
@@ -450,7 +487,11 @@ const visObject = {
     }
 
     if (matches) {
-      if (rulePrefix.startsWith('row_rule')) return config[`${rulePrefix}_bg`];
+      // For row rules, only return bg color
+      if (rulePrefix.startsWith('row_rule')) {
+        return config[`${rulePrefix}_bg`];
+      }
+      // For cell rules, return the requested color type
       return config[`${rulePrefix}_${colorType}`];
     }
 
@@ -485,144 +526,179 @@ const visObject = {
     const hDims = config.enable_bo_hierarchy ? (config.hierarchy_dimensions || "").split(',').map(f => f.trim()) : [];
     const mainTreeCol = hDims[0] || config.subtotal_dimension;
 
+    // ✅ FIX: Define CSS variables based on the 'Freeze Header Row' toggle
     const headerPosition = config.freeze_header_row ? 'sticky' : 'relative';
     const headerZIndex = config.freeze_header_row ? '100' : 'auto';
 
-    // ✅ Fix: Removed !important from striped CSS
+    // ✅ FIX: Injected ${headerPosition} and ${headerZIndex} into the CSS below
     let html = `<style>
-        table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
-        table.advanced-table thead th { font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; }
-        .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
-        .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
-        table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color}; }
-        table.advanced-table thead { position: ${headerPosition}; top: 0; z-index: ${headerZIndex}; }
-        .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
-        .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid ${config.border_color}; }
-        .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; text-align: center; min-width: 60px; }
-        .chip-green { background-color: ${config.chip_bg_green}; color: ${config.chip_text_green}; }
-        .chip-red { background-color: ${config.chip_bg_red}; color: ${config.chip_text_red}; }
-        .chip-yellow { background-color: ${config.chip_bg_yellow}; color: ${config.chip_text_yellow}; }
-        .cell-bar-container { display: flex; align-items: center; gap: 8px; width: 100%; }
-        .cell-bar-bg { flex: 1; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
+    table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
+    table.advanced-table thead th { font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; }
+    .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
+    .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
+    table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color}; }
+
+      /* DYNAMIC HEADER POSITIONING */
+      table.advanced-table thead { position: ${headerPosition}; top: 0; z-index: ${headerZIndex}; }
+
+    .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
+      .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid ${config.border_color}; }
+      .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; text-align: center; }
+      .chip-green { background-color: ${config.chip_bg_green}; color: ${config.chip_text_green}; }
+      .chip-red { background-color: ${config.chip_bg_red}; color: ${config.chip_text_red}; }
+      .chip-yellow { background-color: ${config.chip_bg_yellow}; color: ${config.chip_text_yellow}; }
+      .cell-bar-container { display: flex; align-items: center; gap: 8px; width: 100%; }
+      .cell-bar-bg { flex: 1; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
         .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
         .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; user-select: none; display: inline-block; width: 14px; text-align: center; }
+
+        /* Removed !important from stripe to allow overwrites */
         table.advanced-table.striped tbody tr:nth-child(odd):not(.subtotal-row):not(.grand-total-row) { background-color: ${config.stripe_color}; }
+
         .table-filter-container { margin-bottom: 12px; padding: 8px; background: #f9fafb; border-radius: 4px; }
-        .table-filter-input { width: 300px; padding: 8px 12px; border: 1px solid ${config.border_color}; border-radius: 4px; font-size: 13px; }
-        .column-filter { width: 100%; padding: 4px 6px; margin-top: 4px; border: 1px solid ${config.border_color}; border-radius: 3px; font-size: 11px; box-sizing: border-box; }
-        .column-filter:focus { outline: none; border-color: #3b82f6; }
-    </style>`;
+          .table-filter-input { width: 300px; padding: 8px 12px; border: 1px solid ${config.border_color}; border-radius: 4px; font-size: 13px; }
+          .column-filter { width: 100%; padding: 4px 6px; margin-top: 4px; border: 1px solid ${config.border_color}; border-radius: 3px; font-size: 11px; box-sizing: border-box; }
+          .column-filter:focus { outline: none; border-color: #3b82f6; }
+            </style>`;
 
-    if (config.enable_table_filter) {
-      html += `<div class="table-filter-container"><input type="text" class="table-filter-input" placeholder="Filter table (press Enter)..." /></div>`;
-    }
+            // Table-level filter
+            if (config.enable_table_filter) {
+              html += `<div class="table-filter-container">
+              <input type="text" class="table-filter-input" placeholder="Filter table (press Enter)..." />
+              </div>`;
+            }
 
-    html += `<table class="advanced-table ${config.table_theme}">`;
-    if (config.enable_column_groups) html += this.renderColumnGroups(config, fields);
+            html += `<table class="advanced-table ${config.table_theme}">`;
+            if (config.enable_column_groups) html += this.renderColumnGroups(config, fields);
 
-    html += '<thead><tr>';
-    if (config.show_row_numbers) html += `<th ${config.enable_column_groups ? 'rowspan="2"' : ''}>#</th>`;
-    fields.forEach((f, idx) => {
-      if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
-      const sticky = (idx < config.freeze_columns && config.freeze_header_row) ? 'position:sticky; left:0; z-index:101;' : '';
-      const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
-      const label = config[`field_label_${f.name}`] || f.label_short || f.label;
-      const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
-      const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
-      html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${label}${sortIcon}${columnFilter}</th>`;
-    });
-    html += '</tr></thead><tbody>';
+            html += '<thead><tr>';
+            if (config.show_row_numbers) html += `<th ${config.enable_column_groups ? 'rowspan="2"' : ''}>#</th>`;
+            fields.forEach((f, idx) => {
+              if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
+              const sticky = (idx < config.freeze_columns && config.freeze_header_row) ? 'position:sticky; left:0; z-index:101;' : '';
+              const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+              const label = config[`field_label_${f.name}`] || f.label_short || f.label;
+              const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
+              const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
+              html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${label}${sortIcon}${columnFilter}</th>`;
+            });
+            html += '</tr></thead><tbody>';
 
-    processedData.forEach((row, i) => {
-      const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
-      const level = row.__level || 0;
-      let bg = '';
-      const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
+            processedData.forEach((row, i) => {
+              const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
+              const level = row.__level || 0;
+              let bg = '';
+              const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
-      // Row-level conditional formatting
-      if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
-        const rowFields = config.row_conditional_field.split(',').map(s => s.trim());
-        for (const fieldName of rowFields) {
-          const rowFieldValue = row[fieldName]?.value || row[fieldName];
-          const rowBg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1', 'bg') ||
-                        this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_2', 'bg');
-          if (rowBg) {
-            bg = `background:${rowBg};`;
-            break;
-          }
-        }
-      }
+              // Row-level conditional formatting (Multi-field support)
+              // Rule 1 has priority over Rule 2 via short-circuit evaluation
+              if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
+                const rowFields = config.row_conditional_field.split(',').map(s => s.trim());
 
-      if (isSub && !bg) bg = `background:${config.subtotal_background_color};`;
+                // Check if ANY field in the comma-separated list matches the rule
+                for (const fieldName of rowFields) {
+                  const rowFieldValue = row[fieldName]?.value || row[fieldName];
+                  const rowBg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1') ||
+                  this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_2');
 
-      html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
-      if (config.show_row_numbers) html += `<td>${(isSub || isGT) ? '' : i + 1}</td>`;
+                  if (rowBg) {
+                    bg = `background:${rowBg};`;
+                    break; // Stop at first match
+                  }
+                }
+              }
 
-      fields.forEach((f, idx) => {
-        if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
-        let style = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
-        if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
+              // Apply subtotal background ONLY if no row-level conditional formatting was applied
+              if (isSub && !bg) {
+                bg = `background:${config.subtotal_background_color};`;
+              }
 
-        // Column-level conditional formatting
-        if (config.enable_conditional_formatting && config.conditional_field) {
-          const targetFields = config.conditional_field.split(',').map(s => s.trim());
-          if (targetFields.includes(f.name)) {
-            const cellData = row[f.name];
-            const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
+              html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
+              if (config.show_row_numbers) html += `<td>${(isSub || isGT) ? '' : i + 1}</td>`;
 
-            // Debugging Log
-            if (i === 0) console.log(`[COL-FORMAT] Checking field '${f.name}' value '${cellValue}' against rules.`);
+              fields.forEach((f, idx) => {
+                if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
+                let style = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
+                if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
-            const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
-                            this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
-            const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') ||
-                              this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'text');
+                // Column-level conditional formatting (Cell Highlights)
+                // Rule 1 has priority over Rule 2 via short-circuit evaluation
+                if (config.enable_conditional_formatting && config.conditional_field) {
+                  const targetFields = config.conditional_field.split(',').map(s => s.trim());
 
-            if (bgColor) style += `background:${bgColor} !important;`;
-            if (textColor) style += `color:${textColor} !important;`;
-          }
-        }
+                  if (targetFields.includes(f.name)) {
+                    const cellData = row[f.name];
+                    const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
 
-        let content = this.renderCellContent(row[f.name], f, config, row, i, processedData);
-        if (isSub && f.name === mainTreeCol) content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
+                    // Log matching for debugging
+                    if (i === 0) console.log(`[COL-FORMAT] Checking field '${f.name}' value '${cellValue}' against rules.`);
 
-        const cellData = row[f.name];
-        const hasLinks = cellData && cellData.links && cellData.links.length > 0;
-        if (hasLinks) {
-          style += 'cursor:pointer;';
-          html += `<td style="${style}" class="has-drill-links" data-links='${JSON.stringify(cellData.links)}'>${content}</td>`;
-        } else {
-          html += `<td style="${style}">${content}</td>`;
-        }
-      });
-      html += "</tr>";
-    });
+                    const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
+                    this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
+                    const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') ||
+                    this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'text');
 
-    html += "</tbody></table>";
+                    // Apply Override Priority: Cell formatting overrides Row formatting AND Stripe Mode via !important
+                    if (bgColor) style += `background:${bgColor} !important;`;
+                    if (textColor) style += `color:${textColor} !important;`;
+                  }
+                }
 
-    if (config.enable_pagination && this.state.totalPages > 1) {
-      const currentPage = this.state.currentPage || 1;
-      const totalPages = this.state.totalPages;
-      const totalRows = this.state.totalRowCount || processedData.length;
-      const paginationHTML = `
-        <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9fafb; border-radius: 4px;">
-          <span style="font-size: 13px; color: ${config.cell_text_color}; font-weight: 600;">Total: ${totalRows} rows</span>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <button class="pagination-btn" data-page="first" ${currentPage === 1 ? 'disabled' : ''}>|◄</button>
-            <button class="pagination-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''}>◄ Prev</button>
-            <span style="font-size: 13px; color: ${config.cell_text_color}; padding: 0 8px;">Page ${currentPage} of ${totalPages}</span>
-            <button class="pagination-btn" data-page="next" ${currentPage === totalPages ? 'disabled' : ''}>Next ►</button>
-            <button class="pagination-btn" data-page="last" ${currentPage === totalPages ? 'disabled' : ''}>►|</button>
-          </div>
-        </div>
-      `;
-      if (config.pagination_position === 'top' || config.pagination_position === 'both') html = paginationHTML + html;
-      if (config.pagination_position === 'bottom' || config.pagination_position === 'both') html += paginationHTML;
-    }
+                let content = this.renderCellContent(row[f.name], f, config, row, i, processedData);
+                if (isSub && f.name === mainTreeCol) content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
 
-    this.container.innerHTML = html;
-    this.attachEventListeners(config);
-  },
+                // Add drill link support
+                const cellData = row[f.name];
+                const hasLinks = cellData && cellData.links && cellData.links.length > 0;
+                if (hasLinks) {
+                  style += 'cursor:pointer;';
+                  html += `<td style="${style}" class="has-drill-links" data-links='${JSON.stringify(cellData.links)}'>${content}</td>`;
+                } else {
+                  html += `<td style="${style}">${content}</td>`;
+                }
+              });
+              html += "</tr>";
+            });
+
+            html += "</tbody></table>";
+
+            // Pagination controls - Better format
+            if (config.enable_pagination && this.state.totalPages > 1) {
+              const currentPage = this.state.currentPage || 1;
+              const totalPages = this.state.totalPages;
+              const pageSize = config.page_size || 25;
+              const startRow = ((currentPage - 1) * pageSize) + 1;
+              const endRow = Math.min(currentPage * pageSize, processedData.length);
+              const totalRows = this.state.totalRowCount || processedData.length; // Use GRAND total
+
+              const paginationHTML = `
+              <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9fafb; border-radius: 4px;">
+              <span style="font-size: 13px; color: ${config.cell_text_color}; font-weight: 600;">Total: ${totalRows} rows</span>
+              <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="pagination-btn" data-page="first" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">|◄</button>
+              <button class="pagination-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">◄ Prev</button>
+              <span style="font-size: 13px; color: ${config.cell_text_color}; padding: 0 8px;">Page ${currentPage} of ${totalPages}</span>
+              <button class="pagination-btn" data-page="next" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''}">Next ►</button>
+              <button class="pagination-btn" data-page="last" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 6px 12px; cursor: pointer; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; ${currentPage === totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''}">►|</button>
+              </div>
+              </div>
+              `;
+
+              if (config.pagination_position === 'top' || config.pagination_position === 'both') {
+                html = paginationHTML + html;
+              }
+              if (config.pagination_position === 'bottom' || config.pagination_position === 'both') {
+                html += paginationHTML;
+              }
+            }
+
+            this.container.innerHTML = html;
+            this.attachEventListeners(config);
+          },
+
+
+
+
 
   renderColumnGroups: function (config, fields) {
     let html = '<thead><tr>';
@@ -642,32 +718,49 @@ const visObject = {
 
   renderCellContent: function (cell, field, config, row, rowIdx, data) {
     let val = cell, rendered = cell;
-    if (cell && typeof cell === 'object') { val = cell.value; rendered = cell.rendered || cell.value; }
+    if (cell && typeof cell === 'object') {
+      val = cell.value;
+      rendered = cell.rendered || cell.value;
+    }
     if (val === null || val === undefined) return '∅';
 
+    // FORCE APPLY CUSTOM FORMATTING: If custom field formatting is enabled and format exists,
+    // apply to ALL rows (Detail, Subtotal, Grand Total) regardless of field type classification
     const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
     const customFormat = config[`field_format_${field.name}`];
     const hasCustomFormat = !!(config.enable_custom_field_formatting && customFormat && customFormat.trim() !== '');
 
+    // FORCE APPLY: If custom formatting is enabled and exists for this field,
+    // apply it to ALL rows regardless of field type (measure, dimension, sum, average, etc.)
     if (hasCustomFormat) {
       rendered = this.formatMeasure(val, field, config);
-    } else if (isSubtotalOrGrandTotal && (field.is_measure || field.type === 'number' || field.type === 'count')) {
+    }
+    // Otherwise, only re-format subtotals/grand totals using LookML format
+    else if (isSubtotalOrGrandTotal && (field.is_measure || field.type === 'number' || field.type === 'count')) {
       rendered = this.formatMeasure(val, field, config);
     }
 
-    // Data Chip Logic
+    // Data Chip logic (Expanded with Yellow, Custom Colors, and Default fallback)
     if (config.enable_data_chips && (config.data_chip_fields || "").split(',').includes(field.name)) {
       const s = String(val).toLowerCase();
+
       const greenMatches = (config.chip_match_green || "").toLowerCase().split(',').map(m => m.trim());
       const yellowMatches = (config.chip_match_yellow || "").toLowerCase().split(',').map(m => m.trim());
       const redMatches = (config.chip_match_red || "").toLowerCase().split(',').map(m => m.trim());
 
-      if (greenMatches.includes(s)) rendered = `<span class="data-chip chip-green">${rendered}</span>`;
-      else if (yellowMatches.includes(s)) rendered = `<span class="data-chip chip-yellow">${rendered}</span>`;
-      else if (redMatches.includes(s)) rendered = `<span class="data-chip chip-red">${rendered}</span>`;
-      else rendered = `<span class="data-chip" style="background-color: ${config.chip_default_bg}; color: ${config.chip_default_text};">${rendered}</span>`;
+      if (greenMatches.includes(s)) {
+        rendered = `<span class="data-chip chip-green">${rendered}</span>`;
+      } else if (yellowMatches.includes(s)) {
+        rendered = `<span class="data-chip chip-yellow">${rendered}</span>`;
+      } else if (redMatches.includes(s)) {
+        rendered = `<span class="data-chip chip-red">${rendered}</span>`;
+      } else {
+        // DEFAULT CHIP (No match found)
+        rendered = `<span class="data-chip" style="background-color: ${config.chip_default_bg}; color: ${config.chip_default_text};">${rendered}</span>`;
+      }
     }
 
+    // Smart Peer-Based Comparison Logic
     if (config.enable_comparison && config.comparison_primary_field === field.name) {
       const isLastOfSubgroup = this.isLastElementOfGroup(rowIdx, data, config);
       if (!row.__isGrandTotal && !isLastOfSubgroup) {
@@ -675,10 +768,12 @@ const visObject = {
       }
     }
 
+    // Level-Aware Cell Bar Logic
     if (!row.__isGrandTotal) {
       if (config.enable_cell_bars_1 && (config.cell_bar_fields_1 || "").split(',').map(x => x.trim()).includes(field.name)) {
         rendered = this.generateCellBar(val, rendered, config.cell_bar_color_1, config.use_gradient_1, config.gradient_end_1, data, field.name, row.__level);
       } else if (config.enable_cell_bars_2 && (config.cell_bar_fields_2 || "").split(',').map(x => x.trim()).includes(field.name)) {
+        // Set 2 now uses Gradient options
         rendered = this.generateCellBar(val, rendered, config.cell_bar_color_2, config.use_gradient_2, config.gradient_end_2, data, field.name, row.__level);
       }
     }
@@ -692,34 +787,61 @@ const visObject = {
     const next = data[idx + 1];
     if (next.__isGrandTotal) return true;
 
-    if (config.enable_bo_hierarchy && curr.__isSubtotal) {
+    // For REGULAR subtotals (non-BO mode)
+    if (!config.enable_bo_hierarchy && curr.__isSubtotal) {
+      // Check if there's another subtotal at the same level
+      // with the same group dimension value
       for (let i = idx + 1; i < data.length; i++) {
         const futureRow = data[i];
         if (futureRow.__isGrandTotal) return true;
-        if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
-          if (futureRow.__parentPath === curr.__parentPath) return false;
-          else return true;
+        if (futureRow.__isSubtotal) {
+          // Found another subtotal - they can be compared
+          return false;
         }
       }
-      return true;
+      return true; // No more subtotals found
     }
 
+    // For hierarchy mode with subtotals
     if (config.enable_bo_hierarchy) {
+      // If current is a subtotal, look ahead to find next subtotal at same level
+      if (curr.__isSubtotal) {
+        // Find next subtotal at same level with same parent
+        for (let i = idx + 1; i < data.length; i++) {
+          const futureRow = data[i];
+          if (futureRow.__isGrandTotal) return true;
+          if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
+            // Found next subtotal at same level - check if same parent
+            if (futureRow.__parentPath === curr.__parentPath) {
+              return false; // There's another subtotal to compare with
+            } else {
+              return true; // Different parent, can't compare
+            }
+          }
+        }
+        return true; // No more subtotals at this level
+      }
+      // For detail rows, check immediate next row
       if (next.__level !== curr.__level) return true;
       if (next.__parentPath !== curr.__parentPath) return true;
       return false;
     }
 
+    // For standard subtotals: Only hide if this is last detail row before subtotal
     if (config.enable_subtotals) {
+      // If current is detail and next is subtotal, this is last of group
       if (!curr.__isSubtotal && next.__isSubtotal) return true;
+      // If current is subtotal and next is different subtotal, this is last
       if (curr.__isSubtotal && next.__isSubtotal && curr.__groupValue !== next.__groupValue) return true;
       return false;
     }
+
     return false;
   },
 
   generateCellBar: function (val, rendered, color, useGrad, endColor, data, fieldName, level) {
     const num = parseFloat(val);
+    // Scale only against peer rows (same level)
     const peers = data.filter(r => !r.__isGrandTotal && r.__level === level);
     const maxVal = Math.max(...peers.map(r => parseFloat(r[fieldName]?.value || 0)), 1);
     const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
@@ -732,13 +854,17 @@ const visObject = {
     const isSub = !!row.__isSubtotal;
     const level = row.__level;
     const parentPath = row.__parentPath;
+
+    // Peer subset: same type, same level, same parent branch
     const peers = data.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
     const currPeerIdx = peers.indexOf(row);
     const offset = config.comparison_period_offset || -1;
     const compRow = peers[currPeerIdx - offset];
+
     if (!compRow) return primaryRendered;
     const secondary = parseFloat(compRow[config.comparison_primary_field]?.value || 0);
     if (isNaN(secondary) || secondary === 0) return primaryRendered;
+
     const diff = primary - secondary;
     const pct = ((diff / Math.abs(secondary)) * 100).toFixed(1);
     const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
@@ -746,20 +872,32 @@ const visObject = {
     return `<span>${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
   },
 
-  // ✅ Fixed Column Sorting (Text vs Number)
   sortData: function (data, field, direction) {
     const isAsc = direction === 'asc';
     return [...data].sort((a, b) => {
+      // 1. Extract raw values safely
       const cellA = a[field];
       const cellB = b[field];
       let valA = (cellA && typeof cellA === 'object' && cellA.value !== undefined) ? cellA.value : cellA;
       let valB = (cellB && typeof cellB === 'object' && cellB.value !== undefined) ? cellB.value : cellB;
+
+      // 2. Handle Nulls (Always push to bottom regardless of sort dir)
       if (valA === null || valA === undefined) return 1;
       if (valB === null || valB === undefined) return -1;
-      if (typeof valA === 'number' && typeof valB === 'number') return isAsc ? valA - valB : valB - valA;
+
+      // 3. Numeric Sort: Use strictly if BOTH are valid numbers (e.g. Measures)
+      // This prevents "10" < "2" in strictly numeric columns
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return isAsc ? valA - valB : valB - valA;
+      }
+
+      // 4. String/Mixed Sort: Use localeCompare for Dimensions/Mixed types
+      // {numeric: true} handles "Group 2" before "Group 10" naturally
+      // sensitivity: 'base' ignores case differences
       const strA = String(valA);
       const strB = String(valB);
       const comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+
       return isAsc ? comparison : -comparison;
     });
   },
@@ -777,7 +915,10 @@ const visObject = {
       }
       const th = e.target.closest('th.sortable');
       if (th) {
-        if (e.target.classList.contains('column-filter')) return;
+        // Don't sort if clicking on column filter input
+        if (e.target.classList.contains('column-filter')) {
+          return;
+        }
         const f = th.dataset.field;
         self.state.sortDirection = (self.state.sortField === f && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
         self.state.sortField = f;
@@ -786,12 +927,22 @@ const visObject = {
     };
     if (config.enable_hover) {
       this.container.querySelectorAll('tbody tr:not(.subtotal-row):not(.grand-total-row)').forEach(tr => {
+        // Fix: Save the EXACT full CSS string to restore properly (including gradients, multiple backgrounds, etc.)
         const originalCssText = tr.style.cssText;
-        tr.onmouseenter = () => { tr.style.backgroundColor = config.hover_bg_color; };
-        tr.onmouseleave = () => { tr.style.cssText = originalCssText; };
+
+        tr.onmouseenter = () => {
+          // Temporarily set background color, respecting !important if needed
+          tr.style.backgroundColor = config.hover_bg_color;
+        };
+
+        tr.onmouseleave = () => {
+          // Restore the exact previous state
+          tr.style.cssText = originalCssText;
+        };
       });
     }
 
+    // Table filter
     if (config.enable_table_filter) {
       const tableFilterInput = this.container.querySelector('.table-filter-input');
       if (tableFilterInput) {
@@ -804,47 +955,70 @@ const visObject = {
       }
     }
 
+    // Column filters
     if (config.enable_column_filters) {
       this.container.querySelectorAll('.column-filter').forEach(input => {
+        // Prevent click/mousedown from triggering sort
         input.addEventListener('click', (e) => e.stopPropagation());
         input.addEventListener('mousedown', (e) => e.stopPropagation());
         input.addEventListener('focus', (e) => e.stopPropagation());
+
+        // Handle Enter key to apply filter
         input.addEventListener('keypress', (e) => {
           if (e.key === 'Enter') {
             e.stopPropagation();
             const field = e.target.dataset.field;
             if (!self.state.columnFilters) self.state.columnFilters = {};
             const filterValue = e.target.value.toLowerCase().trim();
-            if (filterValue) self.state.columnFilters[field] = filterValue;
-            else delete self.state.columnFilters[field];
+
+            console.log('[FILTER] Column filter applied:', field, '=', filterValue);
+
+            if (filterValue) {
+              self.state.columnFilters[field] = filterValue;
+            } else {
+              // Remove filter if empty
+              delete self.state.columnFilters[field];
+            }
+
             self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
           }
         });
       });
     }
 
+    // Pagination buttons
     if (config.enable_pagination) {
       this.container.querySelectorAll('.pagination-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           const action = e.target.dataset.page;
-          if (action === 'first') self.state.currentPage = 1;
-          else if (action === 'prev' && self.state.currentPage > 1) self.state.currentPage--;
-          else if (action === 'next' && self.state.currentPage < self.state.totalPages) self.state.currentPage++;
-          else if (action === 'last') self.state.currentPage = self.state.totalPages;
+          if (action === 'first') {
+            self.state.currentPage = 1;
+          } else if (action === 'prev' && self.state.currentPage > 1) {
+            self.state.currentPage--;
+          } else if (action === 'next' && self.state.currentPage < self.state.totalPages) {
+            self.state.currentPage++;
+          } else if (action === 'last') {
+            self.state.currentPage = self.state.totalPages;
+          }
           self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
         });
       });
     }
 
+    // Drill links - Add click handler for cells with drill links
     this.container.querySelectorAll('td.has-drill-links').forEach(td => {
       td.addEventListener('click', (e) => {
         try {
           const linksJson = td.dataset.links;
           if (linksJson) {
             const links = JSON.parse(linksJson);
-            if (links && links.length > 0) LookerCharts.Utils.openDrillMenu({ links: links, event: e });
+            if (links && links.length > 0) {
+              LookerCharts.Utils.openDrillMenu({ links: links, event: e });
+            }
           }
-        } catch (err) { console.error('[DRILL] Error opening drill menu:', err); }
+        } catch (err) {
+          console.error('[DRILL] Error opening drill menu:', err);
+        }
       });
     });
   },
