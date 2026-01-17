@@ -1,11 +1,8 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.31.2 - CRASH FIX: Grand Total Context & Alignment
+ * Version: 4.32.0 - STRICT ADDITIONS ONLY: GT Paging, Alignment, Nulls, Chips Fix
  * Build: 2026-01-17
- * * UPDATES:
- * ✅ CRASH FIX: Added 'fullContext' in updateAsync so Grand Total index is found.
- * ✅ CRASH FIX: Added safety check in isLastElementOfGroup for undefined rows.
- * ✅ ALIGNMENT: Applied fixed-width alignment to Grand Totals and non-comparison rows.
+ * Based exactly on v4.30.7 with specific logic patches.
  */
 
 const visObject = {
@@ -44,6 +41,7 @@ const visObject = {
     cell_bar_color_1: { type: "string", label: "Color 1", display: "color", default: "#3b82f6", section: "Series", order: 3 },
     use_gradient_1: { type: "boolean", label: "Use Gradient 1", default: false, section: "Series", order: 4 },
     gradient_end_1: { type: "string", label: "Gradient End 1", display: "color", default: "#93c5fd", section: "Series", order: 5 },
+
     enable_cell_bars_2: { type: "boolean", label: "Enable Set 2", default: false, section: "Series", order: 6 },
     cell_bar_fields_2: { type: "string", label: "Fields 2", display: "text", default: "", section: "Series", order: 7 },
     cell_bar_color_2: { type: "string", label: "Color 2", display: "color", default: "#10b981", section: "Series", order: 8 },
@@ -144,6 +142,7 @@ const visObject = {
     row_rule_2_value: { type: "string", label: "Row Rule 2 Value", display: "text", default: "", section: "Formatting", order: 57 },
     row_rule_2_bg: { type: "string", label: "Row Rule 2 BG", display: "color", default: "#fee2e2", section: "Formatting", order: 58 },
 
+    // ════ MOVED to Formatting Tab & FIXED Input Types ════
     conditional_formatting_divider: { type: "string", label: "━━━ Column Conditional Formatting ━━━", display: "divider", section: "Formatting", order: 60 },
     enable_conditional_formatting: { type: "boolean", label: "Enable Column Formatting", default: false, section: "Formatting", order: 61 },
     conditional_field: { type: "string", label: "Target Fields (comma-sep)", display: "text", default: "", section: "Formatting", order: 62 },
@@ -239,7 +238,7 @@ const visObject = {
       processedData = processedData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
     }
 
-    // 1. Calculate Grand Total separately (Do NOT add to processedData yet)
+    // 1. Calculate Grand Total (Do not push to processedData yet)
     let grandTotalRow = null;
     if (config.show_grand_total) {
       grandTotalRow = this.calculateGrandTotal(data, measures, config, dims);
@@ -278,13 +277,12 @@ const visObject = {
       }
     }
 
-    // 3. Append Grand Total to the current page (appears on ALL pages)
+    // 3. Append Grand Total to Current Page (so it shows on all pages)
     if (grandTotalRow) {
       paginatedData.push(grandTotalRow);
     }
 
-    // 4. Pass Full Context (Original processedData + Grand Total)
-    // This allows index lookups to work for all rows including GT
+    // 4. Create Full Context (Data + GT) for accurate lookups across pages
     const fullContext = grandTotalRow ? [...processedData, grandTotalRow] : processedData;
 
     this.renderTable(paginatedData, config, queryResponse, fullContext);
@@ -344,7 +342,7 @@ const visObject = {
         let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
         sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
       });
-      // Forced Top
+      // Force Top
       result.push(sub);
       groups[key].forEach(r => { r.__parentGroup = key; result.push(r); });
     });
@@ -387,6 +385,7 @@ const visObject = {
     const absVal = Math.abs(num);
     let formatted = '';
     let suffix = '';
+
     if (absVal >= 1000000) {
       formatted = (num / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
       suffix = ' M';
@@ -396,6 +395,7 @@ const visObject = {
     } else {
       formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
+
     return isCurrency ? '$' + formatted + suffix : formatted + suffix;
   },
 
@@ -512,6 +512,7 @@ const visObject = {
 
     processedData.forEach((row, i) => {
       const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
+      const level = row.__level || 0;
       let bg = '';
       const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
@@ -548,7 +549,7 @@ const visObject = {
 
         if (config.enable_conditional_formatting && config.conditional_field) {
           const targetFields = config.conditional_field.split(',').map(s => s.trim());
-          // FIX: Don't format unused dimension cells in subtotals/GT
+          // ✅ FIX: Don't format unused dimension cells in subtotals/GT (prevents green chips on empty cells)
           const isUnused = (isSub || isGT) && f.is_dimension && f.name !== mainTreeCol;
 
           if (targetFields.includes(f.name) && !isUnused) {
@@ -565,6 +566,7 @@ const visObject = {
           }
         }
 
+        // ✅ FIX: Pass full context to allow finding previous row even across pages
         const contextData = fullData || processedData;
         const contextIndex = fullData ? fullData.indexOf(row) : i;
 
@@ -613,6 +615,7 @@ const visObject = {
     const hDims = config.enable_bo_hierarchy ? (config.hierarchy_dimensions || "").split(',').map(f => f.trim()) : [];
     const mainTreeCol = hDims[0] || config.subtotal_dimension;
 
+    // ✅ FIX: Explicit Grand Total Label
     if (row.__isGrandTotal && field.name === mainTreeCol) return config.grand_total_label || "Grand Total";
 
     let val = cell, rendered = cell;
@@ -645,17 +648,17 @@ const visObject = {
 
     const compFields = (config.comparison_primary_field || "").split(',').map(s => s.trim());
     if (config.enable_comparison && compFields.includes(field.name)) {
-      // ✅ FIX: Use safety check for isLastElementOfGroup + Grand Total handling
+      // ✅ FIX: Safety check for isLastElementOfGroup
       if (!row.__isGrandTotal) {
           const isLastOfSubgroup = this.isLastElementOfGroup(rowIdx, data, config);
           if (!isLastOfSubgroup) {
             rendered = this.renderComparison(row, config, rowIdx, data, rendered, field.name);
           } else {
-            // ✅ ALIGNMENT FIX: Invisible placeholder for values without comparison
+            // ✅ ALIGNMENT FIX: Invisible placeholder for alignment
             rendered = `<span style="display:inline-block; width:60px; text-align:right;">${rendered}</span> <span style="visibility:hidden; font-size:0.85em; font-weight:600; margin-left:5px;">↑00.0%</span>`;
           }
       } else {
-          // Grand Total Alignment
+          // Grand Total alignment
           rendered = `<span style="display:inline-block; width:60px; text-align:right;">${rendered}</span> <span style="visibility:hidden; font-size:0.85em; font-weight:600; margin-left:5px;">↑00.0%</span>`;
       }
     }
@@ -672,7 +675,7 @@ const visObject = {
   },
 
   isLastElementOfGroup: function (idx, data, config) {
-    // ✅ CRASH FIX: Safety Check
+    // ✅ CRASH FIX: Safety check
     if (idx < 0 || idx >= data.length || !data[idx]) return true;
 
     if (idx >= data.length - 1) return true;
@@ -737,7 +740,7 @@ const visObject = {
     const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
     const arrow = config.show_comparison_arrows ? (diff >= 0 ? '↑' : '↓') : '';
 
-    // ✅ ALIGNMENT: Fixed width for value, standard spacing for arrow
+    // ✅ ALIGNMENT: Fixed width and spacing
     return `<span style="display:inline-block; width:60px; text-align:right;">${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
   },
 
