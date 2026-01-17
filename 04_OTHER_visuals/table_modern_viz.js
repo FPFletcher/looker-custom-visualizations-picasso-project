@@ -1,6 +1,6 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.36.0 - FIX: Subtotal LookML Default Parity
+ * Version: 4.37.0 - FIX: Forced Scaling Alignment (Subtotal LookML Match)
  * Build: 2026-01-17
  */
 
@@ -149,8 +149,9 @@ const visObject = {
     if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
-      const hierarchyList = config.hierarchy_dimensions.split(',').map(f => f.trim());
-      processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
+      const hList = config.hierarchy_dimensions.split(',').map(f => f.trim());
+      processedData = this.calculateSubtotalsRecursive(processedData, hList, measures, config);
+      processedData = this.applyHierarchyFilter(processedData);
     } else if (config.enable_subtotals && config.subtotal_dimension) {
       processedData = this.calculateStandardSubtotals(processedData, config.subtotal_dimension, measures, config, dims);
     }
@@ -175,7 +176,6 @@ const visObject = {
       sub[field] = { value: key, rendered: key };
       measures.forEach(m => {
         let sum = groups[key].reduce((acc, r) => acc + Number(r[m.name]?.value || 0), 0);
-        // PARITY FIX: Use formatMeasure which now correctly respects LookML metadata
         sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
       });
       result.push(sub);
@@ -183,24 +183,47 @@ const visObject = {
     return result;
   },
 
+  calculateSubtotalsRecursive: function (data, fields, measures, config) {
+    const result = [];
+    const groupData = (rows, level, parentPath) => {
+      const field = fields[level];
+      const groups = {};
+      rows.forEach(row => {
+        let val = row[field];
+        let key = (val && typeof val === 'object') ? (val.value || val.rendered || 'null') : (val || 'null');
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(row);
+      });
+      Object.keys(groups).forEach(key => {
+        const currentPath = parentPath ? `${parentPath}|${key}` : key;
+        const sub = { __isSubtotal: true, __groupValue: currentPath, __level: level, __parentPath: parentPath };
+        sub[fields[0]] = { value: key, rendered: key };
+        fields.slice(1).forEach(f => sub[f] = { value: '', rendered: '' });
+        measures.forEach(m => {
+          let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
+          sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
+        });
+        result.push(sub);
+        if (level < fields.length - 1) { groupData(groups[key], level + 1, currentPath); }
+        else { groups[key].forEach(r => { r.__parentGroup = currentPath; r.__parentPath = currentPath; r.__level = level + 1; result.push(r); }); }
+      });
+    };
+    groupData(data, 0, "");
+    return result;
+  },
+
   formatMeasure: function (value, field, config) {
     const customFormat = config[`field_format_${field.name}`];
-
-    // PRIORITY 1: Custom Field Formatting box (Forced)
     if (customFormat && config.enable_custom_field_formatting) {
-      const formatted = this.applyCustomFormat(value, customFormat);
-      console.log(`[FORMAT-FORCE] ${field.name}: ${value} -> ${formatted} (Custom)`);
-      return formatted;
+      const res = this.applyCustomFormat(value, customFormat);
+      console.log(`[FORMAT-FORCE] ${field.name}: ${value} -> ${res} (Custom)`);
+      return res;
     }
-
-    // PRIORITY 2: LookML value_format (Matches Detail Rows)
     if (field.value_format) {
-      const formatted = this.applyCustomFormat(value, field.value_format);
-      console.log(`[FORMAT-LOOKML] ${field.name}: ${value} -> ${formatted} (LookML)`);
-      return formatted;
+      const res = this.applyCustomFormat(value, field.value_format);
+      console.log(`[FORMAT-LOOKML] ${field.name}: ${value} -> ${res} (LookML)`);
+      return res;
     }
-
-    // FALLBACK
     return (typeof value === 'number') ? value.toLocaleString('en-US') : String(value);
   },
 
@@ -209,15 +232,15 @@ const visObject = {
     const num = parseFloat(value);
     if (isNaN(num)) return String(value);
 
-    const isKMB = formatString.includes('k') || formatString.includes('m');
+    const isKMB = formatString.toLowerCase().includes('k') || formatString.toLowerCase().includes('m');
     const decimalMatch = formatString.match(/\.([0#]+)/);
     const decimals = decimalMatch ? decimalMatch[1].length : (isKMB ? 1 : 0);
 
     let formatted = num;
     let suffix = "";
 
-    // Simplified scaling to match Looker's "k" format seen in screenshots
-    if (formatString.includes('k') && Math.abs(num) >= 1000) {
+    // FORCE SCALING: If format has 'k', always scale by 1000 to match LookML behavior
+    if (formatString.toLowerCase().includes('k')) {
       formatted = num / 1000;
       suffix = " k";
     }
@@ -302,13 +325,16 @@ const visObject = {
     let rendered = (cell && typeof cell === 'object') ? (cell.rendered || cell.value) : cell;
     if (val === null || val === undefined) return '∅';
 
-    const isSubGT = row.__isSubtotal || row.__isGrandTotal;
+    const isSubGT = !!(row.__isSubtotal || row.__isGrandTotal);
     const customFmt = config[`field_format_${field.name}`];
     const hasCustomFmt = !!(config.enable_custom_field_formatting && customFmt && customFmt.trim() !== '');
 
-    // PARITY LOGIC: For measures, force a re-format to ensure subtotals match LookML detail rows
+    // PARITY FIX: Only re-format measures for Subtotals or when Custom Formatting is active.
+    // Expanded rows (Detail rows) keep Looker's original cell.rendered by default.
     if (field.is_measure || field.type === 'number' || field.type === 'count') {
-        rendered = this.formatMeasure(val, field, config);
+        if (hasCustomFmt || isSubGT) {
+            rendered = this.formatMeasure(val, field, config);
+        }
     }
 
     // Data Chips
@@ -330,7 +356,6 @@ const visObject = {
     return rendered;
   },
 
-  // Helper functions restored from previous stable versions
   evaluateConditionalRule: function (cellValue, config, rulePrefix, colorType = 'bg') {
     const operator = config[`${rulePrefix}_operator`];
     if (!operator) return null;
@@ -384,6 +409,19 @@ const visObject = {
     }
     this.container.querySelectorAll('.has-drill').forEach(td => td.onclick = (e) => {
       LookerCharts.Utils.openDrillMenu({ links: JSON.parse(td.dataset.links), event: e });
+    });
+  },
+
+  applyHierarchyFilter: function (data) {
+    return data.filter(row => {
+      const pathParts = String(row.__isSubtotal ? row.__groupValue : row.__parentGroup || "").split('|');
+      let currentPath = "";
+      const stopIdx = row.__isSubtotal ? pathParts.length - 1 : pathParts.length;
+      for (let i = 0; i < stopIdx; i++) {
+        currentPath = currentPath ? `${currentPath}|${pathParts[i]}` : pathParts[i];
+        if (this.state.collapsedGroups[currentPath]) return false;
+      }
+      return true;
     });
   },
 
