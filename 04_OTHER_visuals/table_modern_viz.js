@@ -1,12 +1,11 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.31.1 - FINAL: Fixed Truncation Error + Alignment + Grand Total
+ * Version: 4.31.2 - CRASH FIX: Grand Total Context & Alignment
  * Build: 2026-01-17
  * * UPDATES:
- * ✅ Fixed "calculateGrandTotal is not a function" (Code is now complete).
- * ✅ Alignment: Added invisible placeholder to non-comparison rows so values align perfectly.
- * ✅ Grand Total: Appears on every page.
- * ✅ Nulls: Displays empty string.
+ * ✅ CRASH FIX: Added 'fullContext' in updateAsync so Grand Total index is found.
+ * ✅ CRASH FIX: Added safety check in isLastElementOfGroup for undefined rows.
+ * ✅ ALIGNMENT: Applied fixed-width alignment to Grand Totals and non-comparison rows.
  */
 
 const visObject = {
@@ -89,14 +88,18 @@ const visObject = {
     chips_divider: { type: "string", label: "━━━ Data Chips ━━━", display: "divider", section: "Series", order: 150 },
     enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: false, section: "Series", order: 151 },
     data_chip_fields: { type: "string", label: "Apply to Fields (comma-sep)", default: "", section: "Series", order: 152 },
+
     chip_default_bg: { type: "string", label: "Default Chip BG", display: "color", default: "#e5e7eb", section: "Series", order: 152.1 },
     chip_default_text: { type: "string", label: "Default Chip Text", display: "color", default: "#1f2937", section: "Series", order: 152.2 },
+
     chip_match_green: { type: "string", label: "Chip 01 Match Values", default: "Complete,Success,Yes", section: "Series", order: 153 },
     chip_bg_green: { type: "string", label: "Chip 01 BG", display: "color", default: "#dcfce7", section: "Series", order: 154 },
     chip_text_green: { type: "string", label: "Chip 01 Text", display: "color", default: "#166534", section: "Series", order: 155 },
+
     chip_match_yellow: { type: "string", label: "Chip 02 Match Values", default: "Pending,Warning,Maybe", section: "Series", order: 156 },
     chip_bg_yellow: { type: "string", label: "Chip 02 BG", display: "color", default: "#fef9c3", section: "Series", order: 157 },
     chip_text_yellow: { type: "string", label: "Chip 02 Text", display: "color", default: "#854d0e", section: "Series", order: 158 },
+
     chip_match_red: { type: "string", label: "Chip 03 Match Values", default: "Failed,Error,No", section: "Series", order: 159 },
     chip_bg_red: { type: "string", label: "Chip 03 BG", display: "color", default: "#fee2e2", section: "Series", order: 160 },
     chip_text_red: { type: "string", label: "Chip 03 Text", display: "color", default: "#991b1b", section: "Series", order: 161 },
@@ -107,12 +110,14 @@ const visObject = {
     formatting_divider_theme: { type: "string", label: "━━━ Theme ━━━", display: "divider", section: "Formatting", order: 0 },
     table_theme: { type: "string", label: "Table Theme", display: "select", values: [{ "Modern": "modern" }, { "Compact": "compact" }, { "Striped": "striped" }], default: "modern", section: "Formatting", order: 1 },
     stripe_color: { type: "string", label: "Stripe color", display: "color", default: "#f9fafb", section: "Formatting", order: 2 },
+
     formatting_divider_headers: { type: "string", label: "━━━ Headers ━━━", display: "divider", section: "Formatting", order: 10 },
     header_font_family: { type: "string", label: "Header Font Family", display: "text", default: "inherit", section: "Formatting", order: 10.5 },
     header_font_weight: { type: "string", label: "Header Font Weight", display: "select", values: [{ "Normal": "normal" }, { "Bold": "bold" }, { "600": "600" }, { "700": "700" }], default: "bold", section: "Formatting", order: 10.6 },
     header_font_size: { type: "number", label: "Header Font Size (px)", default: 12, section: "Formatting", order: 11 },
     header_text_color: { type: "string", label: "Header Text Color", display: "color", default: "#1f2937", section: "Formatting", order: 12 },
     header_bg_color: { type: "string", label: "Header Background Color", display: "color", default: "#f9fafb", section: "Formatting", order: 13 },
+
     formatting_divider_cells: { type: "string", label: "━━━ Cells ━━━", display: "divider", section: "Formatting", order: 20 },
     cell_font_family: { type: "string", label: "Cell Font Family", display: "text", default: "inherit", section: "Formatting", order: 20.5 },
     cell_font_size: { type: "number", label: "Cell Size (px)", default: 11, section: "Formatting", order: 21 },
@@ -120,12 +125,15 @@ const visObject = {
     row_height: { type: "number", label: "Row Height (px)", default: 36, section: "Formatting", order: 23 },
     column_spacing: { type: "number", label: "Col Spacing (px)", default: 12, section: "Formatting", order: 24 },
     wrap_text: { type: "boolean", label: "Wrap Text", default: false, section: "Formatting", order: 25 },
+
     formatting_divider_borders: { type: "string", label: "━━━ Borders ━━━", display: "divider", section: "Formatting", order: 30 },
     show_borders: { type: "boolean", label: "Show Borders", default: true, section: "Formatting", order: 31 },
     border_color: { type: "string", label: "Border Color", display: "color", default: "#e5e7eb", section: "Formatting", order: 32 },
+
     formatting_divider_hover: { type: "string", label: "━━━ Hover ━━━", display: "divider", section: "Formatting", order: 40 },
     enable_hover: { type: "boolean", label: "Enable Hover", default: true, section: "Formatting", order: 41 },
     hover_bg_color: { type: "string", label: "Hover Color", display: "color", default: "#f3f4f6", section: "Formatting", order: 42 },
+
     formatting_divider_row_formatting: { type: "string", label: "━━━ Row Conditional Formatting ━━━", display: "divider", section: "Formatting", order: 50 },
     enable_row_conditional_formatting: { type: "boolean", label: "Enable Row Formatting", default: false, section: "Formatting", order: 51 },
     row_conditional_field: { type: "string", label: "Row Condition Fields (comma-sep)", display: "text", default: "", section: "Formatting", order: 52 },
@@ -136,7 +144,6 @@ const visObject = {
     row_rule_2_value: { type: "string", label: "Row Rule 2 Value", display: "text", default: "", section: "Formatting", order: 57 },
     row_rule_2_bg: { type: "string", label: "Row Rule 2 BG", display: "color", default: "#fee2e2", section: "Formatting", order: 58 },
 
-    // ════ MOVED to Formatting Tab ════
     conditional_formatting_divider: { type: "string", label: "━━━ Column Conditional Formatting ━━━", display: "divider", section: "Formatting", order: 60 },
     enable_conditional_formatting: { type: "boolean", label: "Enable Column Formatting", default: false, section: "Formatting", order: 61 },
     conditional_field: { type: "string", label: "Target Fields (comma-sep)", display: "text", default: "", section: "Formatting", order: 62 },
@@ -232,7 +239,7 @@ const visObject = {
       processedData = processedData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
     }
 
-    // 1. Calculate Grand Total separately
+    // 1. Calculate Grand Total separately (Do NOT add to processedData yet)
     let grandTotalRow = null;
     if (config.show_grand_total) {
       grandTotalRow = this.calculateGrandTotal(data, measures, config, dims);
@@ -271,13 +278,16 @@ const visObject = {
       }
     }
 
-    // 3. Append Grand Total to the current page
+    // 3. Append Grand Total to the current page (appears on ALL pages)
     if (grandTotalRow) {
       paginatedData.push(grandTotalRow);
     }
 
-    // 4. Pass 'processedData' as context for comparison logic
-    this.renderTable(paginatedData, config, queryResponse, processedData);
+    // 4. Pass Full Context (Original processedData + Grand Total)
+    // This allows index lookups to work for all rows including GT
+    const fullContext = grandTotalRow ? [...processedData, grandTotalRow] : processedData;
+
+    this.renderTable(paginatedData, config, queryResponse, fullContext);
     done();
   },
 
@@ -377,7 +387,6 @@ const visObject = {
     const absVal = Math.abs(num);
     let formatted = '';
     let suffix = '';
-
     if (absVal >= 1000000) {
       formatted = (num / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
       suffix = ' M';
@@ -387,7 +396,6 @@ const visObject = {
     } else {
       formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
-
     return isCurrency ? '$' + formatted + suffix : formatted + suffix;
   },
 
@@ -504,7 +512,6 @@ const visObject = {
 
     processedData.forEach((row, i) => {
       const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
-      const level = row.__level || 0;
       let bg = '';
       const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
@@ -515,11 +522,7 @@ const visObject = {
         for (const fieldName of rowFields) {
           const rowFieldValue = row[fieldName]?.value || row[fieldName];
           const r1Bg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1', 'bg');
-          if (r1Bg) {
-            bg = `background:${r1Bg};`;
-            rule1Matched = true;
-            break;
-          }
+          if (r1Bg) { bg = `background:${r1Bg};`; rule1Matched = true; break; }
         }
 
         if (!rule1Matched) {
@@ -538,11 +541,17 @@ const visObject = {
       fields.forEach((f, idx) => {
         if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
         let style = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
-        if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
+        if (f.name === mainTreeCol) {
+           const level = row.__level || 0;
+           style += `padding-left: ${(level * 20) + 12}px;`;
+        }
 
         if (config.enable_conditional_formatting && config.conditional_field) {
           const targetFields = config.conditional_field.split(',').map(s => s.trim());
-          if (targetFields.includes(f.name)) {
+          // FIX: Don't format unused dimension cells in subtotals/GT
+          const isUnused = (isSub || isGT) && f.is_dimension && f.name !== mainTreeCol;
+
+          if (targetFields.includes(f.name) && !isUnused) {
             const cellData = row[f.name];
             const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
 
@@ -600,22 +609,6 @@ const visObject = {
     this.attachEventListeners(config);
   },
 
-  renderColumnGroups: function (config, fields) {
-    let html = '<thead><tr>';
-    let currentIdx = 0;
-    for (let i = 1; i <= 3; i++) {
-      const name = config[`column_group_${i}_name`], count = config[`column_group_${i}_count`];
-      if (name && count > 0) {
-        html += `<th colspan="${count}" class="column-group-header" style="background:${config.group_header_bg_color}">${name}</th>`;
-        currentIdx += count;
-      }
-    }
-    if (config.group_remaining_columns && currentIdx < fields.length) {
-      html += `<th colspan="${fields.length - currentIdx}" class="column-group-header" style="background:${config.group_header_bg_color}">${config.remaining_columns_name}</th>`;
-    }
-    return html + '</tr></thead>';
-  },
-
   renderCellContent: function (cell, field, config, row, rowIdx, data) {
     const hDims = config.enable_bo_hierarchy ? (config.hierarchy_dimensions || "").split(',').map(f => f.trim()) : [];
     const mainTreeCol = hDims[0] || config.subtotal_dimension;
@@ -625,7 +618,7 @@ const visObject = {
     let val = cell, rendered = cell;
     if (cell && typeof cell === 'object') { val = cell.value; rendered = cell.rendered || cell.value; }
 
-    // ✅ FIX: Remove Null Sign
+    // ✅ FIX: Return empty string instead of '∅'
     if (val === null || val === undefined) return '';
 
     const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
@@ -652,12 +645,18 @@ const visObject = {
 
     const compFields = (config.comparison_primary_field || "").split(',').map(s => s.trim());
     if (config.enable_comparison && compFields.includes(field.name)) {
-      const isLastOfSubgroup = this.isLastElementOfGroup(rowIdx, data, config);
-      if (!row.__isGrandTotal && !isLastOfSubgroup) {
-        rendered = this.renderComparison(row, config, rowIdx, data, rendered, field.name);
+      // ✅ FIX: Use safety check for isLastElementOfGroup + Grand Total handling
+      if (!row.__isGrandTotal) {
+          const isLastOfSubgroup = this.isLastElementOfGroup(rowIdx, data, config);
+          if (!isLastOfSubgroup) {
+            rendered = this.renderComparison(row, config, rowIdx, data, rendered, field.name);
+          } else {
+            // ✅ ALIGNMENT FIX: Invisible placeholder for values without comparison
+            rendered = `<span style="display:inline-block; width:60px; text-align:right;">${rendered}</span> <span style="visibility:hidden; font-size:0.85em; font-weight:600; margin-left:5px;">↑00.0%</span>`;
+          }
       } else {
-        // ✅ Alignment Fix: Add invisible placeholder to ensure value aligns
-        rendered = `<span style="display:inline-block; width:60px; text-align:right;">${rendered}</span> <span style="visibility:hidden; font-size:0.85em; font-weight:600; margin-left:5px;">↑00.0%</span>`;
+          // Grand Total Alignment
+          rendered = `<span style="display:inline-block; width:60px; text-align:right;">${rendered}</span> <span style="visibility:hidden; font-size:0.85em; font-weight:600; margin-left:5px;">↑00.0%</span>`;
       }
     }
 
@@ -673,9 +672,13 @@ const visObject = {
   },
 
   isLastElementOfGroup: function (idx, data, config) {
+    // ✅ CRASH FIX: Safety Check
+    if (idx < 0 || idx >= data.length || !data[idx]) return true;
+
     if (idx >= data.length - 1) return true;
     const curr = data[idx];
     const next = data[idx + 1];
+
     if (next.__isGrandTotal) return true;
 
     if (config.enable_bo_hierarchy && curr.__isSubtotal) {
@@ -734,6 +737,7 @@ const visObject = {
     const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
     const arrow = config.show_comparison_arrows ? (diff >= 0 ? '↑' : '↓') : '';
 
+    // ✅ ALIGNMENT: Fixed width for value, standard spacing for arrow
     return `<span style="display:inline-block; width:60px; text-align:right;">${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
   },
 
