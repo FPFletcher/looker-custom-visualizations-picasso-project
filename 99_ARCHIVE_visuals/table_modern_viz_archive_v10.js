@@ -1,13 +1,12 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.30.7 - FINAL: GT Fixes + Comparison Alignment + All Features
+ * Version: 4.30.5 - FIXED: Comparison Logic Restored
  * Build: 2026-01-17
  * * UPDATES:
- * ✅ Grand Total Label: Explicitly renders label in main column.
- * ✅ Subtotal Position: Forced to "Top" (removed Bottom option).
- * ✅ Comparison Alignment: Added width:60px; text-align:right to comparison values.
- * ✅ Comparison Logic: Restored robust peer detection.
- * ✅ Retained all formatting, chip, and gradient features.
+ * ✅ Comparison Feature: Restored robust 'isLastElementOfGroup' logic from v4.30.0.
+ * - Fixes issue where subtotals wouldn't compare against each other.
+ * - Arrows and % now appear correctly for both Metric and Period modes.
+ * ✅ Retained all previous fixes (Col Format, Chips, Stripe Priority).
  */
 
 const visObject = {
@@ -79,7 +78,7 @@ const visObject = {
     subtotal_dimension: { type: "string", label: "Group Dimension", display: "select", values: [{ "None": "" }], default: "", section: "Series", order: 82 },
     standard_subtotal_bold: { type: "boolean", label: "Bold Font for Subtotals", default: true, section: "Series", order: 83 },
     show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 84 },
-    // Removed 'subtotal_position' - Forced to Top
+    subtotal_position: { type: "string", label: "Position", display: "select", values: [{ "Top": "top" }, { "Bottom": "bottom" }], default: "bottom", section: "Series", order: 85 },
     subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 86 },
     grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Series", order: 87 },
 
@@ -158,7 +157,6 @@ const visObject = {
     conditional_rule_1_value: { type: "string", label: "Col Rule 1 Value", display: "text", default: "", section: "Formatting", order: 64 },
     conditional_rule_1_bg: { type: "string", label: "Col Rule 1 BG Color", display: "color", default: "#dcfce7", section: "Formatting", order: 65 },
     conditional_rule_1_text: { type: "string", label: "Col Rule 1 Text Color", display: "color", default: "#166534", section: "Formatting", order: 66 },
-
     conditional_rule_2_operator: { type: "string", label: "Col Rule 2 Operator", display: "select", values: [{ "None": "" }, { ">": ">" }, { ">=": ">=" }, { "<": "<" }, { "<=": "<=" }, { "=": "=" }, { "≠": "!=" }, { "Contains": "contains" }], default: "", section: "Formatting", order: 67 },
     // FIXED: Changed type from 'number' to 'string'
     conditional_rule_2_value: { type: "string", label: "Col Rule 2 Value", display: "text", default: "", section: "Formatting", order: 68 },
@@ -243,12 +241,13 @@ const visObject = {
       processedData = this.applyHierarchyFilter(processedData);
     } else if (config.enable_subtotals && config.subtotal_dimension) {
       processedData = this.calculateStandardSubtotals(processedData, config.subtotal_dimension, measures, config, dims);
-      // FORCE TOP BEHAVIOR for Subtotals
-      if (this.state.forceInitialCollapse) {
-        processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
-        this.state.forceInitialCollapse = false;
+      if (config.subtotal_position === 'top') {
+        if (this.state.forceInitialCollapse) {
+          processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
+          this.state.forceInitialCollapse = false;
+        }
+        processedData = processedData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
       }
-      processedData = processedData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
     }
 
     if (config.show_grand_total) processedData.push(this.calculateGrandTotal(data, measures, config, dims));
@@ -327,11 +326,11 @@ const visObject = {
     return result;
   },
 
-  // ✅ Fixed Subtotal Sorting ("686" bug) + Forced Top Order
+  // ✅ Fixed Subtotal Sorting ("686" bug)
   calculateStandardSubtotals: function (data, field, measures, config, dims) {
     const result = [];
     const groups = {};
-    const groupOrder = [];
+    const groupOrder = []; // Preserve order to avoid auto-sorting integers
 
     data.forEach(row => {
       let val = row[field];
@@ -351,10 +350,13 @@ const visObject = {
         let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
         sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
       });
-
-      // Forced Top: Subtotal First, then Children
-      result.push(sub);
-      groups[key].forEach(r => { r.__parentGroup = key; result.push(r); });
+      if (config.subtotal_position === 'top') {
+        result.push(sub);
+        groups[key].forEach(r => { r.__parentGroup = key; result.push(r); });
+      } else {
+        groups[key].forEach(r => result.push(r));
+        result.push(sub);
+      }
     });
     return result;
   },
@@ -393,10 +395,10 @@ const visObject = {
 
     if (absVal >= 1000000) {
       formatted = (num / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-      suffix = ' M';
+      suffix = 'M';
     } else if (absVal >= 1000) {
       formatted = (num / 1000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-      suffix = ' k';
+      suffix = 'k';
     } else {
       formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
@@ -537,7 +539,7 @@ const visObject = {
       let bg = '';
       const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
-      // Row-level conditional formatting (Priority: Rule 1 > Rule 2)
+      // Row-level conditional formatting
       if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
         const rowFields = config.row_conditional_field.split(',').map(s => s.trim());
         let rule1Matched = false;
@@ -650,14 +652,6 @@ const visObject = {
   },
 
   renderCellContent: function (cell, field, config, row, rowIdx, data) {
-    // ✅ FIX: Explicitly render Grand Total Label in the main column
-    const hDims = config.enable_bo_hierarchy ? (config.hierarchy_dimensions || "").split(',').map(f => f.trim()) : [];
-    const mainTreeCol = hDims[0] || config.subtotal_dimension;
-
-    if (row.__isGrandTotal && field.name === mainTreeCol) {
-       return config.grand_total_label || "Grand Total";
-    }
-
     let val = cell, rendered = cell;
     if (cell && typeof cell === 'object') { val = cell.value; rendered = cell.rendered || cell.value; }
     if (val === null || val === undefined) return '∅';
@@ -689,6 +683,7 @@ const visObject = {
     if (config.enable_comparison && compFields.includes(field.name)) {
       const isLastOfSubgroup = this.isLastElementOfGroup(rowIdx, data, config);
       if (!row.__isGrandTotal && !isLastOfSubgroup) {
+        // Pass field.name to the function so it knows WHICH field to calculate
         rendered = this.renderComparison(row, config, rowIdx, data, rendered, field.name);
       }
     }
@@ -706,36 +701,62 @@ const visObject = {
 
   // ✅ RESTORED: Robust Logic for Subtotal Comparison Checks from v4.30.0
   isLastElementOfGroup: function (idx, data, config) {
-    if (idx >= data.length - 1) return true;
-    const curr = data[idx];
-    const next = data[idx + 1];
-    if (next.__isGrandTotal) return true;
+            if (idx >= data.length - 1) return true;
+            const curr = data[idx];
+            const next = data[idx + 1];
+            if (next.__isGrandTotal) return true;
 
-    if (config.enable_bo_hierarchy && curr.__isSubtotal) {
-      for (let i = idx + 1; i < data.length; i++) {
-        const futureRow = data[i];
-        if (futureRow.__isGrandTotal) return true;
-        if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
-          if (futureRow.__parentPath === curr.__parentPath) return false;
-          else return true;
-        }
-      }
-      return true;
-    }
+            // For REGULAR subtotals (non-BO mode)
+            if (!config.enable_bo_hierarchy && curr.__isSubtotal) {
+              // Check if there's another subtotal at the same level
+              // with the same group dimension value
+              for (let i = idx + 1; i < data.length; i++) {
+                const futureRow = data[i];
+                if (futureRow.__isGrandTotal) return true;
+                if (futureRow.__isSubtotal) {
+                  // Found another subtotal - they can be compared
+                  return false;
+                }
+              }
+              return true; // No more subtotals found
+            }
 
-    if (config.enable_bo_hierarchy) {
-      if (next.__level !== curr.__level) return true;
-      if (next.__parentPath !== curr.__parentPath) return true;
-      return false;
-    }
+            // For hierarchy mode with subtotals
+            if (config.enable_bo_hierarchy) {
+              // If current is a subtotal, look ahead to find next subtotal at same level
+              if (curr.__isSubtotal) {
+                // Find next subtotal at same level with same parent
+                for (let i = idx + 1; i < data.length; i++) {
+                  const futureRow = data[i];
+                  if (futureRow.__isGrandTotal) return true;
+                  if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
+                    // Found next subtotal at same level - check if same parent
+                    if (futureRow.__parentPath === curr.__parentPath) {
+                      return false; // There's another subtotal to compare with
+                    } else {
+                      return true; // Different parent, can't compare
+                    }
+                  }
+                }
+                return true; // No more subtotals at this level
+              }
+              // For detail rows, check immediate next row
+              if (next.__level !== curr.__level) return true;
+              if (next.__parentPath !== curr.__parentPath) return true;
+              return false;
+            }
 
-    if (config.enable_subtotals) {
-      if (!curr.__isSubtotal && next.__isSubtotal) return true;
-      if (curr.__isSubtotal && next.__isSubtotal && curr.__groupValue !== next.__groupValue) return true;
-      return false;
-    }
-    return false;
-  },
+            // For standard subtotals: Only hide if this is last detail row before subtotal
+            if (config.enable_subtotals) {
+              // If current is detail and next is subtotal, this is last of group
+              if (!curr.__isSubtotal && next.__isSubtotal) return true;
+              // If current is subtotal and next is different subtotal, this is last
+              if (curr.__isSubtotal && next.__isSubtotal && curr.__groupValue !== next.__groupValue) return true;
+              return false;
+            }
+
+            return false;
+          },
 
   generateCellBar: function (val, rendered, color, useGrad, endColor, data, fieldName, level) {
     const num = parseFloat(val);
@@ -747,29 +768,36 @@ const visObject = {
   },
 
   renderComparison: function (row, config, rowIdx, data, primaryRendered, fieldName) {
-    const targetField = fieldName || config.comparison_primary_field;
-    const primary = parseFloat(row[targetField]?.value || 0);
-    const isSub = !!row.__isSubtotal;
-    const level = row.__level;
-    const parentPath = row.__parentPath;
+            // ✅ FIXED: Use the specific fieldName passed from the loop, fallback to config if missing
+            const targetField = fieldName || config.comparison_primary_field;
 
-    const peers = data.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
-    const currPeerIdx = peers.indexOf(row);
-    const offset = config.comparison_period_offset || -1;
-    const compRow = peers[currPeerIdx - offset];
+            // Use targetField instead of config.comparison_primary_field
+            const primary = parseFloat(row[targetField]?.value || 0);
 
-    if (!compRow) return primaryRendered;
-    const secondary = parseFloat(compRow[targetField]?.value || 0);
-    if (isNaN(secondary) || secondary === 0) return primaryRendered;
+            const isSub = !!row.__isSubtotal;
+            const level = row.__level;
+            const parentPath = row.__parentPath;
 
-    const diff = primary - secondary;
-    const pct = ((diff / Math.abs(secondary)) * 100).toFixed(1);
-    const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
-    const arrow = config.show_comparison_arrows ? (diff >= 0 ? '↑' : '↓') : '';
+            // Peer subset logic (from v4.27/v4.30.0)
+            const peers = data.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
+            const currPeerIdx = peers.indexOf(row);
+            const offset = config.comparison_period_offset || -1;
+            const compRow = peers[currPeerIdx - offset];
 
-    // ✅ ADDED: Inline style for alignment
-    return `<span style="display:inline-block; width:60px; text-align:right;">${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
-  },
+            if (!compRow) return primaryRendered;
+
+            // Use targetField here as well
+            const secondary = parseFloat(compRow[targetField]?.value || 0);
+
+            if (isNaN(secondary) || secondary === 0) return primaryRendered;
+
+            const diff = primary - secondary;
+            const pct = ((diff / Math.abs(secondary)) * 100).toFixed(1);
+            const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
+            const arrow = config.show_comparison_arrows ? (diff >= 0 ? '↑' : '↓') : '';
+
+            return `<span>${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
+          },
 
   sortData: function (data, field, direction) {
     const isAsc = direction === 'asc';
