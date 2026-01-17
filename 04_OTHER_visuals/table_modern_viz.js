@@ -1,6 +1,6 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.35.0 - FORCE CUSTOM FORMATTING + RESTORED 4.31
+ * Version: 4.36.0 - FIX: Subtotal LookML Default Parity
  * Build: 2026-01-17
  */
 
@@ -46,7 +46,7 @@ const visObject = {
     use_gradient_2: { type: "boolean", label: "Use Gradient 2", default: false, section: "Series", order: 9 },
     gradient_end_2: { type: "string", label: "Gradient End 2", display: "color", default: "#6ee7b7", section: "Series", order: 10 },
 
-    column_group_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
+    grouping_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
     enable_column_groups: { type: "boolean", label: "Enable Grouping", default: false, section: "Series", order: 21 },
     column_group_1_name: { type: "string", label: "Group 1 Name", default: "", section: "Series", order: 22 },
     column_group_1_count: { type: "number", label: "Group 1 Count", default: 1, section: "Series", order: 23 },
@@ -151,7 +151,6 @@ const visObject = {
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
       const hierarchyList = config.hierarchy_dimensions.split(',').map(f => f.trim());
       processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
-      processedData = this.applyHierarchyFilter(processedData);
     } else if (config.enable_subtotals && config.subtotal_dimension) {
       processedData = this.calculateStandardSubtotals(processedData, config.subtotal_dimension, measures, config, dims);
     }
@@ -162,42 +161,11 @@ const visObject = {
     done();
   },
 
-  calculateSubtotalsRecursive: function (data, fields, measures, config) {
-    const result = [];
-    const groupData = (rows, level, parentPath) => {
-      const field = fields[level];
-      const groups = {};
-      rows.forEach(row => {
-        let val = row[field];
-        let key = (val && typeof val === 'object') ? (val.value || val.rendered || 'null') : (val || 'null');
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(row);
-      });
-
-      Object.keys(groups).forEach(key => {
-        const currentPath = parentPath ? `${parentPath}|${key}` : key;
-        const sub = { __isSubtotal: true, __groupValue: currentPath, __level: level, __parentPath: parentPath };
-        sub[fields[0]] = { value: key, rendered: key };
-        fields.slice(1).forEach(f => sub[f] = { value: '', rendered: '' });
-        measures.forEach(m => {
-          let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
-          sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
-        });
-        result.push(sub);
-        if (level < fields.length - 1) { groupData(groups[key], level + 1, currentPath); }
-        else { groups[key].forEach(r => { r.__parentGroup = currentPath; r.__parentPath = currentPath; r.__level = level + 1; result.push(r); }); }
-      });
-    };
-    groupData(data, 0, "");
-    return result;
-  },
-
   calculateStandardSubtotals: function (data, field, measures, config, dims) {
     const result = [];
     const groups = {};
     data.forEach(row => {
-      let val = row[field];
-      let key = (val && typeof val === 'object') ? (val.value || 'null') : (val || 'null');
+      let key = (row[field] && typeof row[field] === 'object') ? (row[field].value || 'null') : (row[field] || 'null');
       if (!groups[key]) groups[key] = [];
       groups[key].push(row);
     });
@@ -207,6 +175,7 @@ const visObject = {
       sub[field] = { value: key, rendered: key };
       measures.forEach(m => {
         let sum = groups[key].reduce((acc, r) => acc + Number(r[m.name]?.value || 0), 0);
+        // PARITY FIX: Use formatMeasure which now correctly respects LookML metadata
         sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
       });
       result.push(sub);
@@ -216,12 +185,22 @@ const visObject = {
 
   formatMeasure: function (value, field, config) {
     const customFormat = config[`field_format_${field.name}`];
+
+    // PRIORITY 1: Custom Field Formatting box (Forced)
     if (customFormat && config.enable_custom_field_formatting) {
-      return this.applyCustomFormat(value, customFormat);
+      const formatted = this.applyCustomFormat(value, customFormat);
+      console.log(`[FORMAT-FORCE] ${field.name}: ${value} -> ${formatted} (Custom)`);
+      return formatted;
     }
+
+    // PRIORITY 2: LookML value_format (Matches Detail Rows)
     if (field.value_format) {
-      return this.applyCustomFormat(value, field.value_format);
+      const formatted = this.applyCustomFormat(value, field.value_format);
+      console.log(`[FORMAT-LOOKML] ${field.name}: ${value} -> ${formatted} (LookML)`);
+      return formatted;
     }
+
+    // FALLBACK
     return (typeof value === 'number') ? value.toLocaleString('en-US') : String(value);
   },
 
@@ -229,32 +208,23 @@ const visObject = {
     if (!formatString || value === null || value === undefined) return String(value);
     const num = parseFloat(value);
     if (isNaN(num)) return String(value);
-    const decimalMatch = formatString.match(/\.([0#]+)/);
-    const decimals = decimalMatch ? decimalMatch[1].length : 0;
-    let formatted = num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-    if (formatString.includes('$')) formatted = '$' + formatted;
-    if (formatString.includes('%')) formatted = formatted + '%';
-    return formatted;
-  },
 
-  evaluateConditionalRule: function (cellValue, config, rulePrefix, colorType = 'bg') {
-    const operator = config[`${rulePrefix}_operator`];
-    if (!operator) return null;
-    const ruleValue = config[`${rulePrefix}_value`];
-    const nCell = parseFloat(cellValue), nRule = parseFloat(ruleValue);
-    let matches = false;
-    if (operator === 'contains') matches = String(cellValue).toLowerCase().includes(String(ruleValue).toLowerCase());
-    else if (!isNaN(nCell) && !isNaN(nRule)) {
-      switch (operator) {
-        case '>': matches = nCell > nRule; break;
-        case '>=': matches = nCell >= nRule; break;
-        case '<': matches = nCell < nRule; break;
-        case '<=': matches = nCell <= nRule; break;
-        case '=': matches = nCell === nRule; break;
-        case '!=': matches = nCell !== nRule; break;
-      }
+    const isKMB = formatString.includes('k') || formatString.includes('m');
+    const decimalMatch = formatString.match(/\.([0#]+)/);
+    const decimals = decimalMatch ? decimalMatch[1].length : (isKMB ? 1 : 0);
+
+    let formatted = num;
+    let suffix = "";
+
+    // Simplified scaling to match Looker's "k" format seen in screenshots
+    if (formatString.includes('k') && Math.abs(num) >= 1000) {
+      formatted = num / 1000;
+      suffix = " k";
     }
-    return matches ? config[`${rulePrefix}_${colorType}`] : null;
+
+    let result = formatted.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    if (formatString.includes('$')) result = '$' + result;
+    return result + suffix;
   },
 
   renderTable: function (processedData, config, queryResponse) {
@@ -327,22 +297,6 @@ const visObject = {
     this.attachEventListeners(config);
   },
 
-  renderColumnGroups: function (config, fields) {
-    let html = '<thead><tr>';
-    let currentIdx = 0;
-    for (let i = 1; i <= 2; i++) {
-      const name = config[`column_group_${i}_name`], count = config[`column_group_${i}_count`];
-      if (name && count > 0) {
-        html += `<th colspan="${count}" class="column-group-header" style="background:${config.group_header_bg_color}">${name}</th>`;
-        currentIdx += count;
-      }
-    }
-    if (config.group_remaining_columns && currentIdx < fields.length) {
-      html += `<th colspan="${fields.length - currentIdx}" class="column-group-header" style="background:${config.group_header_bg_color}">${config.remaining_columns_name}</th>`;
-    }
-    return html + '</tr></thead>';
-  },
-
   renderCellContent: function (cell, field, config, row, idx, data) {
     let val = (cell && typeof cell === 'object') ? cell.value : cell;
     let rendered = (cell && typeof cell === 'object') ? (cell.rendered || cell.value) : cell;
@@ -352,17 +306,9 @@ const visObject = {
     const customFmt = config[`field_format_${field.name}`];
     const hasCustomFmt = !!(config.enable_custom_field_formatting && customFmt && customFmt.trim() !== '');
 
-    // DEBUG & LOGGING
-    if (idx < 5 || isSubGT) {
-        console.log(`[FORMAT-FORCE] Field: ${field.name}, Row: ${idx}, hasCustomFmt: ${hasCustomFmt}, Current: ${rendered}`);
-    }
-
-    // REMOVED ALL TYPE CHECKS: Force custom format for any field that has a config entry
-    if (hasCustomFmt) {
-         rendered = this.formatMeasure(val, field, config);
-         if (idx < 5 || isSubGT) console.log(`[FORMAT-FORCE] Result: ${rendered}`);
-    } else if (isSubGT) {
-         rendered = this.formatMeasure(val, field, config);
+    // PARITY LOGIC: For measures, force a re-format to ensure subtotals match LookML detail rows
+    if (field.is_measure || field.type === 'number' || field.type === 'count') {
+        rendered = this.formatMeasure(val, field, config);
     }
 
     // Data Chips
@@ -384,12 +330,49 @@ const visObject = {
     return rendered;
   },
 
+  // Helper functions restored from previous stable versions
+  evaluateConditionalRule: function (cellValue, config, rulePrefix, colorType = 'bg') {
+    const operator = config[`${rulePrefix}_operator`];
+    if (!operator) return null;
+    const ruleValue = config[`${rulePrefix}_value`];
+    const nCell = parseFloat(cellValue), nRule = parseFloat(ruleValue);
+    let matches = false;
+    if (operator === 'contains') matches = String(cellValue).toLowerCase().includes(String(ruleValue).toLowerCase());
+    else if (!isNaN(nCell) && !isNaN(nRule)) {
+      switch (operator) {
+        case '>': matches = nCell > nRule; break;
+        case '>=': matches = nCell >= nRule; break;
+        case '<': matches = nCell < nRule; break;
+        case '<=': matches = nCell <= nRule; break;
+        case '=': matches = nCell === nRule; break;
+        case '!=': matches = nCell !== nRule; break;
+      }
+    }
+    return matches ? config[`${rulePrefix}_${colorType}`] : null;
+  },
+
   generateBar: function (val, rend, col, grad, end, data, fName, lvl) {
     const peers = data.filter(r => r.__level === lvl);
     const max = Math.max(...peers.map(r => parseFloat(r[fName]?.value || 0)), 1);
     const w = Math.min(100, (parseFloat(val) / max) * 100);
     const fill = grad ? `linear-gradient(to right, ${col}, ${end})` : col;
     return `<div class="cell-bar-container"><div class="cell-bar-bg"><div class="cell-bar-fill" style="width:${w}%; background:${fill};"></div></div><span>${rend}</span></div>`;
+  },
+
+  renderColumnGroups: function (config, fields) {
+    let html = '<thead><tr>';
+    let currentIdx = 0;
+    for (let i = 1; i <= 2; i++) {
+      const name = config[`column_group_${i}_name`], count = config[`column_group_${i}_count`];
+      if (name && count > 0) {
+        html += `<th colspan="${count}" class="column-group-header" style="background:${config.group_header_bg_color}">${name}</th>`;
+        currentIdx += count;
+      }
+    }
+    if (config.group_remaining_columns && currentIdx < fields.length) {
+      html += `<th colspan="${fields.length - currentIdx}" class="column-group-header" style="background:${config.group_header_bg_color}">${config.remaining_columns_name}</th>`;
+    }
+    return html + '</tr></thead>';
   },
 
   attachEventListeners: function (config) {
@@ -404,27 +387,13 @@ const visObject = {
     });
   },
 
-  applyHierarchyFilter: function (data) {
-    return data.filter(row => {
-      const pathParts = String(row.__isSubtotal ? row.__groupValue : row.__parentGroup || "").split('|');
-      let currentPath = "";
-      const stopIdx = row.__isSubtotal ? pathParts.length - 1 : pathParts.length;
-      for (let i = 0; i < stopIdx; i++) {
-        currentPath = currentPath ? `${currentPath}|${pathParts[i]}` : pathParts[i];
-        if (this.state.collapsedGroups[currentPath]) return false;
-      }
-      return true;
-    });
-  },
-
-  trigger: function (event) { },
-  clearErrors: function () { },
   sortData: function (data, field, dir) {
     return [...data].sort((a, b) => {
       let av = a[field]?.value ?? a[field], bv = b[field]?.value ?? b[field];
       return dir === 'asc' ? (av > bv ? 1 : -1) : (av > bv ? -1 : 1);
     });
   },
+
   calculateGrandTotal: function(raw, ms, cfg, ds) {
     const t = { __isGrandTotal: true, __level: -1 };
     ms.forEach(m => {
@@ -432,7 +401,10 @@ const visObject = {
       t[m.name] = { value: s, rendered: this.formatMeasure(s, m, cfg) };
     });
     return t;
-  }
+  },
+
+  trigger: function (event) { },
+  clearErrors: function () { }
 };
 
 looker.plugins.visualizations.add(visObject);
