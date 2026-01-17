@@ -331,71 +331,95 @@ const visObject = {
     return result;
   },
 
+
   formatMeasure: function (value, field, config) {
-  // 1. Check Custom Format Toggle & User Input
-  const isCustomFormattingEnabled = config.enable_custom_field_formatting;
-  const customFormat = config[`field_format_${field.name}`];
-
-  // IF Toggle is ON AND the user typed a specific format -> Use Custom Logic
-  if (isCustomFormattingEnabled && customFormat && customFormat.trim() !== '') {
-    return this.applyCustomFormat(value, customFormat);
-  }
-
-  // 2. Fallback to LookML (Native Looker) Format
-  // IF Toggle is OFF OR (Toggle is ON but text box is empty)
-  if (field.value_format) {
-    // TRY: Use Looker's native utility to match Detail rows exactly (handles "k", "M", currency, etc.)
-    try {
-      if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.formatValue) {
-        return LookerCharts.Utils.formatValue(value, field.value_format);
+    // 1. Custom Format (User entered specific string in Viz Config)
+    // Applies ONLY if Toggle is ON AND String is not empty
+    if (config.enable_custom_field_formatting && config[`field_format_${field.name}`]) {
+      const customFormat = config[`field_format_${field.name}`];
+      if (customFormat && customFormat.trim() !== '') {
+        return this.applyCustomFormat(value, customFormat);
       }
-    } catch (e) {
-      // Continue to fallback if LookerCharts util is missing
     }
 
-    // FALLBACK: If Looker util fails, use internal simple formatter
-    return this.applyCustomFormat(value, field.value_format);
-  }
+    // 2. Try Looker's Native Utils (For strict parity if available)
+    if (field.value_format) {
+      try {
+        if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.formatValue) {
+          // If the utility works, return it. If it throws or returns undefined, fall through.
+          const ret = LookerCharts.Utils.formatValue(value, field.value_format);
+          if (ret) return ret;
+        }
+      } catch (e) {
+        // Fall through to smart default
+      }
+    }
 
-  // 3. Final Fallback: Standard numbers
-  if (typeof value === 'number') {
-    return value.toLocaleString('en-US');
-  }
-  return String(value);
-},
+    // 3. SMART DEFAULT FALLBACK (User Requested Logic)
+    // Use this if LookML parity fails or isn't available.
+    // Logic: [>=1M] 0.0 M; [>=1k] 0 k; Standard
+
+    // Detect if field is likely currency (LookML has '$' or label mentions price/revenue/etc)
+    const isCurrency = (field.value_format && field.value_format.indexOf('$') > -1) ||
+                       (field.label_short || field.label || '').match(/price|amount|revenue|sales|margin|\$/i);
+
+    return this.applySmartFormat(value, isCurrency);
+  },
+
+  applySmartFormat: function (value, isCurrency) {
+    const num = Number(value);
+    if (isNaN(num)) return String(value);
+
+    const absVal = Math.abs(num);
+    let formatted = '';
+    let suffix = '';
+
+    // LOGIC: [>=1000000]#,##0.0,,"M";[>=1000]#,##0,"k";#,##0
+    if (absVal >= 1000000) {
+      // Millions: Divide by 1M, 1 Decimal Place (e.g. 1.2 M)
+      formatted = (num / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      suffix = ' M';
+    } else if (absVal >= 1000) {
+      // Thousands: Divide by 1k, 0 Decimals (e.g. 150 k) - Matches your request "$#,##0,"k""
+      formatted = (num / 1000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      suffix = ' k';
+    } else {
+      // Standard: 0 Decimals for normal numbers (or 2 for small currency if you prefer)
+      // Matching your pattern "#,##0" -> 0 decimals
+      formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    if (isCurrency) {
+      return '$' + formatted + suffix;
+    }
+    return formatted + suffix;
+  },
 
   applyCustomFormat: function (value, formatString) {
+    // This is used ONLY when you type a custom format string in the config box
     if (!formatString || value === null || value === undefined) return String(value);
-
     const num = parseFloat(value);
     if (isNaN(num)) return String(value);
 
-    // Parse decimal places from format like "$0.00" or "0.00%" or "#,##0.0"
+    // Simple parser for standard formats like "$0.00" or "0%"
     const decimalMatch = formatString.match(/\.([0#]+)/);
     const decimals = decimalMatch ? decimalMatch[1].length : 0;
 
-    // Format number with proper decimals
     let formatted = num.toLocaleString('en-US', {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals
     });
 
-    // Apply prefix/suffix
     if (formatString.includes('$') || formatString.startsWith('$')) {
       formatted = '$' + formatted;
     }
     if (formatString.includes('%')) {
       formatted = formatted + '%';
     }
-    if (formatString.includes('€')) {
-      formatted = '€' + formatted;
-    }
-    if (formatString.includes('£')) {
-      formatted = '£' + formatted;
-    }
 
     return formatted;
   },
+
 
   evaluateConditionalRule: function (cellValue, config, rulePrefix, colorType = 'bg') {
     const operator = config[`${rulePrefix}_operator`];
