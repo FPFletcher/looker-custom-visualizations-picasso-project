@@ -640,7 +640,7 @@ const visObject = {
 
     // ALWAYS log for first 3 rows and ALL subtotals to debug
     if (rowIdx < 3 || isSubtotalOrGrandTotal) {
-      console.log(`[FORMAT-DEBUG] Row ${rowIdx}, Field ${field.name}:`, {
+      console.log(`[FORMAT-DEBUG] Row ${rowIdx}, Field ${field.name}:`, JSON.stringify({
         fieldType: field.type,
         isMeasure: field.is_measure,
         isSubtotal: row.__isSubtotal,
@@ -650,7 +650,7 @@ const visObject = {
         hasCustomFormat: hasCustomFormat,
         value: val,
         lookerRendered: cell?.rendered
-      });
+      }, null, 2));
     }
 
     if ((field.is_measure || field.type === 'number' || field.type === 'count')) {
