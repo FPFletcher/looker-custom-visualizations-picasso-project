@@ -1,12 +1,13 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.30.5 - FIXED: Comparison Logic Restored
+ * Version: 4.30.4 - FINAL FIXES: Col Format Types, Stripe Priority, UI Move
  * Build: 2026-01-17
  * * UPDATES:
- * ✅ Comparison Feature: Restored robust 'isLastElementOfGroup' logic from v4.30.0.
- * - Fixes issue where subtotals wouldn't compare against each other.
- * - Arrows and % now appear correctly for both Metric and Period modes.
- * ✅ Retained all previous fixes (Col Format, Chips, Stripe Priority).
+ * ✅ Fixed Column Rules: Changed input type from 'number' to 'string' so text (e.g. "Accessories") works.
+ * ✅ Stripe Mode: Removed !important so Row/Col formatting can overwrite it.
+ * ✅ UI: Moved Column Formatting to 'Formatting' tab.
+ * ✅ Data Chips: Added Customizable Default Chip Color.
+ * ✅ Debug: Added [COL-FORMAT] logs.
  */
 
 const visObject = {
@@ -395,10 +396,10 @@ const visObject = {
 
     if (absVal >= 1000000) {
       formatted = (num / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-      suffix = ' M';
+      suffix = 'M';
     } else if (absVal >= 1000) {
       formatted = (num / 1000).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-      suffix = ' k';
+      suffix = 'k';
     } else {
       formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
@@ -418,45 +419,49 @@ const visObject = {
     return formatted;
   },
 
-  evaluateConditionalRule: function (cellValue, config, rulePrefix, colorType = 'bg') {
-    const operator = config[`${rulePrefix}_operator`];
-    if (!operator) return null;
+evaluateConditionalRule: function (cellValue, config, rulePrefix, colorType = 'bg') {
+  const operator = config[`${rulePrefix}_operator`];
+  if (!operator) return null;
 
-    const ruleValue = config[`${rulePrefix}_value`];
-    const numericCell = parseFloat(cellValue);
-    const numericRule = parseFloat(ruleValue);
+  const ruleValue = config[`${rulePrefix}_value`];
+  const numericCell = parseFloat(cellValue);
+  const numericRule = parseFloat(ruleValue);
 
-    let matches = false;
+  let matches = false;
 
-    if (operator === 'contains') {
-      if (ruleValue) {
-        const targets = String(ruleValue).toLowerCase().split(',').map(s => s.trim()).filter(s => s !== '');
-        const cellStr = String(cellValue).toLowerCase();
-        matches = targets.some(target => cellStr.includes(target));
-      }
-    } else if (!isNaN(numericCell) && !isNaN(numericRule)) {
-      switch (operator) {
-        case '>': matches = numericCell > numericRule; break;
-        case '>=': matches = numericCell >= numericRule; break;
-        case '<': matches = numericCell < numericRule; break;
-        case '<=': matches = numericCell <= numericRule; break;
-        case '=': matches = numericCell === numericRule; break;
-        case '!=': matches = numericCell !== numericRule; break;
-      }
-    } else {
-      switch (operator) {
-        case '=': matches = String(cellValue) === String(ruleValue); break;
-        case '!=': matches = String(cellValue) !== String(ruleValue); break;
-      }
+  if (operator === 'contains') {
+    // ✅ FIX: Split rule by comma, match if cell contains ANY of the values
+    // Example: "Accessories,Zicac" -> Checks if cell has "Accessories" OR "Zicac"
+    if (ruleValue) {
+      const targets = String(ruleValue).toLowerCase().split(',').map(s => s.trim()).filter(s => s !== '');
+      const cellStr = String(cellValue).toLowerCase();
+      matches = targets.some(target => cellStr.includes(target));
     }
-
-    if (matches) {
-      if (rulePrefix.startsWith('row_rule')) return config[`${rulePrefix}_bg`];
-      return config[`${rulePrefix}_${colorType}`];
+  } else if (!isNaN(numericCell) && !isNaN(numericRule)) {
+    // Numeric comparison
+    switch (operator) {
+      case '>': matches = numericCell > numericRule; break;
+      case '>=': matches = numericCell >= numericRule; break;
+      case '<': matches = numericCell < numericRule; break;
+      case '<=': matches = numericCell <= numericRule; break;
+      case '=': matches = numericCell === numericRule; break;
+      case '!=': matches = numericCell !== numericRule; break;
     }
+  } else {
+    // String comparison
+    switch (operator) {
+      case '=': matches = String(cellValue) === String(ruleValue); break;
+      case '!=': matches = String(cellValue) !== String(ruleValue); break;
+    }
+  }
 
-    return null;
-  },
+  if (matches) {
+    if (rulePrefix.startsWith('row_rule')) return config[`${rulePrefix}_bg`];
+    return config[`${rulePrefix}_${colorType}`];
+  }
+
+  return null;
+},
 
   applyHierarchyFilter: function (data) {
     return data.filter(row => {
@@ -489,6 +494,7 @@ const visObject = {
     const headerPosition = config.freeze_header_row ? 'sticky' : 'relative';
     const headerZIndex = config.freeze_header_row ? '100' : 'auto';
 
+    // ✅ Fix: Removed !important from striped CSS
     let html = `<style>
         table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
         table.advanced-table thead th { font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; }
@@ -539,30 +545,31 @@ const visObject = {
       let bg = '';
       const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
-      // Row-level conditional formatting
+      // Row-level conditional formatting (Multi-field support & Strict Priority)
       if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
         const rowFields = config.row_conditional_field.split(',').map(s => s.trim());
+
         let rule1Matched = false;
 
-        // Priority 1: Check Rule 1
+        // PRIORITY CHECK: Check Rule 1 against ALL listed fields first
         for (const fieldName of rowFields) {
           const rowFieldValue = row[fieldName]?.value || row[fieldName];
           const r1Bg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1', 'bg');
           if (r1Bg) {
             bg = `background:${r1Bg};`;
             rule1Matched = true;
-            break;
+            break; // Stop immediately if Rule 1 matches anywhere
           }
         }
 
-        // Priority 2: Check Rule 2 (Only if Rule 1 didn't match)
+        // Only check Rule 2 if Rule 1 was NOT found
         if (!rule1Matched) {
           for (const fieldName of rowFields) {
             const rowFieldValue = row[fieldName]?.value || row[fieldName];
             const r2Bg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_2', 'bg');
             if (r2Bg) {
               bg = `background:${r2Bg};`;
-              break;
+              break; // Stop if Rule 2 matches
             }
           }
         }
@@ -578,11 +585,15 @@ const visObject = {
         let style = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
         if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
+        // Column-level conditional formatting
         if (config.enable_conditional_formatting && config.conditional_field) {
           const targetFields = config.conditional_field.split(',').map(s => s.trim());
           if (targetFields.includes(f.name)) {
             const cellData = row[f.name];
             const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
+
+            // Debugging Log
+            if (i === 0) console.log(`[COL-FORMAT] Checking field '${f.name}' value '${cellValue}' against rules.`);
 
             const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
                             this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
@@ -666,6 +677,7 @@ const visObject = {
       rendered = this.formatMeasure(val, field, config);
     }
 
+    // Data Chip Logic
     if (config.enable_data_chips && (config.data_chip_fields || "").split(',').includes(field.name)) {
       const s = String(val).toLowerCase();
       const greenMatches = (config.chip_match_green || "").toLowerCase().split(',').map(m => m.trim());
@@ -696,43 +708,25 @@ const visObject = {
     return rendered;
   },
 
-  // ✅ RESTORED: Robust Logic for Subtotal Comparison Checks from v4.30.0
   isLastElementOfGroup: function (idx, data, config) {
     if (idx >= data.length - 1) return true;
     const curr = data[idx];
     const next = data[idx + 1];
     if (next.__isGrandTotal) return true;
 
-    // For REGULAR subtotals (non-BO mode)
-    if (!config.enable_bo_hierarchy && curr.__isSubtotal) {
-      // Check if there's another subtotal at the same level
+    if (config.enable_bo_hierarchy && curr.__isSubtotal) {
       for (let i = idx + 1; i < data.length; i++) {
         const futureRow = data[i];
         if (futureRow.__isGrandTotal) return true;
-        if (futureRow.__isSubtotal) {
-          // Found another subtotal - they can be compared
-          return false;
+        if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
+          if (futureRow.__parentPath === curr.__parentPath) return false;
+          else return true;
         }
       }
-      return true; // No more subtotals found
+      return true;
     }
 
-    // For hierarchy mode with subtotals
     if (config.enable_bo_hierarchy) {
-      if (curr.__isSubtotal) {
-        for (let i = idx + 1; i < data.length; i++) {
-          const futureRow = data[i];
-          if (futureRow.__isGrandTotal) return true;
-          if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
-            if (futureRow.__parentPath === curr.__parentPath) {
-              return false;
-            } else {
-              return true;
-            }
-          }
-        }
-        return true;
-      }
       if (next.__level !== curr.__level) return true;
       if (next.__parentPath !== curr.__parentPath) return true;
       return false;
@@ -743,7 +737,6 @@ const visObject = {
       if (curr.__isSubtotal && next.__isSubtotal && curr.__groupValue !== next.__groupValue) return true;
       return false;
     }
-
     return false;
   },
 
@@ -761,17 +754,13 @@ const visObject = {
     const isSub = !!row.__isSubtotal;
     const level = row.__level;
     const parentPath = row.__parentPath;
-
-    // Peer subset: same type, same level, same parent branch
     const peers = data.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
     const currPeerIdx = peers.indexOf(row);
     const offset = config.comparison_period_offset || -1;
     const compRow = peers[currPeerIdx - offset];
-
     if (!compRow) return primaryRendered;
     const secondary = parseFloat(compRow[config.comparison_primary_field]?.value || 0);
     if (isNaN(secondary) || secondary === 0) return primaryRendered;
-
     const diff = primary - secondary;
     const pct = ((diff / Math.abs(secondary)) * 100).toFixed(1);
     const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
@@ -779,6 +768,7 @@ const visObject = {
     return `<span>${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
   },
 
+  // ✅ Fixed Column Sorting (Text vs Number)
   sortData: function (data, field, direction) {
     const isAsc = direction === 'asc';
     return [...data].sort((a, b) => {
