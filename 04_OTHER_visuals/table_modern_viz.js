@@ -419,43 +419,49 @@ const visObject = {
     return formatted;
   },
 
-  evaluateConditionalRule: function (cellValue, config, rulePrefix, colorType = 'bg') {
-    const operator = config[`${rulePrefix}_operator`];
-    if (!operator) return null;
+evaluateConditionalRule: function (cellValue, config, rulePrefix, colorType = 'bg') {
+  const operator = config[`${rulePrefix}_operator`];
+  if (!operator) return null;
 
-    const ruleValue = config[`${rulePrefix}_value`];
-    const numericCell = parseFloat(cellValue);
-    const numericRule = parseFloat(ruleValue);
+  const ruleValue = config[`${rulePrefix}_value`];
+  const numericCell = parseFloat(cellValue);
+  const numericRule = parseFloat(ruleValue);
 
-    let matches = false;
+  let matches = false;
 
-    if (operator === 'contains') {
-      matches = String(cellValue).toLowerCase().includes(String(ruleValue).toLowerCase());
-    } else if (!isNaN(numericCell) && !isNaN(numericRule)) {
-      // Numeric comparison
-      switch (operator) {
-        case '>': matches = numericCell > numericRule; break;
-        case '>=': matches = numericCell >= numericRule; break;
-        case '<': matches = numericCell < numericRule; break;
-        case '<=': matches = numericCell <= numericRule; break;
-        case '=': matches = numericCell === numericRule; break;
-        case '!=': matches = numericCell !== numericRule; break;
-      }
-    } else {
-      // String comparison
-      switch (operator) {
-        case '=': matches = String(cellValue) === String(ruleValue); break;
-        case '!=': matches = String(cellValue) !== String(ruleValue); break;
-      }
+  if (operator === 'contains') {
+    // ✅ FIX: Split rule by comma, match if cell contains ANY of the values
+    // Example: "Accessories,Zicac" -> Checks if cell has "Accessories" OR "Zicac"
+    if (ruleValue) {
+      const targets = String(ruleValue).toLowerCase().split(',').map(s => s.trim()).filter(s => s !== '');
+      const cellStr = String(cellValue).toLowerCase();
+      matches = targets.some(target => cellStr.includes(target));
     }
-
-    if (matches) {
-      if (rulePrefix.startsWith('row_rule')) return config[`${rulePrefix}_bg`];
-      return config[`${rulePrefix}_${colorType}`];
+  } else if (!isNaN(numericCell) && !isNaN(numericRule)) {
+    // Numeric comparison
+    switch (operator) {
+      case '>': matches = numericCell > numericRule; break;
+      case '>=': matches = numericCell >= numericRule; break;
+      case '<': matches = numericCell < numericRule; break;
+      case '<=': matches = numericCell <= numericRule; break;
+      case '=': matches = numericCell === numericRule; break;
+      case '!=': matches = numericCell !== numericRule; break;
     }
+  } else {
+    // String comparison
+    switch (operator) {
+      case '=': matches = String(cellValue) === String(ruleValue); break;
+      case '!=': matches = String(cellValue) !== String(ruleValue); break;
+    }
+  }
 
-    return null;
-  },
+  if (matches) {
+    if (rulePrefix.startsWith('row_rule')) return config[`${rulePrefix}_bg`];
+    return config[`${rulePrefix}_${colorType}`];
+  }
+
+  return null;
+},
 
   applyHierarchyFilter: function (data) {
     return data.filter(row => {
@@ -539,16 +545,32 @@ const visObject = {
       let bg = '';
       const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
-      // Row-level conditional formatting
+      // Row-level conditional formatting (Multi-field support & Strict Priority)
       if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
         const rowFields = config.row_conditional_field.split(',').map(s => s.trim());
+
+        let rule1Matched = false;
+
+        // PRIORITY CHECK: Check Rule 1 against ALL listed fields first
         for (const fieldName of rowFields) {
           const rowFieldValue = row[fieldName]?.value || row[fieldName];
-          const rowBg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1', 'bg') ||
-                        this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_2', 'bg');
-          if (rowBg) {
-            bg = `background:${rowBg};`;
-            break;
+          const r1Bg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_1', 'bg');
+          if (r1Bg) {
+            bg = `background:${r1Bg};`;
+            rule1Matched = true;
+            break; // Stop immediately if Rule 1 matches anywhere
+          }
+        }
+
+        // Only check Rule 2 if Rule 1 was NOT found
+        if (!rule1Matched) {
+          for (const fieldName of rowFields) {
+            const rowFieldValue = row[fieldName]?.value || row[fieldName];
+            const r2Bg = this.evaluateConditionalRule(rowFieldValue, config, 'row_rule_2', 'bg');
+            if (r2Bg) {
+              bg = `background:${r2Bg};`;
+              break; // Stop if Rule 2 matches
+            }
           }
         }
       }
