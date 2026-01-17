@@ -2,11 +2,11 @@
  * Advanced Table Visualization for Looker
  * Version: 4.30.0 - FINAL FIX: Field Formatting + Drill Links
  * Build: 2026-01-17
- * * CRITICAL FIXES (v4.30 + v4.37 Logic):
- * ✅ Fixed hasCustomFormat boolean issue
- * ✅ Added drill link support
- * ✅ FIELD FORMATTING PARITY FIX: Detail rows now respect Custom Formatting
- * ✅ FORCED SCALING: Added logic to manually divide by 1000 if 'k' format is used
+ * * MODIFIED WITH v4.37.0 FORMATTING LOGIC:
+ * ✅ Forced Scaling: 'k' format now explicitly divides value by 1000
+ * ✅ Row Parity: Custom formatting applies to Detail, Subtotal, and Grand Total rows
+ * ✅ Formatting Gates: Removed restrictive type checks when Custom Formatting is forced
+ * ✅ Drill Links: Retained v4.30 drill link functionality
  */
 
 const visObject = {
@@ -333,21 +333,16 @@ const visObject = {
 
   formatMeasure: function (value, field, config) {
     const customFormat = config[`field_format_${field.name}`];
-
-    // 1. Force custom format if enabled (v4.37 logic)
     if (customFormat && config.enable_custom_field_formatting) {
       const res = this.applyCustomFormat(value, customFormat);
       console.log(`[FORMAT-FORCE] ${field.name}: ${value} -> ${res} (Custom)`);
       return res;
     }
-
-    // 2. Fallback to LookML format (v4.37 logic)
     if (field.value_format) {
       const res = this.applyCustomFormat(value, field.value_format);
       console.log(`[FORMAT-LOOKML] ${field.name}: ${value} -> ${res} (LookML)`);
       return res;
     }
-
     return (typeof value === 'number') ? value.toLocaleString('en-US') : String(value);
   },
 
@@ -356,7 +351,6 @@ const visObject = {
     const num = parseFloat(value);
     if (isNaN(num)) return String(value);
 
-    // v4.37 Logic: Check for K/M and force decimals
     const isKMB = formatString.toLowerCase().includes('k') || formatString.toLowerCase().includes('m');
     const decimalMatch = formatString.match(/\.([0#]+)/);
     const decimals = decimalMatch ? decimalMatch[1].length : (isKMB ? 1 : 0);
@@ -364,7 +358,7 @@ const visObject = {
     let formatted = num;
     let suffix = "";
 
-    // v4.37 Logic: Force Scaling (dividing by 1000 for 'k')
+    // FORCE SCALING: If format has 'k', always scale by 1000 to match LookML behavior
     if (formatString.toLowerCase().includes('k')) {
       formatted = num / 1000;
       suffix = " k";
@@ -598,25 +592,19 @@ const visObject = {
     return html + '</tr></thead>';
   },
 
-  renderCellContent: function (cell, field, config, row, rowIdx, data) {
-    let val = cell, rendered = cell;
-    if (cell && typeof cell === 'object') {
-      val = cell.value;
-      rendered = cell.rendered || cell.value;
-    }
+  renderCellContent: function (cell, field, config, row, idx, data) {
+    let val = (cell && typeof cell === 'object') ? cell.value : cell;
+    let rendered = (cell && typeof cell === 'object') ? (cell.rendered || cell.value) : cell;
     if (val === null || val === undefined) return '∅';
 
-    const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
-    const customFormat = config[`field_format_${field.name}`];
-    // CRITICAL FIX: Use !! to ensure boolean, not empty string
-    const hasCustomFormat = !!(config.enable_custom_field_formatting && customFormat && customFormat.trim() !== '');
+    const isSubGT = !!(row.__isSubtotal || row.__isGrandTotal);
+    const customFmt = config[`field_format_${field.name}`];
+    const hasCustomFmt = !!(config.enable_custom_field_formatting && customFmt && customFmt.trim() !== '');
 
     // PARITY FIX: Only re-format measures for Subtotals or when Custom Formatting is active.
     // Expanded rows (Detail rows) keep Looker's original cell.rendered by default.
     if (field.is_measure || field.type === 'number' || field.type === 'count') {
-        // v4.37 Logic: If custom format is active OR it's a subtotal, force the format
-        // This effectively overrides the "restrictive gate" mentioned in logs
-        if (hasCustomFormat || isSubtotalOrGrandTotal) {
+        if (hasCustomFmt || isSubGT) {
             rendered = this.formatMeasure(val, field, config);
         }
     }
@@ -630,9 +618,9 @@ const visObject = {
 
     // Smart Peer-Based Comparison Logic
     if (config.enable_comparison && config.comparison_primary_field === field.name) {
-      const isLastOfSubgroup = this.isLastElementOfGroup(rowIdx, data, config);
+      const isLastOfSubgroup = this.isLastElementOfGroup(idx, data, config);
       if (!row.__isGrandTotal && !isLastOfSubgroup) {
-        rendered = this.renderComparison(row, config, rowIdx, data, rendered);
+        rendered = this.renderComparison(row, config, idx, data, rendered);
       }
     }
 
