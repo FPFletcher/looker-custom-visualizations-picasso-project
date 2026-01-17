@@ -1,11 +1,11 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.32.0 - Complete Fixes: Comparison, Bars, Hierarchy, Expand/Collapse
+ * Version: 4.32.1 - Fixed Regular Subtotal Comparison
  * Build: 2026-01-17
  *
  * UPDATES:
+ * ✅ Fixed regular subtotal comparison (restored v4.27 logic)
  * ✅ Grand Total on ALL pages
- * ✅ Subtotal rows now show comparison metrics
  * ✅ Cell bars responsive with dynamic margins
  * ✅ No ∅ sign on empty BO hierarchy dimension cells
  * ✅ BO hierarchy always first column (even single level)
@@ -789,7 +789,7 @@ const visObject = {
     return rendered;
   },
 
-  // ✅ FIXED: Now uses row object and full dataset for accurate peer detection
+  // ✅ FIXED: Restored logic from v4.27 for correct regular subtotal comparison
   isLastElementOfGroup: function (row, data, config) {
     const idx = data.indexOf(row);
     if (idx === -1 || idx >= data.length - 1) return true;
@@ -798,32 +798,45 @@ const visObject = {
     const next = data[idx + 1];
     if (next.__isGrandTotal) return true;
 
-    if (config.enable_bo_hierarchy && curr.__isSubtotal) {
+    // For REGULAR subtotals (non-BO mode) - KEY FIX from v4.27
+    if (!config.enable_bo_hierarchy && curr.__isSubtotal) {
+      // Check if there's another subtotal to compare with
       for (let i = idx + 1; i < data.length; i++) {
         const futureRow = data[i];
         if (futureRow.__isGrandTotal) return true;
-        if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
-          if (futureRow.__parentPath === curr.__parentPath) return false;
-          else return true;
+        if (futureRow.__isSubtotal) {
+          // Found another subtotal - they can be compared
+          return false;
         }
       }
-      return true;
+      return true; // No more subtotals found
     }
 
+    // For hierarchy mode with subtotals
     if (config.enable_bo_hierarchy) {
+      if (curr.__isSubtotal) {
+        for (let i = idx + 1; i < data.length; i++) {
+          const futureRow = data[i];
+          if (futureRow.__isGrandTotal) return true;
+          if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
+            if (futureRow.__parentPath === curr.__parentPath) return false;
+            else return true;
+          }
+        }
+        return true;
+      }
       if (next.__level !== curr.__level) return true;
       if (next.__parentPath !== curr.__parentPath) return true;
       return false;
     }
 
+    // For standard subtotals detail rows
     if (config.enable_subtotals) {
-      // For standard subtotals, check parent group
       if (!curr.__isSubtotal && next.__isSubtotal) return true;
       if (curr.__isSubtotal && next.__isSubtotal && curr.__groupValue !== next.__groupValue) return true;
-      // ✅ FIX: Subtotals are NOT last of their own group - they should show comparison
-      if (curr.__isSubtotal) return false;
       return false;
     }
+
     return false;
   },
 
@@ -837,30 +850,17 @@ const visObject = {
     return `<div class="cell-bar-container"><div class="cell-bar-bg"><div class="cell-bar-fill" style="width:${width}%; background:${barStyle};"></div></div><span class="cell-bar-value">${rendered}</span></div>`;
   },
 
-  // ✅ FIXED: Uses full dataset for peer detection to work across page changes
+  // ✅ FIXED: Restored logic from v4.27 for correct comparison peer detection
   renderComparison: function (row, config, fullData, primaryRendered, fieldName) {
     const targetField = fieldName || config.comparison_primary_field;
     const primary = parseFloat(row[targetField]?.value || 0);
     const isSub = !!row.__isSubtotal;
     const level = row.__level;
     const parentPath = row.__parentPath;
-    const parentGroup = row.__parentGroup;
 
-    // ✅ FIX: For standard subtotals, compare subtotals with each other
-    let peers;
-    if (config.enable_subtotals && !config.enable_bo_hierarchy) {
-      // Standard subtotals: compare subtotal rows with each other
-      if (isSub) {
-        peers = fullData.filter(r => r.__isSubtotal);
-      } else {
-        // Detail rows: compare within the same parent group
-        peers = fullData.filter(r => !r.__isSubtotal && !r.__isGrandTotal && r.__parentGroup === parentGroup);
-      }
-    } else {
-      // BO Hierarchy mode
-      peers = fullData.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
-    }
-
+    // ✅ KEY FIX: Use same peer logic as v4.27
+    // Peer subset: same type (subtotal vs detail), same level, same parent branch
+    const peers = fullData.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
     const currPeerIdx = peers.indexOf(row);
     const offset = config.comparison_period_offset || -1;
     const compRow = peers[currPeerIdx - offset];
