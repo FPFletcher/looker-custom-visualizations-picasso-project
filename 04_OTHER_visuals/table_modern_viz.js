@@ -1,25 +1,24 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.27.0 - Conditional Formatting + Comparison KPI Fixes
+ * Version: 4.28.0 - Field Formatting Toggle Fix
  * Build: 2026-01-17
  *
- * CRITICAL FIXES (v4.27):
- * ✅ Conditional formatting background now uses !important to override subtotal row background
- * ✅ Subtotal background only applied if no row-level conditional formatting exists
- * ✅ Comparison KPIs now work correctly for regular (non-BO) subtotals
- * ✅ Added comprehensive debug logging for conditional formatting on subtotals/grand totals
+ * CRITICAL FIX (v4.28):
+ * ✅ Custom field formatting now respects enable_custom_field_formatting toggle
+ * ✅ When toggle is OFF: subtotals use LookML, details use Looker's rendered
+ * ✅ When toggle is ON + format specified: applied to ALL rows (detail + subtotals)
+ * ✅ When toggle is ON + no format: subtotals use LookML, details use Looker's rendered
  *
- * Previous fixes (v4.26):
- * ✅ Conditional formatting now applies to ALL rows (detail + subtotals + grand total)
- * ✅ When custom format is disabled, subtotals properly revert to LookML formatting
- * ✅ Enhanced debug logging for subtotals and grand totals
+ * Previous fixes (v4.27):
+ * ✅ Conditional formatting background uses !important to override subtotal row background
+ * ✅ Comparison KPIs work correctly for regular (non-BO) subtotals
+ * ✅ Comprehensive debug logging for conditional formatting on subtotals/grand totals
  *
  * Format Logic:
- * - Custom format present → Apply to ALL rows (detail + subtotals)
- * - No custom format + Subtotal → Use LookML via formatMeasure
- * - No custom format + Detail → Use Looker's rendered (has LookML)
+ * - enable_custom_field_formatting OFF → All use LookML/Looker defaults
+ * - enable_custom_field_formatting ON + format set → Apply to ALL rows
+ * - enable_custom_field_formatting ON + no format → Subtotals use LookML, details use Looker
  * - Conditional formatting → Apply to ALL rows with !important for backgrounds
- * - Comparison KPIs → Work on all subtotals (BO and regular mode)
  *
  * Debug Console Logs:
  * [FILTER] Column filter applied: fieldName = value
@@ -633,16 +632,16 @@ const visObject = {
     if (val === null || val === undefined) return '∅';
 
     // Formatting priority for measures:
-    // 1. If custom format specified in config → apply to ALL rows
-    // 2. If subtotal/grand total → apply formatMeasure (uses LookML default)
-    // 3. If detail row with no custom format → use Looker's rendered (has LookML formatting)
+    // 1. If custom field formatting is ENABLED and format specified → apply to ALL rows
+    // 2. If custom field formatting is DISABLED → subtotals use LookML, details use Looker's rendered
+    // 3. If subtotal/grand total with no custom format → use LookML via formatMeasure
     const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
     const customFormat = config[`field_format_${field.name}`];
-    const hasCustomFormat = customFormat && customFormat.trim() !== '';
+    const hasCustomFormat = config.enable_custom_field_formatting && customFormat && customFormat.trim() !== '';
 
     if ((field.is_measure || field.type === 'number' || field.type === 'count')) {
       if (hasCustomFormat) {
-        // Custom format specified - apply to ALL rows (detail AND subtotals)
+        // Custom field formatting ENABLED + format specified - apply to ALL rows
         rendered = this.formatMeasure(val, field, config);
 
         // Debug logging
@@ -651,14 +650,14 @@ const visObject = {
                       isSubtotalOrGrandTotal ? '(subtotal)' : '(detail)');
         }
       } else if (isSubtotalOrGrandTotal) {
-        // No custom format, but this is subtotal/grand total - use formatMeasure for LookML default
+        // No custom format OR feature disabled - subtotals use LookML via formatMeasure
         rendered = this.formatMeasure(val, field, config);
 
         if (rowIdx < 3 || isSubtotalOrGrandTotal) {
           console.log(`[FORMAT] ${field.name} - Subtotal/GT using LookML format:`, rendered);
         }
       } else {
-        // Detail row with no custom format → keep Looker's rendered value
+        // Detail row with no custom format OR feature disabled → keep Looker's rendered (has LookML)
         if (rowIdx < 3) {
           console.log(`[FORMAT] ${field.name} - Detail row using Looker rendered:`, rendered);
         }
