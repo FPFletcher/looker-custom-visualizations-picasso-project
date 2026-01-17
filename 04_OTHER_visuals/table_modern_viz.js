@@ -93,17 +93,17 @@ const visObject = {
     enable_data_chips: { type: "boolean", label: "Enable Data Chips", default: false, section: "Series", order: 151 },
     data_chip_fields: { type: "string", label: "Apply to Fields (comma-sep)", default: "", section: "Series", order: 152 },
 
-    chip_match_green: { type: "string", label: "Green Match Values", default: "Complete,Success,Yes", section: "Series", order: 153 },
-    chip_bg_green: { type: "string", label: "Green Chip BG", display: "color", default: "#dcfce7", section: "Series", order: 154 },
-    chip_text_green: { type: "string", label: "Green Chip Text", display: "color", default: "#166534", section: "Series", order: 155 },
+    chip_match_green: { type: "string", label: "Chip 01 Match Values", default: "Complete,Success,Yes", section: "Series", order: 153 },
+    chip_bg_green: { type: "string", label: "Chip 01 BG", display: "color", default: "#dcfce7", section: "Series", order: 154 },
+    chip_text_green: { type: "string", label: "Chip 01 Text", display: "color", default: "#166534", section: "Series", order: 155 },
 
-    chip_match_yellow: { type: "string", label: "Yellow Match Values", default: "Pending,Warning,Maybe", section: "Series", order: 156 },
-    chip_bg_yellow: { type: "string", label: "Yellow Chip BG", display: "color", default: "#fef9c3", section: "Series", order: 157 },
-    chip_text_yellow: { type: "string", label: "Yellow Chip Text", display: "color", default: "#854d0e", section: "Series", order: 158 },
+    chip_match_yellow: { type: "string", label: "Chip 02 Match Values", default: "Pending,Warning,Maybe", section: "Series", order: 156 },
+    chip_bg_yellow: { type: "string", label: "Chip 02 BG", display: "color", default: "#fef9c3", section: "Series", order: 157 },
+    chip_text_yellow: { type: "string", label: "Chip 02 Text", display: "color", default: "#854d0e", section: "Series", order: 158 },
 
-    chip_match_red: { type: "string", label: "Red Match Values", default: "Failed,Error,No", section: "Series", order: 159 },
-    chip_bg_red: { type: "string", label: "Red Chip BG", display: "color", default: "#fee2e2", section: "Series", order: 160 },
-    chip_text_red: { type: "string", label: "Red Chip Text", display: "color", default: "#991b1b", section: "Series", order: 161 },
+    chip_match_red: { type: "string", label: "Chip 03 Match Values", default: "Failed,Error,No", section: "Series", order: 159 },
+    chip_bg_red: { type: "string", label: "Chip 03 BG", display: "color", default: "#fee2e2", section: "Series", order: 160 },
+    chip_text_red: { type: "string", label: "Chip 03 Text", display: "color", default: "#991b1b", section: "Series", order: 161 },
 
     // ══════════════════════════════════════════════════════════════
     // TAB: CONDITIONAL FORMATTING (COLUMN & ROW)
@@ -868,14 +868,34 @@ const visObject = {
   },
 
   sortData: function (data, field, direction) {
-    return [...data].sort((a, b) => {
-      let aVal = a[field]?.value ?? a[field];
-      let bVal = b[field]?.value ?? b[field];
-      if (aVal === bVal) return 0;
-      const res = aVal > bVal ? 1 : -1;
-      return direction === 'asc' ? res : -res;
-    });
-  },
+            const isAsc = direction === 'asc';
+            return [...data].sort((a, b) => {
+              // 1. Extract raw values safely
+              const cellA = a[field];
+              const cellB = b[field];
+              let valA = (cellA && typeof cellA === 'object' && cellA.value !== undefined) ? cellA.value : cellA;
+              let valB = (cellB && typeof cellB === 'object' && cellB.value !== undefined) ? cellB.value : cellB;
+
+              // 2. Handle Nulls (Always push to bottom regardless of sort dir)
+              if (valA === null || valA === undefined) return 1;
+              if (valB === null || valB === undefined) return -1;
+
+              // 3. Numeric Sort: Use strictly if BOTH are valid numbers (e.g. Measures)
+              // This prevents "10" < "2" in strictly numeric columns
+              if (typeof valA === 'number' && typeof valB === 'number') {
+                return isAsc ? valA - valB : valB - valA;
+              }
+
+              // 4. String/Mixed Sort: Use localeCompare for Dimensions/Mixed types
+              // {numeric: true} handles "Group 2" before "Group 10" naturally
+              // sensitivity: 'base' ignores case differences
+              const strA = String(valA);
+              const strB = String(valB);
+              const comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+
+              return isAsc ? comparison : -comparison;
+            });
+          },
 
   attachEventListeners: function (config) {
     const self = this;
