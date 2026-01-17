@@ -1,29 +1,28 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.28.0 - Field Formatting Toggle Fix
+ * Version: 4.29.0 - Debug Logging Enhanced
  * Build: 2026-01-17
  *
- * CRITICAL FIX (v4.28):
+ * DEBUG UPDATE (v4.29):
+ * 🔍 Added [FORMAT-DEBUG] logs for EVERY field on first 3 rows + ALL subtotals
+ * 🔍 Shows: fieldType, isMeasure, isSubtotal, enableCustomFieldFormatting, customFormat, hasCustomFormat, value, lookerRendered
+ * 🔍 This will help us identify exactly what's happening with the formatting logic
+ *
+ * Previous fix (v4.28):
  * ✅ Custom field formatting now respects enable_custom_field_formatting toggle
  * ✅ When toggle is OFF: subtotals use LookML, details use Looker's rendered
  * ✅ When toggle is ON + format specified: applied to ALL rows (detail + subtotals)
- * ✅ When toggle is ON + no format: subtotals use LookML, details use Looker's rendered
- *
- * Previous fixes (v4.27):
- * ✅ Conditional formatting background uses !important to override subtotal row background
- * ✅ Comparison KPIs work correctly for regular (non-BO) subtotals
- * ✅ Comprehensive debug logging for conditional formatting on subtotals/grand totals
  *
  * Format Logic:
  * - enable_custom_field_formatting OFF → All use LookML/Looker defaults
  * - enable_custom_field_formatting ON + format set → Apply to ALL rows
  * - enable_custom_field_formatting ON + no format → Subtotals use LookML, details use Looker
- * - Conditional formatting → Apply to ALL rows with !important for backgrounds
  *
  * Debug Console Logs:
- * [FILTER] Column filter applied: fieldName = value
- * [FORMAT] fieldName - Custom format applied / Subtotal LookML / Detail Looker rendered
- * [CONDITIONAL] Subtotal/GrandTotal row N, field X, value: Y, bgColor: Z, textColor: W
+ * [FORMAT-DEBUG] Shows complete state for debugging
+ * [FORMAT] Shows which formatting path was taken
+ * [CONDITIONAL] Shows conditional formatting evaluation
+ * [FILTER] Shows column filter actions
  */
 
 const visObject = {
@@ -638,6 +637,21 @@ const visObject = {
     const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
     const customFormat = config[`field_format_${field.name}`];
     const hasCustomFormat = config.enable_custom_field_formatting && customFormat && customFormat.trim() !== '';
+
+    // ALWAYS log for first 3 rows and ALL subtotals to debug
+    if (rowIdx < 3 || isSubtotalOrGrandTotal) {
+      console.log(`[FORMAT-DEBUG] Row ${rowIdx}, Field ${field.name}:`, {
+        fieldType: field.type,
+        isMeasure: field.is_measure,
+        isSubtotal: row.__isSubtotal,
+        isGrandTotal: row.__isGrandTotal,
+        enableCustomFieldFormatting: config.enable_custom_field_formatting,
+        customFormat: customFormat,
+        hasCustomFormat: hasCustomFormat,
+        value: val,
+        lookerRendered: cell?.rendered
+      });
+    }
 
     if ((field.is_measure || field.type === 'number' || field.type === 'count')) {
       if (hasCustomFormat) {
