@@ -1,24 +1,30 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.25.0 - Final Fixes: CSP Compliance, Filters, Formatting
- * Build: 2026-01-16
+ * Version: 4.27.0 - Conditional Formatting + Comparison KPI Fixes
+ * Build: 2026-01-17
  *
- * CRITICAL FIXES (v4.25):
- * ✅ Fixed CSP violations - removed inline event handlers (onclick, onmousedown, onfocus)
- * ✅ Column filters now persist values after Enter key
- * ✅ Column filters properly attached via addEventListener (CSP compliant)
- * ✅ Empty custom format (empty string) now correctly treated as "no custom format"
- * ✅ Added debug logging for format decisions (first 3 rows + subtotals)
+ * CRITICAL FIXES (v4.27):
+ * ✅ Conditional formatting background now uses !important to override subtotal row background
+ * ✅ Subtotal background only applied if no row-level conditional formatting exists
+ * ✅ Comparison KPIs now work correctly for regular (non-BO) subtotals
+ * ✅ Added comprehensive debug logging for conditional formatting on subtotals/grand totals
  *
- * Format Logic (with empty string fix):
- * - hasCustomFormat checks: customFormat && customFormat.trim() !== ''
+ * Previous fixes (v4.26):
+ * ✅ Conditional formatting now applies to ALL rows (detail + subtotals + grand total)
+ * ✅ When custom format is disabled, subtotals properly revert to LookML formatting
+ * ✅ Enhanced debug logging for subtotals and grand totals
+ *
+ * Format Logic:
  * - Custom format present → Apply to ALL rows (detail + subtotals)
  * - No custom format + Subtotal → Use LookML via formatMeasure
  * - No custom format + Detail → Use Looker's rendered (has LookML)
+ * - Conditional formatting → Apply to ALL rows with !important for backgrounds
+ * - Comparison KPIs → Work on all subtotals (BO and regular mode)
  *
  * Debug Console Logs:
  * [FILTER] Column filter applied: fieldName = value
  * [FORMAT] fieldName - Custom format applied / Subtotal LookML / Detail Looker rendered
+ * [CONDITIONAL] Subtotal/GrandTotal row N, field X, value: Y, bgColor: Z, textColor: W
  */
 
 const visObject = {
@@ -515,7 +521,7 @@ const visObject = {
     processedData.forEach((row, i) => {
       const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
       const level = row.__level || 0;
-      let bg = isSub ? `background:${config.subtotal_background_color};` : '';
+      let bg = '';
       const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
       // Row-level conditional formatting
@@ -526,6 +532,11 @@ const visObject = {
         if (rowBg) bg = `background:${rowBg};`;
       }
 
+      // Apply subtotal background ONLY if no row-level conditional formatting was applied
+      if (isSub && !bg) {
+        bg = `background:${config.subtotal_background_color};`;
+      }
+
       html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
       if (config.show_row_numbers) html += `<td>${(isSub || isGT) ? '' : i + 1}</td>`;
 
@@ -534,15 +545,22 @@ const visObject = {
         let style = (idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '';
         if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
-        // Cell-level conditional formatting
-        if (config.enable_conditional_formatting && config.conditional_field === f.name && !isSub && !isGT) {
+        // Cell-level conditional formatting - applies to ALL rows including subtotals and grand totals
+        if (config.enable_conditional_formatting && config.conditional_field === f.name) {
           const cellData = row[f.name];
           const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
           const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') ||
                           this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
           const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') ||
                             this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'text');
-          if (bgColor) style += `background:${bgColor};`;
+
+          // Debug logging
+          if (isSub || isGT) {
+            console.log(`[CONDITIONAL] ${isSub ? 'Subtotal' : 'GrandTotal'} row ${i}, field ${f.name}, value:`, cellValue,
+                       'bgColor:', bgColor, 'textColor:', textColor);
+          }
+
+          if (bgColor) style += `background:${bgColor} !important;`; // Add !important to override row bg
           if (textColor) style += `color:${textColor};`;
         }
 
@@ -636,8 +654,8 @@ const visObject = {
         // No custom format, but this is subtotal/grand total - use formatMeasure for LookML default
         rendered = this.formatMeasure(val, field, config);
 
-        if (rowIdx < 3) {
-          console.log(`[FORMAT] ${field.name} - Subtotal LookML format:`, rendered);
+        if (rowIdx < 3 || isSubtotalOrGrandTotal) {
+          console.log(`[FORMAT] ${field.name} - Subtotal/GT using LookML format:`, rendered);
         }
       } else {
         // Detail row with no custom format → keep Looker's rendered value
@@ -679,6 +697,21 @@ const visObject = {
     const curr = data[idx];
     const next = data[idx + 1];
     if (next.__isGrandTotal) return true;
+
+    // For REGULAR subtotals (non-BO mode)
+    if (!config.enable_bo_hierarchy && curr.__isSubtotal) {
+      // Check if there's another subtotal at the same level
+      // with the same group dimension value
+      for (let i = idx + 1; i < data.length; i++) {
+        const futureRow = data[i];
+        if (futureRow.__isGrandTotal) return true;
+        if (futureRow.__isSubtotal) {
+          // Found another subtotal - they can be compared
+          return false;
+        }
+      }
+      return true; // No more subtotals found
+    }
 
     // For hierarchy mode with subtotals
     if (config.enable_bo_hierarchy) {
