@@ -678,10 +678,13 @@ const visObject = {
       else rendered = `<span class="data-chip" style="background-color: ${config.chip_default_bg}; color: ${config.chip_default_text};">${rendered}</span>`;
     }
 
-    if (config.enable_comparison && config.comparison_primary_field === field.name) {
+    // ✅ FIXED: Support comma-separated fields for Comparison
+    const compFields = (config.comparison_primary_field || "").split(',').map(s => s.trim());
+    if (config.enable_comparison && compFields.includes(field.name)) {
       const isLastOfSubgroup = this.isLastElementOfGroup(rowIdx, data, config);
       if (!row.__isGrandTotal && !isLastOfSubgroup) {
-        rendered = this.renderComparison(row, config, rowIdx, data, rendered);
+        // Pass field.name to the function so it knows WHICH field to calculate
+        rendered = this.renderComparison(row, config, rowIdx, data, rendered, field.name);
       }
     }
 
@@ -697,7 +700,7 @@ const visObject = {
   },
 
   // ✅ RESTORED: Robust Logic for Subtotal Comparison Checks from v4.30.0
-          isLastElementOfGroup: function (idx, data, config) {
+  isLastElementOfGroup: function (idx, data, config) {
             if (idx >= data.length - 1) return true;
             const curr = data[idx];
             const next = data[idx + 1];
@@ -764,26 +767,35 @@ const visObject = {
     return `<div class="cell-bar-container"><div class="cell-bar-bg"><div class="cell-bar-fill" style="width:${width}%; background:${barStyle};"></div></div><span>${rendered}</span></div>`;
   },
 
-  renderComparison: function (row, config, rowIdx, data, primaryRendered) {
-            const primary = parseFloat(row[config.comparison_primary_field]?.value || 0);
+  renderComparison: function (row, config, rowIdx, data, primaryRendered, fieldName) {
+            // ✅ FIXED: Use the specific fieldName passed from the loop, fallback to config if missing
+            const targetField = fieldName || config.comparison_primary_field;
+
+            // Use targetField instead of config.comparison_primary_field
+            const primary = parseFloat(row[targetField]?.value || 0);
+
             const isSub = !!row.__isSubtotal;
             const level = row.__level;
             const parentPath = row.__parentPath;
 
-            // Peer subset: same type, same level, same parent branch
+            // Peer subset logic (from v4.27/v4.30.0)
             const peers = data.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
             const currPeerIdx = peers.indexOf(row);
             const offset = config.comparison_period_offset || -1;
             const compRow = peers[currPeerIdx - offset];
 
             if (!compRow) return primaryRendered;
-            const secondary = parseFloat(compRow[config.comparison_primary_field]?.value || 0);
+
+            // Use targetField here as well
+            const secondary = parseFloat(compRow[targetField]?.value || 0);
+
             if (isNaN(secondary) || secondary === 0) return primaryRendered;
 
             const diff = primary - secondary;
             const pct = ((diff / Math.abs(secondary)) * 100).toFixed(1);
             const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
             const arrow = config.show_comparison_arrows ? (diff >= 0 ? '↑' : '↓') : '';
+
             return `<span>${primaryRendered}</span> <span style="color:${color}; font-size:0.85em; font-weight:600; margin-left:5px;">${arrow}${Math.abs(pct)}%</span>`;
           },
 
