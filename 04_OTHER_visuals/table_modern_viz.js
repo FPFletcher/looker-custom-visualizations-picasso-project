@@ -1,22 +1,24 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.24.1 - HOTFIX: Variable Scope Bug (paginatedData)
+ * Version: 4.25.0 - Final Fixes: CSP Compliance, Filters, Formatting
  * Build: 2026-01-16
  *
- * CRITICAL HOTFIX (v4.24.1):
- * ✅ Fixed "paginatedData is not defined" error breaking all interactivity
- * ✅ Changed paginatedData → processedData in renderTable function
- * ✅ Expand/collapse, BO hierarchy toggle now working again
+ * CRITICAL FIXES (v4.25):
+ * ✅ Fixed CSP violations - removed inline event handlers (onclick, onmousedown, onfocus)
+ * ✅ Column filters now persist values after Enter key
+ * ✅ Column filters properly attached via addEventListener (CSP compliant)
+ * ✅ Empty custom format (empty string) now correctly treated as "no custom format"
+ * ✅ Added debug logging for format decisions (first 3 rows + subtotals)
  *
- * Root Cause: renderTable() received processedData as parameter but tried to reference
- * paginatedData (which was only in scope in updateAsync). This broke all re-renders.
+ * Format Logic (with empty string fix):
+ * - hasCustomFormat checks: customFormat && customFormat.trim() !== ''
+ * - Custom format present → Apply to ALL rows (detail + subtotals)
+ * - No custom format + Subtotal → Use LookML via formatMeasure
+ * - No custom format + Detail → Use Looker's rendered (has LookML)
  *
- * FIXES (v4.24):
- * - Pagination shows grand total row count
- * - Column filter click doesn't trigger sort
- * - Subtotals revert to LookML format when custom format removed
- * - Custom value format applies to rows AND subtotals
- * - Comparison shows for expanded hierarchy categories
+ * Debug Console Logs:
+ * [FILTER] Column filter applied: fieldName = value
+ * [FORMAT] fieldName - Custom format applied / Subtotal LookML / Detail Looker rendered
  */
 
 const visObject = {
@@ -504,7 +506,8 @@ const visObject = {
       const sticky = (idx < config.freeze_columns && config.freeze_header_row) ? 'position:sticky; left:0; z-index:101;' : '';
       const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
       const label = config[`field_label_${f.name}`] || f.label_short || f.label;
-      const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" placeholder="Filter..." onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onfocus="event.stopPropagation();">` : '';
+      const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
+      const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
       html += `<th class="sortable" data-field="${f.name}" style="${sticky} cursor:pointer;">${label}${sortIcon}${columnFilter}</th>`;
     });
     html += '</tr></thead><tbody>';
@@ -616,17 +619,32 @@ const visObject = {
     // 2. If subtotal/grand total → apply formatMeasure (uses LookML default)
     // 3. If detail row with no custom format → use Looker's rendered (has LookML formatting)
     const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
-    const hasCustomFormat = config[`field_format_${field.name}`];
+    const customFormat = config[`field_format_${field.name}`];
+    const hasCustomFormat = customFormat && customFormat.trim() !== '';
 
     if ((field.is_measure || field.type === 'number' || field.type === 'count')) {
       if (hasCustomFormat) {
         // Custom format specified - apply to ALL rows (detail AND subtotals)
         rendered = this.formatMeasure(val, field, config);
+
+        // Debug logging
+        if (rowIdx < 3 || isSubtotalOrGrandTotal) {
+          console.log(`[FORMAT] ${field.name} - Custom format applied:`, customFormat, '→', rendered,
+                      isSubtotalOrGrandTotal ? '(subtotal)' : '(detail)');
+        }
       } else if (isSubtotalOrGrandTotal) {
         // No custom format, but this is subtotal/grand total - use formatMeasure for LookML default
         rendered = this.formatMeasure(val, field, config);
+
+        if (rowIdx < 3) {
+          console.log(`[FORMAT] ${field.name} - Subtotal LookML format:`, rendered);
+        }
+      } else {
+        // Detail row with no custom format → keep Looker's rendered value
+        if (rowIdx < 3) {
+          console.log(`[FORMAT] ${field.name} - Detail row using Looker rendered:`, rendered);
+        }
       }
-      // Otherwise: detail row with no custom format → keep Looker's rendered value (has LookML formatting)
     }
 
     // Data Chip logic
@@ -789,11 +807,28 @@ const visObject = {
     // Column filters
     if (config.enable_column_filters) {
       this.container.querySelectorAll('.column-filter').forEach(input => {
+        // Prevent click/mousedown from triggering sort
+        input.addEventListener('click', (e) => e.stopPropagation());
+        input.addEventListener('mousedown', (e) => e.stopPropagation());
+        input.addEventListener('focus', (e) => e.stopPropagation());
+
+        // Handle Enter key to apply filter
         input.addEventListener('keypress', (e) => {
           if (e.key === 'Enter') {
+            e.stopPropagation();
             const field = e.target.dataset.field;
             if (!self.state.columnFilters) self.state.columnFilters = {};
-            self.state.columnFilters[field] = e.target.value.toLowerCase();
+            const filterValue = e.target.value.toLowerCase().trim();
+
+            console.log('[FILTER] Column filter applied:', field, '=', filterValue);
+
+            if (filterValue) {
+              self.state.columnFilters[field] = filterValue;
+            } else {
+              // Remove filter if empty
+              delete self.state.columnFilters[field];
+            }
+
             self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => {});
           }
         });
