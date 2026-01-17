@@ -1,6 +1,6 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 4.34.0 - RESTORED 4.31 + DETAIL ROW FORMATTING FIX
+ * Version: 4.35.0 - FORCE CUSTOM FORMATTING + RESTORED 4.31
  * Build: 2026-01-17
  */
 
@@ -46,7 +46,7 @@ const visObject = {
     use_gradient_2: { type: "boolean", label: "Use Gradient 2", default: false, section: "Series", order: 9 },
     gradient_end_2: { type: "string", label: "Gradient End 2", display: "color", default: "#6ee7b7", section: "Series", order: 10 },
 
-    grouping_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
+    column_group_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
     enable_column_groups: { type: "boolean", label: "Enable Grouping", default: false, section: "Series", order: 21 },
     column_group_1_name: { type: "string", label: "Group 1 Name", default: "", section: "Series", order: 22 },
     column_group_1_count: { type: "number", label: "Group 1 Count", default: 1, section: "Series", order: 23 },
@@ -123,7 +123,6 @@ const visObject = {
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     this.clearErrors();
-    console.log("[UI-TRACE] updateAsync started with data length:", data.length);
     if (!queryResponse || !queryResponse.fields || !data || data.length === 0) { done(); return; }
 
     const dims = queryResponse.fields.dimension_like;
@@ -218,9 +217,7 @@ const visObject = {
   formatMeasure: function (value, field, config) {
     const customFormat = config[`field_format_${field.name}`];
     if (customFormat && config.enable_custom_field_formatting) {
-      const res = this.applyCustomFormat(value, customFormat);
-      console.log(`[FORMAT-LOG] Formatted ${field.name}: ${value} -> ${res} (Using Custom: ${customFormat})`);
-      return res;
+      return this.applyCustomFormat(value, customFormat);
     }
     if (field.value_format) {
       return this.applyCustomFormat(value, field.value_format);
@@ -355,18 +352,17 @@ const visObject = {
     const customFmt = config[`field_format_${field.name}`];
     const hasCustomFmt = !!(config.enable_custom_field_formatting && customFmt && customFmt.trim() !== '');
 
-    // DEBUG: Log first 5 rows and all subtotals
+    // DEBUG & LOGGING
     if (idx < 5 || isSubGT) {
-      console.log(`[DEBUG-DATA] Field: ${field.name}, Row: ${idx}, Subtotal: ${isSubGT}, hasCustomFmt: ${hasCustomFmt}, Current Render: ${rendered}`);
+        console.log(`[FORMAT-FORCE] Field: ${field.name}, Row: ${idx}, hasCustomFmt: ${hasCustomFmt}, Current: ${rendered}`);
     }
 
-    if (field.is_measure || field.type === 'number' || field.type === 'count') {
-      if (hasCustomFmt) {
-         // CRITICAL: Ignore Looker pre-rendered value if custom format is active
+    // REMOVED ALL TYPE CHECKS: Force custom format for any field that has a config entry
+    if (hasCustomFmt) {
          rendered = this.formatMeasure(val, field, config);
-      } else if (isSubGT) {
+         if (idx < 5 || isSubGT) console.log(`[FORMAT-FORCE] Result: ${rendered}`);
+    } else if (isSubGT) {
          rendered = this.formatMeasure(val, field, config);
-      }
     }
 
     // Data Chips
@@ -397,7 +393,6 @@ const visObject = {
   },
 
   attachEventListeners: function (config) {
-    const self = this;
     if (config.enable_hover) {
       this.container.querySelectorAll('.table-row').forEach(tr => {
         tr.onmouseenter = () => tr.style.backgroundColor = config.hover_bg_color;
