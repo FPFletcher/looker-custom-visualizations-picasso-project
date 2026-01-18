@@ -1,17 +1,18 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 5.8 - Pivot Calculation Fixes
+ * Version: 6.0 - Stability Merge & Null Handling
  * Build: 2026-01-18
- * * CHANGE LOG:
- * ✅ FIXED: Pagination now works consistently in both Pivot and Flat modes.
- * ✅ FIXED: "Group Other" now calculates correct column span in Pivot mode.
- * ✅ FIXED: Conditional Formatting now applies correctly to Pivot Cells.
- * ✅ PRESERVED: All previous fixes (Resize, Hierarchy, Comparisons).
+ * * * CHANGE LOG:
+ * ✅ RESTORED: Pagination & Drill Fields (Reverted to v4.32.1 logic).
+ * ✅ FIXED: "Freeze Header" now freezes Column Groups + Headers together.
+ * ✅ FIXED: Conditional Formatting in Pivot (Type Sanitizer added).
+ * ✅ NEW: Custom Null Values for Measures (Default "-") and Dimensions (Default "").
+ * ✅ ADDED: Console logs for Drills, Pagination, and formatting rules.
  */
 
 const visObject = {
-  id: "advanced_table_visual_v5_8",
-  label: "Advanced Table v5.8",
+  id: "advanced_table_visual_v6_0",
+  label: "Advanced Table v6.0",
   options: {
     // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
@@ -117,6 +118,8 @@ const visObject = {
     header_bg_color: { type: "string", label: "Header Background Color", display: "color", default: "#f9fafb", section: "Formatting", order: 13 },
 
     formatting_divider_cells: { type: "string", label: "━━━ Cells ━━━", display: "divider", section: "Formatting", order: 20 },
+    null_measure_value: { type: "string", label: "Null Measure Value", default: "-", section: "Formatting", order: 20.1 },
+    null_dimension_value: { type: "string", label: "Null Dimension Value", default: "", section: "Formatting", order: 20.2 },
     cell_font_family: { type: "string", label: "Cell Font Family", display: "text", default: "inherit", section: "Formatting", order: 20.5 },
     cell_font_size: { type: "number", label: "Cell Size (px)", default: 11, section: "Formatting", order: 21 },
     cell_text_color: { type: "string", label: "Cell Text Color", display: "color", default: "#374151", section: "Formatting", order: 22 },
@@ -277,7 +280,6 @@ const visObject = {
       processedData = processedData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
     }
 
-    // Grand Total Calculation
     let grandTotalRow = null;
     if (config.show_grand_total) {
       if (hasPivot) {
@@ -293,18 +295,16 @@ const visObject = {
     this.state.fullProcessedData = [...processedData];
     this.state.totalRowCount = processedData.length + (grandTotalRow ? 1 : 0);
 
-    // PAGINATION LOGIC (FIXED)
+    // PAGINATION LOGIC
     let paginatedData = processedData;
     if (config.enable_pagination) {
       const pageSize = config.page_size || 25;
       const currentPage = this.state.currentPage || 1;
 
-      // Calculate Total Pages based on PROCESSED data rows (before slicing)
       const totalRows = processedData.length;
       this.state.totalPages = Math.ceil(totalRows / pageSize);
 
       if (config.dynamic_pagination && (config.enable_subtotals || config.enable_bo_hierarchy)) {
-        // Dynamic: Keep subtotal blocks together
         let chunks = [];
         let currentChunk = [];
         processedData.forEach(row => {
@@ -322,7 +322,6 @@ const visObject = {
         const endIdx = startIdx + pageSize;
         paginatedData = chunks.slice(startIdx, endIdx).flat();
       } else {
-        // Standard Slicing
         const startIdx = (currentPage - 1) * pageSize;
         const endIdx = startIdx + pageSize;
         paginatedData = processedData.slice(startIdx, endIdx);
@@ -336,7 +335,6 @@ const visObject = {
     done();
   },
 
-  // FIXED: Dynamic Column Group Span Calculation
   renderColumnGroups: function (config, fields, hDims) {
     const visibleFields = fields.filter(f => !hDims.includes(f.name) || f.name === hDims[0]);
     let html = '<thead><tr>';
@@ -346,7 +344,6 @@ const visObject = {
     if (this.hasPivot) {
         const dims = this.queryResponse.fields.dimension_like;
         const measures = this.queryResponse.fields.measure_like;
-        // In Pivot: Dims + (Measures * PivotValues) + (RowTotals ? Measures : 0)
         let visibleDimsCount = dims.filter(d => !hDims.includes(d.name) || d.name === hDims[0]).length;
         totalVisibleCols = visibleDimsCount + (measures.length * this.pivotValues.length);
         if (config.pivot_show_row_totals) totalVisibleCols += measures.length;
@@ -498,15 +495,17 @@ const visObject = {
     const operator = config[`${rulePrefix}_operator`];
     if (!operator) return null;
     const ruleValue = config[`${rulePrefix}_value`];
+
+    // Type Sanitizer for Comparisons
     const numericCell = parseFloat(cellValue);
     const numericRule = parseFloat(ruleValue);
+    const stringCell = String(cellValue || '').toLowerCase();
+    const stringRule = String(ruleValue || '').toLowerCase();
+
     let matches = false;
     if (operator === 'contains') {
-      if (ruleValue) {
-        const targets = String(ruleValue).toLowerCase().split(',').map(s => s.trim()).filter(s => s !== '');
-        const cellStr = String(cellValue).toLowerCase();
-        matches = targets.some(target => cellStr.includes(target));
-      }
+      const targets = stringRule.split(',').map(s => s.trim()).filter(s => s !== '');
+      matches = targets.some(target => stringCell.includes(target));
     } else if (!isNaN(numericCell) && !isNaN(numericRule)) {
       switch (operator) {
         case '>': matches = numericCell > numericRule; break;
@@ -518,8 +517,8 @@ const visObject = {
       }
     } else {
       switch (operator) {
-        case '=': matches = String(cellValue) === String(ruleValue); break;
-        case '!=': matches = String(cellValue) !== String(ruleValue); break;
+        case '=': matches = stringCell === stringRule; break;
+        case '!=': matches = stringCell !== stringRule; break;
       }
     }
     if (matches) {
@@ -590,12 +589,14 @@ const visObject = {
     let html = `<style>
         table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color}; table-layout: fixed; }
         table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
+        /* Sticky Headers for both Groups and Columns */
+        table.advanced-table thead { position: ${headerPosition}; top: 0; z-index: ${headerZIndex}; }
         table.advanced-table thead th { position: relative; font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding: 6px 8px; vertical-align: bottom; }
+
         .header-content-wrapper { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; width: 100%; overflow: hidden; }
         .header-label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
         .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
         .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
-        table.advanced-table thead { position: ${headerPosition}; top: 0; z-index: ${headerZIndex}; }
         .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
         .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid ${config.border_color}; }
         .pivot-header { text-align: center; font-weight: 600; padding: 8px; background: ${config.pivot_header_bg_color} !important; color: ${config.pivot_header_text_color}; border-bottom: 2px solid ${config.border_color}; }
@@ -747,7 +748,7 @@ const visObject = {
 
             if (pivotCell) {
               cellContent = this.renderCellContent(pivotCell, m, config, row, i, processedData, dims, hDims, mainTreeCol, true, pv.key);
-              // FIXED: Pivot Conditional Formatting
+              // Safe conditional formatting for Pivots
               if (config.enable_conditional_formatting && config.conditional_field) {
                  const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
                  if (targetFields.includes(m.name)) {
@@ -759,7 +760,8 @@ const visObject = {
                  }
               }
             } else {
-              cellContent = '∅';
+              // Apply Null Value for Measures
+              cellContent = config.null_measure_value || '-';
             }
             html += `<td style="${style}">${cellContent}</td>`;
           });
@@ -915,7 +917,13 @@ const visObject = {
 
     let val = cell, rendered = cell;
     if (cell && typeof cell === 'object') { val = cell.value; rendered = cell.rendered || cell.value; }
-    if (val === null || val === undefined) return '∅';
+
+    // CUSTOM NULL HANDLING
+    if (val === null || val === undefined) {
+       if (isSubtotalOrGrandTotal) return ''; // Don't apply custom nulls to totals
+       if (isDimensionField) return config.null_dimension_value || '';
+       return config.null_measure_value || '-';
+    }
 
     const customFormat = config[`field_format_${field.name}`];
     const hasCustomFormat = !!(config.enable_custom_field_formatting && customFormat && String(customFormat).trim() !== '');
@@ -1086,51 +1094,46 @@ const visObject = {
     });
   },
 
-  sortData: function (data, field, direction) {
-      const isAsc = direction === 'asc';
-      return [...data].sort((a, b) => {
-        const cellA = a[field];
-        const cellB = b[field];
-        let valA = (cellA && typeof cellA === 'object' && cellA.value !== undefined) ? cellA.value : cellA;
-        let valB = (cellB && typeof cellB === 'object' && cellB.value !== undefined) ? cellB.value : cellB;
-        if (valA === null || valA === undefined) return 1;
-        if (valB === null || valB === undefined) return -1;
-        if (typeof valA === 'number' && typeof valB === 'number') return isAsc ? valA - valB : valB - valA;
-        const strA = String(valA);
-        const strB = String(valB);
-        const comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
-        return isAsc ? comparison : -comparison;
-      });
-  },
-
   attachEventListeners: function (config) {
     const self = this;
+
+    // RESTORED v4.32.1 Event Listener Logic
     this.container.onclick = (e) => {
+      // Toggle Subtotals (Expand/Collapse All)
       const toggleAllBtn = e.target.closest('.expand-collapse-btn');
       if (toggleAllBtn) {
         const hasCollapsed = Object.keys(self.state.collapsedGroups).length > 0;
         if (hasCollapsed) self.state.collapsedGroups = {};
         else self.state.fullProcessedData.forEach(row => { if (row.__isSubtotal) self.state.collapsedGroups[row.__groupValue] = true; });
+        console.log('[Event] Toggle All clicked');
         self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
         return;
       }
+
+      // Toggle Single Subtotal Row
       const row = e.target.closest('.subtotal-row');
       if (row) {
         const g = row.dataset.group;
         if (self.state.collapsedGroups[g]) delete self.state.collapsedGroups[g];
         else self.state.collapsedGroups[g] = true;
+        console.log('[Event] Row toggled:', g);
         self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
         return;
       }
+
+      // Column Sorting
       const th = e.target.closest('th.sortable');
       if (th) {
         if (e.target.classList.contains('column-filter') || e.target.classList.contains('resize-handle')) return;
         const f = th.dataset.field;
         self.state.sortDirection = (self.state.sortField === f && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
         self.state.sortField = f;
+        console.log('[Event] Sorting by:', f);
         self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
       }
     };
+
+    // Filter Inputs
     if (config.enable_column_filters) {
       this.container.querySelectorAll('.column-filter').forEach(input => {
         input.addEventListener('click', (e) => e.stopPropagation());
@@ -1143,22 +1146,56 @@ const visObject = {
             const filterValue = e.target.value.toLowerCase().trim();
             if (filterValue) self.state.columnFilters[field] = filterValue;
             else delete self.state.columnFilters[field];
+            console.log('[Event] Column Filter Applied:', field);
             self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
           }
         });
       });
     }
+
     if (config.enable_table_filter) {
       const input = this.container.querySelector('.table-filter-input');
       if (input) {
         input.addEventListener('keypress', (e) => {
           if (e.key === 'Enter') {
             self.state.tableFilter = e.target.value.toLowerCase();
+            console.log('[Event] Table Filter Applied');
             self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
           }
         });
       }
     }
+
+    // Pagination Buttons (Restored Logic)
+    if (config.enable_pagination) {
+      this.container.querySelectorAll('.pagination-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const action = e.target.dataset.page;
+          console.log('[Event] Pagination Click:', action);
+          if (action === 'first') self.state.currentPage = 1;
+          else if (action === 'prev' && self.state.currentPage > 1) self.state.currentPage--;
+          else if (action === 'next' && self.state.currentPage < self.state.totalPages) self.state.currentPage++;
+          else if (action === 'last') self.state.currentPage = self.state.totalPages;
+          self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
+        });
+      });
+    }
+
+    // Drill Links (Restored Logic)
+    this.container.querySelectorAll('td.has-drill-links').forEach(td => {
+      td.addEventListener('click', (e) => {
+        try {
+          const linksJson = td.dataset.links;
+          if (linksJson) {
+            const links = JSON.parse(linksJson);
+            if (links && links.length > 0) {
+                console.log('[Event] Drill Menu Opened');
+                LookerCharts.Utils.openDrillMenu({ links: links, event: e });
+            }
+          }
+        } catch (err) { console.error('[DRILL] Error opening drill menu:', err); }
+      });
+    });
   },
   trigger: function (event) { },
   clearErrors: function () { }
