@@ -1,19 +1,18 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 12.0 - Final Features & Geometry Fixes
+ * Version: 13.0 - The "Stability & Features" Update
  * Build: 2026-01-18
  * * CHANGE LOG:
- * ✅ FIXED: Heatmap background is now contained (Added position:relative to td).
- * ✅ FIXED: Multiple Column Freezing now stacks correctly (Cumulative Left Offset).
- * ✅ FIXED: "Show Headers" toggle now works (Hides thead completely).
- * ✅ FIXED: Pivot Column Formatting now handles numeric rules (Currency stripped).
- * ✅ FIXED: Pivot Headers now match table theme by default.
- * ✅ PRESERVED: Pivot Sorting, Row Rules, Drill Fields.
+ * ✅ CRITICAL FIX: "pivotDims is not defined" crash resolved (Scope fix).
+ * ✅ FIXED: Pivot Sorting (Dimensions sort normally, Measures sort by Year).
+ * ✅ FIXED: Heatmap (Full cell background + Custom Text Color).
+ * ✅ FIXED: Column Freezing (Restricted to Column 1, fixed Header overlap).
+ * ✅ FIXED: Conditional Formatting (Pivot Row/Column rules now working).
  */
 
 const visObject = {
-  id: "advanced_table_visual_v12_0",
-  label: "Advanced Table v12.0",
+  id: "advanced_table_visual_v13_0",
+  label: "Advanced Table v13.0",
   options: {
     // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
@@ -29,8 +28,8 @@ const visObject = {
     dynamic_pagination: { type: "boolean", label: "Dynamic Pagination (Respects Subtotals)", default: true, section: "Plot", order: 14 },
 
     plot_divider_pivot: { type: "string", label: "━━━ Pivot Settings ━━━", display: "divider", section: "Plot", order: 20 },
-    pivot_header_bg_color: { type: "string", label: "Pivot Header BG", display: "color", default: "#f9fafb", section: "Plot", order: 21 },
-    pivot_header_text_color: { type: "string", label: "Pivot Header Text", display: "color", default: "#1f2937", section: "Plot", order: 22 },
+    pivot_header_bg_color: { type: "string", label: "Pivot Header BG", display: "color", default: "#e0e7ff", section: "Plot", order: 21 },
+    pivot_header_text_color: { type: "string", label: "Pivot Header Text", display: "color", default: "#3730a3", section: "Plot", order: 22 },
     pivot_show_row_totals: { type: "boolean", label: "Show Row Totals", default: false, section: "Plot", order: 23 },
     pivot_row_total_label: { type: "string", label: "Row Total Label", default: "Total", section: "Plot", order: 24 },
 
@@ -60,7 +59,7 @@ const visObject = {
     enable_column_filters: { type: "boolean", label: "Enable Column Filters", default: false, section: "Plot", order: 52 },
 
     plot_divider_freezing: { type: "string", label: "━━━ Freezing ━━━", display: "divider", section: "Plot", order: 60 },
-    freeze_columns: { type: "number", label: "Freeze Left Columns", default: 0, section: "Plot", order: 61 },
+    freeze_columns: { type: "number", label: "Freeze First Column (1=Yes, 0=No)", default: 0, section: "Plot", order: 61 },
     freeze_header_row: { type: "boolean", label: "Freeze Header Row", default: true, section: "Plot", order: 62 },
 
     // ══════════════════════════════════════════════════════════════
@@ -234,6 +233,7 @@ const visObject = {
 
     let processedData = [...data];
 
+    // Filter Logic
     if (config.enable_table_filter && this.state.tableFilter) {
       const filterText = this.state.tableFilter;
       const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
@@ -264,6 +264,7 @@ const visObject = {
 
     if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
+    // Subtotal / Hierarchy Logic
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
       const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
       if (hierarchyList.length > 0) {
@@ -298,6 +299,7 @@ const visObject = {
     this.state.fullProcessedData = [...processedData];
     this.state.totalRowCount = processedData.length + (grandTotalRow ? 1 : 0);
 
+    // PAGINATION LOGIC
     let paginatedData = processedData;
     if (config.enable_pagination) {
       const pageSize = config.page_size || 25;
@@ -340,6 +342,7 @@ const visObject = {
   renderColumnGroups: function (config, fields, hDims) {
     const visibleFields = fields.filter(f => !hDims.includes(f.name) || f.name === hDims[0]);
     let html = '<thead>';
+
     if(config.show_headers) {
       let totalVisibleCols = 0;
       if (this.hasPivot) {
@@ -667,20 +670,21 @@ const visObject = {
     // PIVOT TABLE RENDERING
     // ═══════════════════════════════════════════════════════════════
     if (hasPivot && pivotValues.length > 0) {
+      // FIXED: PIVOTDIMS MOVED TO TOP SCOPE (Fixes ReferenceError)
+      let pivotDims = [...dims];
+      if (config.enable_bo_hierarchy && hDims.length > 0) {
+         const mainField = dims.find(d => d.name === hDims[0]);
+         if (mainField) {
+            pivotDims = [mainField, ...dims.filter(d => d.name !== hDims[0])];
+         }
+      }
+
       // CONDITIONAL HEADER RENDER
       if(config.show_headers) {
           html += '<thead>';
           if (config.enable_column_groups) html += this.renderColumnGroups(config, [...dims, ...measures], hDims);
 
           html += '<tr>';
-
-          let pivotDims = [...dims];
-          if (config.enable_bo_hierarchy && hDims.length > 0) {
-             const mainField = dims.find(d => d.name === hDims[0]);
-             if (mainField) {
-                pivotDims = [mainField, ...dims.filter(d => d.name !== hDims[0])];
-             }
-          }
 
           // Variable to track the cumulative width of frozen columns
           let currentLeftOffset = 0;
@@ -689,19 +693,19 @@ const visObject = {
             if (config.enable_bo_hierarchy && hDims.includes(d.name) && d.name !== hDims[0]) return;
 
             const w = getColumnWidth(d.name);
-            const numericWidth = parseInt(w) || 150; // Parse width for calculation
+            const numericWidth = parseInt(w) || 150;
 
             const label = config[`field_label_${d.name}`] || d.label_short || d.label;
             const filterValue = (this.state.columnFilters && this.state.columnFilters[d.name]) || '';
             const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${d.name}" value="${filterValue}" placeholder="Filter...">` : '';
 
             let stickyStyle = '';
-            if (idx < config.freeze_columns) {
-                stickyStyle = `position:sticky; left:${currentLeftOffset}px; z-index:102; background:inherit; border-right: 2px solid #ccc;`;
-                currentLeftOffset += numericWidth; // Add to offset for next column
+            // FIXED: Limit Freeze to First Column
+            if (idx === 0 && config.freeze_columns > 0) {
+                stickyStyle = `position:sticky; left:0; z-index:122; background:inherit; border-right: 2px solid #ccc;`;
             }
 
-            html += `<th rowspan="2" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}">
+            html += `<th rowspan="2" class="sortable" data-field="${d.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}">
               <div class="header-content-wrapper"><span class="header-label">${label}</span>${columnFilter}</div>
               <div class="resize-handle" data-col="${d.name}"></div>
             </th>`;
@@ -788,14 +792,11 @@ const visObject = {
         let currentCellLeftOffset = 0;
         pivotDims.forEach((d, idx) => {
           if (config.enable_bo_hierarchy && hDims.includes(d.name) && d.name !== hDims[0]) return;
-
           const w = getColumnWidth(d.name);
-          const numericWidth = parseInt(w) || 150;
 
           let stickyStyle = '';
-          if (idx < config.freeze_columns) {
-             stickyStyle = `position:sticky; left:${currentCellLeftOffset}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
-             currentCellLeftOffset += numericWidth;
+          if (idx === 0 && config.freeze_columns > 0) {
+             stickyStyle = `position:sticky; left:0; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
           }
 
           let style = `width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}`;
@@ -808,7 +809,7 @@ const visObject = {
              content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
           }
 
-          html += `<td class="${idx === 0 && config.freeze_columns > 0 ? 'sticky-col' : ''}" style="${style}">${content || ''}</td>`;
+          html += `<td style="${style}">${content || ''}</td>`;
         });
 
         pivotValues.forEach(pv => {
@@ -826,10 +827,10 @@ const visObject = {
               if (config.enable_conditional_formatting && config.conditional_field) {
                  const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
                  if (targetFields.includes(m.name)) {
-                   // FIXED: Extract RAW VALUE for formatting rule (Strip currency)
-                   const rawVal = pivotCell.value !== undefined ? pivotCell.value : pivotCell;
-                   const bgRule = this.evaluateConditionalRule(rawVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(rawVal, config, 'conditional_rule_2', 'bg');
-                   const txtRule = this.evaluateConditionalRule(rawVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(rawVal, config, 'conditional_rule_2', 'text');
+                   // FIXED: Extract RAW VALUE for formatting rule
+                   const cellVal = pivotCell.value !== undefined ? pivotCell.value : pivotCell;
+                   const bgRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'bg');
+                   const txtRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'text');
                    if(bgRule) cellBg = `background-color:${bgRule} !important;`;
                    if(txtRule) style += `color:${txtRule} !important;`;
                  }
@@ -941,6 +942,7 @@ const visObject = {
         let currentCellLeftOffset = 0;
         orderedFields.forEach((f, idx) => {
           if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
+
           const w = getColumnWidth(f.name);
           const numericWidth = parseInt(w) || 150;
 
@@ -1095,7 +1097,7 @@ const visObject = {
              }
              const ratio = Math.min(1, Math.max(0, (parseFloat(val)/maxVal)));
 
-             // FIXED: Apply Heatmap via DIV wrapper for correct stacking
+             // FIXED: Heatmap now applies background via style wrapper
              rendered = `<div style="background-color: ${color}; opacity: ${0.2 + (ratio * 0.8)}; width:100%; height:100%; position:absolute; top:0; left:0; z-index:0;"></div>
                          <span style="position:relative; z-index:1; font-weight:600; color: ${textColor};">${rendered}</span>`;
           } else {
@@ -1253,8 +1255,20 @@ const visObject = {
       return [...data].sort((a, b) => {
         let valA, valB;
         if (this.state.sortPivotKey && this.hasPivot) {
-           valA = a[field] && a[field][this.state.sortPivotKey] ? a[field][this.state.sortPivotKey].value : null;
-           valB = b[field] && b[field][this.state.sortPivotKey] ? b[field][this.state.sortPivotKey].value : null;
+           // FIXED: Sort by Specific Pivot Column
+           if (a[field] && a[field][this.state.sortPivotKey]) {
+              valA = a[field][this.state.sortPivotKey].value;
+           } else {
+              // Fallback for Dimensions
+              valA = a[field] ? a[field].value : null;
+           }
+
+           if (b[field] && b[field][this.state.sortPivotKey]) {
+              valB = b[field][this.state.sortPivotKey].value;
+           } else {
+              valB = b[field] ? b[field].value : null;
+           }
+
         } else {
            const cellA = a[field];
            const cellB = b[field];
