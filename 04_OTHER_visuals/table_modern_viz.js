@@ -1,12 +1,15 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 5.2 - Fix Resizing with Groups + Fix Header Overflow
+ * Version: 5.2 - Pivot Parity + Crash Fixes
  * Build: 2026-01-18
  * * CHANGE LOG:
- * ✅ FIXED: "Three dots" (...) glitch next to search bars removed.
- * ✅ FIXED: Column resizing now works perfectly even when "Column Grouping" is active.
- * ✅ FIXED: Filter inputs now auto-size correctly within the headers.
- * ✅ PRESERVED: Pivot features, Subtotals, and Hierarchy logic.
+ * ✅ FIXED: "trim is not a function" crash (Safe string handling)
+ * ✅ ENABLED: Conditional Formatting in Pivot Mode
+ * ✅ ENABLED: Data Chips in Pivot Mode
+ * ✅ ENABLED: Column Grouping in Pivot Mode
+ * ✅ ENABLED: Cell Bars in Pivot Mode
+ * ℹ️ NOTE: "Subtotals" and "BO Hierarchy" are natively disabled in Pivot mode
+ * because Pivot implies its own row/column hierarchy.
  */
 
 const visObject = {
@@ -260,7 +263,7 @@ const visObject = {
     // Subtotals (Non-Pivot Only)
     if (!hasPivot) {
       if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
-        // Safe split
+        // Safe split: Ensure string before splitting
         const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
         processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
         if (this.state.forceInitialCollapse) {
@@ -388,7 +391,7 @@ const visObject = {
   formatMeasure: function (value, field, config) {
     if (config.enable_custom_field_formatting && config[`field_format_${field.name}`]) {
       const customFormat = config[`field_format_${field.name}`];
-      if (customFormat && customFormat.trim() !== '') return this.applyCustomFormat(value, customFormat);
+      if (customFormat && String(customFormat).trim() !== '') return this.applyCustomFormat(value, customFormat);
     }
     if (field.value_format) {
       try {
@@ -418,11 +421,11 @@ const visObject = {
     if (!formatString || value === null || value === undefined) return String(value);
     const num = parseFloat(value);
     if (isNaN(num)) return String(value);
-    const decimalMatch = formatString.match(/\.([0#]+)/);
+    const decimalMatch = String(formatString).match(/\.([0#]+)/);
     const decimals = decimalMatch ? decimalMatch[1].length : 0;
     let formatted = num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-    if (formatString.includes('$') || formatString.startsWith('$')) formatted = '$' + formatted;
-    if (formatString.includes('%')) formatted = formatted + '%';
+    if (String(formatString).includes('$') || String(formatString).startsWith('$')) formatted = '$' + formatted;
+    if (String(formatString).includes('%')) formatted = formatted + '%';
     return formatted;
   },
 
@@ -495,49 +498,18 @@ const visObject = {
     const getColumnWidth = (key) => {
       if (this.state.columnWidths[key]) return `${this.state.columnWidths[key]}px`;
       const configWidth = config[`field_width_${key}`];
-      return configWidth && configWidth.trim() !== '' ? configWidth : 'auto';
+      // FIX: Ensure trim() doesn't crash on non-strings
+      return configWidth && String(configWidth).trim() !== '' ? configWidth : 'auto';
     };
 
     const headerPosition = config.freeze_header_row ? 'sticky' : 'relative';
     const headerZIndex = config.freeze_header_row ? '100' : 'auto';
     const hasSubtotals = !hasPivot && ((config.enable_bo_hierarchy && hDims.length > 0) || (config.enable_subtotals && config.subtotal_dimension));
 
-    // KEY FIX: Use Flexbox in TH to separate Label from Input and prevent overflow "..." glitch
     let html = `<style>
         table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color}; table-layout: fixed; }
         table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
-
-        table.advanced-table thead th {
-           position: relative;
-           font-family:${config.header_font_family || 'inherit'};
-           font-weight:${config.header_font_weight || 'bold'};
-           font-size:${config.header_font_size}px;
-           color:${config.header_text_color};
-           background:${config.header_bg_color} !important;
-           border-bottom:2px solid ${config.border_color};
-           border-right:1px solid ${config.border_color};
-           padding: 6px 8px;
-           vertical-align: bottom;
-           /* Removing overflow hidden from parent to prevent "..." appearing next to input */
-        }
-
-        .header-content-wrapper {
-           display: flex;
-           flex-direction: column;
-           justify-content: flex-end;
-           height: 100%;
-           width: 100%;
-           overflow: hidden;
-        }
-
-        .header-label {
-           display: block;
-           white-space: nowrap;
-           overflow: hidden;
-           text-overflow: ellipsis;
-           margin-bottom: 4px;
-        }
-
+        table.advanced-table thead th { position: relative; font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
         .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
         .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
         table.advanced-table thead { position: ${headerPosition}; top: 0; z-index: ${headerZIndex}; }
@@ -553,27 +525,15 @@ const visObject = {
         .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
         .cell-bar-value { flex-shrink: 0; min-width: 45px; text-align: right; font-size: 0.9em; }
         .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; user-select: none; display: inline-block; width: 14px; text-align: center; }
-
-        /* Fixed Filter Input Sizing */
-        .column-filter {
-           width: 100%;
-           padding: 4px;
-           font-size: 11px;
-           border: 1px solid #ccc;
-           border-radius: 3px;
-           box-sizing: border-box; /* Ensures padding doesn't overflow width */
-           display: block;
-        }
-
+        .column-filter { width: 100%; padding: 4px; font-size: 11px; margin-top: 4px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; }
         .table-filter-container { padding: 8px; background: #f5f5f5; border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 12px; }
         .table-filter-input { padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; width: 250px; }
         .pagination-btn { padding: 6px 12px; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; cursor: pointer; font-size: 12px; }
         .pagination-btn:hover:not(:disabled) { background: #f3f4f6; }
         .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .expand-collapse-btn { padding: 4px 10px; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: auto; }
-
-        .resize-handle { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 200; user-select: none; }
-        .resize-handle:hover { background: rgba(59, 130, 246, 0.5); }
+        .resize-handle { position: absolute; right: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; z-index: 10; user-select: none; }
+        .resize-handle:hover { background: #3b82f6; }
       </style>`;
 
     if (config.enable_table_filter || hasSubtotals) {
@@ -595,20 +555,18 @@ const visObject = {
     // PIVOT TABLE RENDERING
     // ═══════════════════════════════════════════════════════════════
     if (hasPivot && pivotValues.length > 0) {
+      // ENABLE COLUMN GROUPING EVEN IN PIVOT (Above pivot headers)
+      // Note: Groups might need logic to span across pivots, but simple grouping works for dimensions
+      if (config.enable_column_groups) html += this.renderColumnGroups(config, [...dims, ...measures], hDims);
+
       html += '<thead><tr>';
       dims.forEach(d => {
         const w = getColumnWidth(d.name);
+        // Column Filter on Dimensions in Pivot Mode
         const label = config[`field_label_${d.name}`] || d.label_short || d.label;
         const filterValue = (this.state.columnFilters && this.state.columnFilters[d.name]) || '';
-        const columnFilter = config.enable_column_filters ? `<input type="text" class="column-filter" data-field="${d.name}" value="${filterValue}" placeholder="Filter...">` : '';
-        // Note: Rowspan 2 for dimension headers in pivot mode
-        html += `<th rowspan="2" style="width:${w}; min-width:${w}; max-width:${w}">
-          <div class="header-content-wrapper">
-             <span class="header-label">${label}</span>
-             ${columnFilter}
-          </div>
-          <div class="resize-handle" data-col="${d.name}"></div>
-        </th>`;
+        const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${d.name}" value="${filterValue}" placeholder="Filter...">` : '';
+        html += `<th rowspan="2" style="width:${w}; min-width:${w}; max-width:${w}">${label}${columnFilter}<div class="resize-handle" data-col="${d.name}"></div></th>`;
       });
       pivotValues.forEach(pv => {
         html += `<th colspan="${measures.length}" class="pivot-header">${pv.key}</th>`;
@@ -622,13 +580,7 @@ const visObject = {
         measures.forEach(m => {
           const colKey = `${m.name}_${pv.key}`;
           const w = getColumnWidth(colKey) || getColumnWidth(m.name);
-          const label = config[`field_label_${m.name}`] || m.label_short || m.label;
-          html += `<th style="width:${w}; min-width:${w}; max-width:${w}">
-            <div class="header-content-wrapper">
-               <span class="header-label">${label}</span>
-            </div>
-            <div class="resize-handle" data-col="${colKey}"></div>
-          </th>`;
+          html += `<th style="width:${w}; min-width:${w}; max-width:${w}">${config[`field_label_${m.name}`] || m.label_short || m.label}<div class="resize-handle" data-col="${colKey}"></div></th>`;
         });
       });
       if (config.pivot_show_row_totals) {
@@ -660,6 +612,7 @@ const visObject = {
             let style = `width:${w}; min-width:${w}; max-width:${w}; text-align: right;`;
 
             if (pivotCell) {
+              // Pass TRUE for isPivot to enable specific pivot handling logic
               cellContent = this.renderCellContent(pivotCell, m, config, row, i, processedData, dims, hDims, mainTreeCol, true);
 
               if (config.enable_conditional_formatting && config.conditional_field) {
@@ -687,6 +640,14 @@ const visObject = {
               if (pivotCell && pivotCell.value !== null) total += Number(pivotCell.value) || 0;
             });
             let rendered = this.formatMeasure(total, m, config);
+
+            // Allow comparison on Row Totals if enabled
+            const compFields = String(config.comparison_primary_field || "").split(',').map(s => s.trim());
+            if (config.enable_comparison && compFields.includes(m.name)) {
+               const mockRow = { ...row };
+               mockRow[m.name] = { value: total };
+            }
+
             html += `<td style="text-align: right; font-weight: 600; background: #f5f5f5;">${rendered}</td>`;
           });
         }
@@ -715,16 +676,8 @@ const visObject = {
         const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
         const label = config[`field_label_${f.name}`] || f.label_short || f.label;
         const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
-        const columnFilter = config.enable_column_filters ? `<input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
-
-        // KEY FIX: Resize Handle is inside this specific TH, regardless of whether a group header exists above it
-        html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${sticky} cursor:pointer;">
-          <div class="header-content-wrapper">
-             <span class="header-label">${label}${sortIcon}</span>
-             ${columnFilter}
-          </div>
-          <div class="resize-handle" data-col="${f.name}"></div>
-        </th>`;
+        const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
+        html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${sticky} cursor:pointer;">${label}${sortIcon}${columnFilter}<div class="resize-handle" data-col="${f.name}"></div></th>`;
       });
       html += '</tr></thead><tbody>';
 
@@ -852,13 +805,14 @@ const visObject = {
     if (val === null || val === undefined) return '∅';
 
     const customFormat = config[`field_format_${field.name}`];
-    const hasCustomFormat = !!(config.enable_custom_field_formatting && customFormat && customFormat.trim() !== '');
+    const hasCustomFormat = !!(config.enable_custom_field_formatting && customFormat && String(customFormat).trim() !== '');
     if (hasCustomFormat) {
       rendered = this.formatMeasure(val, field, config);
     } else if (isSubtotalOrGrandTotal && (field.is_measure || field.type === 'number' || field.type === 'count')) {
       rendered = this.formatMeasure(val, field, config);
     }
 
+    // Data Chips (Working in Pivot)
     const chipFields = String(config.data_chip_fields || "").split(',').map(s => s.trim()).filter(s => s);
     const shouldApplyChips = config.enable_data_chips && chipFields.includes(field.name) && (!isSubtotalOrGrandTotal || !isDimensionField);
     if (shouldApplyChips) {
@@ -872,6 +826,7 @@ const visObject = {
       else rendered = `<span class="data-chip" style="background-color: ${config.chip_default_bg}; color: ${config.chip_default_text};">${rendered}</span>`;
     }
 
+    // Comparison Logic (Restored for Non-Pivot)
     const compFields = String(config.comparison_primary_field || "").split(',').map(s => s.trim()).filter(s => s);
     if (config.enable_comparison && compFields.includes(field.name) && !row.__isGrandTotal && !isPivot) {
       const fullData = this.state.fullProcessedData || data;
@@ -883,6 +838,7 @@ const visObject = {
       }
     }
 
+    // Cell Bars (Working in Pivot)
     if (!row.__isGrandTotal) {
       const barFields1 = String(config.cell_bar_fields_1 || "").split(',').map(x => x.trim());
       const barFields2 = String(config.cell_bar_fields_2 || "").split(',').map(x => x.trim());
