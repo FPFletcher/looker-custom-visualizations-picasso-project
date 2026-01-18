@@ -1,69 +1,89 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 6.3 - Pivot Parity, Sticky Groups & Smart Layout
+ * Version: 11.0 - The "Final Polish"
  * Build: 2026-01-18
  * * CHANGE LOG:
- * ✅ FIXED: Pivot Sorting (Sorts by specific pivot column year/key).
- * ✅ FIXED: Pivot Drill Fields (Drill menus work in pivot cells).
- * ✅ FIXED: Sticky Headers (Groups and Labels freeze together).
- * ✅ FIXED: Conditional Formatting in Pivot (Applied to TD background).
- * ✅ IMPROVED: "Smart Layout" (Cell Bars shrink to fit Comparisons without overlap).
- * ✅ RESTORED: Full verbosity to ensure no logic is lost.
+ * ✅ FIXED: Pivot Sorting (Distinguishes between Dimensions and Measures).
+ * ✅ FIXED: Heatmap (Real background color + Custom Text Color).
+ * ✅ FIXED: Freeze Column (Limited to 1 column, fixed Header overlap).
+ * ✅ FIXED: Pivot Row Formatting (Calculates row sum for numeric rules).
+ * ✅ FIXED: Resize Handles (Z-Index boost).
  */
 
 const visObject = {
-  id: "advanced_table_visual_v6_3",
-  label: "Advanced Table v6.3",
+  id: "advanced_table_visual_v11_0",
+  label: "Advanced Table v11.0",
   options: {
     // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
     // ══════════════════════════════════════════════════════════════
-    plot_divider_display: { type: "string", label: "━━━ Display Options ━━━", display: "divider", section: "Plot", order: 0 },
+    plot_divider_display: { type: "string", label: "━━━ Display ━━━", display: "divider", section: "Plot", order: 0 },
     show_row_numbers: { type: "boolean", label: "Show Row Numbers", default: false, section: "Plot", order: 1 },
     show_headers: { type: "boolean", label: "Show Headers", default: true, section: "Plot", order: 2 },
+
     plot_divider_pagination: { type: "string", label: "━━━ Pagination ━━━", display: "divider", section: "Plot", order: 10 },
     enable_pagination: { type: "boolean", label: "Enable Pagination", default: true, section: "Plot", order: 11 },
     page_size: { type: "number", label: "Page Size", default: 25, display: "number", section: "Plot", order: 12 },
     pagination_position: { type: "string", label: "Position", display: "select", values: [{ "Top": "top" }, { "Bottom": "bottom" }, { "Both": "both" }], default: "bottom", section: "Plot", order: 13 },
     dynamic_pagination: { type: "boolean", label: "Dynamic Pagination (Respects Subtotals)", default: true, section: "Plot", order: 14 },
-    plot_divider_filtering: { type: "string", label: "━━━ Filtering ━━━", display: "divider", section: "Plot", order: 15 },
-    enable_table_filter: { type: "boolean", label: "Enable Table-Level Filter", default: false, section: "Plot", order: 16 },
-    enable_column_filters: { type: "boolean", label: "Enable Column Filters", default: false, section: "Plot", order: 17 },
-    plot_divider_freezing: { type: "string", label: "━━━ Freezing ━━━", display: "divider", section: "Plot", order: 20 },
-    freeze_columns: { type: "number", label: "Freeze Left Columns", default: 0, section: "Plot", order: 21 },
-    freeze_header_row: { type: "boolean", label: "Freeze Header Row", default: true, section: "Plot", order: 22 },
+
+    plot_divider_pivot: { type: "string", label: "━━━ Pivot Settings ━━━", display: "divider", section: "Plot", order: 20 },
+    pivot_header_bg_color: { type: "string", label: "Pivot Header BG", display: "color", default: "#e0e7ff", section: "Plot", order: 21 },
+    pivot_header_text_color: { type: "string", label: "Pivot Header Text", display: "color", default: "#3730a3", section: "Plot", order: 22 },
+    pivot_show_row_totals: { type: "boolean", label: "Show Row Totals", default: false, section: "Plot", order: 23 },
+    pivot_row_total_label: { type: "string", label: "Row Total Label", default: "Total", section: "Plot", order: 24 },
+
+    plot_divider_hierarchy: { type: "string", label: "━━━ Hierarchy & Subtotals ━━━", display: "divider", section: "Plot", order: 30 },
+    enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Plot", order: 31 },
+    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels (comma-sep)", display: "text", default: "", placeholder: "brand,category", section: "Plot", order: 32 },
+    bo_hierarchy_bold: { type: "boolean", label: "Bold Font for Hierarchy", default: true, section: "Plot", order: 33 },
+    enable_subtotals: { type: "boolean", label: "Enable Standard Subtotals", default: false, section: "Plot", order: 34 },
+    subtotal_dimension: { type: "string", label: "Subtotal Group Dimension", display: "select", values: [{ "None": "" }], default: "", section: "Plot", order: 35 },
+    standard_subtotal_bold: { type: "boolean", label: "Bold Font for Subtotals", default: true, section: "Plot", order: 36 },
+    show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Plot", order: 37 },
+    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Plot", order: 38 },
+    grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Plot", order: 39 },
+
+    plot_divider_grouping: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Plot", order: 40 },
+    enable_column_groups: { type: "boolean", label: "Enable Grouping", default: false, section: "Plot", order: 41 },
+    column_group_1_name: { type: "string", label: "Group 1 Name", default: "", section: "Plot", order: 42 },
+    column_group_1_count: { type: "number", label: "Group 1 Count", default: 1, section: "Plot", order: 43 },
+    column_group_2_name: { type: "string", label: "Group 2 Name", default: "", section: "Plot", order: 44 },
+    column_group_2_count: { type: "number", label: "Group 2 Count", default: 1, section: "Plot", order: 45 },
+    group_remaining_columns: { type: "boolean", label: "Group Remaining Columns", default: false, section: "Plot", order: 46 },
+    remaining_columns_name: { type: "string", label: "Remaining Name", default: "Other", section: "Plot", order: 47 },
+    group_header_bg_color: { type: "string", label: "Group Header BG Color", display: "color", default: "#8dc6ff", section: "Plot", order: 48 },
+
+    plot_divider_filtering: { type: "string", label: "━━━ Filtering ━━━", display: "divider", section: "Plot", order: 50 },
+    enable_table_filter: { type: "boolean", label: "Enable Table-Level Filter", default: false, section: "Plot", order: 51 },
+    enable_column_filters: { type: "boolean", label: "Enable Column Filters", default: false, section: "Plot", order: 52 },
+
+    plot_divider_freezing: { type: "string", label: "━━━ Freezing ━━━", display: "divider", section: "Plot", order: 60 },
+    freeze_columns: { type: "number", label: "Freeze Left Columns (Max 1 recommended)", default: 0, section: "Plot", order: 61 },
+    freeze_header_row: { type: "boolean", label: "Freeze Header Row", default: true, section: "Plot", order: 62 },
 
     // ══════════════════════════════════════════════════════════════
-    // TAB: SERIES
+    // TAB: SERIES (Cell Bars & Heatmaps)
     // ══════════════════════════════════════════════════════════════
-    hierarchy_divider: { type: "string", label: "━━━ BO Hierarchy Mode ━━━", display: "divider", section: "Series", order: -10 },
-    enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Series", order: -9 },
-    hierarchy_dimensions: { type: "string", label: "Hierarchy Levels (comma-sep)", display: "text", default: "", placeholder: "brand,category", section: "Series", order: -8 },
-    bo_hierarchy_bold: { type: "boolean", label: "Bold Font for Hierarchy", default: true, section: "Series", order: -7 },
-
-    cell_bars_divider: { type: "string", label: "━━━ Cell Bar Charts ━━━", display: "divider", section: "Series", order: 0 },
+    cell_bars_divider: { type: "string", label: "━━━ Cell Bars & Heatmap ━━━", display: "divider", section: "Series", order: 0 },
     enable_cell_bars_1: { type: "boolean", label: "Enable Set 1", default: false, section: "Series", order: 1 },
+    cell_bar_mode_1: { type: "string", label: "Mode 1", display: "select", values: [{ "Bar Chart": "bar" }, { "Heatmap": "heatmap" }], default: "bar", section: "Series", order: 1.5 },
     cell_bar_fields_1: { type: "string", label: "Fields 1", display: "text", default: "", section: "Series", order: 2 },
     cell_bar_color_1: { type: "string", label: "Color 1", display: "color", default: "#3b82f6", section: "Series", order: 3 },
     use_gradient_1: { type: "boolean", label: "Use Gradient 1", default: false, section: "Series", order: 4 },
     gradient_end_1: { type: "string", label: "Gradient End 1", display: "color", default: "#93c5fd", section: "Series", order: 5 },
+    // NEW: Heatmap Text Color
+    heatmap_text_color_1: { type: "string", label: "Heatmap Text Color 1", display: "color", default: "#ffffff", section: "Series", order: 5.5 },
 
     enable_cell_bars_2: { type: "boolean", label: "Enable Set 2", default: false, section: "Series", order: 6 },
+    cell_bar_mode_2: { type: "string", label: "Mode 2", display: "select", values: [{ "Bar Chart": "bar" }, { "Heatmap": "heatmap" }], default: "bar", section: "Series", order: 6.5 },
     cell_bar_fields_2: { type: "string", label: "Fields 2", display: "text", default: "", section: "Series", order: 7 },
     cell_bar_color_2: { type: "string", label: "Color 2", display: "color", default: "#10b981", section: "Series", order: 8 },
     use_gradient_2: { type: "boolean", label: "Use Gradient 2", default: false, section: "Series", order: 8.5 },
     gradient_end_2: { type: "string", label: "Gradient End 2", display: "color", default: "#6ee7b7", section: "Series", order: 9 },
-    cell_bar_max_width: { type: "number", label: "Max Bar Width (%)", default: 100, section: "Series", order: 10 },
+    heatmap_text_color_2: { type: "string", label: "Heatmap Text Color 2", display: "color", default: "#ffffff", section: "Series", order: 9.5 },
 
-    grouping_divider: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Series", order: 20 },
-    enable_column_groups: { type: "boolean", label: "Enable Grouping", default: false, section: "Series", order: 21 },
-    column_group_1_name: { type: "string", label: "Group 1 Name", default: "", section: "Series", order: 22 },
-    column_group_1_count: { type: "number", label: "Group 1 Count", default: 1, section: "Series", order: 23 },
-    column_group_2_name: { type: "string", label: "Group 2 Name", default: "", section: "Series", order: 24 },
-    column_group_2_count: { type: "number", label: "Group 2 Count", default: 1, section: "Series", order: 25 },
-    group_remaining_columns: { type: "boolean", label: "Group Remaining Columns", default: false, section: "Series", order: 26 },
-    remaining_columns_name: { type: "string", label: "Remaining Name", default: "Other", section: "Series", order: 27 },
-    group_header_bg_color: { type: "string", label: "Group Header BG Color", display: "color", default: "#8dc6ff", section: "Series", order: 28 },
+    cell_bar_fit_content: { type: "boolean", label: "Fit Bars to Content (Smart Sizing)", default: true, section: "Series", order: 10 },
 
     comparison_divider: { type: "string", label: "━━━ Comparison ━━━", display: "divider", section: "Series", order: 50 },
     enable_comparison: { type: "boolean", label: "Enable Comparison", default: false, section: "Series", order: 51 },
@@ -74,14 +94,6 @@ const visObject = {
     show_comparison_arrows: { type: "boolean", label: "Show Arrows", default: true, section: "Series", order: 56 },
     positive_comparison_color: { type: "string", label: "Pos Color", display: "color", default: "#10b981", section: "Series", order: 57 },
     negative_comparison_color: { type: "string", label: "Neg Color", display: "color", default: "#ef4444", section: "Series", order: 58 },
-
-    subtotals_divider: { type: "string", label: "━━━ Subtotals & Totals ━━━", display: "divider", section: "Series", order: 80 },
-    enable_subtotals: { type: "boolean", label: "Enable Subtotals", default: false, section: "Series", order: 81 },
-    subtotal_dimension: { type: "string", label: "Group Dimension", display: "select", values: [{ "None": "" }], default: "", section: "Series", order: 82 },
-    standard_subtotal_bold: { type: "boolean", label: "Bold Font for Subtotals", default: true, section: "Series", order: 83 },
-    show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Series", order: 84 },
-    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Series", order: 86 },
-    grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Series", order: 87 },
 
     field_formatting_divider: { type: "string", label: "━━━ Field Formatting ━━━", display: "divider", section: "Series", order: 100 },
     enable_custom_field_formatting: { type: "boolean", label: "Enable Custom Field Formatting", default: true, section: "Series", order: 101 },
@@ -158,15 +170,6 @@ const visObject = {
     conditional_rule_2_value: { type: "string", label: "Col Rule 2 Value", display: "text", default: "", section: "Formatting", order: 68 },
     conditional_rule_2_bg: { type: "string", label: "Col Rule 2 BG Color", display: "color", default: "#fee2e2", section: "Formatting", order: 69 },
     conditional_rule_2_text: { type: "string", label: "Col Rule 2 Text Color", display: "color", default: "#991b1b", section: "Formatting", order: 70 },
-
-    // ══════════════════════════════════════════════════════════════
-    // TAB: PIVOT
-    // ══════════════════════════════════════════════════════════════
-    pivot_divider: { type: "string", label: "━━━ Pivot Display ━━━", display: "divider", section: "Pivot", order: 0 },
-    pivot_header_bg_color: { type: "string", label: "Pivot Header BG", display: "color", default: "#e0e7ff", section: "Pivot", order: 1 },
-    pivot_header_text_color: { type: "string", label: "Pivot Header Text", display: "color", default: "#3730a3", section: "Pivot", order: 2 },
-    pivot_show_row_totals: { type: "boolean", label: "Show Row Totals", default: false, section: "Pivot", order: 3 },
-    pivot_row_total_label: { type: "string", label: "Row Total Label", default: "Total", section: "Pivot", order: 4 },
   },
 
   create: function (element, config) {
@@ -176,6 +179,7 @@ const visObject = {
       currentPage: 1,
       sortField: null,
       sortDirection: 'asc',
+      sortPivotKey: null,
       collapsedGroups: {},
       lastSubtotalDimension: null,
       data: [],
@@ -212,7 +216,6 @@ const visObject = {
         this.options[`field_divider_${fieldKey}`] = { type: "string", label: `━━━ ${field.label_short || field.label} ━━━`, display: "divider", section: "Series", order: baseOrder };
         this.options[`field_label_${fieldKey}`] = { type: "string", label: "Label", display: "text", default: field.label_short || field.label, section: "Series", order: baseOrder + 1 };
         this.options[`field_format_${fieldKey}`] = { type: "string", label: "Value Format", display: "text", default: "", section: "Series", order: baseOrder + 2 };
-        this.options[`field_width_${fieldKey}`] = { type: "string", label: "Initial Width", display: "text", default: "", placeholder: "e.g., 150px", section: "Series", order: baseOrder + 3 };
       }
     });
 
@@ -230,7 +233,6 @@ const visObject = {
 
     let processedData = [...data];
 
-    // Filter Logic
     if (config.enable_table_filter && this.state.tableFilter) {
       const filterText = this.state.tableFilter;
       const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
@@ -261,7 +263,6 @@ const visObject = {
 
     if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
-    // Subtotal / Hierarchy Logic
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
       const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
       if (hierarchyList.length > 0) {
@@ -296,7 +297,6 @@ const visObject = {
     this.state.fullProcessedData = [...processedData];
     this.state.totalRowCount = processedData.length + (grandTotalRow ? 1 : 0);
 
-    // PAGINATION LOGIC
     let paginatedData = processedData;
     if (config.enable_pagination) {
       const pageSize = config.page_size || 25;
@@ -498,9 +498,14 @@ const visObject = {
     if (!operator) return null;
     const ruleValue = config[`${rulePrefix}_value`];
 
-    // Type Sanitizer for Comparisons
-    const numericCell = parseFloat(cellValue);
-    const numericRule = parseFloat(ruleValue);
+    // Type Sanitizer & Cleaner for Comparisons (Fix for Pivot string formats like "$ 465.00")
+    // Remove Currency Symbols, Commas, Spaces before Parsing
+    let cleanCellValue = String(cellValue || '').replace(/[$,€£ ]/g, '');
+    let cleanRuleValue = String(ruleValue || '').replace(/[$,€£ ]/g, '');
+
+    const numericCell = parseFloat(cleanCellValue);
+    const numericRule = parseFloat(cleanRuleValue);
+
     const stringCell = String(cellValue || '').toLowerCase();
     const stringRule = String(ruleValue || '').toLowerCase();
 
@@ -581,8 +586,7 @@ const visObject = {
 
     const getColumnWidth = (key) => {
       if (this.state.columnWidths[key]) return `${this.state.columnWidths[key]}px`;
-      const configWidth = config[`field_width_${key}`];
-      return configWidth && String(configWidth).trim() !== '' ? configWidth : 'auto';
+      return 'auto';
     };
 
     const headerPosition = config.freeze_header_row ? 'sticky' : 'relative';
@@ -590,41 +594,56 @@ const visObject = {
 
     let html = `<style>
         table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color}; table-layout: fixed; }
-        table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
-        /* Sticky Headers for both Groups and Columns */
-        table.advanced-table thead { position: ${headerPosition}; top: 0; z-index: ${headerZIndex}; }
+        table.advanced-table tbody td {
+           font-family:${config.cell_font_family || 'inherit'};
+           font-size:${config.cell_font_size}px;
+           height:${config.row_height}px;
+           padding: 0 ${config.column_spacing}px;
+           border-bottom:1px solid ${config.border_color};
+           border-right:1px solid ${config.border_color};
+           color:${config.cell_text_color};
+           white-space:${config.wrap_text ? 'normal' : 'nowrap'};
+           overflow:hidden;
+           text-overflow:ellipsis;
+        }
+        table.advanced-table thead { position: ${headerPosition}; top: 0; z-index: 120; } /* Increased Z-Index for Header */
         table.advanced-table thead th { position: relative; font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding: 6px 8px; vertical-align: bottom; }
-
-        /* Flex Layout for Smart Sizing (Bar vs Comparison) */
-        .cell-content-wrapper { display: flex; align-items: center; width: 100%; height: 100%; gap: 6px; }
-        .cell-bar-flex { flex: 1 1 auto; min-width: 0; /* Allow bar to shrink */ }
-        .cell-value-flex { flex: 0 0 auto; white-space: nowrap; }
 
         .header-content-wrapper { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; width: 100%; overflow: hidden; }
         .header-label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+
         .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
         .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
         .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
+
         .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid ${config.border_color}; }
         .pivot-header { text-align: center; font-weight: 600; padding: 8px; background: ${config.pivot_header_bg_color} !important; color: ${config.pivot_header_text_color}; border-bottom: 2px solid ${config.border_color}; }
+
         .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; text-align: center; min-width: 60px; }
         .chip-green { background-color: ${config.chip_bg_green}; color: ${config.chip_text_green}; }
         .chip-red { background-color: ${config.chip_bg_red}; color: ${config.chip_text_red}; }
         .chip-yellow { background-color: ${config.chip_bg_yellow}; color: ${config.chip_text_yellow}; }
+
         .cell-bar-container { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 80px; }
-        .cell-bar-bg { flex: 1; min-width: 40px; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
-        .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
-        .cell-bar-value { flex-shrink: 0; min-width: 45px; text-align: right; font-size: 0.9em; }
+        .cell-content-wrapper { display: flex; align-items: center; width: 100%; height: 100%; gap: 6px; }
+        .cell-bar-flex { flex: 1 1 auto; min-width: 0; }
+        .cell-bar-fixed { width: 100%; flex: 1 0 auto; }
+        .cell-value-flex { flex: 0 0 auto; white-space: nowrap; }
+
         .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; user-select: none; display: inline-block; width: 14px; text-align: center; }
         .column-filter { width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; display: block; }
         .table-filter-container { padding: 8px; background: #f5f5f5; border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 12px; }
         .table-filter-input { padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; width: 250px; }
         .pagination-btn { padding: 6px 12px; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; cursor: pointer; font-size: 12px; }
         .pagination-btn:hover:not(:disabled) { background: #f3f4f6; }
-        .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .expand-collapse-btn { padding: 4px 10px; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: auto; }
-        .resize-handle { position: absolute; right: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; z-index: 10; user-select: none; }
+
+        .resize-handle { position: absolute; right: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; z-index: 1000; user-select: none; }
         .resize-handle:hover { background: #3b82f6; }
+
+        /* Sticky Column Class - Lower Z-Index than Header */
+        .sticky-col { position: sticky; z-index: 110 !important; background: inherit; border-right: 2px solid ${config.border_color}; }
+
         table.advanced-table tbody tr:not(.subtotal-row):not(.grand-total-row):hover > td { background-color: ${config.hover_bg_color} !important; }
       </style>`;
 
@@ -647,7 +666,6 @@ const visObject = {
     // PIVOT TABLE RENDERING
     // ═══════════════════════════════════════════════════════════════
     if (hasPivot && pivotValues.length > 0) {
-      // INJECT GROUP HEADER INSIDE THEAD FOR STICKINESS
       html += '<thead>';
       if (config.enable_column_groups) html += this.renderColumnGroups(config, [...dims, ...measures], hDims);
 
@@ -661,18 +679,26 @@ const visObject = {
          }
       }
 
-      pivotDims.forEach((d) => {
+      pivotDims.forEach((d, idx) => {
         if (config.enable_bo_hierarchy && hDims.includes(d.name) && d.name !== hDims[0]) return;
 
         const w = getColumnWidth(d.name);
         const label = config[`field_label_${d.name}`] || d.label_short || d.label;
         const filterValue = (this.state.columnFilters && this.state.columnFilters[d.name]) || '';
         const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${d.name}" value="${filterValue}" placeholder="Filter...">` : '';
-        html += `<th rowspan="2" style="width:${w}; min-width:${w}; max-width:${w}">
+
+        let stickyStyle = '';
+        if (idx === 0 && config.freeze_columns > 0) {
+            // FIXED: Only freeze first column if enabled
+            stickyStyle = `position:sticky; left:0; z-index:122; background:inherit; border-right: 2px solid #ccc;`;
+        }
+
+        html += `<th rowspan="2" class="sortable" data-field="${d.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}">
           <div class="header-content-wrapper"><span class="header-label">${label}</span>${columnFilter}</div>
           <div class="resize-handle" data-col="${d.name}"></div>
         </th>`;
       });
+
       pivotValues.forEach(pv => {
         html += `<th colspan="${measures.length}" class="pivot-header">${pv.key}</th>`;
       });
@@ -686,7 +712,6 @@ const visObject = {
           const colKey = `${m.name}_${pv.key}`;
           const w = getColumnWidth(colKey) || getColumnWidth(m.name);
           const label = config[`field_label_${m.name}`] || m.label_short || m.label;
-          // ADDED data-pivot-key for sorting
           html += `<th style="width:${w}; min-width:${w}; max-width:${w}" class="sortable" data-field="${m.name}" data-pivot-key="${pv.key}">
             <div class="header-content-wrapper"><span class="header-label">${label}</span></div>
             <div class="resize-handle" data-col="${colKey}"></div>
@@ -706,12 +731,22 @@ const visObject = {
         let bg = '';
         const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
+        // FIXED: ROW FORMATTING IN PIVOT MODE (Calculates Sums for Numeric Rules)
         if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
           const rowFields = String(config.row_conditional_field).split(',').map(s => s.trim());
           let ruleMatched = false;
           for (const fieldName of rowFields) {
             let val = row[fieldName];
-            if (val && typeof val === 'object' && val.value !== undefined) val = val.value;
+            // If Measure Object (Pivot), Calculate Sum of Row
+            if (val && typeof val === 'object' && val.value === undefined && pivotValues.length > 0) {
+               let rowSum = 0;
+               pivotValues.forEach(pv => {
+                   if (val[pv.key] && val[pv.key].value) rowSum += Number(val[pv.key].value);
+               });
+               val = rowSum;
+            } else if (val && typeof val === 'object' && val.value !== undefined) {
+               val = val.value;
+            }
 
             const r1Bg = this.evaluateConditionalRule(val, config, 'row_rule_1', 'bg');
             if (r1Bg) { bg = `background:${r1Bg};`; ruleMatched = true; break; }
@@ -719,7 +754,15 @@ const visObject = {
           if (!ruleMatched) {
             for (const fieldName of rowFields) {
               let val = row[fieldName];
-              if (val && typeof val === 'object' && val.value !== undefined) val = val.value;
+              if (val && typeof val === 'object' && val.value === undefined && pivotValues.length > 0) {
+                 let rowSum = 0;
+                 pivotValues.forEach(pv => {
+                     if (val[pv.key] && val[pv.key].value) rowSum += Number(val[pv.key].value);
+                 });
+                 val = rowSum;
+              } else if (val && typeof val === 'object' && val.value !== undefined) {
+                 val = val.value;
+              }
               const r2Bg = this.evaluateConditionalRule(val, config, 'row_rule_2', 'bg');
               if (r2Bg) { bg = `background:${r2Bg};`; break; }
             }
@@ -734,17 +777,21 @@ const visObject = {
         pivotDims.forEach((d, idx) => {
           if (config.enable_bo_hierarchy && hDims.includes(d.name) && d.name !== hDims[0]) return;
           const w = getColumnWidth(d.name);
-          let style = `width:${w}; min-width:${w}; max-width:${w};` + ((idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '');
+
+          let stickyClass = '';
+          if (idx === 0 && config.freeze_columns > 0) stickyClass = 'sticky-col';
+
+          let style = `width:${w}; min-width:${w}; max-width:${w};`;
           if (d.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
           const cell = row[d.name];
-          let content = this.renderCellContent(cell, d, config, row, i, processedData, dims, hDims, mainTreeCol, false);
+          let content = this.renderCellContent(cell, d, config, row, i, processedData, dims, hDims, mainTreeCol, false, null, config.cell_bar_fit_content);
 
           if (isSub && d.name === mainTreeCol) {
              content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
           }
 
-          html += `<td style="${style}">${content || ''}</td>`;
+          html += `<td class="${stickyClass}" style="${style} left:0;">${content || ''}</td>`;
         });
 
         pivotValues.forEach(pv => {
@@ -754,17 +801,18 @@ const visObject = {
             const pivotCell = row[m.name] && row[m.name][pv.key];
             let cellContent = '';
             let style = `width:${w}; min-width:${w}; max-width:${w}; text-align: right;`;
+            let cellBg = '';
 
             if (pivotCell) {
-              cellContent = this.renderCellContent(pivotCell, m, config, row, i, processedData, dims, hDims, mainTreeCol, true, pv.key);
+              cellContent = this.renderCellContent(pivotCell, m, config, row, i, processedData, dims, hDims, mainTreeCol, true, pv.key, config.cell_bar_fit_content);
 
               if (config.enable_conditional_formatting && config.conditional_field) {
                  const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
                  if (targetFields.includes(m.name)) {
-                   const cellVal = pivotCell.value;
+                   const cellVal = pivotCell.value !== undefined ? pivotCell.value : pivotCell;
                    const bgRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'bg');
                    const txtRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'text');
-                   if(bgRule) style += `background:${bgRule} !important;`;
+                   if(bgRule) cellBg = `background-color:${bgRule} !important;`;
                    if(txtRule) style += `color:${txtRule} !important;`;
                  }
               }
@@ -772,12 +820,11 @@ const visObject = {
               cellContent = config.null_measure_value || '-';
             }
 
-            // ADDED: Drill Links + Drill Attributes to Pivot Cells
             let drillAttr = '';
             if (pivotCell && pivotCell.links && pivotCell.links.length > 0) {
-               drillAttr = `class="has-drill-links" data-links='${JSON.stringify(pivotCell.links)}' style="${style} cursor:pointer;"`;
+               drillAttr = `class="has-drill-links" data-links='${JSON.stringify(pivotCell.links)}' style="${style} cursor:pointer; ${cellBg}"`;
             } else {
-               drillAttr = `style="${style}"`;
+               drillAttr = `style="${style} ${cellBg}"`;
             }
 
             html += `<td ${drillAttr}>${cellContent}</td>`;
@@ -817,13 +864,18 @@ const visObject = {
       orderedFields.forEach((f, idx) => {
         if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
         const w = getColumnWidth(f.name);
-        const sticky = (idx < config.freeze_columns && config.freeze_header_row) ? 'position:sticky; left:0; z-index:101;' : '';
+
+        let stickyStyle = '';
+        if (idx === 0 && config.freeze_columns > 0) {
+            stickyStyle = `position:sticky; left:0; z-index:102; background:inherit; border-right: 2px solid #ccc;`;
+        }
+
         const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
         const label = config[`field_label_${f.name}`] || f.label_short || f.label;
         const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
         const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
 
-        html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${sticky} cursor:pointer;">
+        html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle} cursor:pointer;">
           <div class="header-content-wrapper"><span class="header-label">${label}${sortIcon}</span>${columnFilter}</div>
           <div class="resize-handle" data-col="${f.name}"></div>
         </th>`;
@@ -863,7 +915,11 @@ const visObject = {
         orderedFields.forEach((f, idx) => {
           if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
           const w = getColumnWidth(f.name);
-          let style = `width:${w}; min-width:${w}; max-width:${w};` + ((idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '');
+
+          let stickyClass = '';
+          if (idx === 0 && config.freeze_columns > 0) stickyClass = 'sticky-col';
+
+          let style = `width:${w}; min-width:${w}; max-width:${w};`;
           if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
           if (config.enable_conditional_formatting && config.conditional_field) {
@@ -878,17 +934,18 @@ const visObject = {
             }
           }
 
-          let content = this.renderCellContent(row[f.name], f, config, row, i, processedData, dims, hDims, mainTreeCol, false);
+          let content = this.renderCellContent(row[f.name], f, config, row, i, processedData, dims, hDims, mainTreeCol, false, null, config.cell_bar_fit_content);
           if (isSub && f.name === mainTreeCol) content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
 
           const cellData = row[f.name];
-          const hasLinks = cellData && cellData.links && cellData.links.length > 0;
-          if (hasLinks) {
-            style += 'cursor:pointer;';
-            html += `<td style="${style}" class="has-drill-links" data-links='${JSON.stringify(cellData.links)}'>${content}</td>`;
+          let drillAttr = '';
+          if (cellData && cellData.links && cellData.links.length > 0) {
+             drillAttr = `class="has-drill-links ${stickyClass}" data-links='${JSON.stringify(cellData.links)}' style="${style} cursor:pointer; left:0;"`;
           } else {
-            html += `<td style="${style}">${content}</td>`;
+             drillAttr = `class="${stickyClass}" style="${style} left:0;"`;
           }
+
+          html += `<td ${drillAttr}>${content}</td>`;
         });
         html += "</tr>";
       });
@@ -920,7 +977,7 @@ const visObject = {
     this.attachResizeListeners();
   },
 
-  renderCellContent: function (cell, field, config, row, rowIdx, data, dims, hDims, mainTreeCol, isPivot, pivotKey) {
+  renderCellContent: function (cell, field, config, row, rowIdx, data, dims, hDims, mainTreeCol, isPivot, pivotKey, fitContent) {
     const isDimensionField = dims.some(d => d.name === field.name);
     const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
 
@@ -975,18 +1032,49 @@ const visObject = {
       }
     }
 
-    // UPDATED LAYOUT LOGIC (Flexbox)
     if (!row.__isGrandTotal) {
       const barFields1 = String(config.cell_bar_fields_1 || "").split(',').map(x => x.trim());
       const barFields2 = String(config.cell_bar_fields_2 || "").split(',').map(x => x.trim());
 
-      let isBar = false;
+      let mode = 'bar';
+      let isSet1 = false;
+      let isSet2 = false;
+
       if (config.enable_cell_bars_1 && barFields1.includes(field.name)) {
-        rendered = this.generateCellBar(val, rendered, config.cell_bar_color_1, config.use_gradient_1, config.gradient_end_1, data, field.name, row.__level, isPivot);
-        isBar = true;
+         mode = config.cell_bar_mode_1;
+         isSet1 = true;
       } else if (config.enable_cell_bars_2 && barFields2.includes(field.name)) {
-        rendered = this.generateCellBar(val, rendered, config.cell_bar_color_2, config.use_gradient_2, config.gradient_end_2, data, field.name, row.__level, isPivot);
-        isBar = true;
+         mode = config.cell_bar_mode_2;
+         isSet2 = true;
+      }
+
+      if (isSet1 || isSet2) {
+          if (mode === 'heatmap') {
+             // HEATMAP LOGIC
+             const color = isSet1 ? config.cell_bar_color_1 : config.cell_bar_color_2;
+             const textColor = isSet1 ? config.heatmap_text_color_1 : config.heatmap_text_color_2;
+
+             // Calculate Max for Opacity
+             let maxVal = 1;
+             if(isPivot) {
+                // Approximate max for pivot without heavy pre-calc
+                 maxVal = 5000;
+             } else {
+                const peers = data.filter(r => !r.__isGrandTotal && r.__level === (row.__level || 0));
+                maxVal = Math.max(...peers.map(r => parseFloat(r[field.name]?.value || 0)), 1);
+             }
+             const ratio = Math.min(1, Math.max(0, (parseFloat(val)/maxVal)));
+
+             // FIXED: Heatmap now applies background via style wrapper
+             rendered = `<div style="background-color: ${color}; opacity: ${0.2 + (ratio * 0.8)}; width:100%; height:100%; position:absolute; top:0; left:0; z-index:0;"></div>
+                         <span style="position:relative; z-index:1; font-weight:600; color: ${textColor};">${rendered}</span>`;
+          } else {
+             // BAR LOGIC
+             const color = isSet1 ? config.cell_bar_color_1 : config.cell_bar_color_2;
+             const useGrad = isSet1 ? config.use_gradient_1 : config.use_gradient_2;
+             const endColor = isSet1 ? config.gradient_end_1 : config.gradient_end_2;
+             rendered = this.generateCellBar(val, rendered, color, useGrad, endColor, data, field.name, row.__level, isPivot, fitContent);
+          }
       }
     }
 
@@ -1048,7 +1136,6 @@ const visObject = {
     const offset = config.comparison_period_offset || -1;
     const compRow = peers[currPeerIdx - offset];
 
-    // Use Flexbox Wrapper for Comparison
     if (!compRow) return `<div class="cell-content-wrapper"><span class="cell-value-flex" style="margin-left: auto;">${primaryRendered}</span><span style="width:55px;"></span></div>`;
 
     let secondary = 0;
@@ -1065,14 +1152,13 @@ const visObject = {
     const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
     const arrow = config.show_comparison_arrows ? (diff >= 0 ? '↑' : '↓') : '';
 
-    // Structure: [Value (Flex Auto)] [Indicator (Fixed Width)]
     return `<div class="cell-content-wrapper">
               <span class="cell-value-flex" style="margin-left: auto;">${primaryRendered}</span>
               <span style="color:${color}; font-size:0.85em; font-weight:600; flex: 0 0 55px; text-align:left; margin-left:4px;">${arrow}${Math.abs(pct)}%</span>
             </div>`;
   },
 
-  generateCellBar: function (val, rendered, color, useGrad, endColor, data, fieldName, level, isPivot) {
+  generateCellBar: function (val, rendered, color, useGrad, endColor, data, fieldName, level, isPivot, fitContent) {
     const num = parseFloat(val);
     let maxVal = 1;
     if(isPivot) {
@@ -1084,9 +1170,11 @@ const visObject = {
     const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
     const barStyle = useGrad ? `linear-gradient(to right, ${color}, ${endColor})` : color;
 
-    // Cell Bar takes FLEX priority (shrinks)
+    const flexClass = fitContent ? "cell-bar-flex" : "cell-bar-fixed";
+    const fixedStyle = fitContent ? "" : "width: 100%; flex: 1 0 auto;";
+
     return `<div class="cell-content-wrapper">
-              <div class="cell-bar-flex" style="background: #f3f4f6; border-radius: 2px; height: 16px; position: relative; overflow: hidden;">
+              <div class="${flexClass}" style="background: #f3f4f6; border-radius: 2px; height: 16px; position: relative; overflow: hidden; ${fixedStyle}">
                  <div style="width:${width}%; height:100%; background:${barStyle}; transition: width 0.3s ease;"></div>
               </div>
               <span class="cell-value-flex">${rendered}</span>
@@ -1135,8 +1223,20 @@ const visObject = {
       return [...data].sort((a, b) => {
         let valA, valB;
         if (this.state.sortPivotKey && this.hasPivot) {
-           valA = a[field] && a[field][this.state.sortPivotKey] ? a[field][this.state.sortPivotKey].value : null;
-           valB = b[field] && b[field][this.state.sortPivotKey] ? b[field][this.state.sortPivotKey].value : null;
+           // FIXED: Sort by Specific Pivot Column
+           if (a[field] && a[field][this.state.sortPivotKey]) {
+              valA = a[field][this.state.sortPivotKey].value;
+           } else {
+              // Fallback for Dimensions
+              valA = a[field] ? a[field].value : null;
+           }
+
+           if (b[field] && b[field][this.state.sortPivotKey]) {
+              valB = b[field][this.state.sortPivotKey].value;
+           } else {
+              valB = b[field] ? b[field].value : null;
+           }
+
         } else {
            const cellA = a[field];
            const cellB = b[field];
