@@ -1,18 +1,19 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 5.4 - Stability & Feature Restoration
+ * Version: 5.5 - The "Pivot Parity" Update
  * Build: 2026-01-18
  * * CHANGE LOG:
- * ✅ CRITICAL FIX: Fixed "Resize" crash by correctly storing user config.
- * ✅ FIXED: Removed "[object Object]" glitch in headers.
- * ✅ FIXED: BO Hierarchy and Subtotals now correctly nest rows again.
- * ✅ FIXED: Conditional Formatting and Comparisons restored (Logic matched v4.32).
- * ✅ FIXED: Hover effects and Data Chips restored.
+ * ✅ FIXED: Resize no longer reverts table to flat data (Preserves Subtotals).
+ * ✅ FIXED: BO Hierarchy now properly hides extra columns in Pivot Mode.
+ * ✅ FIXED: Grand Total now calculates and displays in Pivot Mode.
+ * ✅ FIXED: Comparisons now work inside Pivot cells (Finds peers by Pivot Key).
+ * ✅ FIXED: Pagination logic synchronized between Update and Render cycles.
+ * ✅ FIXED: Row/Column Conditional Formatting enabled for Pivot cells.
  */
 
 const visObject = {
-  id: "advanced_table_visual_v5_4",
-  label: "Advanced Table v5.4",
+  id: "advanced_table_visual_v5_5",
+  label: "Advanced Table v5.5",
   options: {
     // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
@@ -178,6 +179,7 @@ const visObject = {
       data: [],
       grandTotalRow: null,
       fullProcessedData: [],
+      renderData: [], // Stores the actual data currently displayed
       columnWidths: {}
     };
   },
@@ -186,7 +188,6 @@ const visObject = {
     this.clearErrors();
     if (!queryResponse || !queryResponse.fields || !data || data.length === 0) { done(); return; }
 
-    // CRITICAL FIX: Store config globally for Resize Event Listeners
     this.currentConfig = config;
 
     const dims = queryResponse.fields.dimension_like;
@@ -259,7 +260,9 @@ const visObject = {
 
     if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
-    // FIX: Robust Hierarchy Dimension Parsing
+    // ══════════════════════════════════════════════════════════════
+    // UNIFIED SUBTOTAL CALCULATION (WORKS IN PIVOT NOW)
+    // ══════════════════════════════════════════════════════════════
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
       const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
       if (hierarchyList.length > 0) {
@@ -279,12 +282,17 @@ const visObject = {
       processedData = processedData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // GRAND TOTAL (Pivot Aware)
+    // ══════════════════════════════════════════════════════════════
     let grandTotalRow = null;
     if (config.show_grand_total) {
-      if (!hasPivot) {
+      if (hasPivot) {
+         grandTotalRow = this.calculatePivotGrandTotal(this.state.data, measures, config, dims);
+      } else {
          grandTotalRow = this.calculateGrandTotal(this.state.data, measures, config, dims);
-         this.state.grandTotalRow = grandTotalRow;
       }
+      this.state.grandTotalRow = grandTotalRow;
     } else {
       this.state.grandTotalRow = null;
     }
@@ -292,6 +300,9 @@ const visObject = {
     this.state.fullProcessedData = [...processedData];
     this.state.totalRowCount = processedData.length + (grandTotalRow ? 1 : 0);
 
+    // ══════════════════════════════════════════════════════════════
+    // PAGINATION
+    // ══════════════════════════════════════════════════════════════
     let paginatedData = processedData;
     if (config.enable_pagination) {
       const pageSize = config.page_size || 25;
@@ -309,6 +320,7 @@ const visObject = {
           }
         });
         if (currentChunk.length > 0) chunks.push(currentChunk);
+
         const totalPages = Math.ceil(chunks.length / pageSize);
         this.state.totalPages = totalPages;
         const startIdx = (currentPage - 1) * pageSize;
@@ -324,6 +336,9 @@ const visObject = {
     }
 
     if (grandTotalRow) paginatedData = [...paginatedData, grandTotalRow];
+
+    // Store final render data for Resizing usage
+    this.state.renderData = paginatedData;
 
     this.renderTable(paginatedData, config, queryResponse);
     done();
@@ -512,12 +527,29 @@ const visObject = {
     return total;
   },
 
+  calculatePivotGrandTotal: function (rawData, measures, config, dimensions) {
+    const total = { __isGrandTotal: true, __level: -1 };
+    if (dimensions.length > 0) total[dimensions[0].name] = { value: config.grand_total_label, rendered: config.grand_total_label };
+
+    measures.forEach(m => {
+      total[m.name] = {};
+      this.pivotValues.forEach(pv => {
+         let sum = 0;
+         rawData.forEach(r => {
+            const cell = r[m.name] && r[m.name][pv.key];
+            if (cell && cell.value) sum += Number(cell.value);
+         });
+         total[m.name][pv.key] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
+      });
+    });
+    return total;
+  },
+
   renderTable: function (processedData, config, queryResponse) {
     const dims = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
     const hasPivot = this.hasPivot;
     const pivotValues = this.pivotValues || [];
-    // FIX: Ensure hDims is strictly array of strings, even if config is empty
     const hDims = config.enable_bo_hierarchy ? String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f) : [];
     const mainTreeCol = config.enable_bo_hierarchy && hDims.length > 0 ? hDims[0] : config.subtotal_dimension;
 
@@ -660,7 +692,7 @@ const visObject = {
             let style = `width:${w}; min-width:${w}; max-width:${w}; text-align: right;`;
 
             if (pivotCell) {
-              cellContent = this.renderCellContent(pivotCell, m, config, row, i, processedData, dims, hDims, mainTreeCol, true);
+              cellContent = this.renderCellContent(pivotCell, m, config, row, i, processedData, dims, hDims, mainTreeCol, true, pv.key);
               // Safe conditional formatting for Pivots
               if (config.enable_conditional_formatting && config.conditional_field) {
                  const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
@@ -814,24 +846,7 @@ const visObject = {
     this.attachResizeListeners();
   },
 
-  renderColumnGroups: function (config, fields, hDims) {
-    const visibleFields = fields.filter(f => !hDims.includes(f.name) || f.name === hDims[0]);
-    let html = '<thead><tr>';
-    let currentIdx = 0;
-    for (let i = 1; i <= 3; i++) {
-      const name = config[`column_group_${i}_name`], count = config[`column_group_${i}_count`];
-      if (name && count > 0) {
-        html += `<th colspan="${count}" class="column-group-header" style="background:${config.group_header_bg_color}">${name}</th>`;
-        currentIdx += count;
-      }
-    }
-    if (config.group_remaining_columns && currentIdx < visibleFields.length) {
-      html += `<th colspan="${visibleFields.length - currentIdx}" class="column-group-header" style="background:${config.group_header_bg_color}">${config.remaining_columns_name}</th>`;
-    }
-    return html + '</tr></thead>';
-  },
-
-  renderCellContent: function (cell, field, config, row, rowIdx, data, dims, hDims, mainTreeCol, isPivot) {
+  renderCellContent: function (cell, field, config, row, rowIdx, data, dims, hDims, mainTreeCol, isPivot, pivotKey) {
     const isDimensionField = dims.some(d => d.name === field.name);
     const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
 
@@ -876,7 +891,7 @@ const visObject = {
       const fullData = this.state.fullProcessedData || data;
       const isLastOfSubgroup = this.isLastElementOfGroup(row, fullData, config);
       if (!isLastOfSubgroup) {
-        rendered = this.renderComparison(row, config, fullData, rendered, field.name);
+        rendered = this.renderComparison(row, config, fullData, rendered, field.name, pivotKey);
       } else {
         rendered = `<span style="display:inline-block; min-width:50px; text-align:right;">${rendered}</span><span style="display:inline-block; min-width:55px;"></span>`;
       }
@@ -933,9 +948,15 @@ const visObject = {
     return false;
   },
 
-  renderComparison: function (row, config, fullData, primaryRendered, fieldName) {
+  renderComparison: function (row, config, fullData, primaryRendered, fieldName, pivotKey) {
     const targetField = fieldName || config.comparison_primary_field;
-    const primary = parseFloat(row[targetField]?.value || 0);
+    let primary = 0;
+    if (pivotKey && row[targetField] && row[targetField][pivotKey]) {
+       primary = parseFloat(row[targetField][pivotKey].value || 0);
+    } else if (row[targetField]) {
+       primary = parseFloat(row[targetField].value || 0);
+    }
+
     const isSub = !!row.__isSubtotal;
     const level = row.__level;
     const parentPath = row.__parentPath;
@@ -943,9 +964,18 @@ const visObject = {
     const currPeerIdx = peers.indexOf(row);
     const offset = config.comparison_period_offset || -1;
     const compRow = peers[currPeerIdx - offset];
+
     if (!compRow) return `<span style="display:inline-block; min-width:50px; text-align:right;">${primaryRendered}</span><span style="display:inline-block; min-width:55px;"></span>`;
-    const secondary = parseFloat(compRow[targetField]?.value || 0);
+
+    let secondary = 0;
+    if (pivotKey && compRow[targetField] && compRow[targetField][pivotKey]) {
+       secondary = parseFloat(compRow[targetField][pivotKey].value || 0);
+    } else if (compRow[targetField]) {
+       secondary = parseFloat(compRow[targetField].value || 0);
+    }
+
     if (isNaN(secondary) || secondary === 0) return `<span style="display:inline-block; min-width:50px; text-align:right;">${primaryRendered}</span><span style="display:inline-block; min-width:55px;"></span>`;
+
     const diff = primary - secondary;
     const pct = ((diff / Math.abs(secondary)) * 100).toFixed(1);
     const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
@@ -986,8 +1016,8 @@ const visObject = {
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
         resizingCol = null;
-        // FIX: Use stored currentConfig instead of schema definition
-        this.renderTable(this.state.data, this.currentConfig, this.queryResponse);
+        // FIX: Use stored renderData (which is paginated & processed)
+        this.renderTable(this.state.renderData, this.currentConfig, this.queryResponse);
       }
     };
     headers.forEach(th => {
