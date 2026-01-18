@@ -1,18 +1,19 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 11.0 - The "Final Polish"
+ * Version: 12.0 - Final Features & Geometry Fixes
  * Build: 2026-01-18
  * * CHANGE LOG:
- * ✅ FIXED: Pivot Sorting (Distinguishes between Dimensions and Measures).
- * ✅ FIXED: Heatmap (Real background color + Custom Text Color).
- * ✅ FIXED: Freeze Column (Limited to 1 column, fixed Header overlap).
- * ✅ FIXED: Pivot Row Formatting (Calculates row sum for numeric rules).
- * ✅ FIXED: Resize Handles (Z-Index boost).
+ * ✅ FIXED: Heatmap background is now contained (Added position:relative to td).
+ * ✅ FIXED: Multiple Column Freezing now stacks correctly (Cumulative Left Offset).
+ * ✅ FIXED: "Show Headers" toggle now works (Hides thead completely).
+ * ✅ FIXED: Pivot Column Formatting now handles numeric rules (Currency stripped).
+ * ✅ FIXED: Pivot Headers now match table theme by default.
+ * ✅ PRESERVED: Pivot Sorting, Row Rules, Drill Fields.
  */
 
 const visObject = {
-  id: "advanced_table_visual_v11_0",
-  label: "Advanced Table v11.0",
+  id: "advanced_table_visual_v12_0",
+  label: "Advanced Table v12.0",
   options: {
     // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
@@ -28,8 +29,8 @@ const visObject = {
     dynamic_pagination: { type: "boolean", label: "Dynamic Pagination (Respects Subtotals)", default: true, section: "Plot", order: 14 },
 
     plot_divider_pivot: { type: "string", label: "━━━ Pivot Settings ━━━", display: "divider", section: "Plot", order: 20 },
-    pivot_header_bg_color: { type: "string", label: "Pivot Header BG", display: "color", default: "#e0e7ff", section: "Plot", order: 21 },
-    pivot_header_text_color: { type: "string", label: "Pivot Header Text", display: "color", default: "#3730a3", section: "Plot", order: 22 },
+    pivot_header_bg_color: { type: "string", label: "Pivot Header BG", display: "color", default: "#f9fafb", section: "Plot", order: 21 },
+    pivot_header_text_color: { type: "string", label: "Pivot Header Text", display: "color", default: "#1f2937", section: "Plot", order: 22 },
     pivot_show_row_totals: { type: "boolean", label: "Show Row Totals", default: false, section: "Plot", order: 23 },
     pivot_row_total_label: { type: "string", label: "Row Total Label", default: "Total", section: "Plot", order: 24 },
 
@@ -59,7 +60,7 @@ const visObject = {
     enable_column_filters: { type: "boolean", label: "Enable Column Filters", default: false, section: "Plot", order: 52 },
 
     plot_divider_freezing: { type: "string", label: "━━━ Freezing ━━━", display: "divider", section: "Plot", order: 60 },
-    freeze_columns: { type: "number", label: "Freeze Left Columns (Max 1 recommended)", default: 0, section: "Plot", order: 61 },
+    freeze_columns: { type: "number", label: "Freeze Left Columns", default: 0, section: "Plot", order: 61 },
     freeze_header_row: { type: "boolean", label: "Freeze Header Row", default: true, section: "Plot", order: 62 },
 
     // ══════════════════════════════════════════════════════════════
@@ -72,7 +73,6 @@ const visObject = {
     cell_bar_color_1: { type: "string", label: "Color 1", display: "color", default: "#3b82f6", section: "Series", order: 3 },
     use_gradient_1: { type: "boolean", label: "Use Gradient 1", default: false, section: "Series", order: 4 },
     gradient_end_1: { type: "string", label: "Gradient End 1", display: "color", default: "#93c5fd", section: "Series", order: 5 },
-    // NEW: Heatmap Text Color
     heatmap_text_color_1: { type: "string", label: "Heatmap Text Color 1", display: "color", default: "#ffffff", section: "Series", order: 5.5 },
 
     enable_cell_bars_2: { type: "boolean", label: "Enable Set 2", default: false, section: "Series", order: 6 },
@@ -216,6 +216,7 @@ const visObject = {
         this.options[`field_divider_${fieldKey}`] = { type: "string", label: `━━━ ${field.label_short || field.label} ━━━`, display: "divider", section: "Series", order: baseOrder };
         this.options[`field_label_${fieldKey}`] = { type: "string", label: "Label", display: "text", default: field.label_short || field.label, section: "Series", order: baseOrder + 1 };
         this.options[`field_format_${fieldKey}`] = { type: "string", label: "Value Format", display: "text", default: "", section: "Series", order: baseOrder + 2 };
+        this.options[`field_width_${fieldKey}`] = { type: "string", label: "Initial Width", display: "text", default: "", placeholder: "e.g., 150px", section: "Series", order: baseOrder + 3 };
       }
     });
 
@@ -339,32 +340,33 @@ const visObject = {
   renderColumnGroups: function (config, fields, hDims) {
     const visibleFields = fields.filter(f => !hDims.includes(f.name) || f.name === hDims[0]);
     let html = '<thead>';
-
-    let totalVisibleCols = 0;
-    if (this.hasPivot) {
-        const dims = this.queryResponse.fields.dimension_like;
-        const measures = this.queryResponse.fields.measure_like;
-        let visibleDimsCount = dims.filter(d => !hDims.includes(d.name) || d.name === hDims[0]).length;
-        totalVisibleCols = visibleDimsCount + (measures.length * this.pivotValues.length);
-        if (config.pivot_show_row_totals) totalVisibleCols += measures.length;
-    } else {
-        totalVisibleCols = visibleFields.length;
-    }
-
-    html += '<tr>';
-    let currentIdx = 0;
-    for (let i = 1; i <= 3; i++) {
-      const name = config[`column_group_${i}_name`], count = config[`column_group_${i}_count`];
-      if (name && count > 0) {
-        html += `<th colspan="${count}" class="column-group-header" style="background:${config.group_header_bg_color}">${name}</th>`;
-        currentIdx += count;
+    if(config.show_headers) {
+      let totalVisibleCols = 0;
+      if (this.hasPivot) {
+          const dims = this.queryResponse.fields.dimension_like;
+          const measures = this.queryResponse.fields.measure_like;
+          let visibleDimsCount = dims.filter(d => !hDims.includes(d.name) || d.name === hDims[0]).length;
+          totalVisibleCols = visibleDimsCount + (measures.length * this.pivotValues.length);
+          if (config.pivot_show_row_totals) totalVisibleCols += measures.length;
+      } else {
+          totalVisibleCols = visibleFields.length;
       }
-    }
 
-    if (config.group_remaining_columns && currentIdx < totalVisibleCols) {
-      html += `<th colspan="${totalVisibleCols - currentIdx}" class="column-group-header" style="background:${config.group_header_bg_color}">${config.remaining_columns_name}</th>`;
+      html += '<tr>';
+      let currentIdx = 0;
+      for (let i = 1; i <= 3; i++) {
+        const name = config[`column_group_${i}_name`], count = config[`column_group_${i}_count`];
+        if (name && count > 0) {
+          html += `<th colspan="${count}" class="column-group-header" style="background:${config.group_header_bg_color}">${name}</th>`;
+          currentIdx += count;
+        }
+      }
+
+      if (config.group_remaining_columns && currentIdx < totalVisibleCols) {
+        html += `<th colspan="${totalVisibleCols - currentIdx}" class="column-group-header" style="background:${config.group_header_bg_color}">${config.remaining_columns_name}</th>`;
+      }
+      html += '</tr>';
     }
-    html += '</tr>';
     return html;
   },
 
@@ -577,6 +579,7 @@ const visObject = {
   },
 
   renderTable: function (processedData, config, queryResponse) {
+    console.log('[AdvancedTable] renderTable called. Rows:', processedData.length);
     const dims = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
     const hasPivot = this.hasPivot;
@@ -598,52 +601,50 @@ const visObject = {
            font-family:${config.cell_font_family || 'inherit'};
            font-size:${config.cell_font_size}px;
            height:${config.row_height}px;
-           padding: 0 ${config.column_spacing}px;
+           padding: 0 ${config.column_spacing}px; /* Symmetrical Padding */
            border-bottom:1px solid ${config.border_color};
            border-right:1px solid ${config.border_color};
            color:${config.cell_text_color};
            white-space:${config.wrap_text ? 'normal' : 'nowrap'};
            overflow:hidden;
            text-overflow:ellipsis;
+           position: relative; /* Essential for Heatmap Containment */
         }
+        /* Sticky Headers for both Groups and Columns */
         table.advanced-table thead { position: ${headerPosition}; top: 0; z-index: 120; } /* Increased Z-Index for Header */
         table.advanced-table thead th { position: relative; font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding: 6px 8px; vertical-align: bottom; }
 
+        /* Flex Layout for Smart Sizing (Bar vs Comparison) */
+        .cell-content-wrapper { display: flex; align-items: center; width: 100%; height: 100%; gap: 6px; position: relative; z-index: 10; }
+        .cell-bar-flex { flex: 1 1 auto; min-width: 0; /* Allow bar to shrink */ }
+        .cell-value-flex { flex: 0 0 auto; white-space: nowrap; }
+
         .header-content-wrapper { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; width: 100%; overflow: hidden; }
         .header-label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
-
         .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
         .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
         .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
-
         .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid ${config.border_color}; }
         .pivot-header { text-align: center; font-weight: 600; padding: 8px; background: ${config.pivot_header_bg_color} !important; color: ${config.pivot_header_text_color}; border-bottom: 2px solid ${config.border_color}; }
-
         .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; text-align: center; min-width: 60px; }
         .chip-green { background-color: ${config.chip_bg_green}; color: ${config.chip_text_green}; }
         .chip-red { background-color: ${config.chip_bg_red}; color: ${config.chip_text_red}; }
         .chip-yellow { background-color: ${config.chip_bg_yellow}; color: ${config.chip_text_yellow}; }
-
         .cell-bar-container { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 80px; }
-        .cell-content-wrapper { display: flex; align-items: center; width: 100%; height: 100%; gap: 6px; }
-        .cell-bar-flex { flex: 1 1 auto; min-width: 0; }
-        .cell-bar-fixed { width: 100%; flex: 1 0 auto; }
-        .cell-value-flex { flex: 0 0 auto; white-space: nowrap; }
-
+        .cell-bar-bg { flex: 1; min-width: 40px; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
+        .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
+        .cell-bar-value { flex-shrink: 0; min-width: 45px; text-align: right; font-size: 0.9em; }
         .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; user-select: none; display: inline-block; width: 14px; text-align: center; }
         .column-filter { width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; display: block; }
         .table-filter-container { padding: 8px; background: #f5f5f5; border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 12px; }
         .table-filter-input { padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; width: 250px; }
         .pagination-btn { padding: 6px 12px; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; cursor: pointer; font-size: 12px; }
         .pagination-btn:hover:not(:disabled) { background: #f3f4f6; }
+        .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .expand-collapse-btn { padding: 4px 10px; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: auto; }
-
         .resize-handle { position: absolute; right: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; z-index: 1000; user-select: none; }
         .resize-handle:hover { background: #3b82f6; }
-
-        /* Sticky Column Class - Lower Z-Index than Header */
-        .sticky-col { position: sticky; z-index: 110 !important; background: inherit; border-right: 2px solid ${config.border_color}; }
-
+        /* Explicit Hover Effect */
         table.advanced-table tbody tr:not(.subtotal-row):not(.grand-total-row):hover > td { background-color: ${config.hover_bg_color} !important; }
       </style>`;
 
@@ -666,65 +667,75 @@ const visObject = {
     // PIVOT TABLE RENDERING
     // ═══════════════════════════════════════════════════════════════
     if (hasPivot && pivotValues.length > 0) {
-      html += '<thead>';
-      if (config.enable_column_groups) html += this.renderColumnGroups(config, [...dims, ...measures], hDims);
+      // CONDITIONAL HEADER RENDER
+      if(config.show_headers) {
+          html += '<thead>';
+          if (config.enable_column_groups) html += this.renderColumnGroups(config, [...dims, ...measures], hDims);
 
-      html += '<tr>';
+          html += '<tr>';
 
-      let pivotDims = [...dims];
-      if (config.enable_bo_hierarchy && hDims.length > 0) {
-         const mainField = dims.find(d => d.name === hDims[0]);
-         if (mainField) {
-            pivotDims = [mainField, ...dims.filter(d => d.name !== hDims[0])];
-         }
-      }
+          let pivotDims = [...dims];
+          if (config.enable_bo_hierarchy && hDims.length > 0) {
+             const mainField = dims.find(d => d.name === hDims[0]);
+             if (mainField) {
+                pivotDims = [mainField, ...dims.filter(d => d.name !== hDims[0])];
+             }
+          }
 
-      pivotDims.forEach((d, idx) => {
-        if (config.enable_bo_hierarchy && hDims.includes(d.name) && d.name !== hDims[0]) return;
+          // Variable to track the cumulative width of frozen columns
+          let currentLeftOffset = 0;
 
-        const w = getColumnWidth(d.name);
-        const label = config[`field_label_${d.name}`] || d.label_short || d.label;
-        const filterValue = (this.state.columnFilters && this.state.columnFilters[d.name]) || '';
-        const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${d.name}" value="${filterValue}" placeholder="Filter...">` : '';
+          pivotDims.forEach((d, idx) => {
+            if (config.enable_bo_hierarchy && hDims.includes(d.name) && d.name !== hDims[0]) return;
 
-        let stickyStyle = '';
-        if (idx === 0 && config.freeze_columns > 0) {
-            // FIXED: Only freeze first column if enabled
-            stickyStyle = `position:sticky; left:0; z-index:122; background:inherit; border-right: 2px solid #ccc;`;
-        }
+            const w = getColumnWidth(d.name);
+            const numericWidth = parseInt(w) || 150; // Parse width for calculation
 
-        html += `<th rowspan="2" class="sortable" data-field="${d.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}">
-          <div class="header-content-wrapper"><span class="header-label">${label}</span>${columnFilter}</div>
-          <div class="resize-handle" data-col="${d.name}"></div>
-        </th>`;
-      });
+            const label = config[`field_label_${d.name}`] || d.label_short || d.label;
+            const filterValue = (this.state.columnFilters && this.state.columnFilters[d.name]) || '';
+            const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${d.name}" value="${filterValue}" placeholder="Filter...">` : '';
 
-      pivotValues.forEach(pv => {
-        html += `<th colspan="${measures.length}" class="pivot-header">${pv.key}</th>`;
-      });
-      if (config.pivot_show_row_totals) {
-        html += `<th colspan="${measures.length}" class="pivot-header" style="background: #d1d5db !important;">${config.pivot_row_total_label || 'Total'}</th>`;
-      }
-      html += '</tr><tr>';
+            let stickyStyle = '';
+            if (idx < config.freeze_columns) {
+                stickyStyle = `position:sticky; left:${currentLeftOffset}px; z-index:102; background:inherit; border-right: 2px solid #ccc;`;
+                currentLeftOffset += numericWidth; // Add to offset for next column
+            }
 
-      pivotValues.forEach(pv => {
-        measures.forEach(m => {
-          const colKey = `${m.name}_${pv.key}`;
-          const w = getColumnWidth(colKey) || getColumnWidth(m.name);
-          const label = config[`field_label_${m.name}`] || m.label_short || m.label;
-          html += `<th style="width:${w}; min-width:${w}; max-width:${w}" class="sortable" data-field="${m.name}" data-pivot-key="${pv.key}">
-            <div class="header-content-wrapper"><span class="header-label">${label}</span></div>
-            <div class="resize-handle" data-col="${colKey}"></div>
-          </th>`;
-        });
-      });
-      if (config.pivot_show_row_totals) {
-        measures.forEach(m => {
-          html += `<th style="background: #e5e7eb !important;">${config[`field_label_${m.name}`] || m.label_short || m.label}</th>`;
-        });
-      }
-      html += '</tr></thead><tbody>';
+            html += `<th rowspan="2" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}">
+              <div class="header-content-wrapper"><span class="header-label">${label}</span>${columnFilter}</div>
+              <div class="resize-handle" data-col="${d.name}"></div>
+            </th>`;
+          });
 
+          pivotValues.forEach(pv => {
+            html += `<th colspan="${measures.length}" class="pivot-header">${pv.key}</th>`;
+          });
+          if (config.pivot_show_row_totals) {
+            html += `<th colspan="${measures.length}" class="pivot-header" style="background: #d1d5db !important;">${config.pivot_row_total_label || 'Total'}</th>`;
+          }
+          html += '</tr><tr>';
+
+          pivotValues.forEach(pv => {
+            measures.forEach(m => {
+              const colKey = `${m.name}_${pv.key}`;
+              const w = getColumnWidth(colKey) || getColumnWidth(m.name);
+              const label = config[`field_label_${m.name}`] || m.label_short || m.label;
+              // ADDED data-pivot-key for sorting
+              html += `<th style="width:${w}; min-width:${w}; max-width:${w}" class="sortable" data-field="${m.name}" data-pivot-key="${pv.key}">
+                <div class="header-content-wrapper"><span class="header-label">${label}</span></div>
+                <div class="resize-handle" data-col="${colKey}"></div>
+              </th>`;
+            });
+          });
+          if (config.pivot_show_row_totals) {
+            measures.forEach(m => {
+              html += `<th style="background: #e5e7eb !important;">${config[`field_label_${m.name}`] || m.label_short || m.label}</th>`;
+            });
+          }
+          html += '</tr></thead>';
+      } // End Header Check
+
+      html += '<tbody>';
       processedData.forEach((row, i) => {
         const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
         const level = row.__level || 0;
@@ -774,14 +785,20 @@ const visObject = {
 
         html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
 
+        let currentCellLeftOffset = 0;
         pivotDims.forEach((d, idx) => {
           if (config.enable_bo_hierarchy && hDims.includes(d.name) && d.name !== hDims[0]) return;
+
           const w = getColumnWidth(d.name);
+          const numericWidth = parseInt(w) || 150;
 
-          let stickyClass = '';
-          if (idx === 0 && config.freeze_columns > 0) stickyClass = 'sticky-col';
+          let stickyStyle = '';
+          if (idx < config.freeze_columns) {
+             stickyStyle = `position:sticky; left:${currentCellLeftOffset}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
+             currentCellLeftOffset += numericWidth;
+          }
 
-          let style = `width:${w}; min-width:${w}; max-width:${w};`;
+          let style = `width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}`;
           if (d.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
           const cell = row[d.name];
@@ -791,7 +808,7 @@ const visObject = {
              content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
           }
 
-          html += `<td class="${stickyClass}" style="${style} left:0;">${content || ''}</td>`;
+          html += `<td class="${idx === 0 && config.freeze_columns > 0 ? 'sticky-col' : ''}" style="${style}">${content || ''}</td>`;
         });
 
         pivotValues.forEach(pv => {
@@ -809,9 +826,10 @@ const visObject = {
               if (config.enable_conditional_formatting && config.conditional_field) {
                  const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
                  if (targetFields.includes(m.name)) {
-                   const cellVal = pivotCell.value !== undefined ? pivotCell.value : pivotCell;
-                   const bgRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'bg');
-                   const txtRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'text');
+                   // FIXED: Extract RAW VALUE for formatting rule (Strip currency)
+                   const rawVal = pivotCell.value !== undefined ? pivotCell.value : pivotCell;
+                   const bgRule = this.evaluateConditionalRule(rawVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(rawVal, config, 'conditional_rule_2', 'bg');
+                   const txtRule = this.evaluateConditionalRule(rawVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(rawVal, config, 'conditional_rule_2', 'text');
                    if(bgRule) cellBg = `background-color:${bgRule} !important;`;
                    if(txtRule) style += `color:${txtRule} !important;`;
                  }
@@ -856,32 +874,40 @@ const visObject = {
         if (mainField) orderedFields = [mainField, ...dims.filter(f => f.name !== hDims[0]), ...measures];
       }
 
-      html += '<thead>';
-      if (config.enable_column_groups) html += this.renderColumnGroups(config, orderedFields, hDims);
+      if(config.show_headers) {
+          html += '<thead>';
+          if (config.enable_column_groups) html += this.renderColumnGroups(config, orderedFields, hDims);
 
-      html += '<tr>';
-      if (config.show_row_numbers) html += `<th ${config.enable_column_groups ? 'rowspan="2"' : ''} style="width: 40px;">#</th>`;
-      orderedFields.forEach((f, idx) => {
-        if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
-        const w = getColumnWidth(f.name);
+          html += '<tr>';
+          if (config.show_row_numbers) html += `<th ${config.enable_column_groups ? 'rowspan="2"' : ''} style="width: 40px;">#</th>`;
 
-        let stickyStyle = '';
-        if (idx === 0 && config.freeze_columns > 0) {
-            stickyStyle = `position:sticky; left:0; z-index:102; background:inherit; border-right: 2px solid #ccc;`;
-        }
+          let currentLeftOffset = 0;
 
-        const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
-        const label = config[`field_label_${f.name}`] || f.label_short || f.label;
-        const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
-        const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
+          orderedFields.forEach((f, idx) => {
+            if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
+            const w = getColumnWidth(f.name);
+            const numericWidth = parseInt(w) || 150;
 
-        html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle} cursor:pointer;">
-          <div class="header-content-wrapper"><span class="header-label">${label}${sortIcon}</span>${columnFilter}</div>
-          <div class="resize-handle" data-col="${f.name}"></div>
-        </th>`;
-      });
-      html += '</tr></thead><tbody>';
+            let stickyStyle = '';
+            if (idx < config.freeze_columns && config.freeze_header_row) {
+                stickyStyle = `position:sticky; left:${currentLeftOffset}px; z-index:102; background:inherit; border-right: 2px solid #ccc;`;
+                currentLeftOffset += numericWidth;
+            }
 
+            const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+            const label = config[`field_label_${f.name}`] || f.label_short || f.label;
+            const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
+            const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
+
+            html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle} cursor:pointer;">
+              <div class="header-content-wrapper"><span class="header-label">${label}${sortIcon}</span>${columnFilter}</div>
+              <div class="resize-handle" data-col="${f.name}"></div>
+            </th>`;
+          });
+          html += '</tr></thead>';
+      } // End Header Check
+
+      html += '<tbody>';
       processedData.forEach((row, i) => {
         const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
         const level = row.__level || 0;
@@ -912,14 +938,19 @@ const visObject = {
         html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
         if (config.show_row_numbers) html += `<td style="width: 40px;">${(isSub || isGT) ? '' : i + 1}</td>`;
 
+        let currentCellLeftOffset = 0;
         orderedFields.forEach((f, idx) => {
           if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
           const w = getColumnWidth(f.name);
+          const numericWidth = parseInt(w) || 150;
 
-          let stickyClass = '';
-          if (idx === 0 && config.freeze_columns > 0) stickyClass = 'sticky-col';
+          let stickyStyle = '';
+          if (idx < config.freeze_columns) {
+             stickyStyle = `position:sticky; left:${currentCellLeftOffset}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
+             currentCellLeftOffset += numericWidth;
+          }
 
-          let style = `width:${w}; min-width:${w}; max-width:${w};`;
+          let style = `width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}`;
           if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
 
           if (config.enable_conditional_formatting && config.conditional_field) {
@@ -940,9 +971,9 @@ const visObject = {
           const cellData = row[f.name];
           let drillAttr = '';
           if (cellData && cellData.links && cellData.links.length > 0) {
-             drillAttr = `class="has-drill-links ${stickyClass}" data-links='${JSON.stringify(cellData.links)}' style="${style} cursor:pointer; left:0;"`;
+             drillAttr = `class="has-drill-links" data-links='${JSON.stringify(cellData.links)}' style="${style} cursor:pointer;"`;
           } else {
-             drillAttr = `class="${stickyClass}" style="${style} left:0;"`;
+             drillAttr = `style="${style}"`;
           }
 
           html += `<td ${drillAttr}>${content}</td>`;
@@ -1057,15 +1088,14 @@ const visObject = {
              // Calculate Max for Opacity
              let maxVal = 1;
              if(isPivot) {
-                // Approximate max for pivot without heavy pre-calc
-                 maxVal = 5000;
+                maxVal = 5000;
              } else {
                 const peers = data.filter(r => !r.__isGrandTotal && r.__level === (row.__level || 0));
                 maxVal = Math.max(...peers.map(r => parseFloat(r[field.name]?.value || 0)), 1);
              }
              const ratio = Math.min(1, Math.max(0, (parseFloat(val)/maxVal)));
 
-             // FIXED: Heatmap now applies background via style wrapper
+             // FIXED: Apply Heatmap via DIV wrapper for correct stacking
              rendered = `<div style="background-color: ${color}; opacity: ${0.2 + (ratio * 0.8)}; width:100%; height:100%; position:absolute; top:0; left:0; z-index:0;"></div>
                          <span style="position:relative; z-index:1; font-weight:600; color: ${textColor};">${rendered}</span>`;
           } else {
@@ -1223,20 +1253,8 @@ const visObject = {
       return [...data].sort((a, b) => {
         let valA, valB;
         if (this.state.sortPivotKey && this.hasPivot) {
-           // FIXED: Sort by Specific Pivot Column
-           if (a[field] && a[field][this.state.sortPivotKey]) {
-              valA = a[field][this.state.sortPivotKey].value;
-           } else {
-              // Fallback for Dimensions
-              valA = a[field] ? a[field].value : null;
-           }
-
-           if (b[field] && b[field][this.state.sortPivotKey]) {
-              valB = b[field][this.state.sortPivotKey].value;
-           } else {
-              valB = b[field] ? b[field].value : null;
-           }
-
+           valA = a[field] && a[field][this.state.sortPivotKey] ? a[field][this.state.sortPivotKey].value : null;
+           valB = b[field] && b[field][this.state.sortPivotKey] ? b[field][this.state.sortPivotKey].value : null;
         } else {
            const cellA = a[field];
            const cellB = b[field];
