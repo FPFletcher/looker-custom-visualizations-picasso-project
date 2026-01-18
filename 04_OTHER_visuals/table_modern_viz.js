@@ -1,20 +1,17 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 5.2 - Pivot Parity + Crash Fixes
+ * Version: 5.3 - Pivot + Hierarchy Parity
  * Build: 2026-01-18
  * * CHANGE LOG:
- * ✅ FIXED: "trim is not a function" crash (Safe string handling)
- * ✅ ENABLED: Conditional Formatting in Pivot Mode
- * ✅ ENABLED: Data Chips in Pivot Mode
- * ✅ ENABLED: Column Grouping in Pivot Mode
- * ✅ ENABLED: Cell Bars in Pivot Mode
- * ℹ️ NOTE: "Subtotals" and "BO Hierarchy" are natively disabled in Pivot mode
- * because Pivot implies its own row/column hierarchy.
+ * ✅ UNLOCKED: "BO Hierarchy" and "Subtotals" now work in Pivot Mode!
+ * ✅ FEATURE: Subtotal rows calculate sums per pivot column automatically.
+ * ✅ FEATURE: Expand/Collapse (▼/▶) arrows added to Pivot table dimensions.
+ * ✅ FIXED: Preserved column resizing and "..." header fixes from v5.2.
  */
 
 const visObject = {
-  id: "advanced_table_visual_v5_2",
-  label: "Advanced Table v5.2",
+  id: "advanced_table_visual_v5_3",
+  label: "Advanced Table v5.3",
   options: {
     // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
@@ -260,32 +257,39 @@ const visObject = {
 
     if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
-    // Subtotals (Non-Pivot Only)
-    if (!hasPivot) {
-      if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
-        // Safe split: Ensure string before splitting
-        const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
-        processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
-        if (this.state.forceInitialCollapse) {
-          processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
-          this.state.forceInitialCollapse = false;
-        }
-        processedData = this.applyHierarchyFilter(processedData);
-      } else if (config.enable_subtotals && config.subtotal_dimension) {
-        processedData = this.calculateStandardSubtotals(processedData, config.subtotal_dimension, measures, config, dims);
-        if (this.state.forceInitialCollapse) {
-          processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
-          this.state.forceInitialCollapse = false;
-        }
-        processedData = processedData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
+    // ══════════════════════════════════════════════════════════════
+    // UNIFIED SUBTOTAL/HIERARCHY LOGIC (NOW WORKS FOR PIVOTS TOO)
+    // ══════════════════════════════════════════════════════════════
+    if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
+      const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
+      processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
+      if (this.state.forceInitialCollapse) {
+        processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
+        this.state.forceInitialCollapse = false;
       }
+      processedData = this.applyHierarchyFilter(processedData);
+    } else if (config.enable_subtotals && config.subtotal_dimension) {
+      processedData = this.calculateStandardSubtotals(processedData, config.subtotal_dimension, measures, config, dims);
+      if (this.state.forceInitialCollapse) {
+        processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
+        this.state.forceInitialCollapse = false;
+      }
+      processedData = processedData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
     }
 
     // Grand Total
     let grandTotalRow = null;
-    if (config.show_grand_total && !hasPivot) {
-      grandTotalRow = this.calculateGrandTotal(this.state.data, measures, config, dims);
-      this.state.grandTotalRow = grandTotalRow;
+    if (config.show_grand_total) {
+      // Logic adjusted to handle Pivot structure inside calculateGrandTotal if needed,
+      // but usually the Native Totals from Looker (in queryResponse) are preferred for pivots.
+      // For this visual, we stick to our calculation or row aggregation.
+      // Pivot Grand Totals are complex; simplified here for flat totals,
+      // but note that "Pivot Row Totals" are handled separately in render.
+      // This GT row is for the bottom of the table.
+      if (!hasPivot) {
+         grandTotalRow = this.calculateGrandTotal(this.state.data, measures, config, dims);
+         this.state.grandTotalRow = grandTotalRow;
+      }
     } else {
       this.state.grandTotalRow = null;
     }
@@ -300,7 +304,7 @@ const visObject = {
       const pageSize = config.page_size || 25;
       const currentPage = this.state.currentPage || 1;
 
-      if (config.dynamic_pagination && config.enable_subtotals && !hasPivot) {
+      if (config.dynamic_pagination && config.enable_subtotals) {
         let chunks = [];
         let currentChunk = [];
         processedData.forEach(row => {
@@ -332,6 +336,9 @@ const visObject = {
     done();
   },
 
+  // ══════════════════════════════════════════════════════════════
+  // ENHANCED SUBTOTAL LOGIC FOR PIVOT SUPPORT
+  // ══════════════════════════════════════════════════════════════
   calculateSubtotalsRecursive: function (data, fields, measures, config) {
     const result = [];
     const groupData = (rows, level, parentPath) => {
@@ -348,10 +355,27 @@ const visObject = {
         const sub = { __isSubtotal: true, __groupValue: currentPath, __level: level, __parentPath: parentPath };
         sub[fields[0]] = { value: key, rendered: key };
         fields.slice(1).forEach(f => sub[f] = { value: '', rendered: '' });
+
+        // Measure Aggregation: Handle both Flat and Pivot structures
         measures.forEach(m => {
-          let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
-          sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
+          if (this.hasPivot && this.pivotValues.length > 0) {
+            // Aggregate PER PIVOT KEY
+            sub[m.name] = {};
+            this.pivotValues.forEach(pv => {
+              let sum = 0;
+              groups[key].forEach(r => {
+                 const cell = r[m.name] && r[m.name][pv.key];
+                 if (cell && cell.value) sum += Number(cell.value);
+              });
+              sub[m.name][pv.key] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
+            });
+          } else {
+            // Standard Flat Aggregation
+            let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
+            sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
+          }
         });
+
         result.push(sub);
         if (level < fields.length - 1) {
           groupData(groups[key], level + 1, currentPath);
@@ -378,10 +402,24 @@ const visObject = {
       const sub = { __isSubtotal: true, __groupValue: key, __level: 0 };
       sub[field] = { value: key, rendered: key };
       dims.forEach(d => { if (d.name !== field) sub[d.name] = { value: '', rendered: '' }; });
+
       measures.forEach(m => {
-        let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
-        sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
+         if (this.hasPivot && this.pivotValues.length > 0) {
+            sub[m.name] = {};
+            this.pivotValues.forEach(pv => {
+              let sum = 0;
+              groups[key].forEach(r => {
+                 const cell = r[m.name] && r[m.name][pv.key];
+                 if (cell && cell.value) sum += Number(cell.value);
+              });
+              sub[m.name][pv.key] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
+            });
+         } else {
+            let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
+            sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
+         }
       });
+
       result.push(sub);
       groups[key].forEach(r => { r.__parentGroup = key; result.push(r); });
     });
@@ -498,18 +536,18 @@ const visObject = {
     const getColumnWidth = (key) => {
       if (this.state.columnWidths[key]) return `${this.state.columnWidths[key]}px`;
       const configWidth = config[`field_width_${key}`];
-      // FIX: Ensure trim() doesn't crash on non-strings
       return configWidth && String(configWidth).trim() !== '' ? configWidth : 'auto';
     };
 
     const headerPosition = config.freeze_header_row ? 'sticky' : 'relative';
     const headerZIndex = config.freeze_header_row ? '100' : 'auto';
-    const hasSubtotals = !hasPivot && ((config.enable_bo_hierarchy && hDims.length > 0) || (config.enable_subtotals && config.subtotal_dimension));
 
     let html = `<style>
         table.advanced-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color}; table-layout: fixed; }
         table.advanced-table tbody td { font-family:${config.cell_font_family || 'inherit'}; font-size:${config.cell_font_size}px; height:${config.row_height}px; padding:0 ${config.column_spacing}px; border-bottom:1px solid ${config.border_color}; border-right:1px solid ${config.border_color}; color:${config.cell_text_color}; white-space:${config.wrap_text ? 'normal' : 'nowrap'}; overflow:hidden; text-overflow:ellipsis; }
-        table.advanced-table thead th { position: relative; font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding:8px 12px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+        table.advanced-table thead th { position: relative; font-family:${config.header_font_family || 'inherit'}; font-weight:${config.header_font_weight || 'bold'}; font-size:${config.header_font_size}px; color:${config.header_text_color}; background:${config.header_bg_color} !important; border-bottom:2px solid ${config.border_color}; border-right:1px solid ${config.border_color}; padding: 6px 8px; vertical-align: bottom; }
+        .header-content-wrapper { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; width: 100%; overflow: hidden; }
+        .header-label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
         .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
         .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
         table.advanced-table thead { position: ${headerPosition}; top: 0; z-index: ${headerZIndex}; }
@@ -525,7 +563,7 @@ const visObject = {
         .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
         .cell-bar-value { flex-shrink: 0; min-width: 45px; text-align: right; font-size: 0.9em; }
         .subtotal-toggle { cursor: pointer; margin-right: 8px; font-weight: bold; font-family: monospace; user-select: none; display: inline-block; width: 14px; text-align: center; }
-        .column-filter { width: 100%; padding: 4px; font-size: 11px; margin-top: 4px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; }
+        .column-filter { width: 100%; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; display: block; }
         .table-filter-container { padding: 8px; background: #f5f5f5; border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 12px; }
         .table-filter-input { padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; width: 250px; }
         .pagination-btn { padding: 6px 12px; border: 1px solid ${config.border_color}; background: white; border-radius: 4px; cursor: pointer; font-size: 12px; }
@@ -536,13 +574,14 @@ const visObject = {
         .resize-handle:hover { background: #3b82f6; }
       </style>`;
 
-    if (config.enable_table_filter || hasSubtotals) {
+    if (config.enable_table_filter || Object.keys(this.state.collapsedGroups).length > 0 || config.enable_bo_hierarchy || config.enable_subtotals) {
       html += `<div class="table-filter-container">`;
       if (config.enable_table_filter) {
         const filterValue = this.state.tableFilter || '';
         html += `<input type="text" class="table-filter-input" placeholder="Filter table..." value="${filterValue}">`;
       }
-      if (hasSubtotals) {
+      // Always show button if subtotals are active (either Standard or BO)
+      if (config.enable_bo_hierarchy || config.enable_subtotals) {
         const allCollapsed = Object.keys(this.state.collapsedGroups).length > 0;
         html += `<button class="expand-collapse-btn" data-action="toggle-all">${allCollapsed ? '▼ Expand All' : '▶ Collapse All'}</button>`;
       }
@@ -552,21 +591,21 @@ const visObject = {
     html += `<table class="advanced-table ${config.table_theme}">`;
 
     // ═══════════════════════════════════════════════════════════════
-    // PIVOT TABLE RENDERING
+    // PIVOT TABLE RENDERING (With Hierarchy/Subtotal Support)
     // ═══════════════════════════════════════════════════════════════
     if (hasPivot && pivotValues.length > 0) {
-      // ENABLE COLUMN GROUPING EVEN IN PIVOT (Above pivot headers)
-      // Note: Groups might need logic to span across pivots, but simple grouping works for dimensions
       if (config.enable_column_groups) html += this.renderColumnGroups(config, [...dims, ...measures], hDims);
 
       html += '<thead><tr>';
       dims.forEach(d => {
         const w = getColumnWidth(d.name);
-        // Column Filter on Dimensions in Pivot Mode
         const label = config[`field_label_${d.name}`] || d.label_short || d.label;
         const filterValue = (this.state.columnFilters && this.state.columnFilters[d.name]) || '';
         const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${d.name}" value="${filterValue}" placeholder="Filter...">` : '';
-        html += `<th rowspan="2" style="width:${w}; min-width:${w}; max-width:${w}">${label}${columnFilter}<div class="resize-handle" data-col="${d.name}"></div></th>`;
+        html += `<th rowspan="2" style="width:${w}; min-width:${w}; max-width:${w}">
+          <div class="header-content-wrapper"><span class="header-label">${label}</span>${columnFilter}</div>
+          <div class="resize-handle" data-col="${d.name}"></div>
+        </th>`;
       });
       pivotValues.forEach(pv => {
         html += `<th colspan="${measures.length}" class="pivot-header">${pv.key}</th>`;
@@ -580,7 +619,11 @@ const visObject = {
         measures.forEach(m => {
           const colKey = `${m.name}_${pv.key}`;
           const w = getColumnWidth(colKey) || getColumnWidth(m.name);
-          html += `<th style="width:${w}; min-width:${w}; max-width:${w}">${config[`field_label_${m.name}`] || m.label_short || m.label}<div class="resize-handle" data-col="${colKey}"></div></th>`;
+          const label = config[`field_label_${m.name}`] || m.label_short || m.label;
+          html += `<th style="width:${w}; min-width:${w}; max-width:${w}">
+            <div class="header-content-wrapper"><span class="header-label">${label}</span></div>
+            <div class="resize-handle" data-col="${colKey}"></div>
+          </th>`;
         });
       });
       if (config.pivot_show_row_totals) {
@@ -591,18 +634,34 @@ const visObject = {
       html += '</tr></thead><tbody>';
 
       processedData.forEach((row, i) => {
-        const bg = (config.table_theme === 'striped' && i % 2 === 1) ? `background: ${config.stripe_color};` : '';
-        html += `<tr style="${bg}">`;
+        // Apply subtotal styles
+        const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
+        const level = row.__level || 0;
+        let bg = '';
+        const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
+        if (isSub && !bg) bg = `background:${config.subtotal_background_color};`;
+        if (config.table_theme === 'striped' && !isSub && !isGT && !bg && i % 2 === 1) bg = `background:${config.stripe_color};`;
 
+        html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
+
+        // Render Dimensions (with Arrows if Hierarchy)
         dims.forEach((d, idx) => {
           const w = getColumnWidth(d.name);
           let style = `width:${w}; min-width:${w}; max-width:${w};` + ((idx < config.freeze_columns) ? 'position:sticky; left:0; z-index:1; background:inherit;' : '');
+          if (d.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
+
           const cell = row[d.name];
-          const content = cell && typeof cell === 'object' ? (cell.rendered || cell.value) : cell;
+          let content = this.renderCellContent(cell, d, config, row, i, processedData, dims, hDims, mainTreeCol, false);
+
+          // ADDED: Expand/Collapse Arrow in Pivot Mode
+          if (isSub && d.name === mainTreeCol) {
+             content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
+          }
+
           html += `<td style="${style}">${content || ''}</td>`;
         });
 
-        // Pivot Measures
+        // Render Pivot Measures
         pivotValues.forEach(pv => {
           measures.forEach(m => {
             const colKey = `${m.name}_${pv.key}`;
@@ -612,7 +671,6 @@ const visObject = {
             let style = `width:${w}; min-width:${w}; max-width:${w}; text-align: right;`;
 
             if (pivotCell) {
-              // Pass TRUE for isPivot to enable specific pivot handling logic
               cellContent = this.renderCellContent(pivotCell, m, config, row, i, processedData, dims, hDims, mainTreeCol, true);
 
               if (config.enable_conditional_formatting && config.conditional_field) {
@@ -640,14 +698,6 @@ const visObject = {
               if (pivotCell && pivotCell.value !== null) total += Number(pivotCell.value) || 0;
             });
             let rendered = this.formatMeasure(total, m, config);
-
-            // Allow comparison on Row Totals if enabled
-            const compFields = String(config.comparison_primary_field || "").split(',').map(s => s.trim());
-            if (config.enable_comparison && compFields.includes(m.name)) {
-               const mockRow = { ...row };
-               mockRow[m.name] = { value: total };
-            }
-
             html += `<td style="text-align: right; font-weight: 600; background: #f5f5f5;">${rendered}</td>`;
           });
         }
@@ -677,7 +727,11 @@ const visObject = {
         const label = config[`field_label_${f.name}`] || f.label_short || f.label;
         const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
         const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
-        html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${sticky} cursor:pointer;">${label}${sortIcon}${columnFilter}<div class="resize-handle" data-col="${f.name}"></div></th>`;
+
+        html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${sticky} cursor:pointer;">
+          <div class="header-content-wrapper"><span class="header-label">${label}${sortIcon}</span>${columnFilter}</div>
+          <div class="resize-handle" data-col="${f.name}"></div>
+        </th>`;
       });
       html += '</tr></thead><tbody>';
 
@@ -812,7 +866,6 @@ const visObject = {
       rendered = this.formatMeasure(val, field, config);
     }
 
-    // Data Chips (Working in Pivot)
     const chipFields = String(config.data_chip_fields || "").split(',').map(s => s.trim()).filter(s => s);
     const shouldApplyChips = config.enable_data_chips && chipFields.includes(field.name) && (!isSubtotalOrGrandTotal || !isDimensionField);
     if (shouldApplyChips) {
@@ -826,7 +879,6 @@ const visObject = {
       else rendered = `<span class="data-chip" style="background-color: ${config.chip_default_bg}; color: ${config.chip_default_text};">${rendered}</span>`;
     }
 
-    // Comparison Logic (Restored for Non-Pivot)
     const compFields = String(config.comparison_primary_field || "").split(',').map(s => s.trim()).filter(s => s);
     if (config.enable_comparison && compFields.includes(field.name) && !row.__isGrandTotal && !isPivot) {
       const fullData = this.state.fullProcessedData || data;
@@ -838,7 +890,6 @@ const visObject = {
       }
     }
 
-    // Cell Bars (Working in Pivot)
     if (!row.__isGrandTotal) {
       const barFields1 = String(config.cell_bar_fields_1 || "").split(',').map(x => x.trim());
       const barFields2 = String(config.cell_bar_fields_2 || "").split(',').map(x => x.trim());
