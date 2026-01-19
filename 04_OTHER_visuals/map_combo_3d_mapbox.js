@@ -1,9 +1,10 @@
 /**
- * Multi-Layer 3D Map for Looker - v15 Ultimate
- * Features:
- * - Interaction Mode: Switch between "Pan/Zoom" and "Drill" to fix clicking issues.
+ * Multi-Layer 3D Map for Looker - v16 Ultimate
+ * * * FEATURES:
+ * - Interaction Mode: "Pan" (Hand cursor) vs "Drill" (Crosshair cursor).
+ * - Drill Fix: Synthesizes valid events for Looker's Drill Menu to prevent crashes.
  * - Plot Tab First: Correctly ordered settings.
- * - PDF Fix: Extended delay + WebGL constraints to ensure background map renders.
+ * - PDF Fix: Extended delay + WebGL constraints.
  */
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -16,7 +17,6 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
-  // Start Layer Orders at 100 to ensure they come AFTER Plot settings
   const b = 100 + (n * 10);
 
   return {
@@ -123,10 +123,10 @@ const getLayerOptions = (n) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v15",
-  label: "Combo Map 3D (Interactive Control)",
+  id: "combo_map_ultimate_v16",
+  label: "Combo Map 3D (Cursor Fix)",
   options: {
-    // --- 1. PLOT TAB (Orders 1-99) ---
+    // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
 
     data_mode: {
@@ -175,15 +175,15 @@ looker.plugins.visualizations.add({
       order: 5
     },
 
-    // --- INTERACTION MODE (Fix for Drilling) ---
+    // --- INTERACTION MODE ---
     interaction_header: { type: "string", label: "─── INTERACTION ───", display: "divider", section: "Plot", order: 8 },
     interaction_mode: {
         type: "string",
         label: "Interaction Mode",
         display: "select",
         values: [
-            {"Pan & Zoom (Default)": "pan"},
-            {"Drill / Click (Locks Map)": "drill"}
+            {"Pan & Zoom (Hand)": "pan"},
+            {"Drill / Click (Crosshair)": "drill"}
         ],
         default: "pan",
         section: "Plot",
@@ -278,6 +278,7 @@ looker.plugins.visualizations.add({
       </div>`;
 
     this._container = element.querySelector('#map');
+    this._mapWrapper = element.querySelector('#map-wrapper');
     this._tokenError = element.querySelector('#token-error');
     this._geojsonCache = {};
     this._viewState = null;
@@ -316,12 +317,11 @@ looker.plugins.visualizations.add({
       this._prepareData(data, config, queryResponse).then(processedData => {
         this._render(processedData, config, queryResponse, details);
 
-        // --- PDF FIX: AGGRESSIVE DELAY ---
         if (details && details.print) {
             console.log("PDF Mode: Freezing for 2.5s to load tiles...");
             setTimeout(() => {
                 done();
-            }, 2500); // 2.5s delay to ensure satellite tiles load
+            }, 2500);
         } else {
             done();
         }
@@ -340,7 +340,6 @@ looker.plugins.visualizations.add({
   _prepareData: async function(data, config, queryResponse) {
     const measures = queryResponse.fields.measure_like;
 
-    // A. POINT MODE
     if (config.data_mode === 'points') {
       const dims = queryResponse.fields.dimension_like;
       const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
@@ -359,7 +358,6 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures };
     }
 
-    // B. REGION MODE
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
 
@@ -480,7 +478,6 @@ looker.plugins.visualizations.add({
     const cfgZoom = Number(config.zoom) || 4;
     const cfgPitch = Number(config.pitch) || 45;
 
-    // View State Logic
     const configChanged =
         this._prevConfig.lat !== cfgLat ||
         this._prevConfig.lng !== cfgLng ||
@@ -504,12 +501,19 @@ looker.plugins.visualizations.add({
       this._deck.setProps({ viewState: this._viewState });
     };
 
-    // --- INTERACTION MODE LOGIC ---
-    // If "Drill" mode is active, disable dragging/panning so clicks register easily
+    // --- INTERACTION & CURSOR LOGIC ---
     const interactionMode = config.interaction_mode || 'pan';
-    const controllerSettings = interactionMode === 'drill'
+    const isDrill = interactionMode === 'drill';
+
+    // Update CSS Cursor
+    if (this._mapWrapper) {
+        this._mapWrapper.style.cursor = isDrill ? 'crosshair' : 'grab';
+    }
+
+    // Disable controller if Drill Mode is ON to prevent drag interference
+    const controllerSettings = isDrill
         ? { dragPan: false, dragRotate: false, scrollZoom: false, doubleClickZoom: false }
-        : true; // Default standard controller
+        : true;
 
     if (!this._deck) {
       this._deck = new deck.DeckGL({
@@ -518,7 +522,7 @@ looker.plugins.visualizations.add({
         mapboxApiAccessToken: config.mapbox_token,
         viewState: this._viewState,
         onViewStateChange: onViewStateChange,
-        controller: controllerSettings, // Apply interaction setting
+        controller: controllerSettings,
         layers: layers,
         getTooltip: getTooltip,
         glOptions: {
@@ -535,7 +539,7 @@ looker.plugins.visualizations.add({
         mapboxApiAccessToken: config.mapbox_token,
         getTooltip: getTooltip,
         viewState: this._viewState,
-        controller: controllerSettings, // Update interaction setting
+        controller: controllerSettings,
         onViewStateChange: onViewStateChange
       });
     }
@@ -570,18 +574,28 @@ looker.plugins.visualizations.add({
       return arr && arr[measureIdx] ? parseFloat(arr[measureIdx]) : 0;
     };
 
-    // --- DRILL HANDLER ---
+    // --- DRILL HANDLER (SAFE) ---
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
 
-      // Access links for the specific measure assigned to this layer
       const links = info.object.links ? info.object.links[measureIdx] : null;
 
       if (links && links.length > 0) {
-        console.log("Drilling...", links);
+        // Construct a safe event object if the native one is missing
+        // This fixes the "Cannot read property 'pageX' of null" error
+        const mockEvent = {
+            pageX: info.x,
+            pageY: info.y,
+            clientX: info.x,
+            clientY: info.y,
+            target: info.target || document.elementFromPoint(info.x, info.y)
+        };
+
+        const safeEvent = (info.srcEvent && info.srcEvent.pageX) ? info.srcEvent : mockEvent;
+
         LookerCharts.Utils.openDrillMenu({
           links: links,
-          event: info.srcEvent || info.event
+          event: safeEvent
         });
       }
     };
