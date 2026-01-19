@@ -96,7 +96,7 @@ looker.plugins.visualizations.add({
       display: "divider",
       section: "Plot",
       default: "",
-      order:21
+      order: 21
     },
 
     secondary_image_url: {
@@ -104,7 +104,7 @@ looker.plugins.visualizations.add({
       label: "Secondary Picture Image URL",
       default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png",
       section: "Plot",
-      order:22
+      order: 22
     },
     secondary_image_opacity: {
       type: "number",
@@ -115,21 +115,21 @@ looker.plugins.visualizations.add({
       max: 1,
       step: 0.1,
       section: "Plot",
-      order:23
+      order: 23
     },
     secondary_x_position: {
       type: "number",
       label: "Secondary Picture X Position",
       default: 520,
       section: "Plot",
-      order:24
+      order: 24
     },
     secondary_y_position: {
       type: "number",
       label: "Secondary Picture Y Position",
       default: 250,
       section: "Plot",
-      order:25
+      order: 25
     },
 
     // ========== FONT SECTION ==========
@@ -196,14 +196,14 @@ looker.plugins.visualizations.add({
       label: "Secondary Picture Label",
       default: "",
       section: "Secondary",
-      order:1
+      order: 1
     },
     secondary_Picture_size: {
       type: "number",
       label: "Secondary Picture Size",
       default: 190,
       section: "Secondary",
-      order:2
+      order: 2
     },
     secondary_text_color: {
       type: "string",
@@ -211,7 +211,7 @@ looker.plugins.visualizations.add({
       default: "#E53935",
       display: "color",
       section: "Secondary",
-      order:3
+      order: 3
     },
 
     // Percentage settings (now under Secondary)
@@ -220,19 +220,22 @@ looker.plugins.visualizations.add({
       label: "Show Percentage",
       default: true,
       section: "Secondary",
-      order:11
+      order: 11
     },
     percentage_calculation: {
       type: "string",
       label: "Percentage Calculation",
       display: "select",
-      values: [
-        {"Secondary / Primary": "secondary_over_primary"},
-        {"Use 3rd Measure": "use_third_measure"}
+      values: [{
+          "Secondary / Primary": "secondary_over_primary"
+        },
+        {
+          "Use 3rd Measure": "use_third_measure"
+        }
       ],
       default: "secondary_over_primary",
       section: "Secondary",
-      order:12
+      order: 12
     },
     percentage_color: {
       type: "string",
@@ -240,7 +243,7 @@ looker.plugins.visualizations.add({
       default: "#E53935",
       display: "color",
       section: "Secondary",
-      order:13
+      order: 13
     },
     percentage_decimals: {
       type: "number",
@@ -248,7 +251,7 @@ looker.plugins.visualizations.add({
       default: 1,
       display: "number",
       section: "Secondary",
-      order:14
+      order: 14
     }
   },
 
@@ -378,7 +381,10 @@ looker.plugins.visualizations.add({
     this.clearErrors();
 
     if (!this._svg || !this._container) {
-      this.addError({title: "Initialization Error", message: "Visualization not properly initialized"});
+      this.addError({
+        title: "Initialization Error",
+        message: "Visualization not properly initialized"
+      });
       done();
       return;
     }
@@ -472,18 +478,6 @@ looker.plugins.visualizations.add({
   /**
    * Show error message in the visualization
    */
-  // Preload primary image for PDF compatibility
-  const primaryImg = new Image();
-  primaryImg.crossOrigin = "anonymous";
-  primaryImg.onload = () => {
-    console.log('✓ Primary image loaded successfully');
-  };
-  primaryImg.src = primaryImageUrl;
-
-  // Then create the SVG image element
-  const primaryImage = document.createElementNS(svgNS, 'image');
-  primaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', primaryImageUrl);
-
   showError: function(message) {
     this._svg.innerHTML = `
       <g>
@@ -624,6 +618,10 @@ looker.plugins.visualizations.add({
    * Draw the water Picture images and text
    * IMPROVEMENT 1 & 3: PDF support and Dashboard drill support
    */
+  /**
+   * Draw the water Picture images and text
+   * IMPROVEMENT 1 & 3: PDF support and Dashboard drill support
+   */
   drawWaterPictures: function(primaryValue, secondaryValue, percentage, primaryLabel, secondaryLabel, config, data, row, primaryFieldName, secondaryFieldName) {
     const svg = this._svg;
     const svgNS = "http://www.w3.org/2000/svg";
@@ -648,22 +646,34 @@ looker.plugins.visualizations.add({
     svg.appendChild(defs);
 
     // IMPROVEMENT 1: PRIMARY Picture IMAGE - Enhanced for PDF export
-    // Use a group to contain image and ensure proper rendering in PDF
     const primaryGroup = document.createElementNS(svgNS, 'g');
     primaryGroup.setAttribute('class', 'primary-picture-group');
 
-    // IMPROVEMENT 1: PRIMARY Picture IMAGE - Enhanced for PDF export
-      const primaryImage = document.createElementNS(svgNS, 'image');
-      primaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', primaryImageUrl);
-      primaryImage.setAttribute('x', primaryX - primarySize / 2);
-      primaryImage.setAttribute('y', primaryY - primarySize / 2);
-      primaryImage.setAttribute('width', primarySize);
-      primaryImage.setAttribute('height', primarySize);
-      primaryImage.setAttribute('class', 'water-Picture-image');
-      primaryImage.setAttribute('opacity', primaryOpacity);
-      primaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    // ============================================================
+    // INSERTED CODE START: Preload Logic for PDF Compatibility
+    // ============================================================
+    const primaryImg = new Image();
+    primaryImg.crossOrigin = "anonymous";
+    primaryImg.onload = () => {
+      console.log('✓ Primary image loaded successfully');
+    };
+    primaryImg.src = primaryImageUrl;
+    // ============================================================
+    // INSERTED CODE END
+    // ============================================================
 
-      svg.appendChild(primaryImage);  // Append directly to svg, not to a group
+    // Create the SVG image element (using the preloaded URL)
+    const primaryImage = document.createElementNS(svgNS, 'image');
+    primaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', primaryImageUrl);
+    primaryImage.setAttribute('x', primaryX - primarySize / 2);
+    primaryImage.setAttribute('y', primaryY - primarySize / 2);
+    primaryImage.setAttribute('width', primarySize);
+    primaryImage.setAttribute('height', primarySize);
+    primaryImage.setAttribute('class', 'water-Picture-image');
+    primaryImage.setAttribute('opacity', primaryOpacity);
+    primaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+    svg.appendChild(primaryImage); // Append directly to svg, not to a group
 
     // IMPROVEMENT 3: Primary value text with ENHANCED drill functionality
     const primaryValueText = document.createElementNS(svgNS, 'text');
@@ -679,28 +689,20 @@ looker.plugins.visualizations.add({
     const primaryCell = row[primaryFieldName];
     const primaryMeasureLinks = primaryCell && primaryCell.links ? primaryCell.links : [];
 
-    console.log('Primary field:', primaryFieldName);
-    console.log('Primary cell data:', primaryCell);
-    console.log('Primary measure links:', primaryMeasureLinks);
-
     if (primaryMeasureLinks.length > 0) {
-  primaryValueText.addEventListener('click', (e) => {
-    console.log('Primary value clicked - opening drill menu');
-    if (LookerCharts && LookerCharts.Utils) {
-      try {
-        LookerCharts.Utils.openDrillMenu({
-          links: primaryMeasureLinks,
-          event: e
-        });
-        console.log('✓ Drill menu opened');
-      } catch (error) {
-        console.error('✗ Error opening drill menu:', error);
-      }
+      primaryValueText.addEventListener('click', (e) => {
+        if (LookerCharts && LookerCharts.Utils) {
+          try {
+            LookerCharts.Utils.openDrillMenu({
+              links: primaryMeasureLinks,
+              event: e
+            });
+          } catch (error) {
+            console.error('✗ Error opening drill menu:', error);
+          }
+        }
+      });
     }
-  });
-} else {
-  console.log('✗ No drill links available for primary value');
-}
 
     svg.appendChild(primaryValueText);
 
@@ -727,7 +729,7 @@ looker.plugins.visualizations.add({
     secondaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     svg.appendChild(secondaryImage);
 
-    // Percentage indicator (at top of secondary Picture)
+    // Percentage indicator
     if (config.show_percentage !== false) {
       const percentageText = document.createElementNS(svgNS, 'text');
       percentageText.setAttribute('x', secondaryX);
@@ -739,7 +741,7 @@ looker.plugins.visualizations.add({
       svg.appendChild(percentageText);
     }
 
-    // IMPROVEMENT 3: Secondary value text with ENHANCED drill functionality
+    // Secondary value text
     const secondaryValueText = document.createElementNS(svgNS, 'text');
     secondaryValueText.setAttribute('x', secondaryX);
     secondaryValueText.setAttribute('y', secondaryY - 5);
@@ -752,29 +754,20 @@ looker.plugins.visualizations.add({
     const secondaryCell = row[secondaryFieldName];
     const secondaryMeasureLinks = secondaryCell && secondaryCell.links ? secondaryCell.links : [];
 
-    console.log('Secondary field:', secondaryFieldName);
-    console.log('Secondary cell data:', secondaryCell);
-    console.log('Secondary measure links:', secondaryMeasureLinks);
-
-    // Enhanced drill menu for secondary value
     if (secondaryMeasureLinks.length > 0) {
-  secondaryValueText.addEventListener('click', (e) => {
-    console.log('Secondary value clicked - opening drill menu');
-    if (LookerCharts && LookerCharts.Utils) {
-      try {
-        LookerCharts.Utils.openDrillMenu({
-          links: secondaryMeasureLinks,
-          event: e
-        });
-        console.log('✓ Drill menu opened');
-      } catch (error) {
-        console.error('✗ Error opening drill menu:', error);
-      }
+      secondaryValueText.addEventListener('click', (e) => {
+        if (LookerCharts && LookerCharts.Utils) {
+          try {
+            LookerCharts.Utils.openDrillMenu({
+              links: secondaryMeasureLinks,
+              event: e
+            });
+          } catch (error) {
+            console.error('✗ Error opening drill menu:', error);
+          }
+        }
+      });
     }
-  });
-} else {
-  console.log('✗ No drill links available for secondary value');
-}
 
     svg.appendChild(secondaryValueText);
 
@@ -789,4 +782,7 @@ looker.plugins.visualizations.add({
     secondaryLabelText.textContent = secondaryLabel;
     svg.appendChild(secondaryLabelText);
   }
+
+
+
 });
