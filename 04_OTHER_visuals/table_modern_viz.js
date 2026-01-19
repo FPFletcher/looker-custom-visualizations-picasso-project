@@ -1,13 +1,13 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 22.0
- * Base: 21.0 (Stable)
- * Fixes: Partial Striping Overlap, Heatmap on Hierarchy/Subtotals
+ * Version: 23.0
+ * Base: 22.0 (Stable)
+ * Fixes: Frozen Column Striping (Sticky Background Logic)
  */
 
 const visObject = {
-  id: "advanced_table_visual_v22_0",
-  label: "Advanced Table v22.0",
+  id: "advanced_table_visual_v23_0",
+  label: "Advanced Table v23.0",
   options: {
     // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
@@ -68,7 +68,7 @@ const visObject = {
         { "Per Column (Sensistive to Pivot)": "column" },
         { "Per Peer Group (Hierarchy Sensitive)": "peer" }
       ],
-      default: "peer", // CHANGED DEFAULT AS REQUESTED
+      default: "peer",
       section: "Series",
       order: 0.5
     },
@@ -974,7 +974,12 @@ const visObject = {
           let stickyStyle = '';
           if (idx === 0 && config.freeze_first_column) {
             let leftPos = config.show_row_numbers ? 40 : 0;
-            stickyStyle = `position:sticky; left:${leftPos}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
+            // FIX: Explicitly set background for sticky column (Stripe vs Default)
+            let stickyBg = config.cell_bg_color;
+            if (config.enable_striping && !isSub && !isGT && (i % 2 !== 0)) { // i starts at 0 (odd row), 1 (even row)
+                stickyBg = config.stripe_color;
+            }
+            stickyStyle = `position:sticky; left:${leftPos}px; z-index:100; background:${stickyBg}; border-right: 2px solid ${config.border_color};`;
           }
 
           let style = `width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}`;
@@ -999,7 +1004,6 @@ const visObject = {
             }
           }
 
-          // ADDED: Apply row background to every cell if set
           if (bg && !cellBg) style += `${bg}`;
 
           html += `<td style="${style} ${cellBg}">${content || ''}</td>`;
@@ -1032,7 +1036,6 @@ const visObject = {
             }
 
             let drillAttr = '';
-            // Apply row BG if cell specific BG is not present
             if (bg && !cellBg) style += `${bg}`;
 
             if (pivotCell && pivotCell.links && pivotCell.links.length > 0) {
@@ -1141,7 +1144,13 @@ const visObject = {
 
           let stickyStyle = '';
           if (idx === 0 && config.freeze_first_column) {
-            stickyStyle = `position:sticky; left:${currentCellLeftOffset}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
+            let leftPos = currentCellLeftOffset;
+            // FIX: Explicitly set background for sticky column (Stripe vs Default)
+            let stickyBg = config.cell_bg_color;
+            if (config.enable_striping && !isSub && !isGT && (i % 2 !== 0)) {
+                stickyBg = config.stripe_color;
+            }
+            stickyStyle = `position:sticky; left:${leftPos}px; z-index:100; background:${stickyBg}; border-right: 2px solid ${config.border_color};`;
             currentCellLeftOffset += numericWidth;
           }
 
@@ -1261,9 +1270,7 @@ const visObject = {
       }
     }
 
-    // FIX: Render Heatmap for subtotals too if data exists
-    const showOnSubtotals = true; // allow heatmaps on subtotals?
-    if ((!row.__isGrandTotal && !row.__isSubtotal) || (row.__isSubtotal && showOnSubtotals)) {
+    if ((!row.__isGrandTotal && !row.__isSubtotal) || (row.__isSubtotal && true)) {
       const barFields1 = String(config.cell_bar_fields_1 || "").split(',').map(x => x.trim());
       const barFields2 = String(config.cell_bar_fields_2 || "").split(',').map(x => x.trim());
 
@@ -1285,7 +1292,6 @@ const visObject = {
           const endColor = isSet1 ? config.gradient_end_1 : config.gradient_end_2;
           const textColor = isSet1 ? config.heatmap_text_color_1 : config.heatmap_text_color_2;
 
-          // HEATMAP LOGIC FIXED FOR HIERARCHY
           let maxVal = 1;
           let minVal = 0;
           const heatMode = config.heatmap_mode || 'peer';
@@ -1294,7 +1300,6 @@ const visObject = {
              if(heatMode === 'overall') {
                  let allVals = [];
                  this.state.fullProcessedData.forEach(r => {
-                     // Check if valid row for heatmapping
                      if(!r.__isGrandTotal && r[field.name]) {
                          Object.values(r[field.name]).forEach(v => {
                              if(v && v.value !== undefined) allVals.push(Number(v.value));
@@ -1304,27 +1309,24 @@ const visObject = {
                  maxVal = Math.max(...allVals);
                  minVal = Math.min(...allVals);
              } else if(heatMode === 'column') {
-                 const colValues = this.state.fullProcessedData.filter(r => !r.__isGrandTotal) // Allow subtotals
+                 const colValues = this.state.fullProcessedData.filter(r => !r.__isGrandTotal)
                                        .map(r => r[field.name] && r[field.name][pivotKey] ? parseFloat(r[field.name][pivotKey].value) : null)
                                        .filter(n => !isNaN(n));
                  maxVal = Math.max(...colValues);
                  minVal = Math.min(...colValues);
              } else {
-                 // Peer Mode (Pivot)
                  const peers = this.state.fullProcessedData.filter(r => !r.__isGrandTotal && r.__parentPath === row.__parentPath && r.__level === row.__level);
                  const colValues = peers.map(r => r[field.name] && r[field.name][pivotKey] ? parseFloat(r[field.name][pivotKey].value) : null).filter(n => !isNaN(n));
                  maxVal = Math.max(...colValues);
                  minVal = Math.min(...colValues);
              }
           } else {
-            // Standard Table
             if(heatMode === 'overall') {
                 const peers = this.state.fullProcessedData.filter(r => !r.__isGrandTotal);
                 const colValues = peers.map(r => parseFloat(r[field.name]?.value || 0));
                 maxVal = Math.max(...colValues);
                 minVal = Math.min(...colValues);
             } else {
-                // Peer Mode (Default for Hierarchy)
                 const peers = this.state.fullProcessedData.filter(r => !r.__isGrandTotal && r.__parentPath === row.__parentPath && r.__level === row.__level);
                 const colValues = peers.map(r => parseFloat(r[field.name]?.value || 0));
                 maxVal = Math.max(...colValues);
@@ -1433,19 +1435,42 @@ const visObject = {
 
   generateCellBar: function (val, rendered, color, useGrad, endColor, data, fieldName, level, isPivot, fitContent, pivotKey) {
     const num = parseFloat(val);
-    let maxVal = 1;
-    if (isPivot) {
-      // Find max only in this column
-      const colValues = data.filter(r => !r.__isGrandTotal && !r.__isSubtotal)
-                            .map(r => r[fieldName] && r[fieldName][pivotKey] ? parseFloat(r[fieldName][pivotKey].value) : 0);
-      maxVal = Math.max(...colValues);
-    } else {
-      const peers = data.filter(r => !r.__isGrandTotal && r.__level === level);
-      maxVal = Math.max(...peers.map(r => parseFloat(r[fieldName]?.value || 0)), 1);
-    }
-    const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
-    const barStyle = useGrad ? `linear-gradient(to right, ${color}, ${endColor})` : color;
 
+    // If the value itself is not a number, just return the text/content without a bar
+    if (isNaN(num)) return rendered;
+
+    let maxVal = 1;
+
+    if (isPivot) {
+      // Find max only in this column (Pivot Key)
+      // FIX: Filter out rows that don't have data for this pivot key to avoid NaNs
+      const colValues = data.filter(r => !r.__isGrandTotal && !r.__isSubtotal)
+                            .map(r => {
+                                if (r[fieldName] && r[fieldName][pivotKey] && r[fieldName][pivotKey].value !== null) {
+                                    return parseFloat(r[fieldName][pivotKey].value);
+                                }
+                                return null;
+                            })
+                            .filter(n => n !== null && !isNaN(n)); // Strict number check
+
+      if (colValues.length > 0) maxVal = Math.max(...colValues);
+    } else {
+      // Standard Table peers
+      const peers = data.filter(r => !r.__isGrandTotal && r.__level === level);
+      const colValues = peers.map(r => parseFloat(r[fieldName]?.value || 0))
+                             .filter(n => !isNaN(n));
+
+      if (colValues.length > 0) maxVal = Math.max(...colValues);
+    }
+
+    // Prevent division by zero
+    if (maxVal === 0) maxVal = 1;
+
+    // Calculate Width
+    const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
+
+    // Style Generation
+    const barStyle = useGrad ? `linear-gradient(to right, ${color}, ${endColor})` : color;
     const flexClass = fitContent ? "cell-bar-flex" : "cell-bar-fixed";
     const fixedStyle = fitContent ? "" : "width: 100%; flex: 1 0 auto;";
 
