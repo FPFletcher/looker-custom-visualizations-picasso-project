@@ -1,20 +1,18 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 20.0 - Stable Fixes & Hierarchy Sorting
- * Base: 18.0
- * Build: 2026-01-19
+ * Version: 18.0 - Themes, Styling & Visual Mastery
+ * Build: 2026-01-18
  * * CHANGE LOG:
- * ✅ FIXED: Sorting now respects Hierarchy/Subtotals (Recursive Tree Sort).
- * ✅ FIXED: Heatmap sensitivity is now per-column (local min/max).
- * ✅ FIXED: Striping no longer overrides Conditional Formatting.
- * ✅ REFACTOR: Moved Total/Subtotal colors to new "Totals" section.
- * ✅ UPDATE: Added Red & Yellow themes.
- * ✅ FIXED: Pivot Total Text color no longer affects Dimension headers (Years).
+ * ✅ FIXED: Pivot Header BG & Group Header BG now work (Inline Style Priority).
+ * ✅ FEATURE: Added "Cell Background Color" setting.
+ * ✅ FEATURE: Added "Enable Striping" toggle.
+ * ✅ THEMES: Added Google, Looker, and updated Dark themes.
+ * ✅ CLEANUP: "Custom" is now default/first option. Removed "Modern" duplicate.
  */
 
 const visObject = {
-  id: "advanced_table_visual_v20_0",
-  label: "Advanced Table v20.0",
+  id: "advanced_table_visual_v18_0",
+  label: "Advanced Table v18.0",
   options: {
     // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
@@ -32,7 +30,7 @@ const visObject = {
     plot_divider_pivot: { type: "string", label: "━━━ Pivot Settings ━━━", display: "divider", section: "Plot", order: 20 },
     pivot_show_row_totals: { type: "boolean", label: "Show Row Totals", default: false, section: "Plot", order: 23 },
     pivot_row_total_label: { type: "string", label: "Row Total Label", default: "Total", section: "Plot", order: 24 },
-    // MOVED COLORS TO TOTALS SECTION
+    pivot_row_total_bg: { type: "string", label: "Pivot Row Total BG", display: "color", default: "#f3f4f6", section: "Plot", order: 25 },
 
     plot_divider_hierarchy: { type: "string", label: "━━━ Hierarchy & Subtotals ━━━", display: "divider", section: "Plot", order: 30 },
     enable_bo_hierarchy: { type: "boolean", label: "Enable BO-Style Hierarchy", default: false, section: "Plot", order: 31 },
@@ -42,6 +40,7 @@ const visObject = {
     subtotal_dimension: { type: "string", label: "Subtotal Group Dimension", display: "select", values: [{ "None": "" }], default: "", section: "Plot", order: 35 },
     standard_subtotal_bold: { type: "boolean", label: "Bold Font for Subtotals", default: true, section: "Plot", order: 36 },
     show_grand_total: { type: "boolean", label: "Show Grand Total Row", default: false, section: "Plot", order: 37 },
+    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Plot", order: 38 },
     grand_total_label: { type: "string", label: "Grand Total Label", default: "Grand Total", section: "Plot", order: 39 },
 
     plot_divider_grouping: { type: "string", label: "━━━ Column Grouping ━━━", display: "divider", section: "Plot", order: 40 },
@@ -130,8 +129,6 @@ const visObject = {
         { "Professional (Gray/Blue)": "professional" },
         { "Ocean (Blues)": "ocean" },
         { "Forest (Greens)": "forest" },
-        { "Red (Maroon)": "red" },
-        { "Yellow (Gold)": "yellow" },
         { "Dark Mode": "dark" }
       ],
       default: "custom",
@@ -147,18 +144,14 @@ const visObject = {
     header_font_size: { type: "number", label: "Header Font Size (px)", default: 12, section: "Formatting", order: 11 },
     header_text_color: { type: "string", label: "Header Text Color", display: "color", default: "#1f2937", section: "Formatting", order: 12 },
     header_bg_color: { type: "string", label: "Header Background Color", display: "color", default: "#f9fafb", section: "Formatting", order: 13 },
-
-    // NEW TOTALS SECTION
-    formatting_divider_totals: { type: "string", label: "━━━ Totals ━━━", display: "divider", section: "Formatting", order: 15 },
-    subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Formatting", order: 16 },
-    pivot_row_total_bg: { type: "string", label: "Pivot Row Total BG", display: "color", default: "#f3f4f6", section: "Formatting", order: 17 },
-    pivot_total_bg_color: { type: "string", label: "Pivot Total BG (Bottom)", display: "color", default: "#e0e7ff", section: "Formatting", order: 18 },
-    pivot_total_text_color: { type: "string", label: "Pivot Total Text (Bottom)", display: "color", default: "#3730a3", section: "Formatting", order: 19 },
-
+    // MOVED PIVOT SETTINGS HERE
+    pivot_header_bg_color: { type: "string", label: "Pivot Header BG", display: "color", default: "#e0e7ff", section: "Formatting", order: 14 },
+    pivot_header_text_color: { type: "string", label: "Pivot Header Text", display: "color", default: "#3730a3", section: "Formatting", order: 15 },
 
     formatting_divider_cells: { type: "string", label: "━━━ Cells ━━━", display: "divider", section: "Formatting", order: 20 },
     null_measure_value: { type: "string", label: "Null Measure Value", default: "-", section: "Formatting", order: 20.1 },
     null_dimension_value: { type: "string", label: "Null Dimension Value", default: "", section: "Formatting", order: 20.2 },
+    // NEW: Cell BG
     cell_bg_color: { type: "string", label: "Cell Background Color", display: "color", default: "#ffffff", section: "Formatting", order: 20.3 },
     cell_font_family: { type: "string", label: "Cell Font Family", display: "text", default: "inherit", section: "Formatting", order: 20.5 },
     cell_font_size: { type: "number", label: "Cell Size (px)", default: 11, section: "Formatting", order: 21 },
@@ -202,40 +195,38 @@ const visObject = {
   // ══════════════════════════════════════════════════════════════
   // HELPER FUNCTIONS
   // ══════════════════════════════════════════════════════════════
-  hexToRgb: function (hex) {
+  hexToRgb: function(hex) {
     var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
   },
 
-  componentToHex: function (c) {
+  componentToHex: function(c) {
     var hex = c.toString(16);
     return hex.length == 1 ? "0" + hex : hex;
   },
 
-  rgbToHex: function (r, g, b) {
+  rgbToHex: function(r, g, b) {
     return "#" + this.componentToHex(r) + this.componentToHex(g) + this.componentToHex(b);
   },
 
-  interpolateColor: function (color1, color2, factor) {
+  interpolateColor: function(color1, color2, factor) {
     if (factor === undefined) factor = 0.5;
-    var c1 = this.hexToRgb(color1) || { r: 0, g: 0, b: 0 };
-    var c2 = this.hexToRgb(color2) || { r: 255, g: 255, b: 255 };
+    var c1 = this.hexToRgb(color1) || {r:0,g:0,b:0};
+    var c2 = this.hexToRgb(color2) || {r:255,g:255,b:255};
     var r = Math.round(c1.r + factor * (c2.r - c1.r));
     var g = Math.round(c1.g + factor * (c2.g - c1.g));
     var b = Math.round(c1.b + factor * (c2.b - c1.b));
     return this.rgbToHex(r, g, b);
   },
 
-  // PREDEFINED THEMES (Expanded with Red, Yellow, and Totals support)
+  // PREDEFINED THEMES (Expanded)
   themes: {
-    google: { headerBg: '#4285F4', headerText: '#ffffff', pivotTotalBg: '#E8F0FE', pivotTotalText: '#1967D2', border: '#DADCE0', rowBg: '#ffffff', stripe: '#F8F9FA', cellText: '#202124', subtotalBg: '#F1F3F4' },
-    looker: { headerBg: '#2d1e59', headerText: '#ffffff', pivotTotalBg: '#592ec2', pivotTotalText: '#ffffff', border: '#e6e6e6', rowBg: '#ffffff', stripe: '#f5f5f5', cellText: '#262d33', subtotalBg: '#e8e8e8' },
-    professional: { headerBg: '#e2e8f0', headerText: '#1e293b', pivotTotalBg: '#cbd5e1', pivotTotalText: '#0f172a', border: '#cbd5e1', rowBg: '#ffffff', stripe: '#f8fafc', cellText: '#334155', subtotalBg: '#f1f5f9' },
-    ocean: { headerBg: '#dbeafe', headerText: '#1e40af', pivotTotalBg: '#bfdbfe', pivotTotalText: '#172554', border: '#93c5fd', rowBg: '#ffffff', stripe: '#eff6ff', cellText: '#1e3a8a', subtotalBg: '#e0f2fe' },
-    forest: { headerBg: '#dcfce7', headerText: '#166534', pivotTotalBg: '#bbf7d0', pivotTotalText: '#14532d', border: '#86efac', rowBg: '#ffffff', stripe: '#f0fdf4', cellText: '#14532d', subtotalBg: '#dcfce7' },
-    red: { headerBg: '#fee2e2', headerText: '#991b1b', pivotTotalBg: '#fecaca', pivotTotalText: '#7f1d1d', border: '#fca5a5', rowBg: '#ffffff', stripe: '#fef2f2', cellText: '#7f1d1d', subtotalBg: '#fee2e2' },
-    yellow: { headerBg: '#fef9c3', headerText: '#854d0e', pivotTotalBg: '#fde047', pivotTotalText: '#713f12', border: '#fde047', rowBg: '#ffffff', stripe: '#fefce8', cellText: '#713f12', subtotalBg: '#fef9c3' },
-    dark: { headerBg: '#1f2937', headerText: '#f9fafb', pivotTotalBg: '#374151', pivotTotalText: '#f3f4f6', border: '#4b5563', rowBg: '#111827', stripe: '#1f2937', cellText: '#f3f4f6', cellBg: '#111827', subtotalBg: '#374151' }
+     google: { headerBg: '#4285F4', headerText: '#ffffff', pivotBg: '#E8F0FE', pivotText: '#1967D2', border: '#DADCE0', rowBg: '#ffffff', stripe: '#F8F9FA', cellText: '#202124' },
+     looker: { headerBg: '#2d1e59', headerText: '#ffffff', pivotBg: '#592ec2', pivotText: '#ffffff', border: '#e6e6e6', rowBg: '#ffffff', stripe: '#f5f5f5', cellText: '#262d33' },
+     professional: { headerBg: '#e2e8f0', headerText: '#1e293b', pivotBg: '#cbd5e1', pivotText: '#0f172a', border: '#cbd5e1', rowBg: '#ffffff', stripe: '#f8fafc', cellText: '#334155' },
+     ocean: { headerBg: '#dbeafe', headerText: '#1e40af', pivotBg: '#bfdbfe', pivotText: '#172554', border: '#93c5fd', rowBg: '#ffffff', stripe: '#eff6ff', cellText: '#1e3a8a' },
+     forest: { headerBg: '#dcfce7', headerText: '#166534', pivotBg: '#bbf7d0', pivotText: '#14532d', border: '#86efac', rowBg: '#ffffff', stripe: '#f0fdf4', cellText: '#14532d' },
+     dark: { headerBg: '#1f2937', headerText: '#f9fafb', pivotBg: '#374151', pivotText: '#f3f4f6', border: '#4b5563', rowBg: '#111827', stripe: '#1f2937', cellText: '#f3f4f6', cellBg: '#111827' }
   },
 
   create: function (element, config) {
@@ -263,19 +254,17 @@ const visObject = {
 
     // THEME APPLICATION
     if (config.table_theme !== 'custom') {
-      const t = this.themes[config.table_theme];
-      if (t) {
-        this.currentConfig.header_bg_color = t.headerBg;
-        this.currentConfig.header_text_color = t.headerText;
-        this.currentConfig.pivot_total_bg_color = t.pivotTotalBg;
-        this.currentConfig.pivot_total_text_color = t.pivotTotalText;
-        this.currentConfig.subtotal_background_color = t.subtotalBg;
-        this.currentConfig.pivot_row_total_bg = t.subtotalBg; // Apply to row totals too
-        this.currentConfig.border_color = t.border;
-        this.currentConfig.stripe_color = t.stripe;
-        if (t.cellText) this.currentConfig.cell_text_color = t.cellText;
-        if (t.cellBg) this.currentConfig.cell_bg_color = t.cellBg;
-      }
+       const t = this.themes[config.table_theme];
+       if (t) {
+           this.currentConfig.header_bg_color = t.headerBg;
+           this.currentConfig.header_text_color = t.headerText;
+           this.currentConfig.pivot_header_bg_color = t.pivotBg;
+           this.currentConfig.pivot_header_text_color = t.pivotText;
+           this.currentConfig.border_color = t.border;
+           this.currentConfig.stripe_color = t.stripe;
+           if(t.cellText) this.currentConfig.cell_text_color = t.cellText;
+           if(t.cellBg) this.currentConfig.cell_bg_color = t.cellBg;
+       }
     }
 
     const dims = queryResponse.fields.dimension_like;
@@ -292,7 +281,6 @@ const visObject = {
       this.options.subtotal_dimension.values = [{ "None": "" }, ...dims.map(d => ({ [d.label_short || d.label]: d.name }))];
     }
 
-    // Dynamic field options
     dims.concat(measures).forEach((field, idx) => {
       const baseOrder = 110 + (idx * 4);
       const fieldKey = field.name;
@@ -323,10 +311,10 @@ const visObject = {
       const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
       processedData = processedData.filter(row => {
         return allFields.some(field => {
-          if (hasPivot && field.is_measure) {
-            const cellObj = row[field.name];
-            if (!cellObj) return false;
-            return Object.values(cellObj).some(val => String(val.value || val.rendered || '').toLowerCase().includes(filterText));
+          if(hasPivot && field.is_measure) {
+             const cellObj = row[field.name];
+             if(!cellObj) return false;
+             return Object.values(cellObj).some(val => String(val.value || val.rendered || '').toLowerCase().includes(filterText));
           }
           const cellValue = String(row[field.name]?.value || row[field.name] || '').toLowerCase();
           return cellValue.includes(filterText);
@@ -346,64 +334,34 @@ const visObject = {
       });
     }
 
-    // --- SORTING FIXED (Tree Aware) ---
-    // Instead of flat sort, we sort strictly before we generate hierarchies, OR we implement recursive sort.
-    // For V18 architecture, we sort FIRST, then the subtotal logic preserves order within groups.
-    // BUT if the sort field is a measure, simple sort destroys groups.
-    // We must use a Recursive Sort if hierarchy/subtotals are on.
+    if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
-    if (this.state.sortField) {
-        if(config.enable_bo_hierarchy || config.enable_subtotals) {
-             // We can't easily sort the flat list because it breaks groups.
-             // Strategy: The `calculateSubtotalsRecursive` function builds the tree based on INPUT order.
-             // If we want to sort by metric, we must do it AFTER tree building or inside it.
-             // Current Implementation: We will sort the groups after calculation.
-             // 1. Calculate subtotals (produces flat list with __parentPath)
-             // 2. "Treeify" the flat list, Sort the Tree, Flatten again.
-
-             // Step 1: Calculate
-             let tempProcessed = [...processedData];
-             if(config.enable_bo_hierarchy && config.hierarchy_dimensions) {
-                const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
-                tempProcessed = this.calculateSubtotalsRecursive(tempProcessed, hierarchyList, measures, config);
-             } else if (config.enable_subtotals && config.subtotal_dimension) {
-                tempProcessed = this.calculateStandardSubtotals(tempProcessed, config.subtotal_dimension, measures, config, dims);
-             }
-
-             // Step 2: Recursive Sort on the Calculated Data
-             processedData = this.recursiveSort(tempProcessed, this.state.sortField, this.state.sortDirection, this.state.sortPivotKey);
-
-        } else {
-            // Flat Table - Standard Sort
-            processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
+    // Subtotal / Hierarchy Logic
+    if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
+      const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
+      if (hierarchyList.length > 0) {
+        processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
+        if (this.state.forceInitialCollapse) {
+          processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
+          this.state.forceInitialCollapse = false;
         }
-    } else {
-        // No Sort - Just process hierarchies
-         if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
-            const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
-            processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
-         } else if (config.enable_subtotals && config.subtotal_dimension) {
-            processedData = this.calculateStandardSubtotals(processedData, config.subtotal_dimension, measures, config, dims);
-         }
-    }
-
-
-    // Collapse State Logic
-    if (this.state.forceInitialCollapse) {
-      processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
-      this.state.forceInitialCollapse = false;
-    }
-    // Apply collapse filter
-    if(config.enable_bo_hierarchy || config.enable_subtotals) {
         processedData = this.applyHierarchyFilter(processedData);
+      }
+    } else if (config.enable_subtotals && config.subtotal_dimension) {
+      processedData = this.calculateStandardSubtotals(processedData, config.subtotal_dimension, measures, config, dims);
+      if (this.state.forceInitialCollapse) {
+        processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
+        this.state.forceInitialCollapse = false;
+      }
+      processedData = processedData.filter(row => row.__isSubtotal ? true : !this.state.collapsedGroups[row.__parentGroup]);
     }
 
     let grandTotalRow = null;
     if (config.show_grand_total) {
       if (hasPivot) {
-        grandTotalRow = this.calculatePivotGrandTotal(this.state.data, measures, config, dims);
+         grandTotalRow = this.calculatePivotGrandTotal(this.state.data, measures, config, dims);
       } else {
-        grandTotalRow = this.calculateGrandTotal(this.state.data, measures, config, dims);
+         grandTotalRow = this.calculateGrandTotal(this.state.data, measures, config, dims);
       }
       this.state.grandTotalRow = grandTotalRow;
     } else {
@@ -453,125 +411,31 @@ const visObject = {
     done();
   },
 
-  // ══════════════════════════════════════════════════════════════
-  // FIX: RECURSIVE SORT IMPLEMENTATION
-  // ══════════════════════════════════════════════════════════════
-  recursiveSort: function(flatData, field, direction, pivotKey) {
-      // 1. Rebuild Tree Structure temporarily
-      const root = { children: [] };
-      const map = { "": root };
-
-      // Separate roots (Level 0 subtotals) from others
-      // In v18 logic, a subtotal row appears BEFORE its children in the flat array usually,
-      // but strictly speaking, the flat array is [Subtotal, Child, Child, Subtotal...].
-      // We need to nest them.
-
-      // Optimized for the v18 "calculated" structure which has __parentPath
-
-      // Group by parent path
-      const groups = {};
-      flatData.forEach(row => {
-          const p = row.__parentPath || "";
-          if(!groups[p]) groups[p] = [];
-          groups[p].push(row);
-      });
-
-      // Helper to sort a list of rows
-      const sorter = (a, b) => {
-          // Always put subtotal at top (or bottom?)
-          // v18 puts subtotal at top of the group.
-          if(a.__isSubtotal && !b.__isSubtotal) return -1;
-          if(!a.__isSubtotal && b.__isSubtotal) return 1;
-          if(a.__isSubtotal && b.__isSubtotal) {
-               // Sort two subtotals (i.e. two groups)
-               // compare by the value of the SORT field
-               return this.compareValues(a, b, field, direction, pivotKey);
-          }
-          // Sort two leaf rows
-          return this.compareValues(a, b, field, direction, pivotKey);
-      };
-
-      // Recursive function to flatten and sort
-      const processGroup = (parentPath) => {
-          let rows = groups[parentPath] || [];
-          if(rows.length === 0) return [];
-
-          // Separate the "Header/Subtotal" row for this group from the children candidates
-          // In v18, the subtotal row itself has __parentPath = parent of group.
-          // The children have __parentPath = groupValue.
-
-          // Actually, 'groups' contains siblings.
-          // Sort these siblings.
-          rows.sort(sorter);
-
-          let result = [];
-          rows.forEach(row => {
-              result.push(row);
-              // If this row is a group header, recursively find and add its children
-              if(row.__isSubtotal) {
-                  const children = processGroup(row.__groupValue);
-                  result = result.concat(children);
-              }
-          });
-          return result;
-      };
-
-      return processGroup("");
-  },
-
-  compareValues: function(rowA, rowB, field, direction, pivotKey) {
-      let valA, valB;
-      if (this.hasPivot && pivotKey) {
-        valA = rowA[field] && rowA[field][pivotKey] ? rowA[field][pivotKey].value : null;
-        valB = rowB[field] && rowB[field][pivotKey] ? rowB[field][pivotKey].value : null;
-      } else {
-        const cellA = rowA[field];
-        const cellB = rowB[field];
-        valA = (cellA && typeof cellA === 'object' && cellA.value !== undefined) ? cellA.value : cellA;
-        valB = (cellB && typeof cellB === 'object' && cellB.value !== undefined) ? cellB.value : cellB;
-      }
-
-      if(valA == null) valA = -Infinity; // Treat nulls as small
-      if(valB == null) valB = -Infinity;
-
-      if (typeof valA === 'number' && typeof valB === 'number') {
-           return direction === 'asc' ? valA - valB : valB - valA;
-      }
-      return direction === 'asc' ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
-  },
-
-  sortData: function (data, field, direction) {
-     // Standard flat sort (fallback)
-    const isAsc = direction === 'asc';
-    return [...data].sort((a, b) => {
-        return this.compareValues(a, b, field, direction, this.state.sortPivotKey);
-    });
-  },
-
   renderColumnGroups: function (config, fields, hDims) {
     const visibleFields = fields.filter(f => !hDims.includes(f.name) || f.name === hDims[0]);
     let html = '<thead>';
 
-    if (config.show_headers) {
+    if(config.show_headers) {
       let totalVisibleCols = 0;
       if (this.hasPivot) {
-        const dims = this.queryResponse.fields.dimension_like;
-        const measures = this.queryResponse.fields.measure_like;
-        let visibleDimsCount = dims.filter(d => !hDims.includes(d.name) || d.name === hDims[0]).length;
-        if (config.show_row_numbers) visibleDimsCount += 1;
+          const dims = this.queryResponse.fields.dimension_like;
+          const measures = this.queryResponse.fields.measure_like;
+          let visibleDimsCount = dims.filter(d => !hDims.includes(d.name) || d.name === hDims[0]).length;
+          // ADDED: +1 if row numbers are shown
+          if (config.show_row_numbers) visibleDimsCount += 1;
 
-        totalVisibleCols = visibleDimsCount + (measures.length * this.pivotValues.length);
-        if (config.pivot_show_row_totals) totalVisibleCols += measures.length;
+          totalVisibleCols = visibleDimsCount + (measures.length * this.pivotValues.length);
+          if (config.pivot_show_row_totals) totalVisibleCols += measures.length;
       } else {
-        totalVisibleCols = visibleFields.length;
-        if (config.show_row_numbers) totalVisibleCols += 1;
+          totalVisibleCols = visibleFields.length;
+          if (config.show_row_numbers) totalVisibleCols += 1;
       }
 
       html += '<tr>';
 
       if (config.show_row_numbers) {
-        html += `<th style="background:transparent; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color};"></th>`;
-        totalVisibleCols -= 1;
+          html += `<th style="background:transparent; border-top:1px solid ${config.border_color}; border-left:1px solid ${config.border_color};"></th>`;
+          totalVisibleCols -= 1;
       }
 
       let currentIdx = 0;
@@ -614,8 +478,8 @@ const visObject = {
             this.pivotValues.forEach(pv => {
               let sum = 0;
               groups[key].forEach(r => {
-                const cell = r[m.name] && r[m.name][pv.key];
-                if (cell && cell.value) sum += Number(cell.value);
+                 const cell = r[m.name] && r[m.name][pv.key];
+                 if (cell && cell.value) sum += Number(cell.value);
               });
               sub[m.name][pv.key] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
             });
@@ -648,29 +512,29 @@ const visObject = {
       groups[key].push(row);
     });
     groupOrder.forEach(key => {
-      const sub = { __isSubtotal: true, __groupValue: key, __level: 0, __parentPath: "" }; // parentPath empty for top level
+      const sub = { __isSubtotal: true, __groupValue: key, __level: 0 };
       sub[field] = { value: key, rendered: key };
       dims.forEach(d => { if (d.name !== field) sub[d.name] = { value: '', rendered: '' }; });
 
       measures.forEach(m => {
-        if (this.hasPivot && this.pivotValues.length > 0) {
-          sub[m.name] = {};
-          this.pivotValues.forEach(pv => {
-            let sum = 0;
-            groups[key].forEach(r => {
-              const cell = r[m.name] && r[m.name][pv.key];
-              if (cell && cell.value) sum += Number(cell.value);
+         if (this.hasPivot && this.pivotValues.length > 0) {
+            sub[m.name] = {};
+            this.pivotValues.forEach(pv => {
+              let sum = 0;
+              groups[key].forEach(r => {
+                 const cell = r[m.name] && r[m.name][pv.key];
+                 if (cell && cell.value) sum += Number(cell.value);
+              });
+              sub[m.name][pv.key] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
             });
-            sub[m.name][pv.key] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
-          });
-        } else {
-          let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
-          sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
-        }
+         } else {
+            let sum = groups[key].reduce((acc, r) => acc + Number((r[m.name]?.value || r[m.name]) || 0), 0);
+            sub[m.name] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
+         }
       });
 
       result.push(sub);
-      groups[key].forEach(r => { r.__parentGroup = key; r.__parentPath = key; result.push(r); });
+      groups[key].forEach(r => { r.__parentGroup = key; result.push(r); });
     });
     return result;
   },
@@ -786,18 +650,19 @@ const visObject = {
     measures.forEach(m => {
       total[m.name] = {};
       this.pivotValues.forEach(pv => {
-        let sum = 0;
-        rawData.forEach(r => {
-          const cell = r[m.name] && r[m.name][pv.key];
-          if (cell && cell.value) sum += Number(cell.value);
-        });
-        total[m.name][pv.key] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
+         let sum = 0;
+         rawData.forEach(r => {
+            const cell = r[m.name] && r[m.name][pv.key];
+            if (cell && cell.value) sum += Number(cell.value);
+         });
+         total[m.name][pv.key] = { value: sum, rendered: this.formatMeasure(sum, m, config) };
       });
     });
     return total;
   },
 
   renderTable: function (processedData, config, queryResponse) {
+    console.log('[AdvancedTable] renderTable called. Rows:', processedData.length);
     const dims = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
     const hasPivot = this.hasPivot;
@@ -836,20 +701,17 @@ const visObject = {
 
         .subtotal-row { font-weight: ${config.standard_subtotal_bold ? 'bold' : 'normal'} !important; }
         .subtotal-row.bo-mode { font-weight: ${config.bo_hierarchy_bold ? 'bold' : 'normal'} !important; }
-
-        /* FIX: Pivot Totals and Grand Totals use the new color settings */
-        .grand-total-row > td { background-color: ${config.pivot_total_bg_color} !important; color: ${config.pivot_total_text_color} !important; font-weight: 700; border-top: 2px solid ${config.border_color} !important; }
+        .grand-total-row { background-color: #e8e8e8 !important; font-weight: 700; border-top: 3px solid #333 !important; }
 
         .column-group-header { text-align: center; font-weight: 600; padding: 8px; border-bottom: 2px solid ${config.border_color}; background:${config.group_header_bg_color} !important; color:${config.header_text_color} !important; }
 
-        /* FIXED: PIVOT HEADERS NO LONGER USE TOTAL TEXT COLOR */
-        .pivot-header { text-align: center; font-weight: 600; padding: 8px; background: ${config.pivot_header_bg_color || config.header_bg_color} !important; color: ${config.header_text_color} !important; border-bottom: 2px solid ${config.border_color}; }
+        /* FIXED PIVOT HEADERS */
+        .pivot-header { text-align: center; font-weight: 600; padding: 8px; background: ${config.pivot_header_bg_color} !important; color: ${config.pivot_header_text_color} !important; border-bottom: 2px solid ${config.border_color}; }
 
         .data-chip { padding: 2px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; display: inline-block; text-align: center; min-width: 60px; }
         .chip-green { background-color: ${config.chip_bg_green}; color: ${config.chip_text_green}; }
         .chip-red { background-color: ${config.chip_bg_red}; color: ${config.chip_text_red}; }
         .chip-yellow { background-color: ${config.chip_bg_yellow}; color: ${config.chip_text_yellow}; }
-
         .cell-bar-container { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 80px; }
         .cell-bar-bg { flex: 1; min-width: 40px; height: 16px; background: #f3f4f6; border-radius: 2px; overflow: hidden; position: relative; }
         .cell-bar-fill { height: 100%; transition: width 0.3s ease; }
@@ -869,13 +731,12 @@ const visObject = {
         .cell-value-flex { flex: 0 0 auto; white-space: nowrap; }
     `;
 
-    // FIX: Lower specificity for striping, so conditional formatting !important overrides it.
     if (config.enable_striping) {
-      html += `table.advanced-table tbody tr:nth-child(even):not(.subtotal-row):not(.grand-total-row) > td { background-color: ${config.stripe_color}; }`;
+        html += `table.advanced-table tbody tr:nth-child(even):not(.subtotal-row):not(.grand-total-row) > td { background-color: ${config.stripe_color} !important; }`;
     }
 
     if (config.enable_hover) {
-      html += `table.advanced-table tbody tr:not(.subtotal-row):not(.grand-total-row):hover > td { background-color: ${config.hover_bg_color} !important; }`;
+        html += `table.advanced-table tbody tr:not(.subtotal-row):not(.grand-total-row):hover > td { background-color: ${config.hover_bg_color} !important; }`;
     }
 
     html += `</style>`;
@@ -901,72 +762,72 @@ const visObject = {
     if (hasPivot && pivotValues.length > 0) {
       let pivotDims = [...dims];
       if (config.enable_bo_hierarchy && hDims.length > 0) {
-        const mainField = dims.find(d => d.name === hDims[0]);
-        if (mainField) {
-          pivotDims = [mainField, ...dims.filter(d => d.name !== hDims[0])];
-        }
+         const mainField = dims.find(d => d.name === hDims[0]);
+         if (mainField) {
+            pivotDims = [mainField, ...dims.filter(d => d.name !== hDims[0])];
+         }
       }
 
       // CONDITIONAL HEADER RENDER
-      if (config.show_headers) {
-        html += '<thead>';
-        if (config.enable_column_groups) html += this.renderColumnGroups(config, [...dims, ...measures], hDims);
+      if(config.show_headers) {
+          html += '<thead>';
+          if (config.enable_column_groups) html += this.renderColumnGroups(config, [...dims, ...measures], hDims);
 
-        html += '<tr>';
+          html += '<tr>';
 
-        if (config.show_row_numbers) {
-          html += `<th rowspan="2" style="width:40px; min-width:40px; max-width:40px; text-align:center;">#</th>`;
-        }
-
-        let currentLeftOffset = 0;
-
-        pivotDims.forEach((d, idx) => {
-          if (config.enable_bo_hierarchy && hDims.includes(d.name) && d.name !== hDims[0]) return;
-
-          const w = getColumnWidth(d.name);
-          const numericWidth = parseInt(w) || 150;
-
-          const label = config[`field_label_${d.name}`] || d.label_short || d.label;
-          const filterValue = (this.state.columnFilters && this.state.columnFilters[d.name]) || '';
-          const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${d.name}" value="${filterValue}" placeholder="Filter...">` : '';
-
-          let stickyStyle = '';
-          if (idx === 0 && config.freeze_first_column) {
-            let leftPos = config.show_row_numbers ? 40 : 0;
-            stickyStyle = `position:sticky; left:${leftPos}px; z-index:122; background:inherit; border-right: 2px solid #ccc;`;
+          if (config.show_row_numbers) {
+              html += `<th rowspan="2" style="width:40px; min-width:40px; max-width:40px; text-align:center;">#</th>`;
           }
 
-          html += `<th rowspan="2" class="sortable" data-field="${d.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}">
+          let currentLeftOffset = 0;
+
+          pivotDims.forEach((d, idx) => {
+            if (config.enable_bo_hierarchy && hDims.includes(d.name) && d.name !== hDims[0]) return;
+
+            const w = getColumnWidth(d.name);
+            const numericWidth = parseInt(w) || 150;
+
+            const label = config[`field_label_${d.name}`] || d.label_short || d.label;
+            const filterValue = (this.state.columnFilters && this.state.columnFilters[d.name]) || '';
+            const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${d.name}" value="${filterValue}" placeholder="Filter...">` : '';
+
+            let stickyStyle = '';
+            if (idx === 0 && config.freeze_first_column) {
+                let leftPos = config.show_row_numbers ? 40 : 0;
+                stickyStyle = `position:sticky; left:${leftPos}px; z-index:122; background:inherit; border-right: 2px solid #ccc;`;
+            }
+
+            html += `<th rowspan="2" class="sortable" data-field="${d.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}">
               <div class="header-content-wrapper"><span class="header-label">${label}</span>${columnFilter}</div>
               <div class="resize-handle" data-col="${d.name}"></div>
             </th>`;
-        });
+          });
 
-        pivotValues.forEach(pv => {
-          html += `<th colspan="${measures.length}" class="pivot-header">${pv.key}</th>`;
-        });
-        if (config.pivot_show_row_totals) {
-          html += `<th colspan="${measures.length}" class="pivot-header" style="background: ${config.pivot_total_bg_color} !important; color: ${config.pivot_total_text_color} !important;">${config.pivot_row_total_label || 'Total'}</th>`;
-        }
-        html += '</tr><tr>';
+          pivotValues.forEach(pv => {
+            html += `<th colspan="${measures.length}" class="pivot-header">${pv.key}</th>`;
+          });
+          if (config.pivot_show_row_totals) {
+            html += `<th colspan="${measures.length}" class="pivot-header" style="background: ${config.pivot_header_bg_color} !important; color: ${config.pivot_header_text_color} !important;">${config.pivot_row_total_label || 'Total'}</th>`;
+          }
+          html += '</tr><tr>';
 
-        pivotValues.forEach(pv => {
-          measures.forEach(m => {
-            const colKey = `${m.name}_${pv.key}`;
-            const w = getColumnWidth(colKey) || getColumnWidth(m.name);
-            const label = config[`field_label_${m.name}`] || m.label_short || m.label;
-            html += `<th style="width:${w}; min-width:${w}; max-width:${w}" class="sortable" data-field="${m.name}" data-pivot-key="${pv.key}">
+          pivotValues.forEach(pv => {
+            measures.forEach(m => {
+              const colKey = `${m.name}_${pv.key}`;
+              const w = getColumnWidth(colKey) || getColumnWidth(m.name);
+              const label = config[`field_label_${m.name}`] || m.label_short || m.label;
+              html += `<th style="width:${w}; min-width:${w}; max-width:${w}" class="sortable" data-field="${m.name}" data-pivot-key="${pv.key}">
                 <div class="header-content-wrapper"><span class="header-label">${label}</span></div>
                 <div class="resize-handle" data-col="${colKey}"></div>
               </th>`;
+            });
           });
-        });
-        if (config.pivot_show_row_totals) {
-          measures.forEach(m => {
-            html += `<th style="background: ${config.pivot_total_bg_color} !important; color: ${config.pivot_total_text_color} !important;">${config[`field_label_${m.name}`] || m.label_short || m.label}</th>`;
-          });
-        }
-        html += '</tr></thead>';
+          if (config.pivot_show_row_totals) {
+            measures.forEach(m => {
+              html += `<th style="background: ${config.pivot_header_bg_color} !important; color: ${config.pivot_header_text_color} !important;">${config[`field_label_${m.name}`] || m.label_short || m.label}</th>`;
+            });
+          }
+          html += '</tr></thead>';
       }
 
       html += '<tbody>';
@@ -983,32 +844,32 @@ const visObject = {
           for (const fieldName of rowFields) {
             let val = row[fieldName];
             if (val && typeof val === 'object' && val.value === undefined && pivotValues.length > 0) {
-              let rowSum = 0;
-              pivotValues.forEach(pv => {
-                if (val[pv.key] && val[pv.key].value) rowSum += Number(val[pv.key].value);
-              });
-              val = rowSum;
+               let rowSum = 0;
+               pivotValues.forEach(pv => {
+                   if (val[pv.key] && val[pv.key].value) rowSum += Number(val[pv.key].value);
+               });
+               val = rowSum;
             } else if (val && typeof val === 'object' && val.value !== undefined) {
-              val = val.value;
+               val = val.value;
             }
 
             const r1Bg = this.evaluateConditionalRule(val, config, 'row_rule_1', 'bg');
-            if (r1Bg) { bg = `background:${r1Bg} !important;`; ruleMatched = true; break; } // Added !important
+            if (r1Bg) { bg = `background:${r1Bg};`; ruleMatched = true; break; }
           }
           if (!ruleMatched) {
             for (const fieldName of rowFields) {
               let val = row[fieldName];
               if (val && typeof val === 'object' && val.value === undefined && pivotValues.length > 0) {
-                let rowSum = 0;
-                pivotValues.forEach(pv => {
-                  if (val[pv.key] && val[pv.key].value) rowSum += Number(val[pv.key].value);
-                });
-                val = rowSum;
+                 let rowSum = 0;
+                 pivotValues.forEach(pv => {
+                     if (val[pv.key] && val[pv.key].value) rowSum += Number(val[pv.key].value);
+                 });
+                 val = rowSum;
               } else if (val && typeof val === 'object' && val.value !== undefined) {
-                val = val.value;
+                 val = val.value;
               }
               const r2Bg = this.evaluateConditionalRule(val, config, 'row_rule_2', 'bg');
-              if (r2Bg) { bg = `background:${r2Bg} !important;`; break; } // Added !important
+              if (r2Bg) { bg = `background:${r2Bg};`; break; }
             }
           }
         }
@@ -1018,7 +879,7 @@ const visObject = {
         html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
 
         if (config.show_row_numbers) {
-          html += `<td style="text-align:center;">${(isSub || isGT) ? '' : i + 1}</td>`;
+            html += `<td style="text-align:center;">${(isSub || isGT) ? '' : i + 1}</td>`;
         }
 
         let currentCellLeftOffset = 0;
@@ -1030,8 +891,8 @@ const visObject = {
 
           let stickyStyle = '';
           if (idx === 0 && config.freeze_first_column) {
-            let leftPos = config.show_row_numbers ? 40 : 0;
-            stickyStyle = `position:sticky; left:${leftPos}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
+             let leftPos = config.show_row_numbers ? 40 : 0;
+             stickyStyle = `position:sticky; left:${leftPos}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
           }
 
           let style = `width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}`;
@@ -1041,20 +902,20 @@ const visObject = {
           let content = this.renderCellContent(cell, d, config, row, i, processedData, dims, hDims, mainTreeCol, false, null, config.cell_bar_fit_content);
 
           if (isSub && d.name === mainTreeCol) {
-            content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
+             content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
           }
 
           // ADDED: Column Formatting for Pivot Dimensions
           let cellBg = '';
           if (config.enable_conditional_formatting && config.conditional_field) {
-            const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
-            if (targetFields.includes(d.name)) {
-              const cellVal = cell && typeof cell === 'object' ? cell.value : cell;
-              const bgRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'bg');
-              const txtRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'text');
-              if (bgRule) cellBg = `background-color:${bgRule} !important;`;
-              if (txtRule) style += `color:${txtRule} !important;`;
-            }
+             const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
+             if (targetFields.includes(d.name)) {
+                const cellVal = cell && typeof cell === 'object' ? cell.value : cell;
+                const bgRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'bg');
+                const txtRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'text');
+                if(bgRule) cellBg = `background-color:${bgRule} !important;`;
+                if(txtRule) style += `color:${txtRule} !important;`;
+             }
           }
 
           html += `<td style="${style} ${cellBg}">${content || ''}</td>`;
@@ -1073,14 +934,14 @@ const visObject = {
               cellContent = this.renderCellContent(pivotCell, m, config, row, i, processedData, dims, hDims, mainTreeCol, true, pv.key, config.cell_bar_fit_content);
 
               if (config.enable_conditional_formatting && config.conditional_field) {
-                const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
-                if (targetFields.includes(m.name)) {
-                  const cellVal = pivotCell.value !== undefined ? pivotCell.value : pivotCell;
-                  const bgRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'bg');
-                  const txtRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'text');
-                  if (bgRule) cellBg = `background-color:${bgRule} !important;`;
-                  if (txtRule) style += `color:${txtRule} !important;`;
-                }
+                 const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
+                 if (targetFields.includes(m.name)) {
+                   const cellVal = pivotCell.value !== undefined ? pivotCell.value : pivotCell;
+                   const bgRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'bg');
+                   const txtRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'text');
+                   if(bgRule) cellBg = `background-color:${bgRule} !important;`;
+                   if(txtRule) style += `color:${txtRule} !important;`;
+                 }
               }
             } else {
               cellContent = config.null_measure_value || '-';
@@ -1088,9 +949,9 @@ const visObject = {
 
             let drillAttr = '';
             if (pivotCell && pivotCell.links && pivotCell.links.length > 0) {
-              drillAttr = `class="has-drill-links" data-links='${JSON.stringify(pivotCell.links)}' style="${style} cursor:pointer; ${cellBg}"`;
+               drillAttr = `class="has-drill-links" data-links='${JSON.stringify(pivotCell.links)}' style="${style} cursor:pointer; ${cellBg}"`;
             } else {
-              drillAttr = `style="${style} ${cellBg}"`;
+               drillAttr = `style="${style} ${cellBg}"`;
             }
 
             html += `<td ${drillAttr}>${cellContent}</td>`;
@@ -1122,37 +983,37 @@ const visObject = {
         if (mainField) orderedFields = [mainField, ...dims.filter(f => f.name !== hDims[0]), ...measures];
       }
 
-      if (config.show_headers) {
-        html += '<thead>';
-        if (config.enable_column_groups) html += this.renderColumnGroups(config, orderedFields, hDims);
+      if(config.show_headers) {
+          html += '<thead>';
+          if (config.enable_column_groups) html += this.renderColumnGroups(config, orderedFields, hDims);
 
-        html += '<tr>';
-        if (config.show_row_numbers) html += `<th ${config.enable_column_groups ? 'rowspan="2"' : ''} style="width: 40px;">#</th>`;
+          html += '<tr>';
+          if (config.show_row_numbers) html += `<th ${config.enable_column_groups ? 'rowspan="2"' : ''} style="width: 40px;">#</th>`;
 
-        let currentLeftOffset = 0;
+          let currentLeftOffset = 0;
 
-        orderedFields.forEach((f, idx) => {
-          if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
-          const w = getColumnWidth(f.name);
-          const numericWidth = parseInt(w) || 150;
+          orderedFields.forEach((f, idx) => {
+            if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
+            const w = getColumnWidth(f.name);
+            const numericWidth = parseInt(w) || 150;
 
-          let stickyStyle = '';
-          if (idx === 0 && config.freeze_first_column) {
-            stickyStyle = `position:sticky; left:${currentLeftOffset}px; z-index:102; background:inherit; border-right: 2px solid #ccc;`;
-            currentLeftOffset += numericWidth;
-          }
+            let stickyStyle = '';
+            if (idx === 0 && config.freeze_first_column) {
+                stickyStyle = `position:sticky; left:${currentLeftOffset}px; z-index:102; background:inherit; border-right: 2px solid #ccc;`;
+                currentLeftOffset += numericWidth;
+            }
 
-          const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
-          const label = config[`field_label_${f.name}`] || f.label_short || f.label;
-          const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
-          const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
+            const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+            const label = config[`field_label_${f.name}`] || f.label_short || f.label;
+            const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
+            const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
 
-          html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle} cursor:pointer;">
+            html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle} cursor:pointer;">
               <div class="header-content-wrapper"><span class="header-label">${label}${sortIcon}</span>${columnFilter}</div>
               <div class="resize-handle" data-col="${f.name}"></div>
             </th>`;
-        });
-        html += '</tr></thead>';
+          });
+          html += '</tr></thead>';
       }
 
       html += '<tbody>';
@@ -1168,13 +1029,13 @@ const visObject = {
           for (const fieldName of rowFields) {
             const val = row[fieldName]?.value || row[fieldName];
             const r1Bg = this.evaluateConditionalRule(val, config, 'row_rule_1', 'bg');
-            if (r1Bg) { bg = `background:${r1Bg} !important;`; ruleMatched = true; break; }
+            if (r1Bg) { bg = `background:${r1Bg};`; ruleMatched = true; break; }
           }
           if (!ruleMatched) {
             for (const fieldName of rowFields) {
               const val = row[fieldName]?.value || row[fieldName];
               const r2Bg = this.evaluateConditionalRule(val, config, 'row_rule_2', 'bg');
-              if (r2Bg) { bg = `background:${r2Bg} !important;`; break; }
+              if (r2Bg) { bg = `background:${r2Bg};`; break; }
             }
           }
         }
@@ -1193,8 +1054,8 @@ const visObject = {
 
           let stickyStyle = '';
           if (idx === 0 && config.freeze_first_column) {
-            stickyStyle = `position:sticky; left:${currentCellLeftOffset}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
-            currentCellLeftOffset += numericWidth;
+             stickyStyle = `position:sticky; left:${currentCellLeftOffset}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
+             currentCellLeftOffset += numericWidth;
           }
 
           let style = `width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}`;
@@ -1218,9 +1079,9 @@ const visObject = {
           const cellData = row[f.name];
           let drillAttr = '';
           if (cellData && cellData.links && cellData.links.length > 0) {
-            drillAttr = `class="has-drill-links" data-links='${JSON.stringify(cellData.links)}' style="${style} cursor:pointer;"`;
+             drillAttr = `class="has-drill-links" data-links='${JSON.stringify(cellData.links)}' style="${style} cursor:pointer;"`;
           } else {
-            drillAttr = `style="${style}"`;
+             drillAttr = `style="${style}"`;
           }
 
           html += `<td ${drillAttr}>${content}</td>`;
@@ -1233,9 +1094,9 @@ const visObject = {
 
     // Pagination
     if (config.enable_pagination && this.state.totalPages > 1) {
-      const currentPage = this.state.currentPage || 1;
-      const totalRows = this.state.totalRowCount || processedData.length;
-      const paginationHTML = `
+       const currentPage = this.state.currentPage || 1;
+       const totalRows = this.state.totalRowCount || processedData.length;
+       const paginationHTML = `
         <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9fafb; border-radius: 4px;">
           <span style="font-size: 13px; color: ${config.cell_text_color}; font-weight: 600;">Total: ${totalRows} rows</span>
           <div style="display: flex; gap: 8px; align-items: center;">
@@ -1246,8 +1107,8 @@ const visObject = {
              <button class="pagination-btn" data-page="last" ${currentPage === this.state.totalPages ? 'disabled' : ''}>►|</button>
           </div>
         </div>`;
-      if (config.pagination_position === 'top' || config.pagination_position === 'both') html = paginationHTML + html;
-      if (config.pagination_position === 'bottom' || config.pagination_position === 'both') html += paginationHTML;
+       if (config.pagination_position === 'top' || config.pagination_position === 'both') html = paginationHTML + html;
+       if (config.pagination_position === 'bottom' || config.pagination_position === 'both') html += paginationHTML;
     }
 
     this.container.innerHTML = html;
@@ -1273,9 +1134,9 @@ const visObject = {
 
     // CUSTOM NULL HANDLING
     if (val === null || val === undefined) {
-      if (isSubtotalOrGrandTotal) return '';
-      if (isDimensionField) return config.null_dimension_value || '';
-      return config.null_measure_value || '-';
+       if (isSubtotalOrGrandTotal) return '';
+       if (isDimensionField) return config.null_dimension_value || '';
+       return config.null_measure_value || '-';
     }
 
     const customFormat = config[`field_format_${field.name}`];
@@ -1319,54 +1180,40 @@ const visObject = {
       let isSet2 = false;
 
       if (config.enable_cell_bars_1 && barFields1.includes(field.name)) {
-        mode = config.cell_bar_mode_1;
-        isSet1 = true;
+         mode = config.cell_bar_mode_1;
+         isSet1 = true;
       } else if (config.enable_cell_bars_2 && barFields2.includes(field.name)) {
-        mode = config.cell_bar_mode_2;
-        isSet2 = true;
+         mode = config.cell_bar_mode_2;
+         isSet2 = true;
       }
 
       if (isSet1 || isSet2) {
-        if (mode === 'heatmap') {
-          const color = isSet1 ? config.cell_bar_color_1 : config.cell_bar_color_2;
-          const endColor = isSet1 ? config.gradient_end_1 : config.gradient_end_2;
-          const textColor = isSet1 ? config.heatmap_text_color_1 : config.heatmap_text_color_2;
+          if (mode === 'heatmap') {
+             const color = isSet1 ? config.cell_bar_color_1 : config.cell_bar_color_2;
+             const endColor = isSet1 ? config.gradient_end_1 : config.gradient_end_2;
+             const textColor = isSet1 ? config.heatmap_text_color_1 : config.heatmap_text_color_2;
 
-          // FIX: LOCAL COLUMN SENSITIVITY (Per Pivot Column, not global)
-          let maxVal = 1;
-          let minVal = 0;
+             let maxVal = 1;
+             if(isPivot) {
+                maxVal = 5000;
+             } else {
+                const peers = data.filter(r => !r.__isGrandTotal && r.__level === (row.__level || 0));
+                maxVal = Math.max(...peers.map(r => parseFloat(r[field.name]?.value || 0)), 1);
+             }
+             const ratio = Math.min(1, Math.max(0, (parseFloat(val)/maxVal)));
 
-          if (isPivot) {
-            // Find max ONLY in this column (pivot key)
-            const colValues = data.filter(r => !r.__isGrandTotal && !r.__isSubtotal)
-                                  .map(r => r[field.name] && r[field.name][pivotKey] ? parseFloat(r[field.name][pivotKey].value) : 0);
-            maxVal = Math.max(...colValues);
-            minVal = Math.min(...colValues);
-          } else {
-            const peers = data.filter(r => !r.__isGrandTotal && !r.__isSubtotal);
-            const colValues = peers.map(r => parseFloat(r[field.name]?.value || 0));
-            maxVal = Math.max(...colValues);
-            minVal = Math.min(...colValues);
-          }
+             let finalColor = color;
+             if (config.use_gradient_1 && isSet1) finalColor = this.interpolateColor(color, endColor, ratio);
+             if (config.use_gradient_2 && isSet2) finalColor = this.interpolateColor(color, endColor, ratio);
 
-          if (maxVal === minVal) maxVal = minVal + 1; // Prevent div by zero
-
-          // Normalize (0 to 1)
-          const ratio = Math.max(0, Math.min(1, (parseFloat(val) - minVal) / (maxVal - minVal)));
-
-          let finalColor = color;
-          if (config.use_gradient_1 && isSet1) finalColor = this.interpolateColor(color, endColor, ratio);
-          if (config.use_gradient_2 && isSet2) finalColor = this.interpolateColor(color, endColor, ratio);
-
-          rendered = `<div style="background-color: ${finalColor}; width:100%; height:100%; position:absolute; top:0; left:0; z-index:0;"></div>
+             rendered = `<div style="background-color: ${finalColor}; width:100%; height:100%; position:absolute; top:0; left:0; z-index:0;"></div>
                          <span style="position:relative; z-index:1; font-weight:600; color: ${textColor};">${rendered}</span>`;
-        } else {
-          // Bar Chart logic
-          const color = isSet1 ? config.cell_bar_color_1 : config.cell_bar_color_2;
-          const useGrad = isSet1 ? config.use_gradient_1 : config.use_gradient_2;
-          const endColor = isSet1 ? config.gradient_end_1 : config.gradient_end_2;
-          rendered = this.generateCellBar(val, rendered, color, useGrad, endColor, data, field.name, row.__level, isPivot, fitContent, pivotKey);
-        }
+          } else {
+             const color = isSet1 ? config.cell_bar_color_1 : config.cell_bar_color_2;
+             const useGrad = isSet1 ? config.use_gradient_1 : config.use_gradient_2;
+             const endColor = isSet1 ? config.gradient_end_1 : config.gradient_end_2;
+             rendered = this.generateCellBar(val, rendered, color, useGrad, endColor, data, field.name, row.__level, isPivot, fitContent);
+          }
       }
     }
 
@@ -1415,9 +1262,9 @@ const visObject = {
     const targetField = fieldName || config.comparison_primary_field;
     let primary = 0;
     if (pivotKey && row[targetField] && row[targetField][pivotKey]) {
-      primary = parseFloat(row[targetField][pivotKey].value || 0);
+       primary = parseFloat(row[targetField][pivotKey].value || 0);
     } else if (row[targetField]) {
-      primary = parseFloat(row[targetField].value || 0);
+       primary = parseFloat(row[targetField].value || 0);
     }
 
     const isSub = !!row.__isSubtotal;
@@ -1432,9 +1279,9 @@ const visObject = {
 
     let secondary = 0;
     if (pivotKey && compRow[targetField] && compRow[targetField][pivotKey]) {
-      secondary = parseFloat(compRow[targetField][pivotKey].value || 0);
+       secondary = parseFloat(compRow[targetField][pivotKey].value || 0);
     } else if (compRow[targetField]) {
-      secondary = parseFloat(compRow[targetField].value || 0);
+       secondary = parseFloat(compRow[targetField].value || 0);
     }
 
     if (isNaN(secondary) || secondary === 0) return `<div class="cell-content-wrapper"><span class="cell-value-flex" style="margin-left: auto;">${primaryRendered}</span><span style="width:55px;"></span></div>`;
@@ -1450,17 +1297,14 @@ const visObject = {
             </div>`;
   },
 
-  generateCellBar: function (val, rendered, color, useGrad, endColor, data, fieldName, level, isPivot, fitContent, pivotKey) {
+  generateCellBar: function (val, rendered, color, useGrad, endColor, data, fieldName, level, isPivot, fitContent) {
     const num = parseFloat(val);
     let maxVal = 1;
-    if (isPivot) {
-      // Find max only in this column
-      const colValues = data.filter(r => !r.__isGrandTotal && !r.__isSubtotal)
-                            .map(r => r[fieldName] && r[fieldName][pivotKey] ? parseFloat(r[fieldName][pivotKey].value) : 0);
-      maxVal = Math.max(...colValues);
+    if(isPivot) {
+       maxVal = 100;
     } else {
-      const peers = data.filter(r => !r.__isGrandTotal && r.__level === level);
-      maxVal = Math.max(...peers.map(r => parseFloat(r[fieldName]?.value || 0)), 1);
+       const peers = data.filter(r => !r.__isGrandTotal && r.__level === level);
+       maxVal = Math.max(...peers.map(r => parseFloat(r[fieldName]?.value || 0)), 1);
     }
     const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
     const barStyle = useGrad ? `linear-gradient(to right, ${color}, ${endColor})` : color;
@@ -1511,6 +1355,33 @@ const visObject = {
         });
       }
     });
+  },
+
+  sortData: function (data, field, direction) {
+      const isAsc = direction === 'asc';
+      return [...data].sort((a, b) => {
+        let valA, valB;
+        if (this.state.sortPivotKey && this.hasPivot) {
+           valA = a[field] && a[field][this.state.sortPivotKey] ? a[field][this.state.sortPivotKey].value : null;
+           valB = b[field] && b[field][this.state.sortPivotKey] ? b[field][this.state.sortPivotKey].value : null;
+           if (valA === undefined && a[field]) valA = a[field].value;
+           if (valB === undefined && b[field]) valB = b[field].value;
+        } else {
+           const cellA = a[field];
+           const cellB = b[field];
+           valA = (cellA && typeof cellA === 'object' && cellA.value !== undefined) ? cellA.value : cellA;
+           valB = (cellB && typeof cellB === 'object' && cellB.value !== undefined) ? cellB.value : cellB;
+        }
+
+        if (valA === null || valA === undefined) return 1;
+        if (valB === null || valB === undefined) return -1;
+
+        if (typeof valA === 'number' && typeof valB === 'number') return isAsc ? valA - valB : valB - valA;
+        const strA = String(valA);
+        const strB = String(valB);
+        const comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+        return isAsc ? comparison : -comparison;
+      });
   },
 
   attachEventListeners: function (config) {
@@ -1591,7 +1462,7 @@ const visObject = {
           if (linksJson) {
             const links = JSON.parse(linksJson);
             if (links && links.length > 0) {
-              LookerCharts.Utils.openDrillMenu({ links: links, event: e });
+                LookerCharts.Utils.openDrillMenu({ links: links, event: e });
             }
           }
         } catch (err) { console.error('[DRILL] Error opening drill menu:', err); }
