@@ -1,9 +1,9 @@
 /**
- * Multi-Layer 3D Map for Looker - v17 Ultimate
+ * Multi-Layer 3D Map for Looker - v18 Ultimate
  * * * FEATURES:
- * - On-Map Interaction Toggle: Button to switch Pan vs Drill modes.
- * - Drill Fix: Works for Regions (Choropleth) and Points.
- * - PDF Fixes: Pre-loads icons and forces background redraw.
+ * - PDF Fixes: Background Map + Custom Icons now render reliably in exports.
+ * - UI Fix: Icon URL fields are now correctly positioned under their specific Layer headers.
+ * - Interaction: On-Map Toggle for Pan vs Click.
  */
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -16,7 +16,8 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
-  const b = 100 + (n * 10);
+  // FIX: Increased spacing (50 instead of 10) to prevent UI overlap
+  const b = 100 + (n * 50);
 
   return {
     [`layer${n}_divider_top`]: {
@@ -121,9 +122,21 @@ const getLayerOptions = (n) => {
   };
 };
 
+// --- HELPER: IMAGE PRELOADER FOR PDF ---
+const preloadImage = (url) => {
+    return new Promise((resolve) => {
+        if (!url || url.length < 5) return resolve();
+        const img = new Image();
+        img.crossOrigin = "Anonymous"; // Critical for PDF Screenshots
+        img.onload = () => resolve();
+        img.onerror = () => resolve(); // Resolve anyway so map doesn't hang
+        img.src = url;
+    });
+};
+
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v17",
-  label: "Combo Map 3D (Toggle Button)",
+  id: "combo_map_ultimate_v18",
+  label: "Combo Map 3D (Icons + PDF Fixed)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -172,6 +185,21 @@ looker.plugins.visualizations.add({
       section: "Plot",
       placeholder: "Auto-detect if empty",
       order: 5
+    },
+
+    // --- INTERACTION MODE ---
+    interaction_header: { type: "string", label: "─── INTERACTION ───", display: "divider", section: "Plot", order: 8 },
+    interaction_mode: {
+        type: "string",
+        label: "Interaction Mode",
+        display: "select",
+        values: [
+            {"Pan & Zoom (Hand)": "pan"},
+            {"Drill / Click (Crosshair)": "drill"}
+        ],
+        default: "pan",
+        section: "Plot",
+        order: 9
     },
 
     // --- BASE MAP ---
@@ -229,7 +257,7 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
-    // --- 2. LAYERS TAB ---
+    // --- 2. LAYERS TAB (Consolidated) ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
     ...getLayerOptions(3),
@@ -256,7 +284,6 @@ looker.plugins.visualizations.add({
             font-family: sans-serif; font-weight: bold; text-align: center; display: none; z-index: 999;
         }
 
-        /* INTERACTION TOGGLE BUTTON */
         #interaction-toggle {
             position: absolute; top: 10px; right: 10px; z-index: 10;
             background: #fff; padding: 8px 12px; border-radius: 4px;
@@ -291,14 +318,11 @@ looker.plugins.visualizations.add({
     this._viewState = null;
     this._prevConfig = {};
 
-    // Internal State for Interaction Mode
     this._isDrillMode = false;
 
-    // Toggle Click Handler
     this._toggleBtn.onclick = () => {
         this._isDrillMode = !this._isDrillMode;
         this._updateInteractionMode();
-        // Trigger re-render to update DeckGL controller
         if (this._deck) {
             const controllerSettings = this._isDrillMode
                 ? { dragPan: false, dragRotate: false, scrollZoom: false, doubleClickZoom: false }
@@ -332,16 +356,12 @@ looker.plugins.visualizations.add({
     this.clearErrors();
 
     if (!config.mapbox_token) {
-        if(this._deck) {
-            this._deck.finalize();
-            this._deck = null;
-        }
+        if(this._deck) { this._deck.finalize(); this._deck = null; }
         this._tokenError.style.display = 'block';
         this._toggleBtn.style.display = 'none';
         done(); return;
     } else {
         this._tokenError.style.display = 'none';
-        // Hide toggle in print mode
         this._toggleBtn.style.display = (details && details.print) ? 'none' : 'flex';
     }
 
@@ -350,18 +370,30 @@ looker.plugins.visualizations.add({
       done(); return;
     }
 
+    // --- PDF PRE-LOADER ---
+    // Gather all icon URLs to pre-fetch them before rendering
+    const promises = [];
+    for(let i=1; i<=4; i++) {
+        if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
+            promises.push(preloadImage(config[`layer${i}_icon_url`]));
+        }
+    }
+
+    Promise.all(promises).then(() => {
+        // Proceed with rendering only after images are cached
+        this._executeRender(data, config, queryResponse, details, done);
+    });
+  },
+
+  _executeRender: function(data, config, queryResponse, details, done) {
     try {
       this._prepareData(data, config, queryResponse).then(processedData => {
         this._render(processedData, config, queryResponse, details);
 
-        // --- PDF FIX ---
         if (details && details.print) {
-            console.log("PDF Mode: Waiting for tiles and icons...");
-            // Force redraw before stopping
+            console.log("PDF Mode: Freezing for 2.5s...");
             if(this._deck) this._deck.redraw(true);
-            setTimeout(() => {
-                done();
-            }, 3000); // 3s delay for PDF
+            setTimeout(() => { done(); }, 2500);
         } else {
             done();
         }
@@ -380,7 +412,6 @@ looker.plugins.visualizations.add({
   _prepareData: async function(data, config, queryResponse) {
     const measures = queryResponse.fields.measure_like;
 
-    // A. POINT MODE
     if (config.data_mode === 'points') {
       const dims = queryResponse.fields.dimension_like;
       const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
@@ -399,7 +430,6 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures };
     }
 
-    // B. REGION MODE
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
 
@@ -436,7 +466,6 @@ looker.plugins.visualizations.add({
         geojson.features.forEach(feature => {
             const props = feature.properties;
             let match = null;
-            // Try matching against any property
             for (let key in props) {
                 if (props[key]) {
                   const cleanProp = this._normalizeName(props[key]);
@@ -447,7 +476,6 @@ looker.plugins.visualizations.add({
                 }
             }
             if (match) {
-                // Attach drill links directly to the feature for easier access
                 feature.properties._links = match.links;
                 feature.properties._name = match.rawName;
                 feature.properties._values = match.values;
@@ -493,7 +521,6 @@ looker.plugins.visualizations.add({
       if (!object || config.tooltip_mode === 'none') return null;
       let name, values, formatted;
 
-      // Handle both Feature (GeoJSON) and Point objects
       if (object.properties && object.properties._name) {
         name = object.properties._name;
         values = object.properties._values;
@@ -521,7 +548,6 @@ looker.plugins.visualizations.add({
       return { html, style: { backgroundColor: config.tooltip_bg_color || '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
     };
 
-    // --- VIEW STATE ---
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
@@ -550,13 +576,10 @@ looker.plugins.visualizations.add({
       this._deck.setProps({ viewState: this._viewState });
     };
 
-    // --- CONTROLLER SETTINGS ---
-    // If Drill mode, disable panning/zooming
     const controllerSettings = this._isDrillMode
         ? { dragPan: false, dragRotate: false, scrollZoom: false, doubleClickZoom: false }
         : true;
 
-    // Update cursor initially
     this._updateInteractionMode();
 
     if (!this._deck) {
@@ -618,15 +641,10 @@ looker.plugins.visualizations.add({
       return arr && arr[measureIdx] ? parseFloat(arr[measureIdx]) : 0;
     };
 
-    // --- DRILL HANDLER ---
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
 
-      // Determine where the links are stored
-      // Regions store links in properties._links
-      // Points store links in object.links
       let links = null;
-
       if (info.object.properties && info.object.properties._links) {
           links = info.object.properties._links[measureIdx];
       } else if (info.object.links) {
@@ -634,7 +652,6 @@ looker.plugins.visualizations.add({
       }
 
       if (links && links.length > 0) {
-        // Construct safe event
         const mockEvent = {
             pageX: info.x,
             pageY: info.y,

@@ -55,7 +55,7 @@ looker.plugins.visualizations.add({
 
     primary_image_url: {
       type: "string",
-      label: "Primary Picture Image URL",
+      label: "Primary Picture Image URL (reliable CDN preffered)",
       default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png",
       section: "Plot",
       order: 12
@@ -472,6 +472,18 @@ looker.plugins.visualizations.add({
   /**
    * Show error message in the visualization
    */
+  // Preload primary image for PDF compatibility
+  const primaryImg = new Image();
+  primaryImg.crossOrigin = "anonymous";
+  primaryImg.onload = () => {
+    console.log('✓ Primary image loaded successfully');
+  };
+  primaryImg.src = primaryImageUrl;
+
+  // Then create the SVG image element
+  const primaryImage = document.createElementNS(svgNS, 'image');
+  primaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', primaryImageUrl);
+
   showError: function(message) {
     this._svg.innerHTML = `
       <g>
