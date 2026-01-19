@@ -1,9 +1,7 @@
 /**
- * Multi-Layer 3D Map for Looker - v18 Ultimate
- * * * FEATURES:
- * - PDF Fixes: Background Map + Custom Icons now render reliably in exports.
- * - UI Fix: Icon URL fields are now correctly positioned under their specific Layer headers.
- * - Interaction: On-Map Toggle for Pan vs Click.
+ * Multi-Layer 3D Map for Looker - v20 Ultimate
+ * * * RESTORED V17 RENDER LOGIC (Proven to work for PDF)
+ * * * UI FIX: Increased Layer Setting Spacing to prevent overlap.
  */
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -16,8 +14,9 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
-  // FIX: Increased spacing (50 instead of 10) to prevent UI overlap
-  const b = 100 + (n * 50);
+  // FIX: Use 100 spacing to prevent Layer 1 settings from overlapping Layer 2
+  // Layer 1 starts at 100, Layer 2 at 200, etc.
+  const b = n * 100;
 
   return {
     [`layer${n}_divider_top`]: {
@@ -122,21 +121,21 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: IMAGE PRELOADER FOR PDF ---
+// --- HELPER: V17 PRELOADER ---
 const preloadImage = (url) => {
     return new Promise((resolve) => {
         if (!url || url.length < 5) return resolve();
         const img = new Image();
-        img.crossOrigin = "Anonymous"; // Critical for PDF Screenshots
+        img.crossOrigin = "Anonymous"; // Crucial for PDF
         img.onload = () => resolve();
-        img.onerror = () => resolve(); // Resolve anyway so map doesn't hang
+        img.onerror = () => resolve();
         img.src = url;
     });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v18",
-  label: "Combo Map 3D (Icons + PDF Fixed)",
+  id: "combo_map_ultimate_v20",
+  label: "Combo Map 3D (V17 Logic + UI Fix)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -334,7 +333,7 @@ looker.plugins.visualizations.add({
 
   _updateInteractionMode: function() {
       if (this._isDrillMode) {
-          this._mapWrapper.style.cursor = 'pointer';
+          this._mapWrapper.style.cursor = 'crosshair';
           this._toggleText.innerText = "Drill/Click";
           this._toggleIcon.innerText = "👆";
       } else {
@@ -370,43 +369,39 @@ looker.plugins.visualizations.add({
       done(); return;
     }
 
-    // --- PDF PRE-LOADER ---
-    // Gather all icon URLs to pre-fetch them before rendering
-    const promises = [];
+    // --- V17 LOGIC: PRE-LOAD ICONS IN PARALLEL ---
+    const iconPromises = [];
     for(let i=1; i<=4; i++) {
         if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
-            promises.push(preloadImage(config[`layer${i}_icon_url`]));
+            iconPromises.push(preloadImage(config[`layer${i}_icon_url`]));
         }
     }
 
-    Promise.all(promises).then(() => {
-        // Proceed with rendering only after images are cached
-        this._executeRender(data, config, queryResponse, details, done);
-    });
-  },
+    // Wait for BOTH data processing AND image loading
+    Promise.all([
+        this._prepareData(data, config, queryResponse),
+        ...iconPromises
+    ]).then(([processedData]) => {
 
-  _executeRender: function(data, config, queryResponse, details, done) {
-    try {
-      this._prepareData(data, config, queryResponse).then(processedData => {
         this._render(processedData, config, queryResponse, details);
 
+        // --- V17 LOGIC: PDF RENDER WAIT ---
         if (details && details.print) {
-            console.log("PDF Mode: Freezing for 2.5s...");
+            console.log("PDF Mode: Freezing for 3s to load tiles...");
+            // Force a redraw to flush the buffer
             if(this._deck) this._deck.redraw(true);
-            setTimeout(() => { done(); }, 2500);
+            setTimeout(() => {
+                done();
+            }, 3000);
         } else {
             done();
         }
 
-      }).catch(err => {
+    }).catch(err => {
         console.error("Data Prep Error:", err);
         this.addError({ title: "Error", message: err.message });
         done();
-      });
-    } catch(e) {
-      console.error("Render Error:", e);
-      done();
-    }
+    });
   },
 
   _prepareData: async function(data, config, queryResponse) {
@@ -641,6 +636,7 @@ looker.plugins.visualizations.add({
       return arr && arr[measureIdx] ? parseFloat(arr[measureIdx]) : 0;
     };
 
+    // --- DRILL HANDLER ---
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
 
@@ -652,6 +648,7 @@ looker.plugins.visualizations.add({
       }
 
       if (links && links.length > 0) {
+        // Safe Event Mock for Looker Drill Menu
         const mockEvent = {
             pageX: info.x,
             pageY: info.y,
