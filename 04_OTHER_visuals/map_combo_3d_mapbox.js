@@ -203,10 +203,25 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
+    // 1. Force Load Mapbox CSS (Fixes the shaking/missing styles)
+    if (!document.getElementById('mapbox-css-fix')) {
+      const link = document.createElement('link');
+      link.id = 'mapbox-css-fix';
+      link.rel = 'stylesheet';
+      link.href = 'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css';
+      document.head.appendChild(link);
+    }
+
+    // 2. Set up container with strict sizing
     element.innerHTML = `
-      <div id="map-container" style="width:100%;height:100%;position:relative;">
-        <div id="map" style="width:100%;height:100%;"></div>
-      </div>`;
+    <style>
+    #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; }
+    #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    </style>
+    <div id="map-wrapper">
+    <div id="map"></div>
+    </div>`;
+
     this._container = element.querySelector('#map');
     this._geojsonCache = {};
   },
