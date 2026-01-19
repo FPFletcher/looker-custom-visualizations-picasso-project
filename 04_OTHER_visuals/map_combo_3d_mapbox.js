@@ -1,10 +1,9 @@
 /**
- * Multi-Layer 3D Map for Looker - v16 Ultimate
+ * Multi-Layer 3D Map for Looker - v17 Ultimate
  * * * FEATURES:
- * - Interaction Mode: "Pan" (Hand cursor) vs "Drill" (Crosshair cursor).
- * - Drill Fix: Synthesizes valid events for Looker's Drill Menu to prevent crashes.
- * - Plot Tab First: Correctly ordered settings.
- * - PDF Fix: Extended delay + WebGL constraints.
+ * - On-Map Interaction Toggle: Button to switch Pan vs Drill modes.
+ * - Drill Fix: Works for Regions (Choropleth) and Points.
+ * - PDF Fixes: Pre-loads icons and forces background redraw.
  */
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -123,8 +122,8 @@ const getLayerOptions = (n) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v16",
-  label: "Combo Map 3D (Cursor Fix)",
+  id: "combo_map_ultimate_v17",
+  label: "Combo Map 3D (Toggle Button)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -173,21 +172,6 @@ looker.plugins.visualizations.add({
       section: "Plot",
       placeholder: "Auto-detect if empty",
       order: 5
-    },
-
-    // --- INTERACTION MODE ---
-    interaction_header: { type: "string", label: "─── INTERACTION ───", display: "divider", section: "Plot", order: 8 },
-    interaction_mode: {
-        type: "string",
-        label: "Interaction Mode",
-        display: "select",
-        values: [
-            {"Pan & Zoom (Hand)": "pan"},
-            {"Drill / Click (Crosshair)": "drill"}
-        ],
-        default: "pan",
-        section: "Plot",
-        order: 9
     },
 
     // --- BASE MAP ---
@@ -245,7 +229,7 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
-    // --- 2. LAYERS TAB (Orders 100+) ---
+    // --- 2. LAYERS TAB ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
     ...getLayerOptions(3),
@@ -264,25 +248,76 @@ looker.plugins.visualizations.add({
     element.innerHTML = `
       <style>
         #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; background: #111; }
-        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
         #token-error {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             color: #FF5252; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 8px;
             font-family: sans-serif; font-weight: bold; text-align: center; display: none; z-index: 999;
         }
+
+        /* INTERACTION TOGGLE BUTTON */
+        #interaction-toggle {
+            position: absolute; top: 10px; right: 10px; z-index: 10;
+            background: #fff; padding: 8px 12px; border-radius: 4px;
+            font-family: sans-serif; font-size: 12px; font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3); cursor: pointer;
+            display: flex; align-items: center; gap: 6px; user-select: none;
+        }
+        #interaction-toggle:hover { background: #f0f0f0; }
+        #interaction-icon { font-size: 16px; }
+
         .deck-tooltip { font-family: sans-serif; font-size: 12px; pointer-events: none; }
       </style>
+
       <div id="map-wrapper">
         <div id="map"></div>
         <div id="token-error">MISSING MAPBOX TOKEN<br><span style="font-size:0.8em; font-weight:normal">Please enter your token in the "Plot" settings.</span></div>
+
+        <div id="interaction-toggle">
+            <span id="interaction-icon">✋</span>
+            <span id="interaction-text">Pan/Zoom</span>
+        </div>
       </div>`;
 
     this._container = element.querySelector('#map');
     this._mapWrapper = element.querySelector('#map-wrapper');
     this._tokenError = element.querySelector('#token-error');
+    this._toggleBtn = element.querySelector('#interaction-toggle');
+    this._toggleText = element.querySelector('#interaction-text');
+    this._toggleIcon = element.querySelector('#interaction-icon');
+
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
+
+    // Internal State for Interaction Mode
+    this._isDrillMode = false;
+
+    // Toggle Click Handler
+    this._toggleBtn.onclick = () => {
+        this._isDrillMode = !this._isDrillMode;
+        this._updateInteractionMode();
+        // Trigger re-render to update DeckGL controller
+        if (this._deck) {
+            const controllerSettings = this._isDrillMode
+                ? { dragPan: false, dragRotate: false, scrollZoom: false, doubleClickZoom: false }
+                : true;
+            this._deck.setProps({ controller: controllerSettings });
+        }
+    };
+  },
+
+  _updateInteractionMode: function() {
+      if (this._isDrillMode) {
+          this._mapWrapper.style.cursor = 'pointer';
+          this._toggleText.innerText = "Drill/Click";
+          this._toggleIcon.innerText = "👆";
+      } else {
+          this._mapWrapper.style.cursor = 'grab';
+          this._toggleText.innerText = "Pan/Zoom";
+          this._toggleIcon.innerText = "✋";
+      }
   },
 
   destroy: function() {
@@ -302,10 +337,12 @@ looker.plugins.visualizations.add({
             this._deck = null;
         }
         this._tokenError.style.display = 'block';
-        done();
-        return;
+        this._toggleBtn.style.display = 'none';
+        done(); return;
     } else {
         this._tokenError.style.display = 'none';
+        // Hide toggle in print mode
+        this._toggleBtn.style.display = (details && details.print) ? 'none' : 'flex';
     }
 
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
@@ -317,11 +354,14 @@ looker.plugins.visualizations.add({
       this._prepareData(data, config, queryResponse).then(processedData => {
         this._render(processedData, config, queryResponse, details);
 
+        // --- PDF FIX ---
         if (details && details.print) {
-            console.log("PDF Mode: Freezing for 2.5s to load tiles...");
+            console.log("PDF Mode: Waiting for tiles and icons...");
+            // Force redraw before stopping
+            if(this._deck) this._deck.redraw(true);
             setTimeout(() => {
                 done();
-            }, 2500);
+            }, 3000); // 3s delay for PDF
         } else {
             done();
         }
@@ -340,6 +380,7 @@ looker.plugins.visualizations.add({
   _prepareData: async function(data, config, queryResponse) {
     const measures = queryResponse.fields.measure_like;
 
+    // A. POINT MODE
     if (config.data_mode === 'points') {
       const dims = queryResponse.fields.dimension_like;
       const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
@@ -358,6 +399,7 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures };
     }
 
+    // B. REGION MODE
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
 
@@ -394,6 +436,7 @@ looker.plugins.visualizations.add({
         geojson.features.forEach(feature => {
             const props = feature.properties;
             let match = null;
+            // Try matching against any property
             for (let key in props) {
                 if (props[key]) {
                   const cleanProp = this._normalizeName(props[key]);
@@ -404,9 +447,12 @@ looker.plugins.visualizations.add({
                 }
             }
             if (match) {
+                // Attach drill links directly to the feature for easier access
+                feature.properties._links = match.links;
+                feature.properties._name = match.rawName;
                 feature.properties._values = match.values;
                 feature.properties._formatted = match.formattedValues;
-                feature.properties._name = match.rawName;
+
                 const centroid = this._getCentroid(feature.geometry);
                 matchedFeatures.push({
                     feature: feature,
@@ -446,6 +492,8 @@ looker.plugins.visualizations.add({
     const getTooltip = ({object}) => {
       if (!object || config.tooltip_mode === 'none') return null;
       let name, values, formatted;
+
+      // Handle both Feature (GeoJSON) and Point objects
       if (object.properties && object.properties._name) {
         name = object.properties._name;
         values = object.properties._values;
@@ -473,6 +521,7 @@ looker.plugins.visualizations.add({
       return { html, style: { backgroundColor: config.tooltip_bg_color || '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
     };
 
+    // --- VIEW STATE ---
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
@@ -501,19 +550,14 @@ looker.plugins.visualizations.add({
       this._deck.setProps({ viewState: this._viewState });
     };
 
-    // --- INTERACTION & CURSOR LOGIC ---
-    const interactionMode = config.interaction_mode || 'pan';
-    const isDrill = interactionMode === 'drill';
-
-    // Update CSS Cursor
-    if (this._mapWrapper) {
-        this._mapWrapper.style.cursor = isDrill ? 'crosshair' : 'grab';
-    }
-
-    // Disable controller if Drill Mode is ON to prevent drag interference
-    const controllerSettings = isDrill
+    // --- CONTROLLER SETTINGS ---
+    // If Drill mode, disable panning/zooming
+    const controllerSettings = this._isDrillMode
         ? { dragPan: false, dragRotate: false, scrollZoom: false, doubleClickZoom: false }
         : true;
+
+    // Update cursor initially
+    this._updateInteractionMode();
 
     if (!this._deck) {
       this._deck = new deck.DeckGL({
@@ -574,15 +618,23 @@ looker.plugins.visualizations.add({
       return arr && arr[measureIdx] ? parseFloat(arr[measureIdx]) : 0;
     };
 
-    // --- DRILL HANDLER (SAFE) ---
+    // --- DRILL HANDLER ---
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
 
-      const links = info.object.links ? info.object.links[measureIdx] : null;
+      // Determine where the links are stored
+      // Regions store links in properties._links
+      // Points store links in object.links
+      let links = null;
+
+      if (info.object.properties && info.object.properties._links) {
+          links = info.object.properties._links[measureIdx];
+      } else if (info.object.links) {
+          links = info.object.links[measureIdx];
+      }
 
       if (links && links.length > 0) {
-        // Construct a safe event object if the native one is missing
-        // This fixes the "Cannot read property 'pageX' of null" error
+        // Construct safe event
         const mockEvent = {
             pageX: info.x,
             pageY: info.y,
@@ -590,7 +642,6 @@ looker.plugins.visualizations.add({
             clientY: info.y,
             target: info.target || document.elementFromPoint(info.x, info.y)
         };
-
         const safeEvent = (info.srcEvent && info.srcEvent.pageX) ? info.srcEvent : mockEvent;
 
         LookerCharts.Utils.openDrillMenu({
@@ -768,8 +819,6 @@ looker.plugins.visualizations.add({
         return null;
     }
   },
-
-  // --- UTILITIES ---
 
   _getGeoJSONUrl: function(config) {
     if (config.map_layer_source === 'custom') return config.custom_geojson_url;
