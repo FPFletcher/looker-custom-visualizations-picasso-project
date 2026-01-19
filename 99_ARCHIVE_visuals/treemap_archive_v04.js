@@ -1,11 +1,7 @@
 /**
  * Treemap Visualization for Looker
  * Studio-inspired hierarchical treemap with drill-down and multi-dimension support
- * Features: Robust layout (no gaps), horizontal-only labels, "Others" grouping,
- *           Value format options (numeric/percent), LookML value_format support,
- *           Pivot grouping support.
- *
- * Version: 4.0
+ * Features: Robust layout (no gaps), horizontal-only labels, "Others" grouping.
  */
 
 looker.plugins.visualizations.add({
@@ -49,26 +45,12 @@ looker.plugins.visualizations.add({
     others_threshold: {
       type: "number",
       label: "Others Threshold % (0.1 - 10)",
-      default: 0.5,
+      default: 0.5, // Much smaller default (0.5%)
       min: 0.1,
       max: 10,
       step: 0.1,
       section: "Plot",
       order: 6
-    },
-    // NEW: Pivot Grouping Option
-    pivot_grouping: {
-      type: "string",
-      label: "Pivot Grouping",
-      display: "select",
-      values: [
-        {"None (Flat)": "none"},
-        {"Group by Pivot": "pivot"},
-        {"Group by Dimension": "dimension"}
-      ],
-      default: "none",
-      section: "Plot",
-      order: 7
     },
 
     // ========== SERIES SECTION ==========
@@ -130,99 +112,51 @@ looker.plugins.visualizations.add({
       type: "boolean",
       label: "Show Labels",
       default: true,
-      section: "Values",
-      order: 1
+      section: "Values"
     },
     show_values: {
       type: "boolean",
       label: "Show Values",
       default: true,
-      section: "Values",
-      order: 2
-    },
-    // NEW: Value Display Format
-    value_display_format: {
-      type: "string",
-      label: "Value Display",
-      display: "select",
-      values: [
-        {"Value Only": "value"},
-        {"Percent Only": "percent"},
-        {"Value and Percent": "both"}
-      ],
-      default: "value",
-      section: "Values",
-      order: 3
-    },
-    // NEW: Value Format Type
-    value_format: {
-      type: "string",
-      label: "Value Format",
-      display: "select",
-      values: [
-        {"Auto (LookML)": "auto"},
-        {"Number": "number"},
-        {"Currency ($)": "currency"},
-        {"Percent": "percent_fmt"},
-        {"Decimal (1)": "decimal1"},
-        {"Decimal (2)": "decimal2"},
-        {"Abbreviated (K/M/B)": "abbreviated"}
-      ],
-      default: "auto",
-      section: "Values",
-      order: 4
-    },
-    // NEW: Custom Format String
-    value_format_custom: {
-      type: "string",
-      label: "Custom Format String",
-      placeholder: "e.g., $0.00, #,##0.0, 0.0%",
-      section: "Values",
-      order: 5
+      section: "Values"
     },
     label_threshold: {
       type: "number",
       label: "Min % to Show Label",
       default: 0.01,
-      section: "Values",
-      order: 6
+      section: "Values"
     },
     wrap_labels: {
       type: "boolean",
       label: "Wrap Long Labels",
       default: true,
-      section: "Values",
-      order: 7
+      section: "Values"
     },
     label_font_size: {
       type: "number",
       label: "Label Font Size",
       default: 12,
-      section: "Values",
-      order: 8
+      section: "Values"
     },
     value_font_size: {
       type: "number",
       label: "Value Font Size",
       default: 12,
-      section: "Values",
-      order: 9
+      section: "Values"
     },
     label_color: {
       type: "string",
       label: "Label Color",
       default: "#000000",
       display: "color",
-      section: "Values",
-      order: 10
+      section: "Values"
     },
     value_color: {
       type: "string",
       label: "Value Color",
       default: "#000000",
       display: "color",
-      section: "Values",
-      order: 11
+      section: "Values"
     }
   },
 
@@ -329,6 +263,7 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
+    // //console.log("[INIT] updateAsync called. Rows:", data.length);
     this.clearErrors();
 
     if (!data || data.length === 0) {
@@ -339,7 +274,6 @@ looker.plugins.visualizations.add({
 
     const dimensions = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
-    const hasPivot = queryResponse.fields.pivots && queryResponse.fields.pivots.length > 0;
 
     if (dimensions.length === 0 || measures.length === 0) {
       this._svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#999">Treemap requires 1 Dimension and 1 Measure</text>';
@@ -351,10 +285,6 @@ looker.plugins.visualizations.add({
     this._queryResponse = queryResponse;
     this._config = config;
     this._allData = data;
-    this._hasPivot = hasPivot;
-
-    // Store measure field for formatting
-    this._measureField = measures[0];
 
     // Reset drill if Others toggle or threshold changed
     const othersChanged = this._lastOthersToggle !== config.others_toggle ||
@@ -367,12 +297,12 @@ looker.plugins.visualizations.add({
     }
 
     // Reset drill if color settings changed
-    const colorChanged = this._lastColorBy !== config.color_by ||
-                        this._lastColorPalette !== config.color_palette ||
-                        this._lastUseGradient !== config.use_gradient ||
-                        this._lastReversePalette !== config.reverse_palette ||
-                        this._lastGradientStart !== config.gradient_start_color ||
-                        this._lastGradientEnd !== config.gradient_end_color;
+const colorChanged = this._lastColorBy !== config.color_by ||
+                    this._lastColorPalette !== config.color_palette ||
+                    this._lastUseGradient !== config.use_gradient ||
+                    this._lastReversePalette !== config.reverse_palette ||
+                    this._lastGradientStart !== config.gradient_start_color ||
+                    this._lastGradientEnd !== config.gradient_end_color;
 
     if (colorChanged) {
       this._drillStack = [];
@@ -390,23 +320,20 @@ looker.plugins.visualizations.add({
       this._lastDimensionCount = dimensions.length;
     }
 
-    // Reset drill if pivot grouping changed
-    if (this._lastPivotGrouping !== config.pivot_grouping) {
-      this._drillStack = [];
-      this._lastPivotGrouping = config.pivot_grouping;
-    }
-
     this.drawTreemap(data, config, queryResponse);
     done();
   },
 
   drawTreemap: function(data, config, queryResponse) {
+    // //console.log("[DRAW] drawTreemap called. DrillStack:", JSON.stringify(this._drillStack));
+    // //console.log("[DRAW] Incoming data is:", data ? `Array(${data.length})` : "NULL (will re-filter)");
+
     const dimensions = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
-    const hasPivot = this._hasPivot;
     const currentLevel = this._drillStack.length;
 
-    // Determine Active Data
+    // 1. Determine Active Data
+    // If data is null (from breadcrumb click), re-filter from global _allData
     let activeData = data;
     if (!activeData) {
       activeData = this._allData;
@@ -417,19 +344,14 @@ looker.plugins.visualizations.add({
         activeData = activeData.filter(row => row[dimName].value === filterVal);
       }
     }
+    // //console.log("[DRAW] activeData after filtering:", activeData.length, "rows");
 
+    // Rest of the function...
     const dimIndex = Math.min(currentLevel, dimensions.length - 1);
     const dimension = dimensions[dimIndex].name;
     const measure = measures[0].name;
 
-    let treemapData;
-
-    // Handle pivot grouping
-    if (hasPivot && config.pivot_grouping !== 'none') {
-      treemapData = this.buildPivotGroupedData(activeData, dimension, measure, config, queryResponse, currentLevel, dimensions.length);
-    } else {
-      treemapData = this.groupData(activeData, dimension, measure, currentLevel, dimensions.length, queryResponse);
-    }
+    let treemapData = this.groupData(activeData, dimension, measure, currentLevel, dimensions.length);
 
     if (config.others_toggle && treemapData.length > 5) {
       const threshold = (config.others_threshold || 0.5) / 100;
@@ -446,94 +368,7 @@ looker.plugins.visualizations.add({
     this.renderTreemap(treemapData, config, dimension, queryResponse);
   },
 
-  // NEW: Build pivot-grouped data
-  buildPivotGroupedData: function(data, dimension, measure, config, queryResponse, level, maxDepth) {
-    const pivots = queryResponse.pivots;
-    const pivotGrouping = config.pivot_grouping;
-
-    if (pivotGrouping === 'pivot') {
-      // Group by pivot values first, then by dimension within each pivot
-      const grouped = {};
-
-      pivots.forEach(pivot => {
-        const pivotKey = pivot.key;
-        const pivotLabel = pivot.data ? Object.values(pivot.data).join(' - ') : pivotKey;
-
-        if (!grouped[pivotKey]) {
-          grouped[pivotKey] = {
-            name: pivotLabel,
-            value: 0,
-            rawValue: 0,
-            children: [],
-            level: level,
-            isDrillable: true,
-            isPivotGroup: true,
-            pivotKey: pivotKey
-          };
-        }
-
-        data.forEach(row => {
-          const cell = row[measure] && row[measure][pivotKey];
-          if (cell && cell.value !== null && cell.value !== undefined) {
-            const val = Number(cell.value) || 0;
-            grouped[pivotKey].value += Math.max(0, val);
-            grouped[pivotKey].rawValue += val;
-            grouped[pivotKey].children.push({
-              row: row,
-              pivotKey: pivotKey,
-              value: val,
-              rendered: cell.rendered
-            });
-          }
-        });
-      });
-
-      return Object.values(grouped).filter(d => d.value > 0);
-
-    } else if (pivotGrouping === 'dimension') {
-      // Group by dimension first, aggregate all pivot values
-      const grouped = {};
-
-      data.forEach(row => {
-        const key = row[dimension].value;
-        const safeKey = "k_" + key;
-
-        if (!grouped[safeKey]) {
-          grouped[safeKey] = {
-            name: key,
-            value: 0,
-            rawValue: 0,
-            children: [],
-            level: level,
-            isDrillable: level < maxDepth - 1
-          };
-        }
-
-        // Sum all pivot values for this dimension
-        pivots.forEach(pivot => {
-          const cell = row[measure] && row[measure][pivot.key];
-          if (cell && cell.value !== null && cell.value !== undefined) {
-            const val = Number(cell.value) || 0;
-            grouped[safeKey].value += Math.max(0, val);
-            grouped[safeKey].rawValue += val;
-            grouped[safeKey].children.push({
-              row: row,
-              pivotKey: pivot.key,
-              value: val,
-              rendered: cell.rendered
-            });
-          }
-        });
-      });
-
-      return Object.values(grouped).filter(d => d.value > 0);
-    }
-
-    // Default: flat (no grouping)
-    return this.groupData(data, dimension, measure, level, maxDepth, queryResponse);
-  },
-
-  // --- Grouping Function ---
+  // --- NEW GROUPING FUNCTION ---
   groupSmallItems: function(data, threshold) {
     const total = data.reduce((sum, d) => sum + d.value, 0);
     const visible = [];
@@ -552,7 +387,7 @@ looker.plugins.visualizations.add({
         name: "Others",
         value: others.reduce((s, d) => s + d.value, 0),
         rawValue: others.reduce((s, d) => s + d.rawValue, 0),
-        rawData: others.flatMap(o => o.rawData || o.children || []),
+        rawData: others.flatMap(o => o.rawData || o.children || []),  // FIX THIS
         children: others.flatMap(o => o.rawData || o.children || []),
         isOthers: true,
         level: others[0].level,
@@ -565,60 +400,33 @@ looker.plugins.visualizations.add({
     return data;
   },
 
-  // Modified groupData to handle rendered values
-  groupData: function(data, dimension, measure, level, maxDepth, queryResponse) {
+  // REPLACES buildHierarchicalData
+  groupData: function(data, dimension, measure, level, maxDepth) {
     const grouped = {};
-    const hasPivot = this._hasPivot;
-    const pivots = queryResponse.pivots;
-
     data.forEach(row => {
       const key = row[dimension].value;
       const safeKey = "k_" + key;
-
       if (!grouped[safeKey]) {
         grouped[safeKey] = {
           name: key,
           value: 0,
           rawValue: 0,
-          rendered: null,
-          children: [],
+          children: [], // Still needed for "Others" later
           level: level,
           isDrillable: level < maxDepth - 1
         };
       }
-
-      let val = 0;
-      let rendered = null;
-
-      if (hasPivot && pivots && pivots.length > 0) {
-        // Sum all pivot values
-        pivots.forEach(pivot => {
-          const cell = row[measure] && row[measure][pivot.key];
-          if (cell && cell.value !== null && cell.value !== undefined) {
-            val += Number(cell.value) || 0;
-            // Keep first rendered value as reference
-            if (!rendered && cell.rendered) {
-              rendered = cell.rendered;
-            }
-          }
-        });
-      } else {
-        const cell = row[measure];
-        val = cell && cell.value !== null ? Number(cell.value) : 0;
-        rendered = cell && cell.rendered ? cell.rendered : null;
-      }
-
+      const val = row[measure].value || 0;
       grouped[safeKey].value += Math.max(0, val);
       grouped[safeKey].rawValue += val;
-      if (!grouped[safeKey].rendered && rendered) {
-        grouped[safeKey].rendered = rendered;
-      }
+      // We keep all matching rows for potential "Others" grouping later
       grouped[safeKey].children.push(row);
     });
 
     return Object.values(grouped).filter(d => d.value > 0);
   },
 
+// This is the most important function by far as it dictates the treemap shaping logic. We made it "deterministic" for a cleaner output yet it could use a more flexible sizing if so desired
   renderTreemap: function(data, config, dimension, queryResponse) {
     const svgNS = "http://www.w3.org/2000/svg";
     this._svg.innerHTML = '';
@@ -640,15 +448,14 @@ looker.plugins.visualizations.add({
     const nodes = data.map(d => ({
       ...d,
       area: (d.value / totalValue) * rootArea,
-      percent: (d.value / totalValue) * 100,
       drillLinks: (d.children && d.children.length > 0 && dimension && d.children[0][dimension])
         ? (d.children[0][dimension].links || [])
         : [],
-      rawData: d.children || []
+      rawData: d.children || []  // ADD THIS - store children for drill
     }));
     let layout = this.squarify(nodes, 0, 0, width, height);
 
-    // Force last item to fill to edges
+    // CRITICAL FIX: Force last item to fill to edges
     if (layout.length > 0) {
       const lastItem = layout[layout.length - 1];
       lastItem.width = width - lastItem.x;
@@ -659,18 +466,19 @@ looker.plugins.visualizations.add({
 
     layout.forEach((item, i) => {
       const g = document.createElementNS(svgNS, 'g');
-      const rectEl = document.createElementNS(svgNS, 'rect');
+      const rect = document.createElementNS(svgNS, 'rect');
 
+      // Round coordinates but keep last item forced to edge
       const isLast = (i === layout.length - 1);
       const x = Math.round(item.x);
       const y = Math.round(item.y);
       const w = isLast ? (width - x) : (Math.round(item.x + item.width) - x);
       const h = isLast ? (height - y) : (Math.round(item.y + item.height) - y);
 
-      rectEl.setAttribute('x', x);
-      rectEl.setAttribute('y', y);
-      rectEl.setAttribute('width', Math.max(1, w));
-      rectEl.setAttribute('height', Math.max(1, h));
+      rect.setAttribute('x', x);
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', Math.max(1, w));
+      rect.setAttribute('height', Math.max(1, h));
 
       let fillColor;
       if (config.color_by === 'metric' && config.use_gradient) {
@@ -691,16 +499,23 @@ looker.plugins.visualizations.add({
         fillColor = colors[i % colors.length];
       }
 
-      rectEl.setAttribute('fill', fillColor);
-      rectEl.setAttribute('stroke', config.border_color);
-      rectEl.setAttribute('stroke-width', config.border_width);
-      rectEl.setAttribute('class', 'treemap-rect');
+      rect.setAttribute('fill', fillColor);
+      rect.setAttribute('stroke', config.border_color);
+      rect.setAttribute('stroke-width', config.border_width);
+      rect.setAttribute('class', 'treemap-rect');
 
-      // Click handler for drill-down
-      rectEl.addEventListener('click', (e) => {
+
+      // SIMPLIFIED DRILL TEST - Show drill menu on ANY click
+
+      rect.addEventListener('click', (e) => {
         e.stopPropagation();
 
-        if (this._config.enable_drill_down && (item.isDrillable || item.isOthers || item.isPivotGroup)) {
+        // TWO MODES: Either drill-down OR LookML drill (not both)
+
+        if (this._config.enable_drill_down && (item.isDrillable || item.isOthers)) {
+          // MODE 1: Treemap drill-down navigation
+          //console.log('→ Drilling down to:', item.name);
+
           if (item.isOthers) {
             this.drawTreemap(item.rawData, this._config, this._queryResponse);
           } else {
@@ -708,7 +523,10 @@ looker.plugins.visualizations.add({
             this.drawTreemap(null, this._config, this._queryResponse);
           }
         } else {
-          // LookML drill fields
+          // MODE 2: LookML drill fields
+          //console.log('→ Looking for LookML drill fields for:', item.name);
+
+          // Extract drill links from rawData
           let drillLinks = [];
           if (item.rawData && item.rawData.length > 0) {
             const firstRow = item.rawData[0];
@@ -720,31 +538,31 @@ looker.plugins.visualizations.add({
           }
 
           if (drillLinks.length > 0 && LookerCharts && LookerCharts.Utils) {
+            //console.log('✓ Opening LookML drill menu with', drillLinks.length, 'options');
             try {
               LookerCharts.Utils.openDrillMenu({
                 links: drillLinks,
                 event: e
               });
             } catch (error) {
-              console.error('Error opening drill menu:', error);
+              console.error('✗ Error opening drill menu:', error);
             }
+          } else {
+            //console.log('✗ No drill fields available');
           }
         }
       });
 
-      // Tooltip with formatted values
-      rectEl.addEventListener('mouseenter', () => {
-        const formattedValue = this.formatValue(item.rawValue, config, item.rendered);
-        const pct = item.percent.toFixed(1);
+      rect.addEventListener('mouseenter', () => {
+        const pct = ((item.value / totalValue) * 100).toFixed(1);
         this._tooltip.innerHTML = `
         <div style="font-weight:600; margin-bottom:2px">${item.name}</div>
-        <div>${formattedValue} (${pct}%)</div>
+        <div>${this.formatValue(item.rawValue)} (${pct}%)</div>
         ${item.children && item.children.length > 0 ? '<div style="font-size:10px; opacity:0.8">(Click to drill down)</div>' : ''}
         `;
         this._tooltip.style.display = 'block';
       });
-
-      rectEl.addEventListener('mousemove', (e) => {
+      rect.addEventListener('mousemove', (e) => {
         const tooltipRect = this._tooltip.getBoundingClientRect();
         let left = e.pageX + 12;
         let top = e.pageY + 12;
@@ -753,15 +571,14 @@ looker.plugins.visualizations.add({
         this._tooltip.style.left = left + 'px';
         this._tooltip.style.top = top + 'px';
       });
-
-      rectEl.addEventListener('mouseleave', () => {
+      rect.addEventListener('mouseleave', () => {
         this._tooltip.style.display = 'none';
       });
 
-      g.appendChild(rectEl);
+      g.appendChild(rect);
 
       if ((item.value / totalValue) * 100 >= (config.label_threshold || 0)) {
-        this.addLabels(g, item, config, svgNS, totalValue);
+        this.addLabels(g, item, config, svgNS);
       }
 
       this._svg.appendChild(g);
@@ -813,6 +630,7 @@ looker.plugins.visualizations.add({
      return maxRatio;
   },
 
+  // --- ROBUST LAYOUT (No Grey Space) ---
   layoutRow: function(row, container, results) {
      const totalArea = row.reduce((sum, node) => sum + node.area, 0);
      const useWidth = container.width < container.height;
@@ -860,6 +678,7 @@ looker.plugins.visualizations.add({
       row.forEach((node, i) => {
         let nodeWidth;
         if (i === row.length - 1) {
+          // ABSOLUTE FILL to edge
           nodeWidth = container.x + container.width - runningX;
         } else {
           nodeWidth = (node.area / totalArea) * container.width;
@@ -881,6 +700,7 @@ looker.plugins.visualizations.add({
       row.forEach((node, i) => {
         let nodeHeight;
         if (i === row.length - 1) {
+          // ABSOLUTE FILL to edge
           nodeHeight = container.y + container.height - runningY;
         } else {
           nodeHeight = (node.area / totalArea) * container.height;
@@ -898,8 +718,7 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // Modified addLabels to support value display format
-  addLabels: function(g, item, config, svgNS, totalValue) {
+  addLabels: function(g, item, config, svgNS) {
     const labelFontSize = config.label_font_size || 12;
     const valueFontSize = config.value_font_size || 12;
     const padding = 4;
@@ -915,7 +734,7 @@ looker.plugins.visualizations.add({
     if (!showLabel && !showValue) return;
 
     const labelText = item.name;
-    const valueText = this.getValueDisplayText(item, config, totalValue);
+    const valueText = this.formatValue(item.rawValue);
     const canFitStacked = showLabel && showValue && (maxHeight >= (labelFontSize + valueFontSize + 8));
     let currentY = item.y + (item.height / 2);
 
@@ -951,182 +770,11 @@ looker.plugins.visualizations.add({
        valEl.textContent = valueText;
 
        if (this.estimateTextWidth(valueText, valueFontSize) > maxWidth) {
-          // Don't add if too wide
+          g.removeChild(valEl);
        } else {
           g.appendChild(valEl);
        }
     }
-  },
-
-  // NEW: Get value display text based on config
-  getValueDisplayText: function(item, config, totalValue) {
-    const displayFormat = config.value_display_format || 'value';
-    const formattedValue = this.formatValue(item.rawValue, config, item.rendered);
-    const pct = ((item.value / totalValue) * 100).toFixed(1) + '%';
-
-    switch (displayFormat) {
-      case 'percent':
-        return pct;
-      case 'both':
-        return `${formattedValue} (${pct})`;
-      case 'value':
-      default:
-        return formattedValue;
-    }
-  },
-
-  // NEW: Enhanced formatValue with LookML support (inspired by bar_chart)
-  formatValue: function(value, config, renderedValue) {
-    const formatType = config.value_format || 'auto';
-    const customFormat = config.value_format_custom || '';
-    const field = this._measureField;
-
-    // PRIORITY 1: Custom format string takes precedence
-    if (customFormat && customFormat.trim() !== '') {
-      return this.applyCustomFormat(value, customFormat);
-    }
-
-    if (isNaN(value)) return String(value);
-
-    // PRIORITY 2: AUTO uses LookML's rendered value if available
-    if (formatType === 'auto') {
-      // First try to use the rendered value passed from Looker data
-      if (renderedValue !== null && renderedValue !== undefined) {
-        return renderedValue;
-      }
-
-      // Fallback: Parse LookML value_format
-      if (field && field.value_format) {
-        return this.applyLookMLFormat(value, field.value_format);
-      }
-    }
-
-    // PRIORITY 3: Preset formats
-    switch (formatType) {
-      case 'currency':
-        return '$' + (value >= 1000 ? (value / 1000).toFixed(1) + 'K' : value.toFixed(0));
-      case 'percent_fmt':
-        return (value * 100).toFixed(1) + '%';
-      case 'decimal1':
-        return value.toFixed(1);
-      case 'decimal2':
-        return value.toFixed(2);
-      case 'number':
-        return value.toLocaleString();
-      case 'abbreviated':
-        return this.abbreviateValue(value);
-    }
-
-    // PRIORITY 4: Auto fallback - smart number formatting
-    return this.abbreviateValue(value);
-  },
-
-  // NEW: Apply LookML format string
-  applyLookMLFormat: function(value, fmt) {
-    const num = Number(value);
-
-    // Pattern: "$0.0," k"" or similar -> thousands with k suffix
-    if (fmt.includes('," k"') || fmt.includes(",'k'")) {
-      const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-      const sign = (num < 0) ? '-' : '';
-      const baseVal = Math.abs(num) / 1000;
-      const formattedNum = baseVal.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-        useGrouping: true
-      });
-      return `${sign}$${formattedNum} k`;
-    }
-
-    // Pattern: standard currency format (e.g. $#,##0.00)
-    if (fmt.startsWith('$')) {
-      const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-      return '$' + num.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      });
-    }
-
-    // Pattern: Euro currency
-    if (fmt.startsWith('€') || fmt.includes('€')) {
-      const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-      return '€' + num.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      });
-    }
-
-    // Pattern: standard number format (e.g. #,##0.0)
-    if (fmt.includes('#,##0')) {
-      const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-      return num.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      });
-    }
-
-    // Pattern: percentage format
-    if (fmt.includes('%')) {
-      const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-      return (num * 100).toFixed(decimals) + '%';
-    }
-
-    // Default: use abbreviated format
-    return this.abbreviateValue(value);
-  },
-
-  // NEW: Apply custom format string
-  applyCustomFormat: function(value, customFormat) {
-    if (isNaN(value)) return String(value);
-
-    const num = Number(value);
-
-    // Handle currency formats
-    if (customFormat.includes('$') || customFormat.includes('€') || customFormat.includes('£')) {
-      let currency = customFormat.match(/[$€£]/)?.[0] || '';
-      let decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-      let scaledValue = num;
-      let scaledSuffix = '';
-
-      if (customFormat.includes(',')) {
-        if (customFormat.includes('," k"') || customFormat.includes(",'k'")) {
-          scaledValue = num / 1000;
-          scaledSuffix = ' k';
-        }
-        else if (customFormat.includes('," M"') || customFormat.includes(",'M'")) {
-          scaledValue = num / 1000000;
-          scaledSuffix = ' M';
-        }
-      }
-
-      const formattedNumber = scaledValue.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-        useGrouping: customFormat.includes(',')
-      });
-      return `${currency}${formattedNumber}${scaledSuffix}`;
-    }
-
-    // Handle percentage format
-    if (customFormat.includes('%')) {
-      const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-      return (num * 100).toFixed(decimals) + '%';
-    }
-
-    // Default number formatting
-    const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-    return num.toLocaleString('en-US', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals
-    });
-  },
-
-  // Abbreviated value formatting (K/M/B)
-  abbreviateValue: function(value) {
-    if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
-    if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
-    if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
-    return value.toFixed(0);
   },
 
   ellipsize: function(text, maxWidth, fontSize) {
@@ -1155,7 +803,9 @@ looker.plugins.visualizations.add({
     this._breadcrumb.querySelectorAll('.breadcrumb-item').forEach(elem => {
       elem.addEventListener('click', (e) => {
         const level = parseInt(e.target.getAttribute('data-level'));
+        // Slice stack to go back to the clicked level
         this._drillStack = (level === -1) ? [] : this._drillStack.slice(0, level + 1);
+        // CRITICAL FIX: Pass 'null' as data to force re-filtering based on new stack
         this.drawTreemap(null, this._config, this._queryResponse);
       });
     });
@@ -1164,39 +814,40 @@ looker.plugins.visualizations.add({
   getColors: function(data, config) {
     const palettes = {
       green_scale: ['#F1F8E9', '#DCEDC8', '#C5E1A5', '#AED581', '#9CCC65', '#8BC34A', '#7CB342', '#689F38', '#558B2F', '#33691E', '#1B5E20'],
-      blue_scale: ['#E3F2FD', '#BBDEFB', '#90CAF9', '#64B5F6', '#42A5F5', '#2196F3', '#1E88E5', '#1976D2', '#1565C0', '#0D47A1', '#0A3D91'],
-      google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC', '#7BAAF7', '#F07B72', '#FCD04F', '#71C287'],
-      viridis: ['#440154', '#482475', '#414487', '#355F8D', '#2A788E', '#21908C', '#22A884', '#42BE71', '#7AD151', '#BDDF26', '#FDE725'],
-      warm: ['#FFF5EB', '#FEE6CE', '#FDD0A2', '#FDAE6B', '#FD8D3C', '#F16913', '#E6550D', '#D94801', '#A63603', '#7F2704'],
-      cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B', '#041E42']
-    };
+        blue_scale: ['#E3F2FD', '#BBDEFB', '#90CAF9', '#64B5F6', '#42A5F5', '#2196F3', '#1E88E5', '#1976D2', '#1565C0', '#0D47A1', '#0A3D91'],
+        google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC', '#7BAAF7', '#F07B72', '#FCD04F', '#71C287'],
+        viridis: ['#440154', '#482475', '#414487', '#355F8D', '#2A788E', '#21908C', '#22A884', '#42BE71', '#7AD151', '#BDDF26', '#FDE725'],
+        warm: ['#FFF5EB', '#FEE6CE', '#FDD0A2', '#FDAE6B', '#FD8D3C', '#F16913', '#E6550D', '#D94801', '#A63603', '#7F2704'],
+        cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B', '#041E42']
+        };
 
-    let palette = palettes[config.color_palette] || palettes.green_scale;
+        let palette = palettes[config.color_palette] || palettes.green_scale;
 
-    if (config.reverse_palette) {
-      palette = [...palette].reverse();
-    }
+      if (config.reverse_palette) {
+        palette = [...palette].reverse();
+      }
 
-    const itemCount = data.length;
+      // FIX: Use ALL data length, don't filter
+      const itemCount = data.length;
 
-    if (itemCount <= palette.length) {
-      return palette.slice(0, itemCount);
-    }
+      if (itemCount <= palette.length) {
+        return palette.slice(0, itemCount);
+      }
 
-    // Interpolate for many items
-    const colors = [];
-    for (let i = 0; i < itemCount; i++) {
-      const position = i / Math.max(1, itemCount - 1);
-      const paletteIndex = position * (palette.length - 1);
-      const lowerIndex = Math.floor(paletteIndex);
-      const upperIndex = Math.min(palette.length - 1, Math.ceil(paletteIndex));
-      const blend = paletteIndex - lowerIndex;
+      // Interpolate for many items
+      const colors = [];
+      for (let i = 0; i < itemCount; i++) {
+        const position = i / Math.max(1, itemCount - 1);
+        const paletteIndex = position * (palette.length - 1);
+        const lowerIndex = Math.floor(paletteIndex);
+        const upperIndex = Math.min(palette.length - 1, Math.ceil(paletteIndex));
+        const blend = paletteIndex - lowerIndex;
 
-      colors.push(this.interpolateColor(palette[lowerIndex], palette[upperIndex], blend));
-    }
+        colors.push(this.interpolateColor(palette[lowerIndex], palette[upperIndex], blend));
+      }
 
-    return colors;
-  },
+      return colors;
+    },
 
   interpolateColor: function(color1, color2, ratio) {
     const hex = (c) => {
@@ -1212,5 +863,12 @@ looker.plugins.visualizations.add({
     const g = Math.round(c1.g + (c2.g - c1.g) * ratio);
     const b = Math.round(c1.b + (c2.b - c1.b) * ratio);
     return `rgb(${r}, ${g}, ${b})`;
+  },
+
+  formatValue: function(value) {
+    if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
+    if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+    if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+    return value.toFixed(0);
   }
 });

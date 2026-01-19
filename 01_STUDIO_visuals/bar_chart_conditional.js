@@ -1,7 +1,7 @@
 /**
  * Conditional Bar Chart for Looker
  * COMPLETE VERSION - All features restored & Improved for PDF/Gradients
- * CLEANED - No double animation, no syntax errors.
+ * CLEANED - Console logs removed for professional rendering
  */
 
 looker.plugins.visualizations.add({
@@ -1761,8 +1761,9 @@ looker.plugins.visualizations.add({
     this._lastChartType = config.chart_type;
 
     // FIX FOR PDF RENDERING: Force reflow at the end of the update cycle
-    // REMOVED REFLOW CALL HERE TO FIX DOUBLE ANIMATION
-
+    if(this.chart) {
+      this.chart.reflow();
+    }
     done();
   },
 
