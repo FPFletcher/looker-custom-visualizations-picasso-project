@@ -842,4 +842,645 @@ const visObject = {
 
       html += '<tbody>';
       processedData.forEach((row, i) => {
-        const isSub = !!row.__isSubtotal,
+        const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
+        const level = row.__level || 0;
+        let bg = '';
+        const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
+
+        // FIXED: ROW FORMATTING IN PIVOT MODE (Calculates Sums for Numeric Rules)
+        if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
+          const rowFields = String(config.row_conditional_field).split(',').map(s => s.trim());
+          let ruleMatched = false;
+          for (const fieldName of rowFields) {
+            let val = row[fieldName];
+            if (val && typeof val === 'object' && val.value === undefined && pivotValues.length > 0) {
+              let rowSum = 0;
+              pivotValues.forEach(pv => {
+                if (val[pv.key] && val[pv.key].value) rowSum += Number(val[pv.key].value);
+              });
+              val = rowSum;
+            } else if (val && typeof val === 'object' && val.value !== undefined) {
+              val = val.value;
+            }
+
+            const r1Bg = this.evaluateConditionalRule(val, config, 'row_rule_1', 'bg');
+            if (r1Bg) { bg = `background:${r1Bg};`; ruleMatched = true; break; }
+          }
+          if (!ruleMatched) {
+            for (const fieldName of rowFields) {
+              let val = row[fieldName];
+              if (val && typeof val === 'object' && val.value === undefined && pivotValues.length > 0) {
+                let rowSum = 0;
+                pivotValues.forEach(pv => {
+                  if (val[pv.key] && val[pv.key].value) rowSum += Number(val[pv.key].value);
+                });
+                val = rowSum;
+              } else if (val && typeof val === 'object' && val.value !== undefined) {
+                val = val.value;
+              }
+              const r2Bg = this.evaluateConditionalRule(val, config, 'row_rule_2', 'bg');
+              if (r2Bg) { bg = `background:${r2Bg};`; break; }
+            }
+          }
+        }
+
+        if (isSub && !bg) bg = `background:${config.subtotal_background_color};`;
+
+        html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
+
+        if (config.show_row_numbers) {
+          html += `<td style="text-align:center;">${(isSub || isGT) ? '' : i + 1}</td>`;
+        }
+
+        let currentCellLeftOffset = 0;
+        pivotDims.forEach((d, idx) => {
+          if (config.enable_bo_hierarchy && hDims.includes(d.name) && d.name !== hDims[0]) return;
+
+          const w = getColumnWidth(d.name);
+          const numericWidth = parseInt(w) || 150;
+
+          let stickyStyle = '';
+          if (idx === 0 && config.freeze_first_column) {
+            let leftPos = config.show_row_numbers ? 40 : 0;
+            stickyStyle = `position:sticky; left:${leftPos}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
+          }
+
+          let style = `width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}`;
+          if (d.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
+
+          const cell = row[d.name];
+          let content = this.renderCellContent(cell, d, config, row, i, processedData, dims, hDims, mainTreeCol, false, null, config.cell_bar_fit_content);
+
+          if (isSub && d.name === mainTreeCol) {
+            content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
+          }
+
+          // ADDED: Column Formatting for Pivot Dimensions
+          let cellBg = '';
+          if (config.enable_conditional_formatting && config.conditional_field) {
+            const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
+            if (targetFields.includes(d.name)) {
+              const cellVal = cell && typeof cell === 'object' ? cell.value : cell;
+              const bgRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'bg');
+              const txtRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'text');
+              if (bgRule) cellBg = `background-color:${bgRule} !important;`;
+              if (txtRule) style += `color:${txtRule} !important;`;
+            }
+          }
+
+          html += `<td style="${style} ${cellBg}">${content || ''}</td>`;
+        });
+
+        pivotValues.forEach(pv => {
+          measures.forEach(m => {
+            const colKey = `${m.name}_${pv.key}`;
+            const w = getColumnWidth(colKey) || getColumnWidth(m.name);
+            const pivotCell = row[m.name] && row[m.name][pv.key];
+            let cellContent = '';
+            let style = `width:${w}; min-width:${w}; max-width:${w}; text-align: right;`;
+            let cellBg = '';
+
+            if (pivotCell) {
+              cellContent = this.renderCellContent(pivotCell, m, config, row, i, processedData, dims, hDims, mainTreeCol, true, pv.key, config.cell_bar_fit_content);
+
+              if (config.enable_conditional_formatting && config.conditional_field) {
+                const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
+                if (targetFields.includes(m.name)) {
+                  const cellVal = pivotCell.value !== undefined ? pivotCell.value : pivotCell;
+                  const bgRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'bg');
+                  const txtRule = this.evaluateConditionalRule(cellVal, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(cellVal, config, 'conditional_rule_2', 'text');
+                  if (bgRule) cellBg = `background-color:${bgRule} !important;`;
+                  if (txtRule) style += `color:${txtRule} !important;`;
+                }
+              }
+            } else {
+              cellContent = config.null_measure_value || '-';
+            }
+
+            let drillAttr = '';
+            if (pivotCell && pivotCell.links && pivotCell.links.length > 0) {
+              drillAttr = `class="has-drill-links" data-links='${JSON.stringify(pivotCell.links)}' style="${style} cursor:pointer; ${cellBg}"`;
+            } else {
+              drillAttr = `style="${style} ${cellBg}"`;
+            }
+
+            html += `<td ${drillAttr}>${cellContent}</td>`;
+          });
+        });
+
+        if (config.pivot_show_row_totals) {
+          measures.forEach(m => {
+            let total = 0;
+            pivotValues.forEach(pv => {
+              const pivotCell = row[m.name] && row[m.name][pv.key];
+              if (pivotCell && pivotCell.value !== null) total += Number(pivotCell.value) || 0;
+            });
+            let rendered = this.formatMeasure(total, m, config);
+            html += `<td style="text-align: right; font-weight: 600; background: ${config.pivot_row_total_bg} !important;">${rendered}</td>`;
+          });
+        }
+        html += '</tr>';
+      });
+      html += '</tbody>';
+
+    } else {
+      // ═══════════════════════════════════════════════════════════════
+      // STANDARD TABLE RENDERING
+      // ═══════════════════════════════════════════════════════════════
+      let orderedFields = [...dims, ...measures];
+      if (config.enable_bo_hierarchy && hDims.length > 0) {
+        const mainField = dims.find(f => f.name === hDims[0]);
+        if (mainField) orderedFields = [mainField, ...dims.filter(f => f.name !== hDims[0]), ...measures];
+      }
+
+      if (config.show_headers) {
+        html += '<thead>';
+        if (config.enable_column_groups) html += this.renderColumnGroups(config, orderedFields, hDims);
+
+        html += '<tr>';
+        if (config.show_row_numbers) html += `<th ${config.enable_column_groups ? 'rowspan="2"' : ''} style="width: 40px;">#</th>`;
+
+        let currentLeftOffset = 0;
+
+        orderedFields.forEach((f, idx) => {
+          if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
+          const w = getColumnWidth(f.name);
+          const numericWidth = parseInt(w) || 150;
+
+          let stickyStyle = '';
+          if (idx === 0 && config.freeze_first_column) {
+            stickyStyle = `position:sticky; left:${currentLeftOffset}px; z-index:102; background:inherit; border-right: 2px solid #ccc;`;
+            currentLeftOffset += numericWidth;
+          }
+
+          const sortIcon = this.state.sortField === f.name ? (this.state.sortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+          const label = config[`field_label_${f.name}`] || f.label_short || f.label;
+          const filterValue = (this.state.columnFilters && this.state.columnFilters[f.name]) || '';
+          const columnFilter = config.enable_column_filters ? `<br/><input type="text" class="column-filter" data-field="${f.name}" value="${filterValue}" placeholder="Filter...">` : '';
+
+          html += `<th class="sortable" data-field="${f.name}" style="width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle} cursor:pointer;">
+              <div class="header-content-wrapper"><span class="header-label">${label}${sortIcon}</span>${columnFilter}</div>
+              <div class="resize-handle" data-col="${f.name}"></div>
+            </th>`;
+        });
+        html += '</tr></thead>';
+      }
+
+      html += '<tbody>';
+      processedData.forEach((row, i) => {
+        const isSub = !!row.__isSubtotal, isGT = !!row.__isGrandTotal;
+        const level = row.__level || 0;
+        let bg = '';
+        const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
+
+        if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
+          const rowFields = String(config.row_conditional_field).split(',').map(s => s.trim());
+          let ruleMatched = false;
+          for (const fieldName of rowFields) {
+            const val = row[fieldName]?.value || row[fieldName];
+            const r1Bg = this.evaluateConditionalRule(val, config, 'row_rule_1', 'bg');
+            if (r1Bg) { bg = `background:${r1Bg};`; ruleMatched = true; break; }
+          }
+          if (!ruleMatched) {
+            for (const fieldName of rowFields) {
+              const val = row[fieldName]?.value || row[fieldName];
+              const r2Bg = this.evaluateConditionalRule(val, config, 'row_rule_2', 'bg');
+              if (r2Bg) { bg = `background:${r2Bg};`; break; }
+            }
+          }
+        }
+
+        if (isSub && !bg) bg = `background:${config.subtotal_background_color};`;
+
+        html += `<tr class="${isGT ? 'grand-total-row' : (isSub ? 'subtotal-row ' + modeClass : 'detail-row')}" data-group="${row.__groupValue || ''}" style="${bg}">`;
+        if (config.show_row_numbers) html += `<td style="width: 40px;">${(isSub || isGT) ? '' : i + 1}</td>`;
+
+        let currentCellLeftOffset = 0;
+        orderedFields.forEach((f, idx) => {
+          if (config.enable_bo_hierarchy && hDims.includes(f.name) && f.name !== hDims[0]) return;
+
+          const w = getColumnWidth(f.name);
+          const numericWidth = parseInt(w) || 150;
+
+          let stickyStyle = '';
+          if (idx === 0 && config.freeze_first_column) {
+            stickyStyle = `position:sticky; left:${currentCellLeftOffset}px; z-index:100; background:inherit; border-right: 2px solid ${config.border_color};`;
+            currentCellLeftOffset += numericWidth;
+          }
+
+          let style = `width:${w}; min-width:${w}; max-width:${w}; ${stickyStyle}`;
+          if (f.name === mainTreeCol) style += `padding-left: ${(level * 20) + 12}px;`;
+
+          if (config.enable_conditional_formatting && config.conditional_field) {
+            const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
+            if (targetFields.includes(f.name)) {
+              const cellData = row[f.name];
+              const cellValue = cellData?.value !== undefined ? cellData.value : cellData;
+              const bgColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'bg') || this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'bg');
+              const textColor = this.evaluateConditionalRule(cellValue, config, 'conditional_rule_1', 'text') || this.evaluateConditionalRule(cellValue, config, 'conditional_rule_2', 'text');
+              if (bgColor) style += `background:${bgColor} !important;`;
+              if (textColor) style += `color:${textColor} !important;`;
+            }
+          }
+
+          let content = this.renderCellContent(row[f.name], f, config, row, i, processedData, dims, hDims, mainTreeCol, false, null, config.cell_bar_fit_content);
+          if (isSub && f.name === mainTreeCol) content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
+
+          const cellData = row[f.name];
+          let drillAttr = '';
+          if (cellData && cellData.links && cellData.links.length > 0) {
+            drillAttr = `class="has-drill-links" data-links='${JSON.stringify(cellData.links)}' style="${style} cursor:pointer;"`;
+          } else {
+            drillAttr = `style="${style}"`;
+          }
+
+          html += `<td ${drillAttr}>${content}</td>`;
+        });
+        html += "</tr>";
+      });
+      html += "</tbody>";
+    }
+    html += "</table>";
+
+    // Pagination
+    if (config.enable_pagination && this.state.totalPages > 1) {
+      const currentPage = this.state.currentPage || 1;
+      const totalRows = this.state.totalRowCount || processedData.length;
+      const paginationHTML = `
+        <div class="pagination-container" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9fafb; border-radius: 4px;">
+          <span style="font-size: 13px; color: ${config.cell_text_color}; font-weight: 600;">Total: ${totalRows} rows</span>
+          <div style="display: flex; gap: 8px; align-items: center;">
+             <button class="pagination-btn" data-page="first" ${currentPage === 1 ? 'disabled' : ''}>|◄</button>
+             <button class="pagination-btn" data-page="prev" ${currentPage === 1 ? 'disabled' : ''}>◄ Prev</button>
+             <span style="font-size: 13px; color: ${config.cell_text_color}; padding: 0 8px;">Page ${currentPage} of ${this.state.totalPages}</span>
+             <button class="pagination-btn" data-page="next" ${currentPage === this.state.totalPages ? 'disabled' : ''}>Next ►</button>
+             <button class="pagination-btn" data-page="last" ${currentPage === this.state.totalPages ? 'disabled' : ''}>►|</button>
+          </div>
+        </div>`;
+      if (config.pagination_position === 'top' || config.pagination_position === 'both') html = paginationHTML + html;
+      if (config.pagination_position === 'bottom' || config.pagination_position === 'both') html += paginationHTML;
+    }
+
+    this.container.innerHTML = html;
+    this.attachEventListeners(config);
+    this.attachResizeListeners();
+  },
+
+  renderCellContent: function (cell, field, config, row, rowIdx, data, dims, hDims, mainTreeCol, isPivot, pivotKey, fitContent) {
+    const isDimensionField = dims.some(d => d.name === field.name);
+    const isSubtotalOrGrandTotal = row.__isSubtotal || row.__isGrandTotal;
+
+    if (row.__isGrandTotal && field.name === mainTreeCol) return config.grand_total_label || "Grand Total";
+    if (row.__isGrandTotal && isDimensionField && field.name !== mainTreeCol) return '';
+
+    if (config.enable_bo_hierarchy && isDimensionField && !isPivot) {
+      if (row.__isSubtotal && field.name !== mainTreeCol) return '';
+      const cellVal = cell && typeof cell === 'object' ? cell.value : cell;
+      if (cellVal === null || cellVal === undefined || cellVal === '' || cellVal === 'null') return '';
+    }
+
+    let val = cell, rendered = cell;
+    if (cell && typeof cell === 'object') { val = cell.value; rendered = cell.rendered || cell.value; }
+
+    // CUSTOM NULL HANDLING
+    if (val === null || val === undefined) {
+      if (isSubtotalOrGrandTotal) return '';
+      if (isDimensionField) return config.null_dimension_value || '';
+      return config.null_measure_value || '-';
+    }
+
+    const customFormat = config[`field_format_${field.name}`];
+    const hasCustomFormat = !!(config.enable_custom_field_formatting && customFormat && String(customFormat).trim() !== '');
+    if (hasCustomFormat) {
+      rendered = this.formatMeasure(val, field, config);
+    } else if (isSubtotalOrGrandTotal && (field.is_measure || field.type === 'number' || field.type === 'count')) {
+      rendered = this.formatMeasure(val, field, config);
+    }
+
+    const chipFields = String(config.data_chip_fields || "").split(',').map(s => s.trim()).filter(s => s);
+    const shouldApplyChips = config.enable_data_chips && chipFields.includes(field.name) && (!isSubtotalOrGrandTotal || !isDimensionField);
+    if (shouldApplyChips) {
+      const s = String(val).toLowerCase();
+      const green = String(config.chip_match_green || "").toLowerCase().split(',');
+      const yellow = String(config.chip_match_yellow || "").toLowerCase().split(',');
+      const red = String(config.chip_match_red || "").toLowerCase().split(',');
+      if (green.includes(s)) rendered = `<span class="data-chip chip-green">${rendered}</span>`;
+      else if (yellow.includes(s)) rendered = `<span class="data-chip chip-yellow">${rendered}</span>`;
+      else if (red.includes(s)) rendered = `<span class="data-chip chip-red">${rendered}</span>`;
+      else rendered = `<span class="data-chip" style="background-color: ${config.chip_default_bg}; color: ${config.chip_default_text};">${rendered}</span>`;
+    }
+
+    const compFields = String(config.comparison_primary_field || "").split(',').map(s => s.trim()).filter(s => s);
+    if (config.enable_comparison && compFields.includes(field.name) && !row.__isGrandTotal) {
+      const fullData = this.state.fullProcessedData || data;
+      const isLastOfSubgroup = this.isLastElementOfGroup(row, fullData, config);
+      if (!isLastOfSubgroup) {
+        rendered = this.renderComparison(row, config, fullData, rendered, field.name, pivotKey);
+      } else {
+        rendered = `<div class="cell-content-wrapper"><span class="cell-value-flex" style="margin-left: auto;">${rendered}</span><span style="width:55px;"></span></div>`;
+      }
+    }
+
+    if (!row.__isGrandTotal) {
+      const barFields1 = String(config.cell_bar_fields_1 || "").split(',').map(x => x.trim());
+      const barFields2 = String(config.cell_bar_fields_2 || "").split(',').map(x => x.trim());
+
+      let mode = 'bar';
+      let isSet1 = false;
+      let isSet2 = false;
+
+      if (config.enable_cell_bars_1 && barFields1.includes(field.name)) {
+        mode = config.cell_bar_mode_1;
+        isSet1 = true;
+      } else if (config.enable_cell_bars_2 && barFields2.includes(field.name)) {
+        mode = config.cell_bar_mode_2;
+        isSet2 = true;
+      }
+
+      if (isSet1 || isSet2) {
+        if (mode === 'heatmap') {
+          const color = isSet1 ? config.cell_bar_color_1 : config.cell_bar_color_2;
+          const endColor = isSet1 ? config.gradient_end_1 : config.gradient_end_2;
+          const textColor = isSet1 ? config.heatmap_text_color_1 : config.heatmap_text_color_2;
+
+          let maxVal = 1;
+          if (isPivot) {
+            maxVal = 5000;
+          } else {
+            const peers = data.filter(r => !r.__isGrandTotal && r.__level === (row.__level || 0));
+            maxVal = Math.max(...peers.map(r => parseFloat(r[field.name]?.value || 0)), 1);
+          }
+          const ratio = Math.min(1, Math.max(0, (parseFloat(val) / maxVal)));
+
+          let finalColor = color;
+          if (config.use_gradient_1 && isSet1) finalColor = this.interpolateColor(color, endColor, ratio);
+          if (config.use_gradient_2 && isSet2) finalColor = this.interpolateColor(color, endColor, ratio);
+
+          rendered = `<div style="background-color: ${finalColor}; width:100%; height:100%; position:absolute; top:0; left:0; z-index:0;"></div>
+                         <span style="position:relative; z-index:1; font-weight:600; color: ${textColor};">${rendered}</span>`;
+        } else {
+          const color = isSet1 ? config.cell_bar_color_1 : config.cell_bar_color_2;
+          const useGrad = isSet1 ? config.use_gradient_1 : config.use_gradient_2;
+          const endColor = isSet1 ? config.gradient_end_1 : config.gradient_end_2;
+          rendered = this.generateCellBar(val, rendered, color, useGrad, endColor, data, field.name, row.__level, isPivot, fitContent);
+        }
+      }
+    }
+
+    return rendered;
+  },
+
+  isLastElementOfGroup: function (row, data, config) {
+    const idx = data.indexOf(row);
+    if (idx === -1 || idx >= data.length - 1) return true;
+    const curr = row;
+    const next = data[idx + 1];
+    if (next.__isGrandTotal) return true;
+    if (!config.enable_bo_hierarchy && curr.__isSubtotal) {
+      for (let i = idx + 1; i < data.length; i++) {
+        const futureRow = data[i];
+        if (futureRow.__isGrandTotal) return true;
+        if (futureRow.__isSubtotal) return false;
+      }
+      return true;
+    }
+    if (config.enable_bo_hierarchy) {
+      if (curr.__isSubtotal) {
+        for (let i = idx + 1; i < data.length; i++) {
+          const futureRow = data[i];
+          if (futureRow.__isGrandTotal) return true;
+          if (futureRow.__isSubtotal && futureRow.__level === curr.__level) {
+            if (futureRow.__parentPath === curr.__parentPath) return false;
+            else return true;
+          }
+        }
+        return true;
+      }
+      if (next.__level !== curr.__level) return true;
+      if (next.__parentPath !== curr.__parentPath) return true;
+      return false;
+    }
+    if (config.enable_subtotals) {
+      if (!curr.__isSubtotal && next.__isSubtotal) return true;
+      if (curr.__isSubtotal && next.__isSubtotal && curr.__groupValue !== next.__groupValue) return true;
+      return false;
+    }
+    return false;
+  },
+
+  renderComparison: function (row, config, fullData, primaryRendered, fieldName, pivotKey) {
+    const targetField = fieldName || config.comparison_primary_field;
+    let primary = 0;
+    if (pivotKey && row[targetField] && row[targetField][pivotKey]) {
+      primary = parseFloat(row[targetField][pivotKey].value || 0);
+    } else if (row[targetField]) {
+      primary = parseFloat(row[targetField].value || 0);
+    }
+
+    const isSub = !!row.__isSubtotal;
+    const level = row.__level;
+    const parentPath = row.__parentPath;
+    const peers = fullData.filter(r => !!r.__isSubtotal === isSub && r.__level === level && r.__parentPath === parentPath);
+    const currPeerIdx = peers.indexOf(row);
+    const offset = config.comparison_period_offset || -1;
+    const compRow = peers[currPeerIdx - offset];
+
+    if (!compRow) return `<div class="cell-content-wrapper"><span class="cell-value-flex" style="margin-left: auto;">${primaryRendered}</span><span style="width:55px;"></span></div>`;
+
+    let secondary = 0;
+    if (pivotKey && compRow[targetField] && compRow[targetField][pivotKey]) {
+      secondary = parseFloat(compRow[targetField][pivotKey].value || 0);
+    } else if (compRow[targetField]) {
+      secondary = parseFloat(compRow[targetField].value || 0);
+    }
+
+    if (isNaN(secondary) || secondary === 0) return `<div class="cell-content-wrapper"><span class="cell-value-flex" style="margin-left: auto;">${primaryRendered}</span><span style="width:55px;"></span></div>`;
+
+    const diff = primary - secondary;
+    const pct = ((diff / Math.abs(secondary)) * 100).toFixed(1);
+    const color = diff >= 0 ? config.positive_comparison_color : config.negative_comparison_color;
+    const arrow = config.show_comparison_arrows ? (diff >= 0 ? '↑' : '↓') : '';
+
+    return `<div class="cell-content-wrapper">
+              <span class="cell-value-flex" style="margin-left: auto;">${primaryRendered}</span>
+              <span style="color:${color}; font-size:0.85em; font-weight:600; flex: 0 0 55px; text-align:left; margin-left:4px;">${arrow}${Math.abs(pct)}%</span>
+            </div>`;
+  },
+
+  generateCellBar: function (val, rendered, color, useGrad, endColor, data, fieldName, level, isPivot, fitContent) {
+    const num = parseFloat(val);
+    let maxVal = 1;
+    if (isPivot) {
+      maxVal = 100;
+    } else {
+      const peers = data.filter(r => !r.__isGrandTotal && r.__level === level);
+      maxVal = Math.max(...peers.map(r => parseFloat(r[fieldName]?.value || 0)), 1);
+    }
+    const width = Math.min(100, Math.max(0, (num / maxVal) * 100));
+    const barStyle = useGrad ? `linear-gradient(to right, ${color}, ${endColor})` : color;
+
+    const flexClass = fitContent ? "cell-bar-flex" : "cell-bar-fixed";
+    const fixedStyle = fitContent ? "" : "width: 100%; flex: 1 0 auto;";
+
+    return `<div class="cell-content-wrapper">
+              <div class="${flexClass}" style="background: #f3f4f6; border-radius: 2px; height: 16px; position: relative; overflow: hidden; ${fixedStyle}">
+                 <div style="width:${width}%; height:100%; background:${barStyle}; transition: width 0.3s ease;"></div>
+              </div>
+              <span class="cell-value-flex">${rendered}</span>
+            </div>`;
+  },
+
+  attachResizeListeners: function () {
+    const headers = this.container.querySelectorAll('th');
+    let startX, startWidth, resizingCol;
+    const onMouseMove = (e) => {
+      if (resizingCol) {
+        const diff = e.pageX - startX;
+        const newWidth = Math.max(50, startWidth + diff);
+        const colKey = resizingCol.dataset.col;
+        this.state.columnWidths[colKey] = newWidth;
+        resizingCol.parentElement.style.width = `${newWidth}px`;
+        resizingCol.parentElement.style.minWidth = `${newWidth}px`;
+        resizingCol.parentElement.style.maxWidth = `${newWidth}px`;
+      }
+    };
+    const onMouseUp = () => {
+      if (resizingCol) {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        resizingCol = null;
+        this.renderTable(this.state.renderData, this.currentConfig, this.queryResponse);
+      }
+    };
+    headers.forEach(th => {
+      const handle = th.querySelector('.resize-handle');
+      if (handle) {
+        handle.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          resizingCol = handle;
+          startX = e.pageX;
+          startWidth = th.offsetWidth;
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
+        });
+      }
+    });
+  },
+
+  sortData: function (data, field, direction) {
+    const isAsc = direction === 'asc';
+    return [...data].sort((a, b) => {
+      let valA, valB;
+      if (this.state.sortPivotKey && this.hasPivot) {
+        valA = a[field] && a[field][this.state.sortPivotKey] ? a[field][this.state.sortPivotKey].value : null;
+        valB = b[field] && b[field][this.state.sortPivotKey] ? b[field][this.state.sortPivotKey].value : null;
+        if (valA === undefined && a[field]) valA = a[field].value;
+        if (valB === undefined && b[field]) valB = b[field].value;
+      } else {
+        const cellA = a[field];
+        const cellB = b[field];
+        valA = (cellA && typeof cellA === 'object' && cellA.value !== undefined) ? cellA.value : cellA;
+        valB = (cellB && typeof cellB === 'object' && cellB.value !== undefined) ? cellB.value : cellB;
+      }
+
+      if (valA === null || valA === undefined) return 1;
+      if (valB === null || valB === undefined) return -1;
+
+      if (typeof valA === 'number' && typeof valB === 'number') return isAsc ? valA - valB : valB - valA;
+      const strA = String(valA);
+      const strB = String(valB);
+      const comparison = strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' });
+      return isAsc ? comparison : -comparison;
+    });
+  },
+
+  attachEventListeners: function (config) {
+    const self = this;
+    this.container.onclick = (e) => {
+      const toggleAllBtn = e.target.closest('.expand-collapse-btn');
+      if (toggleAllBtn) {
+        const hasCollapsed = Object.keys(self.state.collapsedGroups).length > 0;
+        if (hasCollapsed) self.state.collapsedGroups = {};
+        else self.state.fullProcessedData.forEach(row => { if (row.__isSubtotal) self.state.collapsedGroups[row.__groupValue] = true; });
+        self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
+        return;
+      }
+      const row = e.target.closest('.subtotal-row');
+      if (row) {
+        const g = row.dataset.group;
+        if (self.state.collapsedGroups[g]) delete self.state.collapsedGroups[g];
+        else self.state.collapsedGroups[g] = true;
+        self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
+        return;
+      }
+      const th = e.target.closest('th.sortable');
+      if (th) {
+        if (e.target.classList.contains('column-filter') || e.target.classList.contains('resize-handle')) return;
+        const f = th.dataset.field;
+        self.state.sortDirection = (self.state.sortField === f && self.state.sortDirection === 'asc') ? 'desc' : 'asc';
+        self.state.sortField = f;
+        self.state.sortPivotKey = th.dataset.pivotKey || null; // Capture pivot key
+        self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
+      }
+    };
+    if (config.enable_column_filters) {
+      this.container.querySelectorAll('.column-filter').forEach(input => {
+        input.addEventListener('click', (e) => e.stopPropagation());
+        input.addEventListener('mousedown', (e) => e.stopPropagation());
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            e.stopPropagation();
+            const field = e.target.dataset.field;
+            if (!self.state.columnFilters) self.state.columnFilters = {};
+            const filterValue = e.target.value.toLowerCase().trim();
+            if (filterValue) self.state.columnFilters[field] = filterValue;
+            else delete self.state.columnFilters[field];
+            self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
+          }
+        });
+      });
+    }
+    if (config.enable_table_filter) {
+      const input = this.container.querySelector('.table-filter-input');
+      if (input) {
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            self.state.tableFilter = e.target.value.toLowerCase();
+            self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
+          }
+        });
+      }
+    }
+    // Pagination Controls
+    if (config.enable_pagination) {
+      this.container.querySelectorAll('.pagination-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const action = e.target.dataset.page;
+          if (action === 'first') self.state.currentPage = 1;
+          else if (action === 'prev' && self.state.currentPage > 1) self.state.currentPage--;
+          else if (action === 'next' && self.state.currentPage < self.state.totalPages) self.state.currentPage++;
+          else if (action === 'last') self.state.currentPage = self.state.totalPages;
+          self.updateAsync(self.state.data, self.container.parentElement, config, self.queryResponse, {}, () => { });
+        });
+      });
+    }
+    // Drill Links
+    this.container.querySelectorAll('td.has-drill-links').forEach(td => {
+      td.addEventListener('click', (e) => {
+        try {
+          const linksJson = td.dataset.links;
+          if (linksJson) {
+            const links = JSON.parse(linksJson);
+            if (links && links.length > 0) {
+              LookerCharts.Utils.openDrillMenu({ links: links, event: e });
+            }
+          }
+        } catch (err) { console.error('[DRILL] Error opening drill menu:', err); }
+      });
+    });
+  },
+  trigger: function (event) { },
+  clearErrors: function () { }
+};
+
+looker.plugins.visualizations.add(visObject);

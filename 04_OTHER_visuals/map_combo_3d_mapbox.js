@@ -1,7 +1,9 @@
 /**
- * Multi-Layer 3D Map for Looker - v21 Ultimate
- * * * REVERTED TO V17 ENGINE (Stable PDF Map)
- * * * UI FIX: Corrected Icon URL Field Positioning
+ * Multi-Layer 3D Map for Looker - v22 Ultimate
+ * * * FEATURES:
+ * - PDF Fix: Increased render delay (4s) to force Background Map tiles to load.
+ * - Cursor Feedback: Hand (Pan) vs Crosshair (Drill).
+ * - UI: Plot Tab First, Single Layers Tab.
  */
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -14,8 +16,8 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
-  // UI FIX: Use wide spacing (50) so fields don't overlap into next layer
-  const b = 100 + (n * 50);
+  // UI FIX: Wide spacing (100) prevents field overlap
+  const b = 100 + (n * 100);
 
   return {
     [`layer${n}_divider_top`]: {
@@ -120,12 +122,12 @@ const getLayerOptions = (n) => {
   };
 };
 
-// Helper: V17 Image Preloader
+// --- HELPER: IMAGE PRELOADER ---
 const preloadImage = (url) => {
     return new Promise((resolve) => {
         if (!url || url.length < 5) return resolve();
         const img = new Image();
-        img.crossOrigin = "Anonymous";
+        img.crossOrigin = "Anonymous"; // Crucial for PDF
         img.onload = () => resolve();
         img.onerror = () => resolve();
         img.src = url;
@@ -133,8 +135,8 @@ const preloadImage = (url) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v21",
-  label: "Combo Map 3D (V17 Stable + UI Fix)",
+  id: "combo_map_ultimate_v22",
+  label: "Combo Map 3D (PDF Fix + Cursor)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -331,6 +333,7 @@ looker.plugins.visualizations.add({
   },
 
   _updateInteractionMode: function() {
+      // Updates Cursor + Button Text
       if (this._isDrillMode) {
           this._mapWrapper.style.cursor = 'crosshair';
           this._toggleText.innerText = "Drill/Click";
@@ -360,6 +363,7 @@ looker.plugins.visualizations.add({
         done(); return;
     } else {
         this._tokenError.style.display = 'none';
+        // Hide Toggle in PDF
         this._toggleBtn.style.display = (details && details.print) ? 'none' : 'flex';
     }
 
@@ -368,7 +372,7 @@ looker.plugins.visualizations.add({
       done(); return;
     }
 
-    // --- V17 LOGIC: PRE-LOAD ICONS IN PARALLEL ---
+    // --- ASSET PRE-LOADING ---
     const iconPromises = [];
     for(let i=1; i<=4; i++) {
         if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
@@ -376,7 +380,6 @@ looker.plugins.visualizations.add({
         }
     }
 
-    // Wait for BOTH data processing AND image loading
     Promise.all([
         this._prepareData(data, config, queryResponse),
         ...iconPromises
@@ -384,15 +387,14 @@ looker.plugins.visualizations.add({
 
         this._render(processedData, config, queryResponse, details);
 
-        // --- V17 LOGIC: PDF RENDER WAIT ---
+        // --- PDF RENDER WAIT (Increased to 4s) ---
         if (details && details.print) {
-            console.log("PDF Mode: Freezing for 3s to load tiles...");
-            // Force redraw ensures buffer is fresh
+            console.log("PDF Mode: Freezing for 4s to load tiles...");
             if(this._deck) this._deck.redraw(true);
 
             setTimeout(() => {
                 done();
-            }, 3000);
+            }, 4000);
         } else {
             done();
         }
