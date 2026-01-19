@@ -1,40 +1,38 @@
 /**
- * Multi-Layer 3D Map for Looker - v7 Ultimate (Crash Proof)
- * * * DEPENDENCIES (Add to manifest.lkml):
- * {
- * "dependencies": {
- * "deck.gl": "https://unpkg.com/deck.gl@latest/dist.min.js",
- * "mapbox-gl": "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
- * "mapbox-gl-css": "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
- * "topojson": "https://unpkg.com/topojson-client@3"
- * }
- * }
+ * Multi-Layer 3D Map for Looker - v8 Ultimate (Crash Proof + UI Overhaul)
+ * Features:
+ * - "Plot" Tab consolidates all settings.
+ * - Per-Layer Gradient vs Solid Color toggles.
+ * - Unique Layer IDs to prevent Shader crashes.
  */
 
-// --- HELPER TO GENERATE REPETITIVE LAYER OPTIONS ---
+// --- HELPER: GENERATE LAYER OPTIONS (With Per-Layer Colors) ---
 const getLayerOptions = (n) => {
   const defaults = [
-    { type: 'geojson', color: '#2E7D32', radius: 1000, height: 1000 }, // L1
-    { type: 'column', color: '#1565C0', radius: 20000, height: 2000 },  // L2
-    { type: 'point', color: '#C62828', radius: 5000, height: 0 },       // L3
-    { type: 'icon', color: '#F9A825', radius: 10000, height: 0 }        // L4
+    { type: 'geojson', color: '#2E7D32', radius: 1000, height: 1000 },
+    { type: 'column', color: '#1565C0', radius: 20000, height: 2000 },
+    { type: 'point', color: '#C62828', radius: 5000, height: 0 },
+    { type: 'icon', color: '#F9A825', radius: 10000, height: 0 }
   ];
   const def = defaults[n-1];
+
+  // Order base: Layer 1 = 100, Layer 2 = 200...
+  const baseOrder = n * 100;
 
   return {
     [`layer${n}_divider`]: {
       type: "string",
       label: `────────── LAYER ${n} ──────────`,
       display: "divider",
-      section: "Layers",
-      order: n * 10
+      section: "Plot",
+      order: baseOrder
     },
     [`layer${n}_enabled`]: {
       type: "boolean",
       label: `Enable Layer ${n}`,
       default: n <= 2,
-      section: "Layers",
-      order: n * 10 + 1
+      section: "Plot",
+      order: baseOrder + 1
     },
     [`layer${n}_type`]: {
       type: "string",
@@ -50,90 +48,89 @@ const getLayerOptions = (n) => {
         {"Hexagon Grid": "hexagon"}
       ],
       default: def.type,
-      section: "Layers",
-      order: n * 10 + 2
-    },
-    [`layer${n}_icon_url`]: {
-      type: "string",
-      label: `L${n} Icon URL`,
-      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png",
-      placeholder: "https://...",
-      section: "Layers",
-      order: n * 10 + 3
+      section: "Plot",
+      order: baseOrder + 2
     },
     [`layer${n}_measure_idx`]: {
       type: "number",
-      label: `L${n} Measure Index`,
+      label: `Measure Index (0, 1...)`,
       default: n-1,
-      section: "Layers",
-      placeholder: "0 = 1st Measure",
-      order: n * 10 + 4
+      section: "Plot",
+      order: baseOrder + 3
     },
-    [`layer${n}_radius`]: {
-      type: "number",
-      label: `L${n} Radius/Size`,
-      default: def.radius,
-      section: "Layers",
-      order: n * 10 + 5
-    },
-    [`layer${n}_height`]: {
-      type: "number",
-      label: `L${n} Height (3D)`,
-      default: def.height,
-      section: "Layers",
-      order: n * 10 + 6
+    // --- COLOR SETTINGS PER LAYER ---
+    [`layer${n}_use_gradient`]: {
+      type: "boolean",
+      label: "Use Color Gradient?",
+      default: false,
+      section: "Plot",
+      order: baseOrder + 4
     },
     [`layer${n}_color`]: {
       type: "string",
-      label: `L${n} Color`,
+      label: "Solid Color",
       display: "color",
       default: def.color,
-      section: "Layers",
-      order: n * 10 + 7
+      section: "Plot",
+      order: baseOrder + 5
+    },
+    [`layer${n}_gradient_start`]: {
+      type: "string",
+      label: "Gradient Start",
+      display: "color",
+      default: "#E8F5E9",
+      section: "Plot",
+      order: baseOrder + 6
+    },
+    [`layer${n}_gradient_end`]: {
+      type: "string",
+      label: "Gradient End",
+      display: "color",
+      default: "#1B5E20",
+      section: "Plot",
+      order: baseOrder + 7
+    },
+    // --- SIZE SETTINGS ---
+    [`layer${n}_radius`]: {
+      type: "number",
+      label: "Radius / Size",
+      default: def.radius,
+      section: "Plot",
+      order: baseOrder + 8
+    },
+    [`layer${n}_height`]: {
+      type: "number",
+      label: "Height (3D)",
+      default: def.height,
+      section: "Plot",
+      order: baseOrder + 9
     },
     [`layer${n}_opacity`]: {
       type: "number",
-      label: `L${n} Opacity`,
+      label: "Opacity (0-1)",
       default: 0.7,
-      min: 0,
-      max: 1,
-      step: 0.1,
-      section: "Layers",
-      order: n * 10 + 8
+      min: 0, max: 1, step: 0.1,
+      section: "Plot",
+      order: baseOrder + 10
+    },
+    [`layer${n}_icon_url`]: {
+      type: "string",
+      label: "Icon URL (for Icon type)",
+      default: "",
+      placeholder: "https://...",
+      section: "Plot",
+      order: baseOrder + 11
     }
   };
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v7",
-  label: "Combo Map 3D (Crash Proof)",
+  id: "combo_map_ultimate_v8",
+  label: "Combo Map 3D (Ultimate)",
   options: {
-    // --- MAP SETTINGS ---
-    mapbox_token: {
-      type: "string",
-      label: "Mapbox Token",
-      section: "Map",
-      placeholder: "pk.eyJ1..."
-    },
-    map_style: {
-      type: "string",
-      label: "Map Style",
-      display: "select",
-      values: [
-        {"Dark": "mapbox://styles/mapbox/dark-v11"},
-        {"Light": "mapbox://styles/mapbox/light-v11"},
-        {"Streets": "mapbox://styles/mapbox/streets-v12"},
-        {"Satellite": "mapbox://styles/mapbox/satellite-streets-v12"}
-      ],
-      default: "mapbox://styles/mapbox/dark-v11",
-      section: "Map"
-    },
-    center_lat: { type: "number", label: "Latitude", default: 46, section: "Map" },
-    center_lng: { type: "number", label: "Longitude", default: 2, section: "Map" },
-    zoom: { type: "number", label: "Zoom", default: 4, section: "Map" },
-    pitch: { type: "number", label: "3D Tilt (0-60)", default: 45, section: "Map" },
+    // --- 1. REGION DATA SETTINGS (Top of Plot) ---
+    region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
 
-    // --- DATA CONFIG ---
     data_mode: {
       type: "string",
       label: "Data Mode",
@@ -143,17 +140,9 @@ looker.plugins.visualizations.add({
         {"Point Data (Lat/Lng)": "points"}
       ],
       default: "regions",
-      section: "Data"
+      section: "Plot",
+      order: 2
     },
-
-    // --- LAYERS ---
-    ...getLayerOptions(1),
-    ...getLayerOptions(2),
-    ...getLayerOptions(3),
-    ...getLayerOptions(4),
-
-    // --- REGION SETTINGS ---
-    region_settings_div: { type: "string", label: "─── REGION MAPPING ───", display: "divider", section: "Data" },
     map_layer_source: {
       type: "string",
       label: "Region Map Source",
@@ -170,40 +159,62 @@ looker.plugins.visualizations.add({
         {"Spain Communities": "spain_communities"}
       ],
       default: "combined_europe_major",
-      section: "Data"
+      section: "Plot",
+      order: 3
     },
     custom_geojson_url: {
       type: "string",
-      label: "Custom URL",
-      section: "Data",
-      placeholder: "https://..."
+      label: "Custom GeoJSON URL",
+      section: "Plot",
+      placeholder: "https://...",
+      order: 4
     },
     region_dim_name: {
       type: "string",
       label: "Region Dimension Name",
-      section: "Data",
-      placeholder: "Auto-detect if empty"
+      section: "Plot",
+      placeholder: "Auto-detect if empty",
+      order: 5
     },
 
-    // --- COLORS ---
-    color_range_start: {
+    // --- 2. BASE MAP SETTINGS ---
+    map_header: { type: "string", label: "─── BASE MAP ───", display: "divider", section: "Plot", order: 10 },
+
+    mapbox_token: {
       type: "string",
-      label: "Gradient Start",
-      display: "color",
-      default: "#E8F5E9",
-      section: "Colors"
+      label: "Mapbox Token",
+      section: "Plot",
+      placeholder: "pk.eyJ1...",
+      order: 11
     },
-    color_range_end: {
+    map_style: {
       type: "string",
-      label: "Gradient End",
-      display: "color",
-      default: "#1B5E20",
-      section: "Colors"
-    }
+      label: "Map Style",
+      display: "select",
+      values: [
+        {"Dark": "mapbox://styles/mapbox/dark-v11"},
+        {"Light": "mapbox://styles/mapbox/light-v11"},
+        {"Streets": "mapbox://styles/mapbox/streets-v12"},
+        {"Satellite": "mapbox://styles/mapbox/satellite-streets-v12"}
+      ],
+      default: "mapbox://styles/mapbox/dark-v11",
+      section: "Plot",
+      order: 12
+    },
+    center_lat: { type: "number", label: "Latitude", default: 46, section: "Plot", order: 13 },
+    center_lng: { type: "number", label: "Longitude", default: 2, section: "Plot", order: 14 },
+    zoom: { type: "number", label: "Zoom", default: 4, section: "Plot", order: 15 },
+    pitch: { type: "number", label: "3D Tilt (0-60)", default: 45, section: "Plot", order: 16 },
+
+    // --- 3. LAYERS (Generated) ---
+    ...getLayerOptions(1),
+    ...getLayerOptions(2),
+    ...getLayerOptions(3),
+    ...getLayerOptions(4),
   },
 
   create: function(element, config) {
-    // 1. Force Load Mapbox CSS (Prevents Shaking)
+    // 1. Force Load Mapbox CSS
     if (!document.getElementById('mapbox-css-fix')) {
       const link = document.createElement('link');
       link.id = 'mapbox-css-fix';
@@ -212,10 +223,10 @@ looker.plugins.visualizations.add({
       document.head.appendChild(link);
     }
 
-    // 2. Set up container
+    // 2. Container
     element.innerHTML = `
       <style>
-        #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; background: #000; }
+        #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; background: #111; }
         #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         .deck-tooltip { font-family: sans-serif; font-size: 12px; }
       </style>
@@ -225,24 +236,22 @@ looker.plugins.visualizations.add({
     this._container = element.querySelector('#map');
     this._geojsonCache = {};
 
-    // 3. Initialize View State Storage
+    // 3. View State Init
     this._viewState = null;
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    // 1. Dependency Check
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
       this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
       done(); return;
     }
     if (!config.mapbox_token) {
-      this.addError({ title: "Mapbox Token Required", message: "Enter token in Map settings." });
+      this.addError({ title: "Mapbox Token Required", message: "Enter token in Plot settings." });
       done(); return;
     }
 
-    // 2. Prepare Data
     this._prepareData(data, config, queryResponse).then(processedData => {
       this._render(processedData, config, queryResponse, details);
       done();
@@ -281,7 +290,6 @@ looker.plugins.visualizations.add({
     try {
         geojson = await this._loadGeoJSON(url);
     } catch (error) {
-        // Fallback for empty/failed geojson
         console.warn("GeoJSON Load Fail", error);
         geojson = { type: "FeatureCollection", features: [] };
     }
@@ -311,7 +319,6 @@ looker.plugins.visualizations.add({
         geojson.features.forEach(feature => {
             const props = feature.properties;
             let match = null;
-
             for (let key in props) {
                 if (props[key]) {
                   const cleanProp = this._normalizeName(props[key]);
@@ -321,13 +328,11 @@ looker.plugins.visualizations.add({
                   }
                 }
             }
-
             if (match) {
                 feature.properties._values = match.values;
                 feature.properties._formatted = match.formattedValues;
                 feature.properties._name = match.rawName;
                 const centroid = this._getCentroid(feature.geometry);
-
                 matchedFeatures.push({
                     feature: feature,
                     centroid: centroid,
@@ -345,14 +350,13 @@ looker.plugins.visualizations.add({
   _render: function(processed, config, queryResponse, details) {
     const layers = [];
 
-    // Loop through Layer 1, 2, 3, 4
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`]) {
         try {
           const layer = this._buildSingleLayer(i, config, processed);
           if (layer) layers.push(layer);
         } catch(e) {
-          console.error(`Layer ${i} failed to build`, e);
+          console.error(`Layer ${i} failed`, e);
         }
       }
     }
@@ -371,7 +375,6 @@ looker.plugins.visualizations.add({
       } else {
         return null;
       }
-
       let html = `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
       queryResponse.fields.measure_like.forEach((m, idx) => {
         html += `<div style="display:flex; justify-content:space-between; gap:10px;">
@@ -413,7 +416,6 @@ looker.plugins.visualizations.add({
         layers: layers,
         getTooltip: getTooltip,
         glOptions: { preserveDrawingBuffer: true },
-        // Add basic error handler for deck.gl
         onError: (err) => console.warn("DeckGL Error:", err)
       });
     } else {
@@ -428,7 +430,7 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // NEW HELPER: Strict Data Validator
+  // --- Strict Data Validator ---
   _validateLayerData: function(data) {
     if(!data || !Array.isArray(data) || data.length === 0) return [];
     return data.filter(d =>
@@ -436,14 +438,20 @@ looker.plugins.visualizations.add({
         d.position.length === 2 &&
         !isNaN(d.position[0]) &&
         !isNaN(d.position[1]) &&
-        d.position[1] >= -90 && d.position[1] <= 90 // Valid Latitude check
+        d.position[1] >= -90 && d.position[1] <= 90
     );
   },
 
   _buildSingleLayer: function(idx, config, processed) {
     const type = config[`layer${idx}_type`];
     const measureIdx = config[`layer${idx}_measure_idx`] || 0;
-    const color = this._hexToRgb(config[`layer${idx}_color`]);
+
+    // COLOR LOGIC
+    const useGradient = config[`layer${idx}_use_gradient`];
+    const solidColor = this._hexToRgb(config[`layer${idx}_color`]);
+    const gradStart = config[`layer${idx}_gradient_start`];
+    const gradEnd = config[`layer${idx}_gradient_end`];
+
     const radius = config[`layer${idx}_radius`];
     const heightScale = config[`layer${idx}_height`];
     const opacity = config[`layer${idx}_opacity`];
@@ -466,19 +474,30 @@ looker.plugins.visualizations.add({
       pointData = processed.data;
     }
 
-    // Validate coordinates to prevent "invalid latitude" crash
     const safePointData = this._validateLayerData(pointData);
-    if (safePointData.length === 0 && type !== 'geojson') return null;
 
-    const id = `layer-${idx}`;
+    // CRASH FIX: Unique ID per type to prevent Shader corruption
+    const id = `layer-${idx}-${type}`;
+
+    // Helper for gradient calc
+    const allVals = safePointData.map(d => getValue(d));
+    const maxVal = Math.max(...allVals, 0.1);
+
+    const getMyColor = (d) => {
+        if (!useGradient) return solidColor;
+        const val = getValue(d);
+        const ratio = val / maxVal;
+        return this._interpolateColor(gradStart, gradEnd, ratio);
+    };
 
     switch (type) {
       case 'geojson':
         if (processed.type !== 'regions') return null;
         if (!processed.data || processed.data.length === 0) return null;
 
-        const allVals = processed.data.map(d => d.values[measureIdx] || 0);
-        const maxVal = Math.max(...allVals, 0.1);
+        // Recalc max for GeoJSON specifically
+        const geoVals = processed.data.map(d => d.values[measureIdx] || 0);
+        const geoMax = Math.max(...geoVals, 0.1);
 
         return new deck.GeoJsonLayer({
           id: id,
@@ -490,16 +509,17 @@ looker.plugins.visualizations.add({
           getLineColor: [255,255,255],
           opacity: opacity,
           getFillColor: d => {
-            const val = getValue(d);
-            const ratio = val / maxVal;
-            return this._interpolateColor(config.color_range_start, config.color_range_end, ratio);
+             if (!useGradient) return solidColor;
+             const val = getValue(d);
+             return this._interpolateColor(gradStart, gradEnd, val / geoMax);
           },
           updateTriggers: {
-            getFillColor: [measureIdx, config.color_range_start, config.color_range_end]
+            getFillColor: [measureIdx, useGradient, solidColor, gradStart, gradEnd]
           }
         });
 
       case 'column':
+        if (safePointData.length === 0) return null;
         return new deck.ColumnLayer({
           id: id,
           data: safePointData,
@@ -509,13 +529,17 @@ looker.plugins.visualizations.add({
           pickable: true,
           elevationScale: heightScale,
           getPosition: d => d.position,
-          getFillColor: color,
+          getFillColor: d => getMyColor(d),
           getLineColor: [255, 255, 255],
           getElevation: d => getValue(d),
-          opacity: opacity
+          opacity: opacity,
+          updateTriggers: {
+            getFillColor: [measureIdx, useGradient, solidColor, gradStart, gradEnd]
+          }
         });
 
       case 'point':
+        if (safePointData.length === 0) return null;
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
@@ -527,15 +551,17 @@ looker.plugins.visualizations.add({
           radiusMinPixels: 2,
           getPosition: d => d.position,
           getRadius: radius,
-          getFillColor: color,
-          getLineColor: [255,255,255]
+          getFillColor: d => getMyColor(d),
+          getLineColor: [255,255,255],
+          updateTriggers: {
+            getFillColor: [measureIdx, useGradient, solidColor, gradStart, gradEnd]
+          }
         });
 
       case 'bubble':
-        const bVals = safePointData.map(d => getValue(d));
-        const bMax = Math.max(...bVals, 1);
+        if (safePointData.length === 0) return null;
         return new deck.ScatterplotLayer({
-          id: id,
+          id: id, // Different ID from 'point' type
           data: safePointData,
           pickable: true,
           opacity: opacity,
@@ -544,12 +570,16 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          getRadius: d => Math.sqrt(getValue(d) / bMax) * radius,
-          getFillColor: color,
-          getLineColor: [255,255,255]
+          getRadius: d => Math.sqrt(getValue(d) / maxVal) * radius,
+          getFillColor: d => getMyColor(d),
+          getLineColor: [255,255,255],
+          updateTriggers: {
+            getFillColor: [measureIdx, useGradient, solidColor, gradStart, gradEnd]
+          }
         });
 
       case 'icon':
+        if (safePointData.length === 0) return null;
         if (!iconUrl || iconUrl.length < 5) return null;
         return new deck.IconLayer({
             id: id,
@@ -565,11 +595,12 @@ looker.plugins.visualizations.add({
             getSize: d => radius,
             sizeScale: 1,
             sizeMinPixels: 20,
-            autoHighlight: false, // Fixes getTexture crash
+            autoHighlight: false,
             onIconError: (err) => console.warn("Icon error", err)
         });
 
       case 'heatmap':
+        if (safePointData.length === 0) return null;
         return new deck.HeatmapLayer({
           id: id,
           data: safePointData,
@@ -580,6 +611,7 @@ looker.plugins.visualizations.add({
         });
 
       case 'hexagon':
+        if (safePointData.length === 0) return null;
         return new deck.HexagonLayer({
           id: id,
           data: safePointData,
