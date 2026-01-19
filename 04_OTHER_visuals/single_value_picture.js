@@ -62,7 +62,7 @@ looker.plugins.visualizations.add({
     },
     primary_image_url: {
       type: "string",
-      label: "Primary Image URL",
+      label: "Primary Image URL (CDN preferred)",
       default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png",
       section: "Plot",
       order: 21
@@ -110,7 +110,7 @@ looker.plugins.visualizations.add({
     },
     secondary_image_url: {
       type: "string",
-      label: "Secondary Image URL",
+      label: "Secondary Image URL (CDN preferred)",
       default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png",
       section: "Plot",
       order: 31

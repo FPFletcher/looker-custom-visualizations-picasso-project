@@ -1,11 +1,14 @@
 /**
- * Conditional Bar Chart for Looker
- * COMPLETE VERSION - Fixes PDF Rendering & Dashboard Drilling
+ * Conditional Bar Chart for Looker - v3 Ultimate (Full Code + PDF Fix)
+ * * * FEATURES:
+ * - PDF Fix: Disables animations during export to ensure bars are fully visible.
+ * - Debugging: Logs render steps to console.
+ * - Stability: Improved container resizing logic.
  */
 
 looker.plugins.visualizations.add({
-  id: "conditional_bar_chart",
-  label: "Bar Chart (Conditional)",
+  id: "conditional_bar_chart_v3",
+  label: "Bar Chart (Conditional + PDF Fix)",
   options: {
     // ========== PLOT SECTION ==========
     chart_type: {
@@ -95,7 +98,6 @@ looker.plugins.visualizations.add({
       order: 11
     },
 
-    // RESTORED: Hide Legend with Formatting
     hide_legend_with_formatting: {
       type: "boolean",
       label: "Hide Series Legend (conditional only)",
@@ -398,7 +400,6 @@ looker.plugins.visualizations.add({
       section: "Series",
       order: 2
     },
-    // NEW: Gradient Options
 
     series_gradient_enabled: {
       type: "boolean",
@@ -434,7 +435,7 @@ looker.plugins.visualizations.add({
       type: "string",
       label: "Custom Series Labels (comma-separated)",
       placeholder: "Series 1, Series 2",
-      display: "text", // Fixed: Explicitly set display text to avoid object placeholders
+      display: "text",
       default: "",
       section: "Series",
       order: 3
@@ -504,7 +505,6 @@ looker.plugins.visualizations.add({
       section: "Values",
       order: 6
     },
-    // RESTORED: Custom Format String
     value_format_custom: {
       type: "string",
       label: "Custom Format String",
@@ -551,7 +551,6 @@ looker.plugins.visualizations.add({
       section: "X",
       order: 2
     },
-    // REINTRODUCED: x_axis_value_format_custom
     x_axis_value_format_custom: {
       type: "string",
       label: "Custom Format String",
@@ -605,7 +604,6 @@ looker.plugins.visualizations.add({
       section: "Y",
       order: 2
     },
-    // RESTORED: Y-Axis Value Format Options
     y_axis_value_format: {
       type: "string",
       label: "Value Format",
@@ -723,7 +721,7 @@ looker.plugins.visualizations.add({
       type: "string",
       label: "Reference Title",
       placeholder: "Auto (based on type)",
-      default: "",  // empty string (will be calculated dynamically)
+      default: "",
       section: "Y",
       order: 16
     },
@@ -821,8 +819,8 @@ looker.plugins.visualizations.add({
     trend_line_title: {
       type: "string",
       label: "Trend Line Title",
-      placeholder: "Auto (based on type)",  // placeholder
-      default: "",  // empty string (will be calculated dynamically)
+      placeholder: "Auto (based on type)",
+      default: "",
       section: "Y",
       order: 28
     },
@@ -837,8 +835,8 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
-    // FIX FOR PDF RENDERING:
-    // Sometimes PDF export containers have 0 height. We force a reasonable default if so.
+    console.log("[Viz] 0. Create triggered");
+    // Ensure container has height for PDF
     if (element.clientHeight === 0) {
       element.style.height = '500px';
     } else {
@@ -856,7 +854,6 @@ looker.plugins.visualizations.add({
     this._chartContainer = element.querySelector('#chart-container');
     this.chart = null;
 
-    // Initialize state tracking variables
     this._lastConditionalFormatting = null;
     this._lastReverseColors = null;
     this._lastSeriesPositioning = null;
@@ -868,12 +865,10 @@ looker.plugins.visualizations.add({
     this._resizeObserver.observe(element);
   },
 
-  // --- NEW: Centralized Palette Getter ---
   getPalette: function(config, seriesCount = 0) {
     const palettes = {
       google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC'],
       looker: ['#7FCDAE', '#7ED09C', '#7DD389', '#85D67C', '#9AD97B', '#B1DB7A'],
-      // Categorical palettes
       cat_shoreline: ['#1A5B87', '#5C9AB4', '#8FC3DD', '#C0E5F6', '#FFA726', '#FF7043', '#E91E63'],
       cat_boardwalk: ['#A0522D', '#CD853F', '#DEB887', '#F5DEB3', '#5F9EA0', '#4682B4', '#B0C4DE'],
       cat_breeze: ['#C51B7D', '#E7298A', '#F781BF', '#FDE0DD', '#B8E186', '#7FBC41', '#4D9221'],
@@ -886,11 +881,10 @@ looker.plugins.visualizations.add({
       cat_sonoma: ['#762A83', '#AF8DC3', '#E7D4E8', '#F7F7F7', '#D9F0D3', '#7FBF7B', '#1B7837'],
       cat_casual: ['#D7191C', '#FDAE61', '#FFFFBF', '#ABD9E9', '#2C7BB6', '#A6D96A', '#1A9641'],
       cat_sunset: ['#C51B7D', '#E7298A', '#F781BF', '#FDE0DD', '#E6F5D0', '#B8E186', '#7FBC41'],
-      cat_ashland: ['#01665E', '#35978F', '#80CDC1', '#C7EAE5', '#F6E8C3', '#DFC27D', '#BF812D'],
+      cat_ashland: ['#01665E', '#35978F', '#80CDC1', '#C7EAE5', '#F5F5F5', '#F6E8C3', '#DFC27D'],
       cat_oasis: ['#2166AC', '#4393C3', '#92C5DE', '#D1E5F0', '#FDDBC7', '#F4A582', '#D6604D'],
       cat_dalton: ['#40004B', '#762A83', '#9970AB', '#C2A5CF', '#E7D4E8', '#D9F0D3', '#A6DBA0'],
       cat_legacy: ['#E41A1C', '#377EB8', '#4DAF4A', '#984EA3', '#FF7F00', '#FFFF33', '#A65628'],
-      // Sequential palettes
       seq_shoreline: ['#E8F4F8', '#C0E5F6', '#8FC3DD', '#5C9AB4', '#1A5B87', '#0D3D5C', '#001F2F'],
       seq_boardwalk: ['#FFF5F0', '#FEE0D2', '#FCBBA1', '#FC9272', '#FB6A4A', '#EF3B2C', '#CB181D'],
       seq_breeze: ['#FFF7BC', '#FEE391', '#FEC44F', '#FE9929', '#EC7014', '#CC4C02', '#8C2D04'],
@@ -907,7 +901,6 @@ looker.plugins.visualizations.add({
       seq_oasis: ['#FFF5F0', '#FEE0D2', '#FCBBA1', '#FC9272', '#FB6A4A', '#EF3B2C', '#CB181D'],
       seq_dalton: ['#F7FCF5', '#E5F5E0', '#C7E9C0', '#A1D99B', '#74C476', '#41AB5D', '#238B45'],
       seq_legacy: ['#FFF7EC', '#FEE8C8', '#FDD49E', '#FDBB84', '#FC8D59', '#EF6548', '#D7301F'],
-      // Diverging palettes
       div_shoreline: ['#D73027', '#F46D43', '#FDAE61', '#FEE08B', '#D9EF8B', '#A6D96A', '#66BD63'],
       div_boardwalk: ['#8C510A', '#BF812D', '#DFC27D', '#F6E8C3', '#C7EAE5', '#80CDC1', '#35978F'],
       div_breeze: ['#C51B7D', '#E7298A', '#F781BF', '#FDE0DD', '#E6F5D0', '#B8E186', '#7FBC41'],
@@ -924,30 +917,23 @@ looker.plugins.visualizations.add({
       div_oasis: ['#2166AC', '#4393C3', '#92C5DE', '#D1E5F0', '#FDDBC7', '#F4A582', '#D6604D'],
       div_dalton: ['#40004B', '#762A83', '#9970AB', '#C2A5CF', '#E7D4E8', '#D9F0D3', '#A6DBA0'],
       div_legacy: ['#A50026', '#D73027', '#F46D43', '#FDAE61', '#FEE08B', '#D9EF8B', '#A6D96A'],
-      // Original scales
       green_scale: ['#F1F8E9', '#C5E1A5', '#9CCC65', '#7CB342', '#558B2F', '#33691E'],
       blue_scale: ['#E3F2FD', '#90CAF9', '#42A5F5', '#1E88E5', '#1565C0', '#0D47A1'],
       red_scale: ['#FFEBEE', '#FFCDD2', '#EF9A9A', '#E57373', '#EF5350', '#F44336', '#E53935', '#D32F2F'],
       purple_scale: ['#F3E5F5', '#CE93D8', '#AB47BC', '#8E24AA', '#6A1B9A', '#4A148C'],
       orange_scale: ['#FFF3E0', '#FFE0B2', '#FFCC80', '#FFB74D', '#FFA726', '#FF9800', '#FB8C00', '#F57C00'],
-      // Brand palette
       chantelle: ['#E8D5D0', '#B89B96', '#C85A54', '#8B7A72', '#A63C3A', '#4A4543', '#F5EBE7']
     };
 
     let palette = palettes[config.color_collection] || palettes.google;
-
-    // Custom colors override the collection entirely
     const customColors = config.series_colors && config.series_colors.trim() !== '' ? String(config.series_colors).split(',').map(c => c.trim()) : null;
 
     if (customColors) {
         palette = customColors;
-    // UPDATED: Now checks for config.series_gradient_enabled
     } else if (config.series_gradient_enabled && config.series_gradient_start && config.series_gradient_end && seriesCount > 0) {
-        // Generate a gradient palette if enabled and Start/End are provided
         const start = config.series_gradient_start;
         const end = config.series_gradient_end;
         const colors = [];
-        // If only 1 series, use the start color
         if (seriesCount === 1) {
             colors.push(start);
         } else {
@@ -960,17 +946,13 @@ looker.plugins.visualizations.add({
     }
 
     if (config.reverse_colors) {
-      // Return a new reversed array
       return [...palette].reverse();
     }
-
-    // Return the default palette
     return palette;
   },
-  // --- END: Centralized Palette Getter ---
-
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
+    console.log("[Viz] 1. Update Async Started");
     this.clearErrors();
 
     if (!queryResponse || queryResponse.fields.dimensions.length < 1 || queryResponse.fields.measures.length < 1) {
@@ -979,807 +961,683 @@ looker.plugins.visualizations.add({
       return;
     }
 
-    // Helper function to format values using LookML formats or custom
-    const formatValue = (value, formatType, customFormat, field, renderedValue) => {
-      if (value === null || value === undefined) return '';
+    // CHECK PDF MODE
+    const isPrint = details && details.print;
+    if(isPrint) { console.log("[Viz] PDF/Print Mode Detected - Animations Disabled"); }
 
-      // PRIORITY 1: Custom format overrides everything
-      if (customFormat && customFormat.trim() !== '') {
-        // For dates - support strftime-style formats
-        if (customFormat.includes('%')) {
-          try {
-            const date = new Date(value);
-            if (isNaN(date.getTime())) return String(value);
-            return customFormat
-              .replace(/%Y/g, date.getFullYear())
-              .replace(/%y/g, String(date.getFullYear()).slice(-2))
-              .replace(/%m/g, String(date.getMonth() + 1).padStart(2, '0'))
-              .replace(/%d/g, String(date.getDate()).padStart(2, '0'))
-              .replace(/%b/g, date.toLocaleString('default', { month: 'short' }))
-              .replace(/%B/g, date.toLocaleString('default', { month: 'long' }));
-          } catch (e) {
-            return String(value);
-          }
-        }
-        // For numbers - basic support (user provides literal format string)
-        if (!isNaN(value)) {
-            // Simplified custom number format implementation
-            if (customFormat.includes('$') || customFormat.includes('€') || customFormat.includes('£')) {
-                let currency = customFormat.match(/[$€£]/)?.[0] || '';
-                let decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-                let scaledValue = value;
-                let scaledSuffix = '';
-                if (customFormat.includes(',')) {
-                    // Check for thousand/million/etc abbreviation in custom string (e.g., $0.0," k")
-                    if (customFormat.includes('," k"')) { scaledValue = value / 1000; scaledSuffix = ' k'; }
-                    else if (customFormat.includes('," M"')) { scaledValue = value / 1000000; scaledSuffix = ' M'; }
+    try {
+        const formatValue = (value, formatType, customFormat, field, renderedValue) => {
+            if (value === null || value === undefined) return '';
+            if (customFormat && customFormat.trim() !== '') {
+                if (customFormat.includes('%')) {
+                    try {
+                        const date = new Date(value);
+                        if (isNaN(date.getTime())) return String(value);
+                        return customFormat
+                            .replace(/%Y/g, date.getFullYear())
+                            .replace(/%y/g, String(date.getFullYear()).slice(-2))
+                            .replace(/%m/g, String(date.getMonth() + 1).padStart(2, '0'))
+                            .replace(/%d/g, String(date.getDate()).padStart(2, '0'))
+                            .replace(/%b/g, date.toLocaleString('default', { month: 'short' }))
+                            .replace(/%B/g, date.toLocaleString('default', { month: 'long' }));
+                    } catch (e) {
+                        return String(value);
+                    }
                 }
-                const formattedNumber = scaledValue.toLocaleString('en-US', {
-                    minimumFractionDigits: decimals,
-                    maximumFractionDigits: decimals,
-                    useGrouping: customFormat.includes(',') // Only use grouping if commas are requested in format
+                if (!isNaN(value)) {
+                    if (customFormat.includes('$') || customFormat.includes('€') || customFormat.includes('£')) {
+                        let currency = customFormat.match(/[$€£]/)?.[0] || '';
+                        let decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+                        let scaledValue = value;
+                        let scaledSuffix = '';
+                        if (customFormat.includes(',')) {
+                            if (customFormat.includes('," k"')) { scaledValue = value / 1000; scaledSuffix = ' k'; }
+                            else if (customFormat.includes('," M"')) { scaledValue = value / 1000000; scaledSuffix = ' M'; }
+                        }
+                        const formattedNumber = scaledValue.toLocaleString('en-US', {
+                            minimumFractionDigits: decimals,
+                            maximumFractionDigits: decimals,
+                            useGrouping: customFormat.includes(',')
+                        });
+                        return `${currency}${formattedNumber}${scaledSuffix}`;
+
+                    } else if (customFormat.includes('%')) {
+                        const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+                        return (value * 100).toFixed(decimals) + '%';
+                    }
+                    const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+                    return value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+                }
+                return customFormat.replace(/0+/g, value.toLocaleString());
+            }
+
+            if (isNaN(value)) return String(value);
+
+            if (formatType === 'auto') {
+                if (renderedValue !== null && renderedValue !== undefined) {
+                    return renderedValue;
+                }
+                if (field && field.value_format) {
+                    const fmt = field.value_format;
+                    const num = Number(value);
+                    if (fmt.includes('," k"') || fmt.includes(",'k'")) {
+                        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+                        const sign = (num < 0) ? '-' : '';
+                        const baseVal = Math.abs(num) / 1000;
+                        const formattedNum = baseVal.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: true });
+                        return `${sign}$${formattedNum} k`;
+                    }
+                    if (fmt.startsWith('$')) {
+                        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+                        return '$' + num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+                    }
+                    if (fmt.includes('#,##0')) {
+                        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+                        return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+                    }
+                    if (fmt.includes('%')) {
+                        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+                        return (num * 100).toFixed(decimals) + '%';
+                    }
+                }
+            }
+
+            if (formatType === 'currency') return '$' + (value >= 1000 ? (value / 1000).toFixed(1) + 'K' : value.toFixed(0));
+            if (formatType === 'percent') return (value * 100).toFixed(1) + '%';
+            if (formatType === 'decimal1') return value.toFixed(1);
+            if (formatType === 'decimal2') return value.toFixed(2);
+            if (formatType === 'number') return value.toLocaleString();
+
+            if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
+            if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+            if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+            return value.toLocaleString();
+        };
+
+        const dimension = queryResponse.fields.dimensions[0].name;
+        const dimensionField = queryResponse.fields.dimensions[0];
+        const categories = data.map(row => LookerCharts.Utils.textForCell(row[dimension]));
+        const rawDimensionValues = data.map(row => {
+            const cell = row[dimension];
+            return cell && cell.value !== undefined ? cell.value : LookerCharts.Utils.textForCell(row[dimension]);
+        });
+        const measures = queryResponse.fields.measures.map(m => m.name);
+        const measureFields = queryResponse.fields.measures;
+        const hasPivot = queryResponse.fields.pivots && queryResponse.fields.pivots.length > 0;
+
+        let totalSeriesCount = measures.length;
+        if (hasPivot) {
+            totalSeriesCount = queryResponse.pivots.length * measures.length;
+        }
+        const palette = this.getPalette(config, totalSeriesCount);
+
+        const customLabelsArray = config.series_labels && typeof config.series_labels === 'string' && config.series_labels.trim() !== ''
+            ? config.series_labels.split(',').map(label => label.trim()).filter(label => label !== '')
+            : [];
+
+        const getSeriesLabel = (index, defaultLabel) => {
+            if (customLabelsArray.length > 0 && index < customLabelsArray.length && customLabelsArray[index]) {
+                return customLabelsArray[index];
+            }
+            return defaultLabel;
+        };
+
+        let seriesData = [];
+        const isConditionalEnabled = config.conditional_formatting_enabled;
+
+        if (hasPivot) {
+            const pivotValues = queryResponse.pivots;
+            pivotValues.forEach((pivotValue, pivotIndex) => {
+                measures.forEach((measure, measureIndex) => {
+                    const values = data.map((row, i) => {
+                        const cell = row[measure][pivotValue.key];
+                        return {
+                            y: cell && cell.value !== null ? Number(cell.value) : null,
+                            rendered: cell && cell.rendered ? cell.rendered : null,
+                            drillLinks: cell ? cell.links : [],
+                            categoryIndex: i
+                        };
+                    });
+                    const seriesIndex = pivotIndex * measures.length + measureIndex;
+                    const defaultName = `${queryResponse.fields.measures[measureIndex].label_short || queryResponse.fields.measures[measureIndex].label} - ${pivotValue.key}`;
+                    const seriesName = getSeriesLabel(seriesIndex, defaultName);
+                    const baseColor = palette[seriesIndex % palette.length];
+
+                    const shouldApplyFormatting = isConditionalEnabled &&
+                        (config.conditional_formatting_apply_to === 'all' || (config.conditional_formatting_apply_to === 'first' && seriesIndex === 0));
+
+                    if (shouldApplyFormatting) {
+                        const rawValues = values.map(v => v.y);
+                        const colors = this.getColors(rawValues, config, baseColor, 'Pivot');
+                        seriesData.push({
+                            name: seriesName,
+                            data: values.map((v, i) => ({ ...v, color: colors[i] })),
+                            showInLegend: true,
+                            color: baseColor
+                        });
+                    } else {
+                        seriesData.push({
+                            name: seriesName,
+                            data: values.map(v => ({ ...v, color: null })),
+                            color: baseColor,
+                            showInLegend: true
+                        });
+                    }
                 });
-                return `${currency}${formattedNumber}${scaledSuffix}`;
-
-            } else if (customFormat.includes('%')) {
-                const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-                return (value * 100).toFixed(decimals) + '%';
-            }
-            // Default number formatting for custom string if very generic
-            const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-            return value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-        }
-        return customFormat.replace(/0+/g, value.toLocaleString());
-      }
-
-      if (isNaN(value)) return String(value);
-
-      // PRIORITY 2: AUTO uses LookML's rendered value if available
-      if (formatType === 'auto') {
-        // First try to use the rendered value passed from Looker data
-        if (renderedValue !== null && renderedValue !== undefined) {
-          return renderedValue;
-        }
-
-        // Fallback: This fallback logic needs to be more reliable for y-axis/tooltip when renderedValue isn't directly available.
-        if (field && field.value_format) {
-            const fmt = field.value_format;
-            const num = Number(value);
-
-            // Pattern: "$0.0," k"" or similar -> thousands with k suffix
-            if (fmt.includes('," k"') || fmt.includes(",'k'")) {
-                const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-                const sign = (num < 0) ? '-' : '';
-                const baseVal = Math.abs(num) / 1000;
-                const formattedNum = baseVal.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: true });
-                return `${sign}$${formattedNum} k`; // Hardcoded $ and k for common case
-            }
-            // Pattern: standard currency format (e.g. $#,##0.00)
-            if (fmt.startsWith('$')) {
-                const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-                return '$' + num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-            }
-            // Pattern: standard number format (e.g. #,##0.0)
-            if (fmt.includes('#,##0')) {
-                const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-                return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-            }
-            // Pattern: percentage format
-            if (fmt.includes('%')) {
-                const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-                return (num * 100).toFixed(decimals) + '%';
-            }
-        }
-      }
-
-      // PRIORITY 3: Preset formats
-      if (formatType === 'currency') return '$' + (value >= 1000 ? (value / 1000).toFixed(1) + 'K' : value.toFixed(0));
-      if (formatType === 'percent') return (value * 100).toFixed(1) + '%';
-      if (formatType === 'decimal1') return value.toFixed(1);
-      if (formatType === 'decimal2') return value.toFixed(2);
-      if (formatType === 'number') return value.toLocaleString();
-
-      // PRIORITY 4: Auto fallback - smart number formatting
-      if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
-      if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
-      if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
-      return value.toLocaleString();
-    };
-
-    const dimension = queryResponse.fields.dimensions[0].name;
-    const dimensionField = queryResponse.fields.dimensions[0];
-    const categories = data.map(row => LookerCharts.Utils.textForCell(row[dimension]));
-    // --- RESTORED: Raw Dimension Values for X-Axis Custom Format ---
-    const rawDimensionValues = data.map(row => {
-      const cell = row[dimension];
-      // Extract the raw value for custom formatting if available
-      return cell && cell.value !== undefined ? cell.value : LookerCharts.Utils.textForCell(row[dimension]);
-    });
-    // ---------------------------------------------------------------
-    const measures = queryResponse.fields.measures.map(m => m.name);
-    const measureFields = queryResponse.fields.measures;
-    const hasPivot = queryResponse.fields.pivots && queryResponse.fields.pivots.length > 0;
-
-    // --- REPLACED: Moved palette definitions to getPalette() ---
-    // Calculate total series count to handle gradient generation if needed
-    let totalSeriesCount = measures.length;
-    if (hasPivot) {
-        totalSeriesCount = queryResponse.pivots.length * measures.length;
-    }
-    const palette = this.getPalette(config, totalSeriesCount);
-    // --- END REPLACED ---
-
-    // Handle series_labels - it's a comma-separated string like "Label1,Label2,Label3"
-    const customLabelsArray = config.series_labels && typeof config.series_labels === 'string' && config.series_labels.trim() !== ''
-      ? config.series_labels.split(',').map(label => label.trim()).filter(label => label !== '')
-      : [];
-
-    // Helper to get label for a series by index
-    const getSeriesLabel = (index, defaultLabel) => {
-      if (customLabelsArray.length > 0 && index < customLabelsArray.length && customLabelsArray[index]) {
-        return customLabelsArray[index];
-      }
-      return defaultLabel;
-    };
-
-    let seriesData = [];
-    const isConditionalEnabled = config.conditional_formatting_enabled;
-
-    if (hasPivot) {
-      const pivotValues = queryResponse.pivots;
-      pivotValues.forEach((pivotValue, pivotIndex) => {
-        measures.forEach((measure, measureIndex) => {
-          const values = data.map((row, i) => {
-            const cell = row[measure][pivotValue.key];
-            return {
-              y: cell && cell.value !== null ? Number(cell.value) : null,
-              rendered: cell && cell.rendered ? cell.rendered : null,
-              drillLinks: cell ? cell.links : [],
-              categoryIndex: i
-            };
-          });
-          const seriesIndex = pivotIndex * measures.length + measureIndex;
-          const measureName = measure;
-          const defaultName = `${queryResponse.fields.measures[measureIndex].label_short || queryResponse.fields.measures[measureIndex].label} - ${pivotValue.key}`;
-          const seriesName = getSeriesLabel(seriesIndex, defaultName);
-
-          const baseColor = palette[seriesIndex % palette.length];
-
-
-          const shouldApplyFormatting = isConditionalEnabled &&
-                                        (config.conditional_formatting_apply_to === 'all' || (config.conditional_formatting_apply_to === 'first' && seriesIndex === 0));
-
-          if (shouldApplyFormatting) {
-            // Apply Conditional Formatting
-            const rawValues = values.map(v => v.y);
-
-            // Call getColors, which uses baseColor as the fallback
-            const colors = this.getColors(rawValues, config, baseColor, 'Pivot');
-
-            seriesData.push({
-              name: seriesName,
-              data: values.map((v, i) => ({ ...v, color: colors[i] })), // Point colors defined here
-              showInLegend: true,
-              color: baseColor // Series color needed for area/line fill and legend entry
             });
-          } else {
-            // No conditional formatting applied (either disabled globally or not targeted)
-            seriesData.push({
-              name: seriesName,
-              data: values.map(v => ({...v, color: null})), // CRITICAL FIX: Force null point colors
-              color: baseColor, // Use the correct reversed/unreversed series color
-              showInLegend: true
-            });
-          }
-        });
-      });
-    } else {
-      measures.forEach((measure, index) => {
-        const values = data.map((row, i) => {
-          const cell = row[measure];
-          return {
-            y: cell && cell.value !== null ? Number(cell.value) : null,
-            rendered: cell && cell.rendered ? cell.rendered : null,
-            drillLinks: cell ? cell.links : [],
-            categoryIndex: i
-          };
-        });
-
-
-        const shouldApplyFormatting = isConditionalEnabled &&
-                                      (config.conditional_formatting_apply_to === 'all' || config.conditional_formatting_apply_to === 'first' && index === 0);
-
-        const baseColor = palette[index % palette.length];
-
-        const measureName = measure;
-        const defaultName = queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label;
-        const seriesName = getSeriesLabel(index, defaultName);
-
-        if (shouldApplyFormatting) {
-          // Apply Conditional Formatting
-          const rawValues = values.map(v => v.y);
-
-          // Call getColors, which uses baseColor as the fallback
-          const colors = this.getColors(rawValues, config, baseColor, 'Non-Pivot');
-
-          seriesData.push({
-            name: seriesName,
-            data: values.map((v, i) => ({ ...v, color: colors[i] })),
-            color: baseColor,
-            showInLegend: true
-          });
         } else {
-          // No conditional formatting applied (either disabled globally or not targeted)
-          seriesData.push({
-            name: seriesName,
-            data: values.map(v => ({...v, color: null})), // CRITICAL FIX: Force null point colors
-            color: baseColor,
-            showInLegend: true
-          });
-        }
-      });
-    }
+            measures.forEach((measure, index) => {
+                const values = data.map((row, i) => {
+                    const cell = row[measure];
+                    return {
+                        y: cell && cell.value !== null ? Number(cell.value) : null,
+                        rendered: cell && cell.rendered ? cell.rendered : null,
+                        drillLinks: cell ? cell.links : [],
+                        categoryIndex: i
+                    };
+                });
 
-    // --- Conditional Formatting Cleanup (Stacked Measures and Reverting non-first series) ---
-    // Calculate stacked totals for trendline and total labels
-    const stackedTotals = categories.map((cat, i) => {
-      return seriesData.reduce((sum, series) => {
-        const val = series.data[i] && typeof series.data[i].y === 'number' ? series.data[i].y : 0;
-        return sum + val;
-      }, 0);
-    });
+                const shouldApplyFormatting = isConditionalEnabled &&
+                    (config.conditional_formatting_apply_to === 'all' || config.conditional_formatting_apply_to === 'first' && index === 0);
 
-    if (isConditionalEnabled && config.conditional_formatting_apply_to === 'stacked') {
-        const stackedColors = this.getStackedColors(stackedTotals, config);
+                const baseColor = palette[index % palette.length];
+                const defaultName = queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label;
+                const seriesName = getSeriesLabel(index, defaultName);
 
-        seriesData = seriesData.map(series => {
-            const seriesBaseColor = series.color;
-
-            return {
-                ...series,
-                data: series.data.map((point, index) => ({
-                    ...point,
-                    // Override point color with stacked conditional color, falling back to series color if no rule matched (color is null)
-                    color: stackedColors[index] || seriesBaseColor
-                }))
-            }
-        });
-    } else if (isConditionalEnabled && config.conditional_formatting_apply_to === 'first') {
-        // When switching back to 'first', ensure NON-first series points
-        // revert to their original series color.
-        // This block ensures only series 0 retains point coloring.
-        seriesData = seriesData.map((series, index) => {
-            if (index === 0) return series; // Keep series 0 as-is (it has point colors)
-
-            // For all other series (index > 0), ensure explicit point colors are removed.
-            const baseColor = palette[index % palette.length];
-
-            return {
-                ...series,
-                data: series.data.map(point => ({
-                    ...point,
-                    color: null // CRITICAL FIX: Ensure no residual point color is set here
-                })),
-                color: baseColor // Ensure series color is the default
-            };
-        });
-    }
-    // --- END Conditional Formatting Cleanup ---
-
-
-    // Calculate reference value
-    let refValue = config.ref_line_value || 0;
-    if (config.ref_line_enabled && config.ref_line_type !== 'custom') {
-      let valuesToConsider;
-      if (config.ref_line_apply_to === 'stacked') {
-        valuesToConsider = stackedTotals.filter(v => v !== null && v !== undefined); // Check for null/undefined as well
-      } else if (config.ref_line_apply_to === 'all') {
-        valuesToConsider = seriesData.flatMap(s => s.data.map(d => d.y)).filter(v => typeof v === 'number');
-      } else {
-        valuesToConsider = seriesData[0].data.map(d => d.y).filter(y => typeof y === 'number');
-      }
-
-      if (valuesToConsider.length > 0) {
-        if (config.ref_line_type === 'average') refValue = valuesToConsider.reduce((a, b) => a + b, 0) / valuesToConsider.length;
-        else if (config.ref_line_type === 'median') {
-          valuesToConsider.sort((a, b) => a - b);
-          const mid = Math.floor(valuesToConsider.length / 2);
-          refValue = valuesToConsider.length % 2 !== 0 ? valuesToConsider[mid] : (valuesToConsider[mid - 1] + valuesToConsider[mid]) / 2;
-        } else if (config.ref_line_type === 'min') refValue = Math.min(...valuesToConsider);
-        else if (config.ref_line_type === 'max') refValue = Math.max(...valuesToConsider);
-      }
-    }
-
-    // Stacking & Chart Type
-    let stackingMode = undefined;
-    if (config.series_positioning === 'stacked') stackingMode = 'normal';
-    else if (config.series_positioning === 'percent') stackingMode = 'percent';
-
-    const isBar = config.chart_type === 'bar';
-    const baseType = config.chart_type || 'column';
-    const groupPadding = (config.group_padding || 10) / 100;
-    const pointPadding = (config.point_padding || 10) / 100;
-
-    let tickInterval = undefined;
-    if (config.x_axis_tick_density === 'compact') tickInterval = Math.ceil(categories.length / 10);
-    if (config.x_axis_tick_density === 'comfortable') tickInterval = Math.ceil(categories.length / 5);
-
-    // Build legend items for rules
-    const ruleLegendItems = [];
-
-    // Add legend items for each enabled rule with a legend label
-    if (isConditionalEnabled) {
-      for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
-        if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_legend_label`] && config[`rule${ruleNum}_legend_label`].trim() !== '') {
-          ruleLegendItems.push({
-            name: config[`rule${ruleNum}_legend_label`],
-            color: config[`rule${ruleNum}_color`] || '#EA4335'
-          });
-        }
-      }
-    }
-
-    // Determine if the series legend should be enabled
-    let seriesLegendEnabled = seriesData.length > 1;
-    // FIX 2: Correct legend visibility logic
-    if (isConditionalEnabled && config.hide_legend_with_formatting) {
-        // If conditional formatting is enabled AND the user chose to hide the series legend,
-        // the series legend is explicitly disabled.
-        seriesLegendEnabled = false;
-    }
-    // Final legend status: enabled if the series are visible OR if there are rule items to show.
-    const finalLegendEnabled = seriesLegendEnabled || (ruleLegendItems.length > 0 && isConditionalEnabled);
-
-
-    // Apply chart options
-    const chartOptions = {
-      // --- CRITICAL FIX: Pass the desired color array to Highcharts at the top level ---
-      // This forces the global palette to be the reversed/unreversed one we calculated.
-      colors: palette,
-      // ----------------------------------------------------------------------------------
-      chart: {
-        type: baseType,
-        backgroundColor: 'transparent',
-        spacing: [10, 10, 10, 10],
-        events: {
-          load: function() {
-            // Ensure trendline title labels are visible after chart loads
-            const trendSeries = this.get('trend-line-series');
-            if (trendSeries && trendSeries.points) {
-              trendSeries.points.forEach(point => {
-                if (point.dataLabel && point.dataLabels) {
-                  point.dataLabel.show();
-                  point.dataLabel.toFront();
+                if (shouldApplyFormatting) {
+                    const rawValues = values.map(v => v.y);
+                    const colors = this.getColors(rawValues, config, baseColor, 'Non-Pivot');
+                    seriesData.push({
+                        name: seriesName,
+                        data: values.map((v, i) => ({ ...v, color: colors[i] })),
+                        color: baseColor,
+                        showInLegend: true
+                    });
+                } else {
+                    seriesData.push({
+                        name: seriesName,
+                        data: values.map(v => ({ ...v, color: null })),
+                        color: baseColor,
+                        showInLegend: true
+                    });
                 }
-              });
-            }
-          }
+            });
         }
-      },
-      title: { text: null },
-      credits: { enabled: false },
-      tooltip: {
-        shared: false
-      },
-      xAxis: {
-        categories: categories,
-        type: 'category',
-        title: { text: config.x_axis_label || null },
-        labels: {
-          rotation: isBar ? 0 : (config.x_axis_label_rotation || -45),
-          formatter: function() {
-            const customFormat = config.x_axis_value_format_custom || '';
 
-            if (customFormat.trim() !== '') {
-              // Use the raw dimension value for custom formatting
-              const rawValue = rawDimensionValues[this.pos];
-              if (rawValue === undefined || rawValue === null) {
-                  return this.value;
-              }
-              // For X-axis, formatType is often null, forcing usage of customFormat
-              // We pass 'number' type just as a hint, but rely on customFormat for output logic
-              return formatValue(rawValue, 'number', customFormat, dimensionField);
-            }
+        const stackedTotals = categories.map((cat, i) => {
+            return seriesData.reduce((sum, series) => {
+                const val = series.data[i] && typeof series.data[i].y === 'number' ? series.data[i].y : 0;
+                return sum + val;
+            }, 0);
+        });
 
-            return this.value; // Use Looker's default rendering
-          }
-        },
-        tickInterval: tickInterval,
-        gridLineWidth: config.show_x_gridlines ? 1 : 0,
-        tickmarkPlacement: 'on'
-      },
-      yAxis: {
-        title: { text: config.y_axis_label || null },
-        min: config.y_axis_min !== undefined ? config.y_axis_min : null,
-        max: config.y_axis_max !== undefined ? config.y_axis_max : null,
-        gridLineWidth: config.show_y_gridlines !== false ? 1 : 0,
-        labels: {
-          formatter: function() {
-            // Y-axis uses its own format options (which were restored) or falls back to main options
-            const formatType = config.y_axis_value_format || config.value_format || 'auto';
-            const customFormat = config.y_axis_value_format_custom || config.value_format_custom;
-            return formatValue(this.value, formatType, customFormat, measureFields[0]);
-          }
-        },
-        stackLabels: {
-          enabled: config.show_total_labels === true && !!stackingMode,
-          style: {
-            fontWeight: config.total_label_bold !== false ? 'bold' : 'normal',
-            color: config.total_label_color || '#000000',
-            textOutline: 'none'
-          },
-          formatter: function() {
-            const num = this.total;
-            if (num === undefined || num === null) return '';
-            // Stack labels use value_format and custom format
-            const formatType = config.value_format || 'auto';
-            const customFormat = config.value_format_custom;
-            // Use the first measure field for total format logic
-            return formatValue(num, formatType, customFormat, measureFields[0]);
-          }
-        },
-        plotLines: config.ref_line_enabled ? [{
-          value: refValue,
-          color: config.ref_line_color || '#EA4335',
-          width: 2,
-          zIndex: 5,
-          dashStyle: 'Dash',
-          label: {
-            useHTML: true,
-            text: (() => {
-              // Use Y axis format config for reference line label
-              const formatType = config.y_axis_value_format || config.value_format || 'auto';
-              const customFormat = config.y_axis_value_format_custom || config.value_format_custom;
-
-              const formatted = formatValue(refValue, formatType, customFormat, measureFields[0]);
-
-              // CALCULATE DEFAULT TITLE BASED ON TYPE
-              let refTitle = config.ref_line_title;
-              if (!refTitle || refTitle.trim() === '') {
-                // Auto-generate title based on type
-                const typeMap = {
-                  'custom': 'Reference',
-                  'average': 'Average',
-                  'median': 'Median',
-                  'min': 'Minimum',
-                  'max': 'Maximum'
+        if (isConditionalEnabled && config.conditional_formatting_apply_to === 'stacked') {
+            const stackedColors = this.getStackedColors(stackedTotals, config);
+            seriesData = seriesData.map(series => {
+                const seriesBaseColor = series.color;
+                return {
+                    ...series,
+                    data: series.data.map((point, index) => ({
+                        ...point,
+                        color: stackedColors[index] || seriesBaseColor
+                    }))
+                }
+            });
+        } else if (isConditionalEnabled && config.conditional_formatting_apply_to === 'first') {
+            seriesData = seriesData.map((series, index) => {
+                if (index === 0) return series;
+                const baseColor = palette[index % palette.length];
+                return {
+                    ...series,
+                    data: series.data.map(point => ({
+                        ...point,
+                        color: null
+                    })),
+                    color: baseColor
                 };
-                refTitle = typeMap[config.ref_line_type] || 'Reference';
-              }
+            });
+        }
 
-              return `<span style="background-color: ${config.ref_line_title_bg || '#FFFFFF'}; color: ${config.ref_line_color || '#EA4335'}; padding: 4px; border: 1px solid ${config.ref_line_color || '#EA4335'}; border-radius: 3px; font-weight: bold; white-space: nowrap;">${refTitle}: ${formatted}</span>`;
-            })(),
-            align: isBar ? 'left' : 'right',
-            verticalAlign: isBar ? 'middle' : 'bottom',
-            rotation: 0,
-            y: isBar ? 0 : -5,
-            x: isBar ? 10 : -20,
-            style: { textOutline: 'none' }
-          }
-        }] : []
-      },
-      plotOptions: {
-        series: {
-          stacking: stackingMode,
-          cursor: 'pointer',
-          point: {
-            events: {
-              click: function (e) {
-                if (this.drillLinks) LookerCharts.Utils.openDrillMenu({ links: this.drillLinks, event: e });
-              }
+        let refValue = config.ref_line_value || 0;
+        if (config.ref_line_enabled && config.ref_line_type !== 'custom') {
+            let valuesToConsider;
+            if (config.ref_line_apply_to === 'stacked') {
+                valuesToConsider = stackedTotals.filter(v => v !== null && v !== undefined);
+            } else if (config.ref_line_apply_to === 'all') {
+                valuesToConsider = seriesData.flatMap(s => s.data.map(d => d.y)).filter(v => typeof v === 'number');
+            } else {
+                valuesToConsider = seriesData[0].data.map(d => d.y).filter(y => typeof y === 'number');
             }
-          },
-          dataLabels: {
-            enabled: config.show_labels,
-            align: config.label_position === 'outside' ? 'center' :
-            config.label_position === 'inside' ? 'center' : 'center',
-            verticalAlign: config.label_position === 'outside' ? null :
-            config.label_position === 'inside' ? 'top' : 'middle',
-            inside: config.label_position === 'inside' || config.label_position === 'center',
-            rotation: config.label_rotation || 0,
-            style: {
-              color: config.label_color || '#000000',
-              fontSize: (config.label_font_size || 11) + 'px',
-              textOutline: 'none',
-              fontWeight: 'normal'
-            },
-            formatter: function() {
-              const num = this.y;
-              if (num === undefined || num === null) return '';
-              // Try to determine which measure this point belongs to
-              const seriesIndex = this.series.index;
-              const measureField = measureFields[seriesIndex % measureFields.length];
-              // Access rendered value from the point's options
-              const renderedValue = this.point && this.point.options && this.point.options.rendered ? this.point.options.rendered : null;
-              return formatValue(num, config.value_format || 'auto', config.value_format_custom, measureField, renderedValue);
+
+            if (valuesToConsider.length > 0) {
+                if (config.ref_line_type === 'average') refValue = valuesToConsider.reduce((a, b) => a + b, 0) / valuesToConsider.length;
+                else if (config.ref_line_type === 'median') {
+                    valuesToConsider.sort((a, b) => a - b);
+                    const mid = Math.floor(valuesToConsider.length / 2);
+                    refValue = valuesToConsider.length % 2 !== 0 ? valuesToConsider[mid] : (valuesToConsider[mid - 1] + valuesToConsider[mid]) / 2;
+                } else if (config.ref_line_type === 'min') refValue = Math.min(...valuesToConsider);
+                else if (config.ref_line_type === 'max') refValue = Math.max(...valuesToConsider);
             }
-          },
-          tooltip: {
-            pointFormatter: function() {
-              const num = this.y;
-              if (num === undefined || num === null) return '';
-              // Determine which measure field this point belongs to
-              const seriesIndex = this.series.index;
-              const measureField = measureFields[seriesIndex % measureFields.length];
-              const renderedValue = this.options && this.options.rendered ? this.options.rendered : null;
-              const formatted = formatValue(num, config.value_format || 'auto', config.value_format_custom, measureField, renderedValue);
-              return `<span style="color:${this.color}">●</span> ${this.series.name}: <b>${formatted}</b><br/>`;
-            }
-          }
-        },
-        column: { groupPadding, pointPadding, borderWidth: 0 },
-        bar: { groupPadding, pointPadding, borderWidth: 0 },
+        }
 
-        area: {
-          marker: {
-            enabled: true,
-            radius: 3
-          },
-          fillOpacity: 0.75,
-          lineWidth: 2,
-          zones: []
-        },
+        let stackingMode = undefined;
+        if (config.series_positioning === 'stacked') stackingMode = 'normal';
+        else if (config.series_positioning === 'percent') stackingMode = 'percent';
 
-        line: { marker: { enabled: true, radius: 3 } }
-      },
-      legend: {
-        // Only hide series legend if hide_legend_with_formatting is true, but always show if there are rule items.
-        enabled: finalLegendEnabled,
-        align: 'center',
-        verticalAlign: 'bottom'
-      },
-      series: [
-        // Filter out series data showInLegend property based on seriesLegendEnabled flag
-        ...seriesData.map(s => ({
-            ...s,
-            showInLegend: seriesLegendEnabled
-        })),
-        // Rule legend items are independent and always show in legend if enabled (showInLegend: true)
-        ...ruleLegendItems.map(item => ({
-          name: item.name,
-          color: item.color,
-          type: 'line', // Hack to display custom legend entry
-          data: [],
-          showInLegend: true, // Always show rule legend items
-          enableMouseTracking: false
-        }))
-      ]
-    };
+        const isBar = config.chart_type === 'bar';
+        const baseType = config.chart_type || 'column';
+        const groupPadding = (config.group_padding || 10) / 100;
+        const pointPadding = (config.point_padding || 10) / 100;
 
-    // TRENDLINE
-    if (config.trend_line_enabled) {
-      if (seriesData.length > 0) {
-        let trendSourceData;
+        let tickInterval = undefined;
+        if (config.x_axis_tick_density === 'compact') tickInterval = Math.ceil(categories.length / 10);
+        if (config.x_axis_tick_density === 'comfortable') tickInterval = Math.ceil(categories.length / 5);
 
-        try {
-          if (config.trend_line_apply_to === 'stacked') {
-            trendSourceData = stackedTotals;
-          } else if (config.trend_line_apply_to === 'all') {
-            trendSourceData = [];
-            for (let i = 0; i < categories.length; i++) {
-              let sum = 0, count = 0;
-              seriesData.forEach(s => {
-                if (s.data[i] && typeof s.data[i].y === 'number') {
-                  sum += s.data[i].y;
-                  count++;
+        const ruleLegendItems = [];
+        if (isConditionalEnabled) {
+            for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
+                if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_legend_label`] && config[`rule${ruleNum}_legend_label`].trim() !== '') {
+                    ruleLegendItems.push({
+                        name: config[`rule${ruleNum}_legend_label`],
+                        color: config[`rule${ruleNum}_color`] || '#EA4335'
+                    });
                 }
-              });
-              trendSourceData.push(count > 0 ? sum / count : null);
             }
-          } else {
-            // First measure is default
-            trendSourceData = seriesData[0].data.map(d => d && d.y !== undefined ? d.y : null);
-          }
+        }
 
-          let trendSeriesData = [];
-          const validPoints = trendSourceData.map((y, x) => ({ x, y })).filter(p => typeof p.y === 'number');
+        let seriesLegendEnabled = seriesData.length > 1;
+        if (isConditionalEnabled && config.hide_legend_with_formatting) {
+            seriesLegendEnabled = false;
+        }
+        const finalLegendEnabled = seriesLegendEnabled || (ruleLegendItems.length > 0 && isConditionalEnabled);
 
-          if (validPoints.length > 1) {
-            if (config.trend_line_type === 'linear') {
-              const n = validPoints.length;
-              const sumX = validPoints.reduce((a, p) => a + p.x, 0);
-              const sumY = validPoints.reduce((a, p) => a + p.y, 0);
-              const sumXY = validPoints.reduce((a, p) => a + p.x * p.y, 0);
-              const sumX2 = validPoints.reduce((a, p) => a + p.x * p.x, 0);
+        const chartOptions = {
+            colors: palette,
+            chart: {
+                type: baseType,
+                backgroundColor: 'transparent',
+                spacing: [10, 10, 10, 10],
+                // PDF FIX: Disable animation when printing
+                animation: !isPrint,
+                events: {
+                    load: function () {
+                        const trendSeries = this.get('trend-line-series');
+                        if (trendSeries && trendSeries.points) {
+                            trendSeries.points.forEach(point => {
+                                if (point.dataLabel && point.dataLabels) {
+                                    point.dataLabel.show();
+                                    point.dataLabel.toFront();
+                                }
+                            });
+                        }
+                    }
+                }
+            },
+            title: { text: null },
+            credits: { enabled: false },
+            tooltip: {
+                shared: false
+            },
+            plotOptions: {
+                series: {
+                    stacking: stackingMode,
+                    cursor: 'pointer',
+                    // PDF FIX: Disable animation for series
+                    animation: !isPrint,
+                    point: {
+                        events: {
+                            click: function (e) {
+                                if (this.drillLinks) LookerCharts.Utils.openDrillMenu({ links: this.drillLinks, event: e });
+                            }
+                        }
+                    },
+                    dataLabels: {
+                        enabled: config.show_labels,
+                        align: config.label_position === 'outside' ? 'center' :
+                            config.label_position === 'inside' ? 'center' : 'center',
+                        verticalAlign: config.label_position === 'outside' ? null :
+                            config.label_position === 'inside' ? 'top' : 'middle',
+                        inside: config.label_position === 'inside' || config.label_position === 'center',
+                        rotation: config.label_rotation || 0,
+                        style: {
+                            color: config.label_color || '#000000',
+                            fontSize: (config.label_font_size || 11) + 'px',
+                            textOutline: 'none',
+                            fontWeight: 'normal'
+                        },
+                        formatter: function () {
+                            const num = this.y;
+                            if (num === undefined || num === null) return '';
+                            const seriesIndex = this.series.index;
+                            const measureField = measureFields[seriesIndex % measureFields.length];
+                            const renderedValue = this.point && this.point.options && this.point.options.rendered ? this.point.options.rendered : null;
+                            return formatValue(num, config.value_format || 'auto', config.value_format_custom, measureField, renderedValue);
+                        }
+                    },
+                    tooltip: {
+                        pointFormatter: function () {
+                            const num = this.y;
+                            if (num === undefined || num === null) return '';
+                            const seriesIndex = this.series.index;
+                            const measureField = measureFields[seriesIndex % measureFields.length];
+                            const renderedValue = this.options && this.options.rendered ? this.options.rendered : null;
+                            const formatted = formatValue(num, config.value_format || 'auto', config.value_format_custom, measureField, renderedValue);
+                            return `<span style="color:${this.color}">●</span> ${this.series.name}: <b>${formatted}</b><br/>`;
+                        }
+                    }
+                },
+                column: { groupPadding, pointPadding, borderWidth: 0 },
+                bar: { groupPadding, pointPadding, borderWidth: 0 },
+                area: {
+                    marker: { enabled: true, radius: 3 },
+                    fillOpacity: 0.75,
+                    lineWidth: 2,
+                    zones: []
+                },
+                line: { marker: { enabled: true, radius: 3 } }
+            },
+            xAxis: {
+                categories: categories,
+                type: 'category',
+                title: { text: config.x_axis_label || null },
+                labels: {
+                    rotation: isBar ? 0 : (config.x_axis_label_rotation || -45),
+                    formatter: function () {
+                        const customFormat = config.x_axis_value_format_custom || '';
+                        if (customFormat.trim() !== '') {
+                            const rawValue = rawDimensionValues[this.pos];
+                            if (rawValue === undefined || rawValue === null) {
+                                return this.value;
+                            }
+                            return formatValue(rawValue, 'number', customFormat, dimensionField);
+                        }
+                        return this.value;
+                    }
+                },
+                tickInterval: tickInterval,
+                gridLineWidth: config.show_x_gridlines ? 1 : 0,
+                tickmarkPlacement: 'on'
+            },
+            yAxis: {
+                title: { text: config.y_axis_label || null },
+                min: config.y_axis_min !== undefined ? config.y_axis_min : null,
+                max: config.y_axis_max !== undefined ? config.y_axis_max : null,
+                gridLineWidth: config.show_y_gridlines !== false ? 1 : 0,
+                labels: {
+                    formatter: function () {
+                        const formatType = config.y_axis_value_format || config.value_format || 'auto';
+                        const customFormat = config.y_axis_value_format_custom || config.value_format_custom;
+                        return formatValue(this.value, formatType, customFormat, measureFields[0]);
+                    }
+                },
+                stackLabels: {
+                    enabled: config.show_total_labels === true && !!stackingMode,
+                    style: {
+                        fontWeight: config.total_label_bold !== false ? 'bold' : 'normal',
+                        color: config.total_label_color || '#000000',
+                        textOutline: 'none'
+                    },
+                    formatter: function () {
+                        const num = this.total;
+                        if (num === undefined || num === null) return '';
+                        const formatType = config.value_format || 'auto';
+                        const customFormat = config.value_format_custom;
+                        return formatValue(num, formatType, customFormat, measureFields[0]);
+                    }
+                },
+                plotLines: config.ref_line_enabled ? [{
+                    value: refValue,
+                    color: config.ref_line_color || '#EA4335',
+                    width: 2,
+                    zIndex: 5,
+                    dashStyle: 'Dash',
+                    label: {
+                        useHTML: true,
+                        text: (() => {
+                            const formatType = config.y_axis_value_format || config.value_format || 'auto';
+                            const customFormat = config.y_axis_value_format_custom || config.value_format_custom;
+                            const formatted = formatValue(refValue, formatType, customFormat, measureFields[0]);
+                            let refTitle = config.ref_line_title;
+                            if (!refTitle || refTitle.trim() === '') {
+                                const typeMap = { 'custom': 'Reference', 'average': 'Average', 'median': 'Median', 'min': 'Minimum', 'max': 'Maximum' };
+                                refTitle = typeMap[config.ref_line_type] || 'Reference';
+                            }
+                            return `<span style="background-color: ${config.ref_line_title_bg || '#FFFFFF'}; color: ${config.ref_line_color || '#EA4335'}; padding: 4px; border: 1px solid ${config.ref_line_color || '#EA4335'}; border-radius: 3px; font-weight: bold; white-space: nowrap;">${refTitle}: ${formatted}</span>`;
+                        })(),
+                        align: isBar ? 'left' : 'right',
+                        verticalAlign: isBar ? 'middle' : 'bottom',
+                        rotation: 0,
+                        y: isBar ? 0 : -5,
+                        x: isBar ? 10 : -20,
+                        style: { textOutline: 'none' }
+                    }
+                }] : []
+            },
+            legend: {
+                enabled: finalLegendEnabled,
+                align: 'center',
+                verticalAlign: 'bottom'
+            },
+            series: [
+                ...seriesData.map(s => ({
+                    ...s,
+                    showInLegend: seriesLegendEnabled
+                })),
+                ...ruleLegendItems.map(item => ({
+                    name: item.name,
+                    color: item.color,
+                    type: 'line',
+                    data: [],
+                    showInLegend: true,
+                    enableMouseTracking: false
+                }))
+            ]
+        };
 
-              // Handle potential division by zero if all X values are the same (shouldn't happen with categories)
-              const denominator = (n * sumX2 - sumX * sumX);
-              const slope = denominator === 0 ? 0 : (n * sumXY - sumX * sumY) / denominator;
-              const intercept = (sumY - slope * sumX) / n;
-
-              trendSeriesData = categories.map((_, x) => slope * x + intercept);
-
-            } else if (config.trend_line_type === 'moving_avg') {
-              const period = config.trend_line_period || 3;
-              trendSeriesData = trendSourceData.map((val, i, arr) => {
-                if (i < period - 1) return null;
-                const subset = arr.slice(i - period + 1, i + 1).filter(v => typeof v === 'number');
-                return subset.length > 0 ? subset.reduce((a, b) => a + b, 0) / subset.length : null;
-              });
-            }
-
-            // Find last valid point
-            let lastValidIndex = -1;
-            for (let i = trendSeriesData.length - 1; i >= 0; i--) {
-              if (trendSeriesData[i] !== null && trendSeriesData[i] !== undefined && typeof trendSeriesData[i] === 'number') {
-                lastValidIndex = i;
-                break;
-              }
-            }
-
-            const finalTrendData = trendSeriesData.map((y, i) => {
-              const point = { y: y };
-
-              // Only add title label on last valid point
-              if (i === lastValidIndex && y !== null && y !== undefined && typeof y === 'number') {
-                point.dataLabels = {
-                  enabled: true,
-                  useHTML: true,
-                  align: isBar ? 'left' : 'right',
-                  x: isBar ? 10 : -10,
-                  y: isBar ? 0 : -10,
-                  verticalAlign: isBar ? 'middle' : 'bottom',
-                  rotation: 0,
-                  overflow: 'allow',
-                  crop: false,
-                  inside: false,
-                  zIndex: 1000,
-                  style: {
-                    textOutline: 'none',
-                    zIndex: 1000
-                  },
-                  formatter: function() {
-                    // CALCULATE DEFAULT TITLE BASED ON TYPE
-                    let trendTitle = config.trend_line_title;
-                    if (!trendTitle || trendTitle.trim() === '') {
-                      // Auto-generate title based on type
-                      const typeMap = {
-                        'linear': 'Linear Trend',
-                        'moving_avg': `Moving Avg (${config.trend_line_period || 3})`
-                      };
-                      trendTitle = typeMap[config.trend_line_type] || 'Trend';
+        if (config.trend_line_enabled) {
+            if (seriesData.length > 0) {
+                let trendSourceData;
+                try {
+                    if (config.trend_line_apply_to === 'stacked') {
+                        trendSourceData = stackedTotals;
+                    } else if (config.trend_line_apply_to === 'all') {
+                        trendSourceData = [];
+                        for (let i = 0; i < categories.length; i++) {
+                            let sum = 0, count = 0;
+                            seriesData.forEach(s => {
+                                if (s.data[i] && typeof s.data[i].y === 'number') {
+                                    sum += s.data[i].y;
+                                    count++;
+                                }
+                            });
+                            trendSourceData.push(count > 0 ? sum / count : null);
+                        }
+                    } else {
+                        trendSourceData = seriesData[0].data.map(d => d && d.y !== undefined ? d.y : null);
                     }
 
-                    return `<span style="background-color: ${config.trend_line_title_bg || '#FFFFFF'}; color: ${config.trend_line_label_color || config.trend_line_color || '#4285F4'}; padding: 4px; border: 1px solid ${config.trend_line_color || '#4285F4'}; border-radius: 3px; font-weight: bold; white-space: nowrap; z-index: 1000;">${trendTitle}</span>`;
-                  }
-                };
-              }
-              return point;
-            });
+                    let trendSeriesData = [];
+                    const validPoints = trendSourceData.map((y, x) => ({ x, y })).filter(p => typeof p.y === 'number');
 
-            const trendSeries = {
-              id: 'trend-line-series',
-              type: 'line',
-              name: (() => {
-                let trendTitle = config.trend_line_title;
-                if (!trendTitle || trendTitle.trim() === '') {
-                  const typeMap = {
-                    'linear': 'Linear Trend',
-                    'moving_avg': `Moving Avg (${config.trend_line_period || 3})`
-                  };
-                  trendTitle = typeMap[config.trend_line_type] || 'Trend';
+                    if (validPoints.length > 1) {
+                        if (config.trend_line_type === 'linear') {
+                            const n = validPoints.length;
+                            const sumX = validPoints.reduce((a, p) => a + p.x, 0);
+                            const sumY = validPoints.reduce((a, p) => a + p.y, 0);
+                            const sumXY = validPoints.reduce((a, p) => a + p.x * p.y, 0);
+                            const sumX2 = validPoints.reduce((a, p) => a + p.x * p.x, 0);
+                            const denominator = (n * sumX2 - sumX * sumX);
+                            const slope = denominator === 0 ? 0 : (n * sumXY - sumX * sumY) / denominator;
+                            const intercept = (sumY - slope * sumX) / n;
+                            trendSeriesData = categories.map((_, x) => slope * x + intercept);
+
+                        } else if (config.trend_line_type === 'moving_avg') {
+                            const period = config.trend_line_period || 3;
+                            trendSeriesData = trendSourceData.map((val, i, arr) => {
+                                if (i < period - 1) return null;
+                                const subset = arr.slice(i - period + 1, i + 1).filter(v => typeof v === 'number');
+                                return subset.length > 0 ? subset.reduce((a, b) => a + b, 0) / subset.length : null;
+                            });
+                        }
+
+                        let lastValidIndex = -1;
+                        for (let i = trendSeriesData.length - 1; i >= 0; i--) {
+                            if (trendSeriesData[i] !== null && trendSeriesData[i] !== undefined && typeof trendSeriesData[i] === 'number') {
+                                lastValidIndex = i;
+                                break;
+                            }
+                        }
+
+                        const finalTrendData = trendSeriesData.map((y, i) => {
+                            const point = { y: y };
+                            if (i === lastValidIndex && y !== null && y !== undefined && typeof y === 'number') {
+                                point.dataLabels = {
+                                    enabled: true,
+                                    useHTML: true,
+                                    align: isBar ? 'left' : 'right',
+                                    x: isBar ? 10 : -10,
+                                    y: isBar ? 0 : -10,
+                                    verticalAlign: isBar ? 'middle' : 'bottom',
+                                    rotation: 0,
+                                    overflow: 'allow',
+                                    crop: false,
+                                    inside: false,
+                                    zIndex: 1000,
+                                    style: { textOutline: 'none', zIndex: 1000 },
+                                    formatter: function () {
+                                        let trendTitle = config.trend_line_title;
+                                        if (!trendTitle || trendTitle.trim() === '') {
+                                            const typeMap = { 'linear': 'Linear Trend', 'moving_avg': `Moving Avg (${config.trend_line_period || 3})` };
+                                            trendTitle = typeMap[config.trend_line_type] || 'Trend';
+                                        }
+                                        return `<span style="background-color: ${config.trend_line_title_bg || '#FFFFFF'}; color: ${config.trend_line_label_color || config.trend_line_color || '#4285F4'}; padding: 4px; border: 1px solid ${config.trend_line_color || '#4285F4'}; border-radius: 3px; font-weight: bold; white-space: nowrap; z-index: 1000;">${trendTitle}</span>`;
+                                    }
+                                };
+                            }
+                            return point;
+                        });
+
+                        const trendSeries = {
+                            id: 'trend-line-series',
+                            type: 'line',
+                            name: (() => {
+                                let trendTitle = config.trend_line_title;
+                                if (!trendTitle || trendTitle.trim() === '') {
+                                    const typeMap = { 'linear': 'Linear Trend', 'moving_avg': `Moving Avg (${config.trend_line_period || 3})` };
+                                    trendTitle = typeMap[config.trend_line_type] || 'Trend';
+                                }
+                                return trendTitle;
+                            })(),
+                            data: finalTrendData,
+                            color: config.trend_line_color || '#4285F4',
+                            dashStyle: 'ShortDash',
+                            marker: { enabled: false },
+                            enableMouseTracking: true,
+                            zIndex: 10,
+                            showInLegend: false,
+                            stacking: undefined,
+                            stack: null,
+                            dataLabels: {
+                                enabled: config.trend_line_show_label === true,
+                                allowOverlap: true,
+                                formatter: function () {
+                                    return formatValue(this.y, config.value_format || 'auto', config.value_format_custom, measureFields[0]);
+                                },
+                                style: {
+                                    color: config.trend_line_label_color || config.trend_line_color || '#4285F4',
+                                    fontSize: '11px',
+                                    textOutline: 'none',
+                                    fontWeight: 'normal',
+                                    zIndex: 1000
+                                }
+                            },
+                            tooltip: {
+                                pointFormatter: function () {
+                                    const formatted = formatValue(this.y, config.value_format || 'auto', config.value_format_custom, measureFields[0]);
+                                    return `<b>${config.trend_line_title || 'Trend'}</b>: ${formatted}`;
+                                }
+                            }
+                        };
+                        chartOptions.series.push(trendSeries);
+                    }
+                } catch (error) {
+                    console.error('[TRENDLINE ERROR] Error calculating trendline:', error);
                 }
-                return trendTitle;
-              })(),
-              data: finalTrendData,
-              color: config.trend_line_color || '#4285F4',
-              dashStyle: 'ShortDash',
-              marker: { enabled: false },
-              enableMouseTracking: true,
-              zIndex: 10,
-              showInLegend: false,
-              stacking: undefined,
-              stack: null,
-
-              // Removed redundant and dangerous afterAnimate events from trendSeries itself
-
-              dataLabels: {
-                enabled: config.trend_line_show_label === true,
-                allowOverlap: true,
-                formatter: function() {
-                  // Use the primary value format for trendline labels
-                  return formatValue(this.y, config.value_format || 'auto', config.value_format_custom, measureFields[0]);
-                },
-                style: {
-                  color: config.trend_line_label_color || config.trend_line_color || '#4285F4',
-                  fontSize: '11px',
-                  textOutline: 'none',
-                  fontWeight: 'normal',
-                  zIndex: 1000
-                }
-              },
-              tooltip: {
-                pointFormatter: function() {
-                  const formatted = formatValue(this.y, config.value_format || 'auto', config.value_format_custom, measureFields[0]);
-                  return `<b>${config.trend_line_title || 'Trend'}</b>: ${formatted}`;
-                }
-              }
-            };
-            chartOptions.series.push(trendSeries);
-
-          } else {
-             // Not enough valid points
-          }
-        } catch (error) {
-          console.error('[TRENDLINE ERROR] Error calculating trendline:', error);
+            }
         }
-      } else {
-         // No series data
-      }
-    }
 
-    // Track if critical options changed that require full re-render
-    const criticalOptionsChanged = this.chart && (
-      this._lastConditionalFormatting !== config.conditional_formatting_enabled ||
-      this._lastReverseColors !== config.reverse_colors ||
-      this._lastSeriesPositioning !== config.series_positioning ||
-      this._lastChartType !== config.chart_type
-    );
+        const criticalOptionsChanged = this.chart && (
+            this._lastConditionalFormatting !== config.conditional_formatting_enabled ||
+            this._lastReverseColors !== config.reverse_colors ||
+            this._lastSeriesPositioning !== config.series_positioning ||
+            this._lastChartType !== config.chart_type
+        );
 
-    if (!this.chart || criticalOptionsChanged) {
-      if (criticalOptionsChanged) {
-        this.chart.destroy();
-      } else {
-        // Creating new chart
-      }
-      this.chart = Highcharts.chart(this._chartContainer, chartOptions);
-    } else {
-      // When updating, ensure trendline is preserved if it exists in new options
-      const hasTrendlineInOptions = chartOptions.series.some(s => s.id === 'trend-line-series');
-      const hasTrendlineInChart = this.chart.get('trend-line-series');
-
-      // Remove existing trendline if present but not in new options
-      if (hasTrendlineInChart && !hasTrendlineInOptions) {
-        hasTrendlineInChart.remove(false);
-      }
-
-      // Update with new options (redraw: false to prevent flicker)
-      this.chart.update(chartOptions, false, true);
-
-      // Add or update trendline after main update
-      if (hasTrendlineInOptions) {
-        const trendlineData = chartOptions.series.find(s => s.id === 'trend-line-series');
-        const existingTrendline = this.chart.get('trend-line-series');
-
-        if (existingTrendline) {
-          existingTrendline.setData(trendlineData.data, false);
+        if (!this.chart || criticalOptionsChanged) {
+            if (criticalOptionsChanged) {
+                this.chart.destroy();
+            }
+            this.chart = Highcharts.chart(this._chartContainer, chartOptions);
         } else {
-          this.chart.addSeries(trendlineData, false);
+            const hasTrendlineInOptions = chartOptions.series.some(s => s.id === 'trend-line-series');
+            const hasTrendlineInChart = this.chart.get('trend-line-series');
+
+            if (hasTrendlineInChart && !hasTrendlineInOptions) {
+                hasTrendlineInChart.remove(false);
+            }
+
+            this.chart.update(chartOptions, false, true);
+
+            if (hasTrendlineInOptions) {
+                const trendlineData = chartOptions.series.find(s => s.id === 'trend-line-series');
+                const existingTrendline = this.chart.get('trend-line-series');
+
+                if (existingTrendline) {
+                    existingTrendline.setData(trendlineData.data, false);
+                } else {
+                    this.chart.addSeries(trendlineData, false);
+                }
+            }
+
+            this.chart.redraw();
         }
-      }
 
-      // Final redraw
-      this.chart.redraw();
+        this._lastConditionalFormatting = config.conditional_formatting_enabled;
+        this._lastReverseColors = config.reverse_colors;
+        this._lastSeriesPositioning = config.series_positioning;
+        this._lastChartType = config.chart_type;
+
+        // PDF FIX: Explicit done() call with slight delay to ensure render complete
+        if (isPrint) {
+            console.log("[Viz] Rendering for Print. Waiting 500ms before done()...");
+            setTimeout(() => {
+                if (this.chart) this.chart.reflow();
+                done();
+            }, 500);
+        } else {
+            done();
+        }
+
+    } catch (e) {
+        console.error("[Viz] Render Error:", e);
+        // Ensure done() is called even if error, to prevent dashboard hanging
+        done();
     }
-
-    // Store last state
-    this._lastConditionalFormatting = config.conditional_formatting_enabled;
-    this._lastReverseColors = config.reverse_colors;
-    this._lastSeriesPositioning = config.series_positioning;
-    this._lastChartType = config.chart_type;
-
-    // FIX FOR PDF RENDERING: REMOVED REFLOW CALL HERE TO FIX DOUBLE ANIMATION
-
-    done();
   },
 
-
-  // FIX 1.2: Implement getStackedColors inspired by the provided file to ensure non-matched categories revert to their base color.
   getStackedColors: function(values, config) {
     const defaultColor = '#EEEEEE';
 
-    // Helper function to check discrete rules (non-gradient) - RE-COPIED from bar_chart_conditional (6).js
     const checkDiscrete = (val, ruleNum, allVals) => {
         if (!config[`rule${ruleNum}_enabled`]) return false;
         const type = config[`rule${ruleNum}_type`];
-        if (type === 'gradient') return false; // Skip gradients in discrete check
+        if (type === 'gradient') return false;
 
         const v1 = config[`rule${ruleNum}_value`];
         const v2 = config[`rule${ruleNum}_value2`];
 
         if (val === null || val === undefined || isNaN(val)) return false;
 
-        // Top N / Bottom N logic
         if (type === 'topn' || type === 'bottomn') {
             const numericVals = allVals.filter(v => typeof v === 'number');
             const n = Math.max(1, Math.floor(v1 || 5));
@@ -1800,11 +1658,9 @@ looker.plugins.visualizations.add({
         return false;
     };
 
-    // Apply rules in priority order: Rule 1 > Rule 2 > Rule 3
     return values.map((val, index) => {
-        if (val === null || val === undefined || isNaN(val)) return null; // Return null if not numeric, so updateAsync uses base series color
+        if (val === null || val === undefined || isNaN(val)) return null;
 
-        // 1. Check discrete rules first (R1 > R2 > R3)
         for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
             if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_type`] !== 'gradient') {
                 if (checkDiscrete(val, ruleNum, values)) {
@@ -1813,7 +1669,6 @@ looker.plugins.visualizations.add({
             }
         }
 
-        // 2. If no discrete rule matched, check gradient rules (R1 > R2 > R3)
         for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
             if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_type`] === 'gradient') {
                 const numericValues = values.filter(v => typeof v === 'number' && v !== null && v !== undefined);
@@ -1823,91 +1678,68 @@ looker.plugins.visualizations.add({
                 return this.interpolateColor(config[`rule${ruleNum}_color`] || defaultColor, config[`rule${ruleNum}_color2`] || defaultColor, ratio);
             }
         }
-
-        // No rule matched - return null (updateAsync handles fallback to series color)
         return null;
     });
   },
 
-  // Note: Removed unused arguments (paletteForFallback, seriesIndex, isReversed)
   getColors: function(values, config, baseColor, callerInfo = 'unknown') {
-
-  if (!config.conditional_formatting_enabled) {
-    // This should never happen now, but good practice to keep
-    return values.map(() => baseColor);
-  }
-
-  // Helper function to check discrete rules (non-gradient)
-  const checkDiscrete = (val, ruleNum, allVals) => {
-    if (!config[`rule${ruleNum}_enabled`]) return false;
-    const type = config[`rule${ruleNum}_type`];
-    if (type === 'gradient') return false; // Skip gradients in discrete check
-
-    const v1 = config[`rule${ruleNum}_value`];
-    const v2 = config[`rule${ruleNum}_value2`];
-
-    if (val === null || val === undefined || isNaN(val)) return false;
-
-    // Top N / Bottom N logic
-    if (type === 'topn' || type === 'bottomn') {
-        const numericVals = allVals.filter(v => typeof v === 'number');
-        const n = Math.max(1, Math.floor(v1 || 5));
-        const uniqueSorted = [...new Set(numericVals)].sort((a, b) => type === 'topn' ? b - a : a - b);
-
-        if (uniqueSorted.length === 0) return false;
-        if (n >= uniqueSorted.length) return true;
-
-        const threshold = uniqueSorted[n - 1];
-        return type === 'topn' ? val >= threshold : val <= threshold;
+    if (!config.conditional_formatting_enabled) {
+      return values.map(() => baseColor);
     }
 
+    const checkDiscrete = (val, ruleNum, allVals) => {
+      if (!config[`rule${ruleNum}_enabled`]) return false;
+      const type = config[`rule${ruleNum}_type`];
+      if (type === 'gradient') return false;
 
-    if (type === 'gt') return val > v1;
-    if (type === 'lt') return val < v1;
-    if (type === 'eq') return val == v1;
-    if (type === 'between') return val >= v1 && val <= v2;
+      const v1 = config[`rule${ruleNum}_value`];
+      const v2 = config[`rule${ruleNum}_value2`];
 
-    return false;
-  };
+      if (val === null || val === undefined || isNaN(val)) return false;
 
-  // Apply rules in priority order: Discrete (R1>R2>R3) -> Gradient (R1>R2>R3) -> Base Color
-  return values.map((val, index) => {
-    if (val === null || val === undefined || isNaN(val)) return baseColor;
+      if (type === 'topn' || type === 'bottomn') {
+          const numericVals = allVals.filter(v => typeof v === 'number');
+          const n = Math.max(1, Math.floor(v1 || 5));
+          const uniqueSorted = [...new Set(numericVals)].sort((a, b) => type === 'topn' ? b - a : a - b);
+          if (uniqueSorted.length === 0) return false;
+          if (n >= uniqueSorted.length) return true;
+          const threshold = uniqueSorted[n - 1];
+          return type === 'topn' ? val >= threshold : val <= threshold;
+      }
+      if (type === 'gt') return val > v1;
+      if (type === 'lt') return val < v1;
+      if (type === 'eq') return val == v1;
+      if (type === 'between') return val >= v1 && val <= v2;
+      return false;
+    };
 
-    let matchedColor = null;
-
-    // 1. Check Discrete Rules
-    for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
-        if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_type`] !== 'gradient') {
-            if (checkDiscrete(val, ruleNum, values)) {
-                matchedColor = config[`rule${ruleNum}_color`];
-                break;
-            }
-        }
-    }
-
-    if (matchedColor) return matchedColor;
-
-    // 2. Check Gradient Rules (only if no discrete rule matched)
-    for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
-        if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_type`] === 'gradient') {
-            const numericValues = values.filter(v => typeof v === 'number' && v !== null && v !== undefined);
-            const min = Math.min(...numericValues);
-            const max = Math.max(...numericValues);
-            const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
-
-            let color1 = config[`rule${ruleNum}_color`] || baseColor;
-            let color2 = config[`rule${ruleNum}_color2`] || baseColor;
-
-            const resultColor = this.interpolateColor(color1, color2, ratio);
-            return resultColor;
-        }
-    }
-
-    // 3. No rule matched - use the series base color.
-    return baseColor;
-  });
-},
+    return values.map((val, index) => {
+      if (val === null || val === undefined || isNaN(val)) return baseColor;
+      let matchedColor = null;
+      for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
+          if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_type`] !== 'gradient') {
+              if (checkDiscrete(val, ruleNum, values)) {
+                  matchedColor = config[`rule${ruleNum}_color`];
+                  break;
+              }
+          }
+      }
+      if (matchedColor) return matchedColor;
+      for (let ruleNum = 1; ruleNum <= 3; ruleNum++) {
+          if (config[`rule${ruleNum}_enabled`] && config[`rule${ruleNum}_type`] === 'gradient') {
+              const numericValues = values.filter(v => typeof v === 'number' && v !== null && v !== undefined);
+              const min = Math.min(...numericValues);
+              const max = Math.max(...numericValues);
+              const ratio = (max === min) ? 0.5 : (val - min) / (max - min);
+              let color1 = config[`rule${ruleNum}_color`] || baseColor;
+              let color2 = config[`rule${ruleNum}_color2`] || baseColor;
+              const resultColor = this.interpolateColor(color1, color2, ratio);
+              return resultColor;
+          }
+      }
+      return baseColor;
+    });
+  },
 
   interpolateColor: function(color1, color2, ratio) {
     const hex = (c) => {

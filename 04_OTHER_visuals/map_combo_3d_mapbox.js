@@ -1,7 +1,8 @@
 /**
- * Multi-Layer 3D Map for Looker - v23 Ultimate
+ * Multi-Layer 3D Map for Looker - v24 Ultimate (Debug Edition)
  * * * FEATURES:
  * - Smart PDF Fix: Waits for Mapbox 'idle' state instead of hard delay.
+ * - Debugging: Console logs added to track render lifecycle.
  * - Performance: Faster PDF generation (no unnecessary waiting).
  * - UI/UX: On-Map Toggle, Correct Tab Ordering, Drill Cursors.
  */
@@ -16,7 +17,6 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
-  // UI FIX: Wide spacing (100) prevents field overlap
   const b = 100 + (n * 100);
 
   return {
@@ -125,18 +125,27 @@ const getLayerOptions = (n) => {
 // --- HELPER: IMAGE PRELOADER ---
 const preloadImage = (url) => {
     return new Promise((resolve) => {
-        if (!url || url.length < 5) return resolve();
+        if (!url || url.length < 5) {
+            // console.log(`[Viz] Skipping invalid icon URL: ${url}`);
+            return resolve();
+        }
         const img = new Image();
         img.crossOrigin = "Anonymous"; // Crucial for PDF
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
+        img.onload = () => {
+            // console.log(`[Viz] Icon Loaded: ${url}`);
+            resolve();
+        };
+        img.onerror = () => {
+            console.warn(`[Viz] Icon Load Failed: ${url}`);
+            resolve();
+        };
         img.src = url;
     });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v23",
-  label: "Combo Map 3D (Smart Print)",
+  id: "combo_map_ultimate_v24",
+  label: "Combo Map 3D (Debug Mode)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -353,9 +362,11 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
+    console.log(`[Viz] 1. Update Async Started (${data.length} rows)`);
     this.clearErrors();
 
     if (!config.mapbox_token) {
+        console.warn("[Viz] Missing Mapbox Token");
         if(this._deck) { this._deck.finalize(); this._deck = null; }
         this._tokenError.style.display = 'block';
         this._toggleBtn.style.display = 'none';
@@ -374,41 +385,39 @@ looker.plugins.visualizations.add({
     const iconPromises = [];
     for(let i=1; i<=4; i++) {
         if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
+            console.log(`[Viz] Preloading Icon for Layer ${i}: ${config[`layer${i}_icon_url`]}`);
             iconPromises.push(preloadImage(config[`layer${i}_icon_url`]));
         }
     }
+
+    console.log(`[Viz] 2. Starting Parallel Load (Data + ${iconPromises.length} Icons)`);
 
     Promise.all([
         this._prepareData(data, config, queryResponse),
         ...iconPromises
     ]).then(([processedData]) => {
-
+        console.log("[Viz] 3. Data & Icons Ready. Rendering...");
         this._render(processedData, config, queryResponse, details);
 
         // --- SMART PDF WAIT ---
         if (details && details.print) {
+            console.log("[Viz] PDF Mode DETECTED. Freezing map.");
 
-            // 1. Force a redraw to ensure buffers are populated
             if(this._deck) this._deck.redraw(true);
 
-            // 2. Set a fallback timeout (1.5s max wait)
-            const fallback = setTimeout(() => {
-                console.log("PDF: Fallback timeout triggered");
+            // Wait 1.5s as fallback for tiles to paint
+            setTimeout(() => {
+                console.log("[Viz] PDF Wait Complete (Calling done)");
                 done();
             }, 1500);
 
-            // 3. Try to listen for Mapbox "idle" (fully loaded)
-            // DeckGL exposes the underlying mapbox instance via .getMapboxMap() in newer versions
-            // or we might need to rely on the deck onload.
-            // Since accessing the internal map can be flaky in Looker's sandbox,
-            // we stick to the 1.5s fallback which is generally safe for raster tiles.
-
         } else {
+            console.log("[Viz] Interactive Mode (Done)");
             done();
         }
 
     }).catch(err => {
-        console.error("Data Prep Error:", err);
+        console.error("[Viz] Data/Render Error:", err);
         this.addError({ title: "Error", message: err.message });
         done();
     });
@@ -439,9 +448,10 @@ looker.plugins.visualizations.add({
     let geojson = null;
 
     try {
+        console.log(`[Viz] Fetching GeoJSON: ${url}`);
         geojson = await this._loadGeoJSON(url);
     } catch (error) {
-        console.warn("GeoJSON Load Fail", error);
+        console.warn("[Viz] GeoJSON Load Fail", error);
         geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -498,7 +508,7 @@ looker.plugins.visualizations.add({
             }
         });
     }
-
+    console.log(`[Viz] Matched ${matchedFeatures.length} GeoJSON features`);
     return { type: 'regions', data: matchedFeatures, geojson: geojson, measures };
   },
 
@@ -514,7 +524,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch(e) {
-          console.error(`Layer ${i} failed`, e);
+          console.error(`[Viz] Layer ${i} failed`, e);
         }
       }
     }
@@ -565,6 +575,7 @@ looker.plugins.visualizations.add({
         this._prevConfig.pitch !== cfgPitch;
 
     if (!this._viewState || configChanged) {
+        console.log("[Viz] Resetting View State (Config changed or First Load)");
         this._viewState = {
             longitude: cfgLng,
             latitude: cfgLat,
@@ -666,6 +677,7 @@ looker.plugins.visualizations.add({
         };
         const safeEvent = (info.srcEvent && info.srcEvent.pageX) ? info.srcEvent : mockEvent;
 
+        console.log("[Viz] Opening Drill Menu", links);
         LookerCharts.Utils.openDrillMenu({
           links: links,
           event: safeEvent
@@ -809,7 +821,7 @@ looker.plugins.visualizations.add({
             sizeMinPixels: 20,
             autoHighlight: false,
             onClick: onClickHandler,
-            onIconError: (err) => console.warn("Icon error", err)
+            onIconError: (err) => console.warn("[Viz] Icon error", err)
         });
 
       case 'heatmap':
