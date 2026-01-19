@@ -728,8 +728,8 @@ looker.plugins.visualizations.add({
       });
 
       // Add visual feedback for clickable element
-      primaryValueText.style.textDecoration = 'underline';
-      primaryValueText.style.textDecorationStyle = 'dotted';
+      //primaryValueText.style.textDecoration = 'underline';
+      //primaryValueText.style.textDecorationStyle = 'dotted';
     } else {
       console.log('✗ No drill links available for primary value');
     }
@@ -838,8 +838,8 @@ looker.plugins.visualizations.add({
       });
 
       // Add visual feedback for clickable element
-      secondaryValueText.style.textDecoration = 'underline';
-      secondaryValueText.style.textDecorationStyle = 'dotted';
+      //secondaryValueText.style.textDecoration = 'underline';
+      //secondaryValueText.style.textDecorationStyle = 'dotted';
     } else {
       console.log('✗ No drill links available for secondary value');
     }
