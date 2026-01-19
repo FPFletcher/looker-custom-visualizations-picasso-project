@@ -390,13 +390,7 @@ looker.plugins.visualizations.add({
       section: "Series",
       order: 1
     },
-    reverse_colors: {
-      type: "boolean",
-      label: "Reverse Colors",
-      default: false,
-      section: "Series",
-      order: 1.5
-    },
+
     series_colors: {
       type: "string",
       label: "Custom Colors (comma-separated)",
@@ -405,19 +399,36 @@ looker.plugins.visualizations.add({
       order: 2
     },
     // NEW: Gradient Options
+
+    series_gradient_enabled: {
+      type: "boolean",
+      label: "Enable Custom Gradient",
+      default: false,
+      section: "Series",
+      order: 2.05
+    },
+
     series_gradient_start: {
       type: "string",
-      label: "Custom Gradient Start (if above is empty)",
+      label: "Custom Gradient Start",
       display: "color",
       section: "Series",
       order: 2.1
     },
     series_gradient_end: {
       type: "string",
-      label: "Custom Gradient End (if above is empty)",
+      label: "Custom Gradient End",
       display: "color",
       section: "Series",
       order: 2.2
+    },
+
+    reverse_colors: {
+      type: "boolean",
+      label: "Reverse Colors",
+      default: false,
+      section: "Series",
+      order: 2.3
     },
     series_labels: {
       type: "string",
@@ -930,8 +941,9 @@ looker.plugins.visualizations.add({
 
     if (customColors) {
         palette = customColors;
-    } else if (config.series_gradient_start && config.series_gradient_end && seriesCount > 0) {
-        // Generate a gradient palette if no custom list is provided, but Start/End are
+    // UPDATED: Now checks for config.series_gradient_enabled
+    } else if (config.series_gradient_enabled && config.series_gradient_start && config.series_gradient_end && seriesCount > 0) {
+        // Generate a gradient palette if enabled and Start/End are provided
         const start = config.series_gradient_start;
         const end = config.series_gradient_end;
         const colors = [];
