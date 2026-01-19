@@ -1,13 +1,13 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 21.0
- * Base: 18.0 (Stable)
- * Fixes: Crash Loop, Striping Overlap, Heatmap Peers, Recursive Sort
+ * Version: 22.0
+ * Base: 21.0 (Stable)
+ * Fixes: Partial Striping Overlap, Heatmap on Hierarchy/Subtotals
  */
 
 const visObject = {
-  id: "advanced_table_visual_v21_0",
-  label: "Advanced Table v21.0",
+  id: "advanced_table_visual_v22_0",
+  label: "Advanced Table v22.0",
   options: {
     // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
@@ -59,7 +59,6 @@ const visObject = {
     // ══════════════════════════════════════════════════════════════
     cell_bars_divider: { type: "string", label: "━━━ Cell Bars & Heatmap ━━━", display: "divider", section: "Series", order: 0 },
 
-    // NEW: Heatmap Logic Mode
     heatmap_mode: {
       type: "string",
       label: "Heatmap Scale Mode",
@@ -69,7 +68,7 @@ const visObject = {
         { "Per Column (Sensistive to Pivot)": "column" },
         { "Per Peer Group (Hierarchy Sensitive)": "peer" }
       ],
-      default: "column",
+      default: "peer", // CHANGED DEFAULT AS REQUESTED
       section: "Series",
       order: 0.5
     },
@@ -156,13 +155,11 @@ const visObject = {
     header_text_color: { type: "string", label: "Header Text Color", display: "color", default: "#1f2937", section: "Formatting", order: 12 },
     header_bg_color: { type: "string", label: "Header Background Color", display: "color", default: "#f9fafb", section: "Formatting", order: 13 },
 
-    // NEW TOTALS SECTION
     formatting_divider_totals: { type: "string", label: "━━━ Totals ━━━", display: "divider", section: "Formatting", order: 15 },
     subtotal_background_color: { type: "string", label: "Subtotal BG Color", display: "color", default: "#f0f0f0", section: "Formatting", order: 16 },
     pivot_row_total_bg: { type: "string", label: "Pivot Row Total BG", display: "color", default: "#f3f4f6", section: "Formatting", order: 17 },
     pivot_total_bg_color: { type: "string", label: "Pivot Total BG (Bottom)", display: "color", default: "#e0e7ff", section: "Formatting", order: 18 },
     pivot_total_text_color: { type: "string", label: "Pivot Total Text (Bottom)", display: "color", default: "#3730a3", section: "Formatting", order: 19 },
-
 
     formatting_divider_cells: { type: "string", label: "━━━ Cells ━━━", display: "divider", section: "Formatting", order: 20 },
     null_measure_value: { type: "string", label: "Null Measure Value", default: "-", section: "Formatting", order: 20.1 },
@@ -234,7 +231,6 @@ const visObject = {
     return this.rgbToHex(r, g, b);
   },
 
-  // PREDEFINED THEMES (Expanded with Red, Yellow, and Totals support)
   themes: {
     google: { headerBg: '#4285F4', headerText: '#ffffff', pivotTotalBg: '#E8F0FE', pivotTotalText: '#1967D2', border: '#DADCE0', rowBg: '#ffffff', stripe: '#F8F9FA', cellText: '#202124', subtotalBg: '#F1F3F4' },
     looker: { headerBg: '#2d1e59', headerText: '#ffffff', pivotTotalBg: '#592ec2', pivotTotalText: '#ffffff', border: '#e6e6e6', rowBg: '#ffffff', stripe: '#f5f5f5', cellText: '#262d33', subtotalBg: '#e8e8e8' },
@@ -278,7 +274,7 @@ const visObject = {
         this.currentConfig.pivot_total_bg_color = t.pivotTotalBg;
         this.currentConfig.pivot_total_text_color = t.pivotTotalText;
         this.currentConfig.subtotal_background_color = t.subtotalBg;
-        this.currentConfig.pivot_row_total_bg = t.subtotalBg; // Apply to row totals too
+        this.currentConfig.pivot_row_total_bg = t.subtotalBg;
         this.currentConfig.border_color = t.border;
         this.currentConfig.stripe_color = t.stripe;
         if (t.cellText) this.currentConfig.cell_text_color = t.cellText;
@@ -300,7 +296,6 @@ const visObject = {
       this.options.subtotal_dimension.values = [{ "None": "" }, ...dims.map(d => ({ [d.label_short || d.label]: d.name }))];
     }
 
-    // Dynamic field options
     dims.concat(measures).forEach((field, idx) => {
       const baseOrder = 110 + (idx * 4);
       const fieldKey = field.name;
@@ -357,7 +352,6 @@ const visObject = {
     // --- SORTING FIXED (Tree Aware) ---
     if (this.state.sortField) {
         if(config.enable_bo_hierarchy || config.enable_subtotals) {
-             // Calculate groups first
              let tempProcessed = [...processedData];
              if(config.enable_bo_hierarchy && config.hierarchy_dimensions) {
                 const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
@@ -365,15 +359,12 @@ const visObject = {
              } else if (config.enable_subtotals && config.subtotal_dimension) {
                 tempProcessed = this.calculateStandardSubtotals(tempProcessed, config.subtotal_dimension, measures, config, dims);
              }
-             // Recursive Sort
              processedData = this.recursiveSort(tempProcessed, this.state.sortField, this.state.sortDirection, this.state.sortPivotKey);
 
         } else {
-            // Flat Table - Standard Sort
             processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
         }
     } else {
-        // No Sort - Just process hierarchies
          if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
             const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
             processedData = this.calculateSubtotalsRecursive(processedData, hierarchyList, measures, config);
@@ -382,13 +373,10 @@ const visObject = {
          }
     }
 
-
-    // Collapse State Logic
     if (this.state.forceInitialCollapse) {
       processedData.forEach(row => { if (row.__isSubtotal) this.state.collapsedGroups[row.__groupValue] = true; });
       this.state.forceInitialCollapse = false;
     }
-    // Apply collapse filter
     if(config.enable_bo_hierarchy || config.enable_subtotals) {
         processedData = this.applyHierarchyFilter(processedData);
     }
@@ -448,11 +436,7 @@ const visObject = {
     done();
   },
 
-  // ══════════════════════════════════════════════════════════════
-  // FIX: RECURSIVE SORT IMPLEMENTATION
-  // ══════════════════════════════════════════════════════════════
   recursiveSort: function(flatData, field, direction, pivotKey) {
-      // Group by parent path
       const groups = {};
       flatData.forEach(row => {
           const p = row.__parentPath || "";
@@ -775,7 +759,6 @@ const visObject = {
     };
 
     const headerPosition = config.freeze_header_row ? 'sticky' : 'relative';
-    // FIX CRASH: Cast numeric configs safely
     const headerFontSize = Number(config.header_font_size) || 12;
     const cellFontSize = Number(config.cell_font_size) || 11;
     const rowHeight = Number(config.row_height) || 36;
@@ -835,7 +818,6 @@ const visObject = {
         .cell-value-flex { flex: 0 0 auto; white-space: nowrap; }
     `;
 
-    // FIX: Striping no longer uses !important, allowing Inline Styles (Conditional Formatting) to override it.
     if (config.enable_striping) {
       html += `table.advanced-table tbody tr:nth-child(even):not(.subtotal-row):not(.grand-total-row) > td { background-color: ${config.stripe_color}; }`;
     }
@@ -939,7 +921,7 @@ const visObject = {
         let bg = '';
         const modeClass = config.enable_bo_hierarchy ? 'bo-mode' : '';
 
-        // FIXED: ROW FORMATTING IN PIVOT MODE (Calculates Sums for Numeric Rules)
+        // FIXED: Force Row Condition background to !important to prevent striping overlap
         if (config.enable_row_conditional_formatting && !isSub && !isGT && config.row_conditional_field) {
           const rowFields = String(config.row_conditional_field).split(',').map(s => s.trim());
           let ruleMatched = false;
@@ -956,7 +938,7 @@ const visObject = {
             }
 
             const r1Bg = this.evaluateConditionalRule(val, config, 'row_rule_1', 'bg');
-            if (r1Bg) { bg = `background:${r1Bg} !important;`; ruleMatched = true; break; } // Added !important
+            if (r1Bg) { bg = `background:${r1Bg} !important;`; ruleMatched = true; break; }
           }
           if (!ruleMatched) {
             for (const fieldName of rowFields) {
@@ -971,7 +953,7 @@ const visObject = {
                 val = val.value;
               }
               const r2Bg = this.evaluateConditionalRule(val, config, 'row_rule_2', 'bg');
-              if (r2Bg) { bg = `background:${r2Bg} !important;`; break; } // Added !important
+              if (r2Bg) { bg = `background:${r2Bg} !important;`; break; }
             }
           }
         }
@@ -1005,7 +987,6 @@ const visObject = {
             content = `<span class="subtotal-toggle">${this.state.collapsedGroups[row.__groupValue] ? '▶' : '▼'}</span>${content}`;
           }
 
-          // ADDED: Column Formatting for Pivot Dimensions
           let cellBg = '';
           if (config.enable_conditional_formatting && config.conditional_field) {
             const targetFields = String(config.conditional_field).split(',').map(s => s.trim());
@@ -1017,6 +998,9 @@ const visObject = {
               if (txtRule) style += `color:${txtRule} !important;`;
             }
           }
+
+          // ADDED: Apply row background to every cell if set
+          if (bg && !cellBg) style += `${bg}`;
 
           html += `<td style="${style} ${cellBg}">${content || ''}</td>`;
         });
@@ -1048,6 +1032,9 @@ const visObject = {
             }
 
             let drillAttr = '';
+            // Apply row BG if cell specific BG is not present
+            if (bg && !cellBg) style += `${bg}`;
+
             if (pivotCell && pivotCell.links && pivotCell.links.length > 0) {
               drillAttr = `class="has-drill-links" data-links='${JSON.stringify(pivotCell.links)}' style="${style} cursor:pointer; ${cellBg}"`;
             } else {
@@ -1129,13 +1116,13 @@ const visObject = {
           for (const fieldName of rowFields) {
             const val = row[fieldName]?.value || row[fieldName];
             const r1Bg = this.evaluateConditionalRule(val, config, 'row_rule_1', 'bg');
-            if (r1Bg) { bg = `background:${r1Bg} !important;`; ruleMatched = true; break; } // Added !important
+            if (r1Bg) { bg = `background:${r1Bg} !important;`; ruleMatched = true; break; }
           }
           if (!ruleMatched) {
             for (const fieldName of rowFields) {
               const val = row[fieldName]?.value || row[fieldName];
               const r2Bg = this.evaluateConditionalRule(val, config, 'row_rule_2', 'bg');
-              if (r2Bg) { bg = `background:${r2Bg} !important;`; break; } // Added !important
+              if (r2Bg) { bg = `background:${r2Bg} !important;`; break; }
             }
           }
         }
@@ -1178,6 +1165,9 @@ const visObject = {
 
           const cellData = row[f.name];
           let drillAttr = '';
+
+          if (bg && style.indexOf('background') === -1) style += `${bg}`;
+
           if (cellData && cellData.links && cellData.links.length > 0) {
             drillAttr = `class="has-drill-links" data-links='${JSON.stringify(cellData.links)}' style="${style} cursor:pointer;"`;
           } else {
@@ -1271,7 +1261,9 @@ const visObject = {
       }
     }
 
-    if (!row.__isGrandTotal) {
+    // FIX: Render Heatmap for subtotals too if data exists
+    const showOnSubtotals = true; // allow heatmaps on subtotals?
+    if ((!row.__isGrandTotal && !row.__isSubtotal) || (row.__isSubtotal && showOnSubtotals)) {
       const barFields1 = String(config.cell_bar_fields_1 || "").split(',').map(x => x.trim());
       const barFields2 = String(config.cell_bar_fields_2 || "").split(',').map(x => x.trim());
 
@@ -1293,45 +1285,47 @@ const visObject = {
           const endColor = isSet1 ? config.gradient_end_1 : config.gradient_end_2;
           const textColor = isSet1 ? config.heatmap_text_color_1 : config.heatmap_text_color_2;
 
-          // HEATMAP LOGIC UPDATED: PEER vs GLOBAL vs COLUMN
+          // HEATMAP LOGIC FIXED FOR HIERARCHY
           let maxVal = 1;
           let minVal = 0;
-          const heatMode = config.heatmap_mode || 'column'; // Default to column sensitivity
+          const heatMode = config.heatmap_mode || 'peer';
 
           if (isPivot) {
              if(heatMode === 'overall') {
-                 // Global Min/Max across all rows and pivot cols for this measure
                  let allVals = [];
-                 data.forEach(r => {
-                     if(!r.__isGrandTotal && !r.__isSubtotal && r[field.name]) {
-                         Object.values(r[field.name]).forEach(v => { if(v.value) allVals.push(Number(v.value)); });
+                 this.state.fullProcessedData.forEach(r => {
+                     // Check if valid row for heatmapping
+                     if(!r.__isGrandTotal && r[field.name]) {
+                         Object.values(r[field.name]).forEach(v => {
+                             if(v && v.value !== undefined) allVals.push(Number(v.value));
+                         });
                      }
                  });
                  maxVal = Math.max(...allVals);
                  minVal = Math.min(...allVals);
+             } else if(heatMode === 'column') {
+                 const colValues = this.state.fullProcessedData.filter(r => !r.__isGrandTotal) // Allow subtotals
+                                       .map(r => r[field.name] && r[field.name][pivotKey] ? parseFloat(r[field.name][pivotKey].value) : null)
+                                       .filter(n => !isNaN(n));
+                 maxVal = Math.max(...colValues);
+                 minVal = Math.min(...colValues);
              } else {
-                 // Column Mode (Standard for Pivot - compares 2023 to 2023 only)
-                 const colValues = data.filter(r => !r.__isGrandTotal && !r.__isSubtotal)
-                                       .map(r => r[field.name] && r[field.name][pivotKey] ? parseFloat(r[field.name][pivotKey].value) : 0);
+                 // Peer Mode (Pivot)
+                 const peers = this.state.fullProcessedData.filter(r => !r.__isGrandTotal && r.__parentPath === row.__parentPath && r.__level === row.__level);
+                 const colValues = peers.map(r => r[field.name] && r[field.name][pivotKey] ? parseFloat(r[field.name][pivotKey].value) : null).filter(n => !isNaN(n));
                  maxVal = Math.max(...colValues);
                  minVal = Math.min(...colValues);
              }
           } else {
             // Standard Table
-            if(heatMode === 'peer') {
-                // Compare only to siblings in hierarchy
-                const peers = data.filter(r => !r.__isGrandTotal && r.__parentPath === row.__parentPath && r.__level === row.__level);
-                const colValues = peers.map(r => parseFloat(r[field.name]?.value || 0));
-                maxVal = Math.max(...colValues);
-                minVal = Math.min(...colValues);
-            } else if (heatMode === 'overall') {
-                const peers = data.filter(r => !r.__isGrandTotal && !r.__isSubtotal);
+            if(heatMode === 'overall') {
+                const peers = this.state.fullProcessedData.filter(r => !r.__isGrandTotal);
                 const colValues = peers.map(r => parseFloat(r[field.name]?.value || 0));
                 maxVal = Math.max(...colValues);
                 minVal = Math.min(...colValues);
             } else {
-                // Default fallback (Column/Overall same for flat table usually, unless we want strict column bounds)
-                const peers = data.filter(r => !r.__isGrandTotal && !r.__isSubtotal);
+                // Peer Mode (Default for Hierarchy)
+                const peers = this.state.fullProcessedData.filter(r => !r.__isGrandTotal && r.__parentPath === row.__parentPath && r.__level === row.__level);
                 const colValues = peers.map(r => parseFloat(r[field.name]?.value || 0));
                 maxVal = Math.max(...colValues);
                 minVal = Math.min(...colValues);
