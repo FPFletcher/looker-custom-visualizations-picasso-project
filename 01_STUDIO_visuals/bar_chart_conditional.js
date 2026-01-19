@@ -1,7 +1,6 @@
 /**
  * Conditional Bar Chart for Looker
- * COMPLETE VERSION - All features restored & Improved for PDF/Gradients
- * CLEANED - No double animation, no syntax errors.
+ * COMPLETE VERSION - Fixes PDF Rendering & Dashboard Drilling
  */
 
 looker.plugins.visualizations.add({
@@ -1463,11 +1462,15 @@ looker.plugins.visualizations.add({
         series: {
           stacking: stackingMode,
           cursor: 'pointer',
+          // FIX: Disable animations for PDF export
+          animation: (details && details.print) ? false : true,
           // REMOVED: The afterAnimate event that caused the infinite loop
           point: {
             events: {
               click: function (e) {
-                if (this.drillLinks) LookerCharts.Utils.openDrillMenu({ links: this.drillLinks, event: e });
+                // FIX: Use native event for proper dashboard drill menu positioning
+                const eventToUse = e.originalEvent || e;
+                if (this.drillLinks) LookerCharts.Utils.openDrillMenu({ links: this.drillLinks, event: eventToUse });
               }
             }
           },
@@ -1760,8 +1763,7 @@ looker.plugins.visualizations.add({
     this._lastSeriesPositioning = config.series_positioning;
     this._lastChartType = config.chart_type;
 
-    // FIX FOR PDF RENDERING: Force reflow at the end of the update cycle
-    // REMOVED REFLOW CALL HERE TO FIX DOUBLE ANIMATION
+    // FIX FOR PDF RENDERING: REMOVED REFLOW CALL HERE TO FIX DOUBLE ANIMATION
 
     done();
   },
