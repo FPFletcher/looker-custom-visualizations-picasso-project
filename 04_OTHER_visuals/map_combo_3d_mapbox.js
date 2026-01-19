@@ -624,19 +624,19 @@ looker.plugins.visualizations.add({
     return name.toString().toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   },
 
-  _hexToRgb: function(hex) {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [0,0,0];
-  },
+ _hexToRgb: function(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [0,0,0];
+},
 
-  _interpolateColor: function(c1, c2, factor) {
-    const rgb1 = this._hexToRgb(c1);
-    const rgb2 = this._hexToRgb(c2);
-    const f = Math.min(Math.max(factor, 0), 1);
-    return [
-      Math.round(rgb1[0] + (rgb2[0] - rgb1[0]) * f),
-      Math.round(rgb1[1] + (rgb2[1] - rgb1[1]) * f),
-      Math.round(rgb1[2] + (rgb2[2] - rgb1[2]) * f)
-    ];
-  }
+_interpolateColor: function(c1, c2, factor) {
+  const rgb1 = this._hexToRgb(c1);
+  const rgb2 = this._hexToRgb(c2);
+  const f = Math.min(Math.max(factor, 0), 1);
+  return [
+    Math.round(rgb1[0] + (rgb2[0] - rgb1[0]) * f),
+  Math.round(rgb1[1] + (rgb2[1] - rgb1[1]) * f),
+  Math.round(rgb1[2] + (rgb2[2] - rgb1[2]) * f)
+];
+}
 });
