@@ -1,6 +1,7 @@
 /**
- * Multi-Layer 3D Map for Looker - v4 Ultimate (CORS Fixed + Image Support)
- * * * DEPENDENCIES (Add to manifest.lkml):
+ * Multi-Layer 3D Map for Looker - v3 Ultimate
+ * Features: 4 Layers, Tooltips, Bubble Mode, Measure Selection
+ * * DEPENDENCIES (Add to manifest.lkml):
  * {
  * "dependencies": {
  * "deck.gl": "https://unpkg.com/deck.gl@latest/dist.min.js",
@@ -17,7 +18,7 @@ const getLayerOptions = (n) => {
     { type: 'geojson', color: '#2E7D32', radius: 1000, height: 1000 }, // L1
     { type: 'column', color: '#1565C0', radius: 20000, height: 2000 },  // L2
     { type: 'point', color: '#C62828', radius: 5000, height: 0 },       // L3
-    { type: 'icon', color: '#F9A825', radius: 10000, height: 0 }        // L4
+    { type: 'bubble', color: '#F9A825', radius: 10000, height: 0 }      // L4
   ];
   const def = defaults[n-1];
 
@@ -45,7 +46,6 @@ const getLayerOptions = (n) => {
         {"3D Columns": "column"},
         {"Points (Fixed Size)": "point"},
         {"Bubbles (Value Size)": "bubble"},
-        {"Icon (Custom Image)": "icon"},  // NEW FEATURE
         {"Heatmap": "heatmap"},
         {"Hexagon Grid": "hexagon"}
       ],
@@ -53,35 +53,27 @@ const getLayerOptions = (n) => {
       section: `Layer ${n}`,
       order: 2
     },
-    [`layer${n}_icon_url`]: {
-      type: "string",
-      label: "Custom Image URL (for Icon type)",
-      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png",
-      placeholder: "https://...",
-      section: `Layer ${n}`,
-      order: 3
-    },
     [`layer${n}_measure_idx`]: {
       type: "number",
       label: "Measure Index (0, 1, 2...)",
-      default: n-1,
+      default: n-1, // Default to 1st, 2nd, 3rd measure respectively
       section: `Layer ${n}`,
       placeholder: "0 = First Measure",
-      order: 4
+      order: 3
     },
     [`layer${n}_radius`]: {
       type: "number",
       label: "Size / Radius (Meters)",
       default: def.radius,
       section: `Layer ${n}`,
-      order: 5
+      order: 4
     },
     [`layer${n}_height`]: {
       type: "number",
       label: "Height Scale (for 3D)",
       default: def.height,
       section: `Layer ${n}`,
-      order: 6
+      order: 5
     },
     [`layer${n}_color`]: {
       type: "string",
@@ -89,7 +81,7 @@ const getLayerOptions = (n) => {
       display: "color",
       default: def.color,
       section: `Layer ${n}`,
-      order: 7
+      order: 6
     },
     [`layer${n}_opacity`]: {
       type: "number",
@@ -105,8 +97,8 @@ const getLayerOptions = (n) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v4",
-  label: "Combo Map 3D (Fixed + Images)",
+  id: "combo_map_ultimate",
+  label: "Combo Map 3D (4 Layers + Tooltips)",
   options: {
     // --- MAP SETTINGS ---
     mapbox_token: {
@@ -128,9 +120,9 @@ looker.plugins.visualizations.add({
       default: "mapbox://styles/mapbox/dark-v11",
       section: "Map"
     },
-    center_lat: { type: "number", label: "Latitude", default: 46, section: "Map" },
-    center_lng: { type: "number", label: "Longitude", default: 2, section: "Map" },
-    zoom: { type: "number", label: "Zoom", default: 4, section: "Map" },
+    center_lat: { type: "number", label: "Latitude", default: 40, section: "Map" },
+    center_lng: { type: "number", label: "Longitude", default: -50, section: "Map" },
+    zoom: { type: "number", label: "Zoom", default: 3, section: "Map" },
     pitch: { type: "number", label: "3D Tilt (0-60)", default: 45, section: "Map" },
 
     // --- DATA CONFIG ---
@@ -158,7 +150,7 @@ looker.plugins.visualizations.add({
         {"USA States": "us_states"},
         {"USA Counties": "us_counties"},
         {"Europe Major Combined": "combined_europe_major"},
-        {"France Regions (Fixed)": "france_regions"},
+        {"France Regions": "france_regions"},
         {"Germany States": "germany_states"},
         {"UK Regions": "uk_regions"},
         {"Spain Communities": "spain_communities"}
@@ -225,14 +217,19 @@ looker.plugins.visualizations.add({
     }
 
     // 2. Prepare Data
-    this._prepareData(data, config, queryResponse).then(processedData => {
-      this._render(processedData, config, queryResponse);
+    try {
+      this._prepareData(data, config, queryResponse).then(processedData => {
+        this._render(processedData, config, queryResponse);
+        done();
+      }).catch(err => {
+        console.error("Data Prep Error:", err);
+        this.addError({ title: "Error", message: err.message });
+        done();
+      });
+    } catch(e) {
+      this.addError({ title: "Render Error", message: e.message });
       done();
-    }).catch(err => {
-      console.error("Data Prep Error:", err);
-      this.addError({ title: "Error", message: err.message });
-      done();
-    });
+    }
   },
 
   _prepareData: async function(data, config, queryResponse) {
@@ -248,9 +245,9 @@ looker.plugins.visualizations.add({
 
       const points = data.map(row => ({
         position: [parseFloat(row[lngF.name].value), parseFloat(row[latF.name].value)],
-        values: measures.map(m => row[m.name].value),
-        formattedValues: measures.map(m => row[m.name].rendered || row[m.name].value),
-        name: "Point"
+        values: measures.map(m => row[m.name].value), // Store raw values
+        formattedValues: measures.map(m => row[m.name].rendered || row[m.name].value), // Store formatted
+        name: "Point" // Generic name, could find a string dim
       })).filter(p => !isNaN(p.position[0]) && !isNaN(p.position[1]));
 
       return { type: 'points', data: points, measures };
@@ -258,19 +255,13 @@ looker.plugins.visualizations.add({
 
     // B. REGION MODE
     const url = this._getGeoJSONUrl(config);
-    let geojson = null;
-
-    try {
-        geojson = await this._loadGeoJSON(url);
-    } catch (error) {
-        throw new Error(`Failed to load Map Data: ${error.message}. Check Internet or CORS.`);
-    }
+    const geojson = await this._loadGeoJSON(url);
 
     // Find region dimension
     const dims = queryResponse.fields.dimension_like;
     const regionDim = config.region_dim_name
       ? dims.find(d => d.name === config.region_dim_name)
-      : dims.find(d => d.type === 'string');
+      : dims.find(d => d.type === 'string'); // Default to first string
 
     if (!regionDim) throw new Error("No Region Name dimension found.");
 
@@ -290,39 +281,39 @@ looker.plugins.visualizations.add({
 
     // Match features
     const matchedFeatures = [];
-    if (geojson && geojson.features) {
-        geojson.features.forEach(feature => {
-            const props = feature.properties;
-            let match = null;
+    geojson.features.forEach(feature => {
+      const props = feature.properties;
+      let match = null;
 
-            // Try to find match in properties
-            for (let key in props) {
-                if (props[key]) {
-                const cleanProp = this._normalizeName(props[key]);
-                if (dataMap[cleanProp]) {
-                    match = dataMap[cleanProp];
-                    break;
-                }
-                }
-            }
+      // Try to find match in properties
+      for (let key in props) {
+        if (props[key]) {
+          const cleanProp = this._normalizeName(props[key]);
+          if (dataMap[cleanProp]) {
+            match = dataMap[cleanProp];
+            break;
+          }
+        }
+      }
 
-            if (match) {
-                feature.properties._values = match.values;
-                feature.properties._formatted = match.formattedValues;
-                feature.properties._name = match.rawName;
+      if (match) {
+        // Add data to feature for tooltip/logic
+        feature.properties._values = match.values;
+        feature.properties._formatted = match.formattedValues;
+        feature.properties._name = match.rawName;
 
-                const centroid = this._getCentroid(feature.geometry);
+        // Calculate Centroid for Point/Column/Bubble layers
+        const centroid = this._getCentroid(feature.geometry);
 
-                matchedFeatures.push({
-                    feature: feature,
-                    centroid: centroid,
-                    values: match.values,
-                    formattedValues: match.formattedValues,
-                    name: match.rawName
-                });
-            }
+        matchedFeatures.push({
+          feature: feature,
+          centroid: centroid,
+          values: match.values,
+          formattedValues: match.formattedValues,
+          name: match.rawName
         });
-    }
+      }
+    });
 
     return { type: 'regions', data: matchedFeatures, geojson: geojson, measures };
   },
@@ -338,15 +329,20 @@ looker.plugins.visualizations.add({
       }
     }
 
+    // TOOLTIP HANDLER
     const getTooltip = ({object}) => {
       if (!object) return null;
 
+      // Identify source of data (GeoJSON feature or Point object)
       let name, values, formatted;
+
       if (object.properties && object.properties._name) {
+        // It's a GeoJSON Region
         name = object.properties._name;
         values = object.properties._values;
         formatted = object.properties._formatted;
       } else if (object.name && object.values) {
+        // It's a Point/Centroid object
         name = object.name;
         values = object.values;
         formatted = object.formattedValues;
@@ -354,16 +350,21 @@ looker.plugins.visualizations.add({
         return null;
       }
 
+      // Construct HTML
       let html = `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
+
+      // Show all measures or just specific ones? Let's show all for context.
       queryResponse.fields.measure_like.forEach((m, idx) => {
         html += `<div style="display:flex; justify-content:space-between; gap:10px;">
           <span>${m.label_short || m.label}:</span>
           <span style="font-weight:bold;">${formatted[idx]}</span>
         </div>`;
       });
+
       return { html, style: { backgroundColor: '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
     };
 
+    // INITIALIZE DECK
     const viewState = {
       longitude: config.center_lng,
       latitude: config.center_lat,
@@ -380,7 +381,7 @@ looker.plugins.visualizations.add({
         initialViewState: viewState,
         controller: true,
         layers: layers,
-        getTooltip: getTooltip
+        getTooltip: getTooltip // Add tooltip
       });
     } else {
       this._deck.setProps({
@@ -400,13 +401,16 @@ looker.plugins.visualizations.add({
     const radius = config[`layer${idx}_radius`];
     const heightScale = config[`layer${idx}_height`];
     const opacity = config[`layer${idx}_opacity`];
-    const iconUrl = config[`layer${idx}_icon_url`];
 
+    // Helper to get value safely
     const getValue = (d) => {
       const arr = d.values || (d.properties && d.properties._values);
       return arr && arr[measureIdx] ? parseFloat(arr[measureIdx]) : 0;
     };
 
+    // Data Source determination
+    // Regions: 'data' is array of {feature, centroid, values}
+    // Points: 'data' is array of {position, values}
     let pointData = [];
     if (processed.type === 'regions') {
       pointData = processed.data.map(d => ({
@@ -421,11 +425,15 @@ looker.plugins.visualizations.add({
 
     const id = `layer-${idx}`;
 
+    // --- LAYER SWITCH ---
     switch (type) {
       case 'geojson':
+        // Only works in Region mode
         if (processed.type !== 'regions') return null;
+
+        // Calculate min/max for color scale logic
         const allVals = processed.data.map(d => d.values[measureIdx] || 0);
-        const maxVal = Math.max(...allVals, 0.1);
+        const maxVal = Math.max(...allVals, 0.1); // avoid div 0
 
         return new deck.GeoJsonLayer({
           id: id,
@@ -452,7 +460,7 @@ looker.plugins.visualizations.add({
           data: pointData,
           diskResolution: 6,
           radius: radius,
-          extruded: true,
+          extruded: true, // Always 3D
           pickable: true,
           elevationScale: heightScale,
           getPosition: d => d.position,
@@ -473,14 +481,16 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          getRadius: radius,
+          getRadius: radius, // Fixed radius
           getFillColor: color,
           getLineColor: [255,255,255]
         });
 
       case 'bubble':
+        // Normalize size based on max value
         const bVals = pointData.map(d => getValue(d));
         const bMax = Math.max(...bVals, 1);
+
         return new deck.ScatterplotLayer({
           id: id,
           data: pointData,
@@ -491,26 +501,10 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
+          // Radius based on value (Square root for area perception)
           getRadius: d => Math.sqrt(getValue(d) / bMax) * radius,
           getFillColor: color,
           getLineColor: [255,255,255]
-        });
-
-      case 'icon': // NEW ICON LAYER
-        return new deck.IconLayer({
-            id: id,
-            data: pointData,
-            pickable: true,
-            opacity: opacity,
-            iconAtlas: iconUrl,
-            iconMapping: {
-                marker: { x: 0, y: 0, width: 512, height: 512, mask: false }
-            },
-            getIcon: d => 'marker',
-            getPosition: d => d.position,
-            getSize: d => radius, // Use the radius slider to control image size
-            sizeScale: 1,
-            sizeMinPixels: 20
         });
 
       case 'heatmap':
@@ -520,7 +514,7 @@ looker.plugins.visualizations.add({
           pickable: false,
           getPosition: d => d.position,
           getWeight: d => getValue(d),
-          radiusPixels: radius / 500
+          radiusPixels: radius / 500 // Approximation conversion
         });
 
       case 'hexagon':
@@ -545,18 +539,18 @@ looker.plugins.visualizations.add({
   _getGeoJSONUrl: function(config) {
     if (config.map_layer_source === 'custom') return config.custom_geojson_url;
 
-    // UPDATED URLS TO CORS-COMPATIBLE SOURCES (GitHub Raw/Unpkg)
     const URLS = {
         world_countries: 'https://unpkg.com/world-atlas@2/countries-110m.json',
         us_states: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
         us_counties: 'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json',
-        // Fixed France URL (Using GitHub Raw instead of gregoiredavid.fr which blocks CORS)
-        france_regions: 'https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/regions.geojson',
+        france_departments: 'https://france-geojson.gregoiredavid.fr/repo/departements.geojson',
+        france_regions: 'https://france-geojson.gregoiredavid.fr/repo/regions.geojson',
         uk_regions: 'https://martinjc.github.io/UK-GeoJSON/json/eng/topo_eer.json',
         germany_states: 'https://raw.githubusercontent.com/isellsoap/deutschlandGeoJSON/main/2_bundeslaender/3_mittel.geo.json',
         spain_communities: 'https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/spain-communities.geojson',
     };
 
+    // Arrays for combined
     const COMBOS = {
       combined_europe_major: [
         URLS.france_regions,
@@ -572,6 +566,7 @@ looker.plugins.visualizations.add({
   },
 
   _loadGeoJSON: async function(urlOrList) {
+    // Handle Array (Combined)
     if (Array.isArray(urlOrList)) {
       const promises = urlOrList.map(u => this._loadSingleGeoJSON(u));
       const results = await Promise.all(promises);
@@ -587,7 +582,7 @@ looker.plugins.visualizations.add({
     if (this._geojsonCache[url]) return this._geojsonCache[url];
 
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+    if (!res.ok) throw new Error(`Failed to load map: ${url}`);
     const data = await res.json();
 
     let geojson = data;
@@ -603,6 +598,7 @@ looker.plugins.visualizations.add({
 
   _getCentroid: function(geometry) {
     if (!geometry) return [0,0];
+    // Simple first-point logic for polygons for speed, or true centroid
     const coords = geometry.coordinates;
     if (geometry.type === 'Polygon') {
       return this._polyAvg(coords[0]);
@@ -620,6 +616,7 @@ looker.plugins.visualizations.add({
   },
 
   _normalizeName: function(name) {
+    // Simple normalizer. Add specific dictionary overrides here if needed
     if (!name) return "";
     return name.toString().toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   },
