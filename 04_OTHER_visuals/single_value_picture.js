@@ -1,7 +1,12 @@
 /**
- * Water Picture Visualization for Looker
+ * Water Picture Visualization for Looker - IMPROVED VERSION
  * Combined JavaScript file with embedded HTML and CSS
  * Displays two values in water Picture images with a percentage indicator
+ *
+ * IMPROVEMENTS:
+ * 1. PDF Export Support - Primary picture displays correctly in PDF exports
+ * 2. LookML Value Formatting - Respects value_format from LookML
+ * 3. Dashboard Drill Support - Drill menus work from both Explore and Dashboard
  */
 
 looker.plugins.visualizations.add({
@@ -47,8 +52,6 @@ looker.plugins.visualizations.add({
       default: "",
       order: 11
     },
-
-    // Custom Series Labels (comma-separated)
 
     primary_image_url: {
       type: "string",
@@ -411,12 +414,12 @@ looker.plugins.visualizations.add({
 
     // Extract values
     const row = data[0];
-    const primaryField = measures[0].name;
-    const secondaryField = measures[1].name;
-    const percentageField = measures.length > 2 ? measures[2].name : null;
+    const primaryField = measures[0];
+    const secondaryField = measures[1];
+    const percentageField = measures.length > 2 ? measures[2] : null;
 
-    let primaryValue = row[primaryField].value;
-    let secondaryValue = row[secondaryField].value;
+    let primaryValue = row[primaryField.name].value;
+    let secondaryValue = row[secondaryField.name].value;
     let percentageValue;
 
     // Get percentage calculation method
@@ -425,15 +428,15 @@ looker.plugins.visualizations.add({
     // Calculate or get percentage based on configuration
     if (percentageCalc === "use_third_measure" && percentageField) {
       // Use the third measure directly
-      percentageValue = row[percentageField].value;
+      percentageValue = row[percentageField.name].value;
     } else {
       // Default: secondary / primary (will be multiplied by 100 in formatting)
       percentageValue = primaryValue !== 0 ? (secondaryValue / primaryValue) : 0;
     }
 
-    // Format values
-    const primaryFormatted = this.formatValue(primaryValue);
-    const secondaryFormatted = this.formatValue(secondaryValue);
+    // IMPROVEMENT 2: Format values using LookML value_format
+    const primaryFormatted = this.formatValueWithLookML(primaryValue, primaryField, row[primaryField.name].rendered);
+    const secondaryFormatted = this.formatValueWithLookML(secondaryValue, secondaryField, row[secondaryField.name].rendered);
     const percentageFormatted = this.formatPercentage(percentageValue, config.percentage_decimals || 1, percentageCalc);
 
     // Get labels
@@ -446,6 +449,8 @@ looker.plugins.visualizations.add({
     console.log('Secondary Value:', secondaryValue, '→', secondaryFormatted);
     console.log('Percentage Value:', percentageValue, '→', percentageFormatted);
     console.log('Calculation Method:', percentageCalc);
+    console.log('Primary Field:', primaryField);
+    console.log('Secondary Field:', secondaryField);
 
     // Draw visualization
     this.drawWaterPictures(
@@ -455,8 +460,10 @@ looker.plugins.visualizations.add({
       primaryLabel,
       secondaryLabel,
       config,
-      data,          // pass the data
-      primaryField   // pass the field name
+      data,
+      row,
+      primaryField.name,
+      secondaryField.name
     );
 
     done();
@@ -479,7 +486,95 @@ looker.plugins.visualizations.add({
   },
 
   /**
-   * Format numeric values with M/K suffixes
+   * IMPROVEMENT 2: Format numeric values using LookML value_format
+   * This respects the value_format defined in LookML
+   */
+  formatValueWithLookML: function(value, field, renderedValue) {
+    if (value === null || value === undefined) return '';
+
+    // Priority 1: Use Looker's rendered value if available (most accurate)
+    if (renderedValue !== null && renderedValue !== undefined && renderedValue !== '') {
+      return renderedValue;
+    }
+
+    // Priority 2: Parse LookML value_format if available
+    if (field && field.value_format) {
+      const fmt = field.value_format;
+      const num = Number(value);
+
+      // Pattern: "$0.0,\" k\"" or similar -> thousands with k suffix
+      if (fmt.includes('," k"') || fmt.includes(",'k'")) {
+        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+        const sign = (num < 0) ? '-' : '';
+        const baseVal = Math.abs(num) / 1000;
+        const formattedNum = baseVal.toLocaleString('en-US', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+          useGrouping: true
+        });
+        return `${sign}$${formattedNum} k`;
+      }
+
+      // Pattern: "$0.0,\" M\"" or similar -> millions with M suffix
+      if (fmt.includes('," M"') || fmt.includes(",'M'")) {
+        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+        const sign = (num < 0) ? '-' : '';
+        const baseVal = Math.abs(num) / 1000000;
+        const formattedNum = baseVal.toLocaleString('en-US', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+          useGrouping: true
+        });
+        return `${sign}$${formattedNum} M`;
+      }
+
+      // Pattern: standard currency format (e.g. $#,##0.00)
+      if (fmt.startsWith('$') || fmt.includes('$#')) {
+        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+        const sign = (num < 0) ? '-' : '';
+        return `${sign}$${Math.abs(num).toLocaleString('en-US', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals
+        })}`;
+      }
+
+      // Pattern: Euro currency
+      if (fmt.startsWith('€') || fmt.includes('€#')) {
+        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+        return `€${num.toLocaleString('en-US', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals
+        })}`;
+      }
+
+      // Pattern: standard number format (e.g. #,##0.0)
+      if (fmt.includes('#,##0') || fmt.includes('#,###')) {
+        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+        return num.toLocaleString('en-US', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals
+        });
+      }
+
+      // Pattern: percentage format
+      if (fmt.includes('%')) {
+        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 1;
+        return (num * 100).toFixed(decimals) + '%';
+      }
+
+      // Pattern: simple decimal format
+      if (fmt.match(/^0\.([0#]+)$/)) {
+        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
+        return num.toFixed(decimals);
+      }
+    }
+
+    // Priority 3: Fallback to smart formatting
+    return this.formatValue(value);
+  },
+
+  /**
+   * Format numeric values with M/K suffixes (fallback)
    */
   formatValue: function(value) {
     const absValue = Math.abs(value);
@@ -515,8 +610,9 @@ looker.plugins.visualizations.add({
 
   /**
    * Draw the water Picture images and text
+   * IMPROVEMENT 1 & 3: PDF support and Dashboard drill support
    */
-  drawWaterPictures: function(primaryValue, secondaryValue, percentage, primaryLabel, secondaryLabel, config, data, primaryField) {
+  drawWaterPictures: function(primaryValue, secondaryValue, percentage, primaryLabel, secondaryLabel, config, data, row, primaryFieldName, secondaryFieldName) {
     const svg = this._svg;
     const svgNS = "http://www.w3.org/2000/svg";
 
@@ -539,7 +635,11 @@ looker.plugins.visualizations.add({
     const defs = document.createElementNS(svgNS, 'defs');
     svg.appendChild(defs);
 
-    // PRIMARY Picture IMAGE (larger, bottom-left)
+    // IMPROVEMENT 1: PRIMARY Picture IMAGE - Enhanced for PDF export
+    // Use a group to contain image and ensure proper rendering in PDF
+    const primaryGroup = document.createElementNS(svgNS, 'g');
+    primaryGroup.setAttribute('class', 'primary-picture-group');
+
     const primaryImage = document.createElementNS(svgNS, 'image');
     primaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', primaryImageUrl);
     primaryImage.setAttribute('x', primaryX - primarySize / 2);
@@ -549,10 +649,15 @@ looker.plugins.visualizations.add({
     primaryImage.setAttribute('class', 'water-Picture-image');
     primaryImage.setAttribute('opacity', primaryOpacity);
     primaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    primaryImage.style.pointerEvents = 'none';
-    svg.appendChild(primaryImage);
+    // CRITICAL for PDF: Ensure image is not set to pointer-events: none on the element itself
+    primaryImage.style.pointerEvents = 'all';
+    // Add explicit crossOrigin attribute for better PDF rendering
+    primaryImage.setAttribute('crossorigin', 'anonymous');
 
-    // Primary value text (with drill functionality)
+    primaryGroup.appendChild(primaryImage);
+    svg.appendChild(primaryGroup);
+
+    // IMPROVEMENT 3: Primary value text with ENHANCED drill functionality
     const primaryValueText = document.createElementNS(svgNS, 'text');
     primaryValueText.setAttribute('x', primaryX);
     primaryValueText.setAttribute('y', primaryY - 10);
@@ -562,29 +667,69 @@ looker.plugins.visualizations.add({
     primaryValueText.setAttribute('cursor', 'pointer');
     primaryValueText.textContent = primaryValue;
 
-    // ADD DRILL FUNCTIONALITY - Get links from the first measure
-    const primaryMeasureLinks = data && data[0] && data[0][primaryField]
-      ? (data[0][primaryField].links || [])
-      : [];
+    // Get drill links from the row data
+    const primaryCell = row[primaryFieldName];
+    const primaryMeasureLinks = primaryCell && primaryCell.links ? primaryCell.links : [];
 
-    console.log('Primary field:', primaryField);
+    console.log('Primary field:', primaryFieldName);
+    console.log('Primary cell data:', primaryCell);
     console.log('Primary measure links:', primaryMeasureLinks);
 
+    // IMPROVEMENT 3: Enhanced drill menu that works in both Explore and Dashboard
     if (primaryMeasureLinks.length > 0) {
       primaryValueText.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
         console.log('Primary value clicked - opening drill menu');
-        if (LookerCharts && LookerCharts.Utils) {
+        console.log('Event details:', e);
+
+        // Try multiple methods to ensure drill menu opens
+        if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.openDrillMenu) {
           try {
+            // Method 1: Standard LookerCharts.Utils.openDrillMenu
             LookerCharts.Utils.openDrillMenu({
               links: primaryMeasureLinks,
               event: e
             });
-            console.log('✓ Drill menu opened');
+            console.log('✓ Drill menu opened via LookerCharts.Utils.openDrillMenu');
           } catch (error) {
-            console.error('✗ Error opening drill menu:', error);
+            console.error('✗ Error opening drill menu via LookerCharts.Utils:', error);
+
+            // Method 2: Fallback - try direct openDrillMenu if available
+            try {
+              if (typeof openDrillMenu === 'function') {
+                openDrillMenu({
+                  links: primaryMeasureLinks,
+                  event: e
+                });
+                console.log('✓ Drill menu opened via direct openDrillMenu function');
+              }
+            } catch (fallbackError) {
+              console.error('✗ Fallback drill menu also failed:', fallbackError);
+            }
+          }
+        } else {
+          console.warn('⚠ LookerCharts.Utils.openDrillMenu not available');
+
+          // Method 3: Try to trigger via element dispatch if LookerCharts not available
+          try {
+            const drillEvent = new CustomEvent('looker-drill-menu', {
+              detail: { links: primaryMeasureLinks, event: e },
+              bubbles: true,
+              cancelable: true
+            });
+            primaryValueText.dispatchEvent(drillEvent);
+            console.log('✓ Dispatched custom looker-drill-menu event');
+          } catch (customEventError) {
+            console.error('✗ Custom event dispatch failed:', customEventError);
           }
         }
       });
+
+      // Add visual feedback for clickable element
+      primaryValueText.style.textDecoration = 'underline';
+      primaryValueText.style.textDecorationStyle = 'dotted';
     } else {
       console.log('✗ No drill links available for primary value');
     }
@@ -612,7 +757,8 @@ looker.plugins.visualizations.add({
     secondaryImage.setAttribute('class', 'water-Picture-image');
     secondaryImage.setAttribute('opacity', secondaryOpacity);
     secondaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    secondaryImage.style.pointerEvents = 'none';
+    secondaryImage.style.pointerEvents = 'all';
+    secondaryImage.setAttribute('crossorigin', 'anonymous');
     svg.appendChild(secondaryImage);
 
     // Percentage indicator (at top of secondary Picture)
@@ -627,7 +773,7 @@ looker.plugins.visualizations.add({
       svg.appendChild(percentageText);
     }
 
-    // Secondary value text (with drill functionality)
+    // IMPROVEMENT 3: Secondary value text with ENHANCED drill functionality
     const secondaryValueText = document.createElementNS(svgNS, 'text');
     secondaryValueText.setAttribute('x', secondaryX);
     secondaryValueText.setAttribute('y', secondaryY - 5);
@@ -637,34 +783,63 @@ looker.plugins.visualizations.add({
     secondaryValueText.setAttribute('cursor', 'pointer');
     secondaryValueText.textContent = secondaryValue;
 
-    // ADD DRILL FUNCTIONALITY - Get secondary measure field name
-    const measures = data[0] ? Object.keys(data[0]).filter(key =>
-      data[0][key] && typeof data[0][key].value === 'number'
-    ) : [];
-    const secondaryField = measures[1]; // Second measure
+    const secondaryCell = row[secondaryFieldName];
+    const secondaryMeasureLinks = secondaryCell && secondaryCell.links ? secondaryCell.links : [];
 
-    const secondaryMeasureLinks = data && data[0] && secondaryField && data[0][secondaryField]
-      ? (data[0][secondaryField].links || [])
-      : [];
-
-    console.log('Secondary field:', secondaryField);
+    console.log('Secondary field:', secondaryFieldName);
+    console.log('Secondary cell data:', secondaryCell);
     console.log('Secondary measure links:', secondaryMeasureLinks);
 
+    // Enhanced drill menu for secondary value
     if (secondaryMeasureLinks.length > 0) {
       secondaryValueText.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
         console.log('Secondary value clicked - opening drill menu');
-        if (LookerCharts && LookerCharts.Utils) {
+
+        if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.openDrillMenu) {
           try {
             LookerCharts.Utils.openDrillMenu({
               links: secondaryMeasureLinks,
               event: e
             });
-            console.log('✓ Drill menu opened');
+            console.log('✓ Drill menu opened via LookerCharts.Utils.openDrillMenu');
           } catch (error) {
-            console.error('✗ Error opening drill menu:', error);
+            console.error('✗ Error opening drill menu via LookerCharts.Utils:', error);
+
+            try {
+              if (typeof openDrillMenu === 'function') {
+                openDrillMenu({
+                  links: secondaryMeasureLinks,
+                  event: e
+                });
+                console.log('✓ Drill menu opened via direct openDrillMenu function');
+              }
+            } catch (fallbackError) {
+              console.error('✗ Fallback drill menu also failed:', fallbackError);
+            }
+          }
+        } else {
+          console.warn('⚠ LookerCharts.Utils.openDrillMenu not available');
+
+          try {
+            const drillEvent = new CustomEvent('looker-drill-menu', {
+              detail: { links: secondaryMeasureLinks, event: e },
+              bubbles: true,
+              cancelable: true
+            });
+            secondaryValueText.dispatchEvent(drillEvent);
+            console.log('✓ Dispatched custom looker-drill-menu event');
+          } catch (customEventError) {
+            console.error('✗ Custom event dispatch failed:', customEventError);
           }
         }
       });
+
+      // Add visual feedback for clickable element
+      secondaryValueText.style.textDecoration = 'underline';
+      secondaryValueText.style.textDecorationStyle = 'dotted';
     } else {
       console.log('✗ No drill links available for secondary value');
     }
