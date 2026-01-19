@@ -640,22 +640,18 @@ looker.plugins.visualizations.add({
     const primaryGroup = document.createElementNS(svgNS, 'g');
     primaryGroup.setAttribute('class', 'primary-picture-group');
 
-    const primaryImage = document.createElementNS(svgNS, 'image');
-    primaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', primaryImageUrl);
-    primaryImage.setAttribute('x', primaryX - primarySize / 2);
-    primaryImage.setAttribute('y', primaryY - primarySize / 2);
-    primaryImage.setAttribute('width', primarySize);
-    primaryImage.setAttribute('height', primarySize);
-    primaryImage.setAttribute('class', 'water-Picture-image');
-    primaryImage.setAttribute('opacity', primaryOpacity);
-    primaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    // CRITICAL for PDF: Ensure image is not set to pointer-events: none on the element itself
-    primaryImage.style.pointerEvents = 'all';
-    // Add explicit crossOrigin attribute for better PDF rendering
-    primaryImage.setAttribute('crossorigin', 'anonymous');
+    // IMPROVEMENT 1: PRIMARY Picture IMAGE - Enhanced for PDF export
+      const primaryImage = document.createElementNS(svgNS, 'image');
+      primaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', primaryImageUrl);
+      primaryImage.setAttribute('x', primaryX - primarySize / 2);
+      primaryImage.setAttribute('y', primaryY - primarySize / 2);
+      primaryImage.setAttribute('width', primarySize);
+      primaryImage.setAttribute('height', primarySize);
+      primaryImage.setAttribute('class', 'water-Picture-image');
+      primaryImage.setAttribute('opacity', primaryOpacity);
+      primaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
-    primaryGroup.appendChild(primaryImage);
-    svg.appendChild(primaryGroup);
+      svg.appendChild(primaryImage);  // Append directly to svg, not to a group
 
     // IMPROVEMENT 3: Primary value text with ENHANCED drill functionality
     const primaryValueText = document.createElementNS(svgNS, 'text');
@@ -675,64 +671,24 @@ looker.plugins.visualizations.add({
     console.log('Primary cell data:', primaryCell);
     console.log('Primary measure links:', primaryMeasureLinks);
 
-    // IMPROVEMENT 3: Enhanced drill menu that works in both Explore and Dashboard
     if (primaryMeasureLinks.length > 0) {
-      primaryValueText.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-
-        console.log('Primary value clicked - opening drill menu');
-        console.log('Event details:', e);
-
-        // Try multiple methods to ensure drill menu opens
-        if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.openDrillMenu) {
-          try {
-            // Method 1: Standard LookerCharts.Utils.openDrillMenu
-            LookerCharts.Utils.openDrillMenu({
-              links: primaryMeasureLinks,
-              event: e
-            });
-            console.log('✓ Drill menu opened via LookerCharts.Utils.openDrillMenu');
-          } catch (error) {
-            console.error('✗ Error opening drill menu via LookerCharts.Utils:', error);
-
-            // Method 2: Fallback - try direct openDrillMenu if available
-            try {
-              if (typeof openDrillMenu === 'function') {
-                openDrillMenu({
-                  links: primaryMeasureLinks,
-                  event: e
-                });
-                console.log('✓ Drill menu opened via direct openDrillMenu function');
-              }
-            } catch (fallbackError) {
-              console.error('✗ Fallback drill menu also failed:', fallbackError);
-            }
-          }
-        } else {
-          console.warn('⚠ LookerCharts.Utils.openDrillMenu not available');
-
-          // Method 3: Try to trigger via element dispatch if LookerCharts not available
-          try {
-            const drillEvent = new CustomEvent('looker-drill-menu', {
-              detail: { links: primaryMeasureLinks, event: e },
-              bubbles: true,
-              cancelable: true
-            });
-            primaryValueText.dispatchEvent(drillEvent);
-            console.log('✓ Dispatched custom looker-drill-menu event');
-          } catch (customEventError) {
-            console.error('✗ Custom event dispatch failed:', customEventError);
-          }
-        }
-      });
-
-      // Add visual feedback for clickable element
-      //primaryValueText.style.textDecoration = 'underline';
-      //primaryValueText.style.textDecorationStyle = 'dotted';
-    } else {
-      console.log('✗ No drill links available for primary value');
+  primaryValueText.addEventListener('click', (e) => {
+    console.log('Primary value clicked - opening drill menu');
+    if (LookerCharts && LookerCharts.Utils) {
+      try {
+        LookerCharts.Utils.openDrillMenu({
+          links: primaryMeasureLinks,
+          event: e
+        });
+        console.log('✓ Drill menu opened');
+      } catch (error) {
+        console.error('✗ Error opening drill menu:', error);
+      }
     }
+  });
+} else {
+  console.log('✗ No drill links available for primary value');
+}
 
     svg.appendChild(primaryValueText);
 
@@ -757,8 +713,6 @@ looker.plugins.visualizations.add({
     secondaryImage.setAttribute('class', 'water-Picture-image');
     secondaryImage.setAttribute('opacity', secondaryOpacity);
     secondaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    secondaryImage.style.pointerEvents = 'all';
-    secondaryImage.setAttribute('crossorigin', 'anonymous');
     svg.appendChild(secondaryImage);
 
     // Percentage indicator (at top of secondary Picture)
@@ -792,57 +746,23 @@ looker.plugins.visualizations.add({
 
     // Enhanced drill menu for secondary value
     if (secondaryMeasureLinks.length > 0) {
-      secondaryValueText.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-
-        console.log('Secondary value clicked - opening drill menu');
-
-        if (typeof LookerCharts !== 'undefined' && LookerCharts.Utils && LookerCharts.Utils.openDrillMenu) {
-          try {
-            LookerCharts.Utils.openDrillMenu({
-              links: secondaryMeasureLinks,
-              event: e
-            });
-            console.log('✓ Drill menu opened via LookerCharts.Utils.openDrillMenu');
-          } catch (error) {
-            console.error('✗ Error opening drill menu via LookerCharts.Utils:', error);
-
-            try {
-              if (typeof openDrillMenu === 'function') {
-                openDrillMenu({
-                  links: secondaryMeasureLinks,
-                  event: e
-                });
-                console.log('✓ Drill menu opened via direct openDrillMenu function');
-              }
-            } catch (fallbackError) {
-              console.error('✗ Fallback drill menu also failed:', fallbackError);
-            }
-          }
-        } else {
-          console.warn('⚠ LookerCharts.Utils.openDrillMenu not available');
-
-          try {
-            const drillEvent = new CustomEvent('looker-drill-menu', {
-              detail: { links: secondaryMeasureLinks, event: e },
-              bubbles: true,
-              cancelable: true
-            });
-            secondaryValueText.dispatchEvent(drillEvent);
-            console.log('✓ Dispatched custom looker-drill-menu event');
-          } catch (customEventError) {
-            console.error('✗ Custom event dispatch failed:', customEventError);
-          }
-        }
-      });
-
-      // Add visual feedback for clickable element
-      //secondaryValueText.style.textDecoration = 'underline';
-      //secondaryValueText.style.textDecorationStyle = 'dotted';
-    } else {
-      console.log('✗ No drill links available for secondary value');
+  secondaryValueText.addEventListener('click', (e) => {
+    console.log('Secondary value clicked - opening drill menu');
+    if (LookerCharts && LookerCharts.Utils) {
+      try {
+        LookerCharts.Utils.openDrillMenu({
+          links: secondaryMeasureLinks,
+          event: e
+        });
+        console.log('✓ Drill menu opened');
+      } catch (error) {
+        console.error('✗ Error opening drill menu:', error);
+      }
     }
+  });
+} else {
+  console.log('✗ No drill links available for secondary value');
+}
 
     svg.appendChild(secondaryValueText);
 

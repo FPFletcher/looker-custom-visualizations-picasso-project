@@ -1462,15 +1462,10 @@ looker.plugins.visualizations.add({
         series: {
           stacking: stackingMode,
           cursor: 'pointer',
-          // FIX: Disable animations for PDF export
-          animation: (details && details.print) ? false : true,
-          // REMOVED: The afterAnimate event that caused the infinite loop
           point: {
             events: {
               click: function (e) {
-                // FIX: Use native event for proper dashboard drill menu positioning
-                const eventToUse = e.originalEvent || e;
-                if (this.drillLinks) LookerCharts.Utils.openDrillMenu({ links: this.drillLinks, event: eventToUse });
+                if (this.drillLinks) LookerCharts.Utils.openDrillMenu({ links: this.drillLinks, event: e });
               }
             }
           },
