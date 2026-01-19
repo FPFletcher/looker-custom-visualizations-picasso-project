@@ -1,10 +1,9 @@
 /**
- * Multi-Layer 3D Map for Looker - v14 Ultimate (Drill Support + PDF Background Fix)
- * * * FEATURES:
- * - Drill Menus: Click any shape/point to see Looker drill options.
- * - PDF Background Fix: Adds a loading delay during export so map tiles can appear.
- * - Sticky View: Map only moves if you change settings.
- * - Single Tab: All layers in one "Layers" tab.
+ * Multi-Layer 3D Map for Looker - v15 Ultimate
+ * Features:
+ * - Interaction Mode: Switch between "Pan/Zoom" and "Drill" to fix clicking issues.
+ * - Plot Tab First: Correctly ordered settings.
+ * - PDF Fix: Extended delay + WebGL constraints to ensure background map renders.
  */
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -17,7 +16,8 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
-  const b = n * 100;
+  // Start Layer Orders at 100 to ensure they come AFTER Plot settings
+  const b = 100 + (n * 10);
 
   return {
     [`layer${n}_divider_top`]: {
@@ -123,10 +123,10 @@ const getLayerOptions = (n) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v14",
-  label: "Combo Map 3D (Drill + PDF Fix)",
+  id: "combo_map_ultimate_v15",
+  label: "Combo Map 3D (Interactive Control)",
   options: {
-    // --- 1. DATA (Plot Tab) ---
+    // --- 1. PLOT TAB (Orders 1-99) ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
 
     data_mode: {
@@ -175,7 +175,22 @@ looker.plugins.visualizations.add({
       order: 5
     },
 
-    // --- 2. BASE MAP (Plot Tab) ---
+    // --- INTERACTION MODE (Fix for Drilling) ---
+    interaction_header: { type: "string", label: "─── INTERACTION ───", display: "divider", section: "Plot", order: 8 },
+    interaction_mode: {
+        type: "string",
+        label: "Interaction Mode",
+        display: "select",
+        values: [
+            {"Pan & Zoom (Default)": "pan"},
+            {"Drill / Click (Locks Map)": "drill"}
+        ],
+        default: "pan",
+        section: "Plot",
+        order: 9
+    },
+
+    // --- BASE MAP ---
     map_header: { type: "string", label: "─── BASE MAP ───", display: "divider", section: "Plot", order: 10 },
 
     mapbox_token: {
@@ -204,7 +219,7 @@ looker.plugins.visualizations.add({
     zoom: { type: "number", label: "Zoom", default: 4, section: "Plot", order: 15 },
     pitch: { type: "number", label: "3D Tilt (0-60)", default: 45, section: "Plot", order: 16 },
 
-    // --- 3. TOOLTIP (Plot Tab) ---
+    // --- TOOLTIP ---
     tooltip_header: { type: "string", label: "─── TOOLTIP ───", display: "divider", section: "Plot", order: 20 },
 
     tooltip_mode: {
@@ -230,7 +245,7 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
-    // --- 4. LAYERS (Consolidated) ---
+    // --- 2. LAYERS TAB (Orders 100+) ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
     ...getLayerOptions(3),
@@ -280,7 +295,6 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    // 1. Token Check
     if (!config.mapbox_token) {
         if(this._deck) {
             this._deck.finalize();
@@ -298,18 +312,16 @@ looker.plugins.visualizations.add({
       done(); return;
     }
 
-    // 2. Main Logic
     try {
       this._prepareData(data, config, queryResponse).then(processedData => {
         this._render(processedData, config, queryResponse, details);
 
-        // --- PDF BACKGROUND FIX ---
-        // If printing, we delay calling done() to allow Mapbox tiles to load
+        // --- PDF FIX: AGGRESSIVE DELAY ---
         if (details && details.print) {
-            console.log("PDF Mode: Waiting for tiles...");
+            console.log("PDF Mode: Freezing for 2.5s to load tiles...");
             setTimeout(() => {
                 done();
-            }, 1500); // 1.5s delay allows map tiles to fetch before screenshot
+            }, 2500); // 2.5s delay to ensure satellite tiles load
         } else {
             done();
         }
@@ -340,7 +352,6 @@ looker.plugins.visualizations.add({
         position: [parseFloat(row[lngF.name].value), parseFloat(row[latF.name].value)],
         values: measures.map(m => row[m.name].value),
         formattedValues: measures.map(m => row[m.name].rendered || row[m.name].value),
-        // DRILL LINKS: Capture drill links for every measure
         links: measures.map(m => row[m.name].links),
         name: "Point"
       })).filter(p => !isNaN(p.position[0]) && !isNaN(p.position[1]));
@@ -374,7 +385,6 @@ looker.plugins.visualizations.add({
         dataMap[clean] = {
           values: measures.map(m => row[m.name].value),
           formattedValues: measures.map(m => row[m.name].rendered || row[m.name].value),
-          // DRILL LINKS: Capture for regions too
           links: measures.map(m => row[m.name].links),
           rawName: rawName
         };
@@ -405,7 +415,7 @@ looker.plugins.visualizations.add({
                     centroid: centroid,
                     values: match.values,
                     formattedValues: match.formattedValues,
-                    links: match.links, // Pass links to feature
+                    links: match.links,
                     name: match.rawName
                 });
             }
@@ -470,7 +480,7 @@ looker.plugins.visualizations.add({
     const cfgZoom = Number(config.zoom) || 4;
     const cfgPitch = Number(config.pitch) || 45;
 
-    // View State Logic: Only update if config actually changed
+    // View State Logic
     const configChanged =
         this._prevConfig.lat !== cfgLat ||
         this._prevConfig.lng !== cfgLng ||
@@ -494,6 +504,13 @@ looker.plugins.visualizations.add({
       this._deck.setProps({ viewState: this._viewState });
     };
 
+    // --- INTERACTION MODE LOGIC ---
+    // If "Drill" mode is active, disable dragging/panning so clicks register easily
+    const interactionMode = config.interaction_mode || 'pan';
+    const controllerSettings = interactionMode === 'drill'
+        ? { dragPan: false, dragRotate: false, scrollZoom: false, doubleClickZoom: false }
+        : true; // Default standard controller
+
     if (!this._deck) {
       this._deck = new deck.DeckGL({
         container: this._container,
@@ -501,12 +518,13 @@ looker.plugins.visualizations.add({
         mapboxApiAccessToken: config.mapbox_token,
         viewState: this._viewState,
         onViewStateChange: onViewStateChange,
-        controller: true,
+        controller: controllerSettings, // Apply interaction setting
         layers: layers,
         getTooltip: getTooltip,
         glOptions: {
           preserveDrawingBuffer: true,
-          willReadFrequently: true
+          willReadFrequently: true,
+          failIfMajorPerformanceCaveat: false
         },
         onError: (err) => console.warn("DeckGL Error:", err)
       });
@@ -517,6 +535,7 @@ looker.plugins.visualizations.add({
         mapboxApiAccessToken: config.mapbox_token,
         getTooltip: getTooltip,
         viewState: this._viewState,
+        controller: controllerSettings, // Update interaction setting
         onViewStateChange: onViewStateChange
       });
     }
@@ -551,18 +570,19 @@ looker.plugins.visualizations.add({
       return arr && arr[measureIdx] ? parseFloat(arr[measureIdx]) : 0;
     };
 
-    // DRILL HANDLER
+    // --- DRILL HANDLER ---
     const onClickHandler = (info) => {
-      // Looker Drill logic
-      if (info && info.object && info.object.links) {
-        // Get links specifically for this measure
-        const links = info.object.links[measureIdx];
-        if (links && links.length > 0) {
-          LookerCharts.Utils.openDrillMenu({
-            links: links,
-            event: info.srcEvent || info.event
-          });
-        }
+      if (!info || !info.object) return;
+
+      // Access links for the specific measure assigned to this layer
+      const links = info.object.links ? info.object.links[measureIdx] : null;
+
+      if (links && links.length > 0) {
+        console.log("Drilling...", links);
+        LookerCharts.Utils.openDrillMenu({
+          links: links,
+          event: info.srcEvent || info.event
+        });
       }
     };
 
@@ -609,7 +629,7 @@ looker.plugins.visualizations.add({
           getLineWidth: 1,
           getLineColor: [255,255,255],
           opacity: opacity,
-          onClick: onClickHandler, // Add click handler
+          onClick: onClickHandler,
           getFillColor: d => {
              if (!useGradient) return mainColor;
              const val = getValue(d);
@@ -734,6 +754,8 @@ looker.plugins.visualizations.add({
         return null;
     }
   },
+
+  // --- UTILITIES ---
 
   _getGeoJSONUrl: function(config) {
     if (config.map_layer_source === 'custom') return config.custom_geojson_url;
