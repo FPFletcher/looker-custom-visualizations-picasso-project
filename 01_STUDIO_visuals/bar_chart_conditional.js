@@ -1,6 +1,7 @@
 /**
  * Conditional Bar Chart for Looker
  * COMPLETE VERSION - All features restored & Improved for PDF/Gradients
+ * CLEANED - Console logs removed for professional rendering
  */
 
 looker.plugins.visualizations.add({
@@ -1107,15 +1108,12 @@ looker.plugins.visualizations.add({
         totalSeriesCount = queryResponse.pivots.length * measures.length;
     }
     const palette = this.getPalette(config, totalSeriesCount);
-    console.log(`[UPDATE] Final Palette (reversed=${config.reverse_colors}): ${palette.slice(0, 5).join(', ')}...`);
     // --- END REPLACED ---
 
     // Handle series_labels - it's a comma-separated string like "Label1,Label2,Label3"
     const customLabelsArray = config.series_labels && typeof config.series_labels === 'string' && config.series_labels.trim() !== ''
       ? config.series_labels.split(',').map(label => label.trim()).filter(label => label !== '')
       : [];
-
-    console.log('Custom labels array:', customLabelsArray);
 
     // Helper to get label for a series by index
     const getSeriesLabel = (index, defaultLabel) => {
@@ -1702,13 +1700,13 @@ looker.plugins.visualizations.add({
             chartOptions.series.push(trendSeries);
 
           } else {
-             console.log('[TRENDLINE DEBUG] Not enough valid points (<= 1) to draw trendline.');
+             // Not enough valid points
           }
         } catch (error) {
           console.error('[TRENDLINE ERROR] Error calculating trendline:', error);
         }
       } else {
-         console.log('[TRENDLINE DEBUG] No series data available.');
+         // No series data
       }
     }
 
@@ -1722,23 +1720,18 @@ looker.plugins.visualizations.add({
 
     if (!this.chart || criticalOptionsChanged) {
       if (criticalOptionsChanged) {
-        console.log('[CHART REINIT] Critical options changed. Destroying and recreating chart.');
         this.chart.destroy();
       } else {
-        console.log('[CHART INIT] Creating new chart instance.');
+        // Creating new chart
       }
       this.chart = Highcharts.chart(this._chartContainer, chartOptions);
     } else {
-      console.log('[CHART UPDATE] Updating existing chart with new options.');
       // When updating, ensure trendline is preserved if it exists in new options
       const hasTrendlineInOptions = chartOptions.series.some(s => s.id === 'trend-line-series');
       const hasTrendlineInChart = this.chart.get('trend-line-series');
 
-      console.log('[CHART UPDATE] hasTrendlineInOptions:', hasTrendlineInOptions, 'hasTrendlineInChart:', !!hasTrendlineInChart);
-
       // Remove existing trendline if present but not in new options
       if (hasTrendlineInChart && !hasTrendlineInOptions) {
-        console.log('[CHART UPDATE] Removing trendline from chart.');
         hasTrendlineInChart.remove(false);
       }
 
@@ -1751,10 +1744,8 @@ looker.plugins.visualizations.add({
         const existingTrendline = this.chart.get('trend-line-series');
 
         if (existingTrendline) {
-          console.log('[CHART UPDATE] Updating existing trendline.');
           existingTrendline.setData(trendlineData.data, false);
         } else {
-          console.log('[CHART UPDATE] Adding new trendline.');
           this.chart.addSeries(trendlineData, false);
         }
       }
