@@ -1,11 +1,10 @@
 /**
  * Treemap Visualization for Looker
  * Studio-inspired hierarchical treemap with drill-down and multi-dimension support
- * Features: Robust layout (no gaps), horizontal-only labels, "Others" grouping,
- *           Value format options (numeric/percent), LookML value_format support,
- *           Pivot grouping support.
+ * Features: Nested layout (parent groups with visible children), "Others" grouping,
+ *           Value format options (numeric/percent), LookML value_format support.
  *
- * Version: 4.0
+ * Version: 5.0 - Proper nested treemap layout
  */
 
 looker.plugins.visualizations.add({
@@ -56,19 +55,31 @@ looker.plugins.visualizations.add({
       section: "Plot",
       order: 6
     },
-    // NEW: Pivot Grouping Option
-    pivot_grouping: {
-      type: "string",
-      label: "Pivot Grouping",
-      display: "select",
-      values: [
-        {"None (Flat)": "none"},
-        {"Group by Pivot": "pivot"},
-        {"Group by Dimension": "dimension"}
-      ],
-      default: "none",
+    // Nested Layout Option
+    nested_layout: {
+      type: "boolean",
+      label: "Nested Layout (Group by 1st Dimension)",
+      default: false,
       section: "Plot",
       order: 7
+    },
+    group_header_height: {
+      type: "number",
+      label: "Group Header Height (px)",
+      default: 20,
+      min: 0,
+      max: 40,
+      section: "Plot",
+      order: 8
+    },
+    group_padding: {
+      type: "number",
+      label: "Group Padding (px)",
+      default: 2,
+      min: 0,
+      max: 10,
+      section: "Plot",
+      order: 9
     },
 
     // ========== SERIES SECTION ==========
@@ -78,9 +89,10 @@ looker.plugins.visualizations.add({
       display: "select",
       values: [
         {"Dimension Values": "dimension"},
-        {"Metric Value": "metric"}
+        {"Metric Value": "metric"},
+        {"Parent Group": "parent"}
       ],
-      default: "metric",
+      default: "parent",
       section: "Series"
     },
     color_palette: {
@@ -93,9 +105,10 @@ looker.plugins.visualizations.add({
         {"Google Colors": "google"},
         {"Viridis": "viridis"},
         {"Warm": "warm"},
-        {"Cool": "cool"}
+        {"Cool": "cool"},
+        {"Categorical": "categorical"}
       ],
-      default: "green_scale",
+      default: "categorical",
       section: "Series"
     },
     use_gradient: {
@@ -140,7 +153,6 @@ looker.plugins.visualizations.add({
       section: "Values",
       order: 2
     },
-    // NEW: Value Display Format
     value_display_format: {
       type: "string",
       label: "Value Display",
@@ -154,7 +166,6 @@ looker.plugins.visualizations.add({
       section: "Values",
       order: 3
     },
-    // NEW: Value Format Type
     value_format: {
       type: "string",
       label: "Value Format",
@@ -172,7 +183,6 @@ looker.plugins.visualizations.add({
       section: "Values",
       order: 4
     },
-    // NEW: Custom Format String
     value_format_custom: {
       type: "string",
       label: "Custom Format String",
@@ -223,6 +233,14 @@ looker.plugins.visualizations.add({
       display: "color",
       section: "Values",
       order: 11
+    },
+    group_label_color: {
+      type: "string",
+      label: "Group Label Color",
+      default: "#FFFFFF",
+      display: "color",
+      section: "Values",
+      order: 12
     }
   },
 
@@ -253,7 +271,10 @@ looker.plugins.visualizations.add({
         shape-rendering: crispEdges;
       }
       .treemap-rect:hover {
-        opacity: 0.9;
+        opacity: 0.85;
+      }
+      .treemap-group-rect {
+        shape-rendering: crispEdges;
       }
       .treemap-label, .treemap-value {
         pointer-events: none;
@@ -266,6 +287,13 @@ looker.plugins.visualizations.add({
       .treemap-value {
         font-weight: 400;
         opacity: 0.8;
+      }
+      .treemap-group-label {
+        pointer-events: none;
+        user-select: none;
+        font-family: inherit;
+        font-weight: 700;
+        font-size: 11px;
       }
       .treemap-breadcrumb {
         position: absolute;
@@ -308,8 +336,8 @@ looker.plugins.visualizations.add({
       }
     `;
 
-    if (!document.getElementById('treemap-styles')) {
-      style.id = 'treemap-styles';
+    if (!document.getElementById('treemap-styles-v5')) {
+      style.id = 'treemap-styles-v5';
       document.head.appendChild(style);
     }
 
@@ -339,7 +367,6 @@ looker.plugins.visualizations.add({
 
     const dimensions = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
-    const hasPivot = queryResponse.fields.pivots && queryResponse.fields.pivots.length > 0;
 
     if (dimensions.length === 0 || measures.length === 0) {
       this._svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#999">Treemap requires 1 Dimension and 1 Measure</text>';
@@ -351,49 +378,29 @@ looker.plugins.visualizations.add({
     this._queryResponse = queryResponse;
     this._config = config;
     this._allData = data;
-    this._hasPivot = hasPivot;
-
-    // Store measure field for formatting
     this._measureField = measures[0];
+    this._dimensions = dimensions;
 
-    // Reset drill if Others toggle or threshold changed
-    const othersChanged = this._lastOthersToggle !== config.others_toggle ||
-    this._lastOthersThreshold !== config.others_threshold;
+    // Reset drill on config changes
+    const configChanged =
+      this._lastOthersToggle !== config.others_toggle ||
+      this._lastOthersThreshold !== config.others_threshold ||
+      this._lastNestedLayout !== config.nested_layout ||
+      this._lastColorBy !== config.color_by ||
+      this._lastColorPalette !== config.color_palette;
 
-    if (othersChanged) {
+    if (configChanged) {
       this._drillStack = [];
       this._lastOthersToggle = config.others_toggle;
       this._lastOthersThreshold = config.others_threshold;
-    }
-
-    // Reset drill if color settings changed
-    const colorChanged = this._lastColorBy !== config.color_by ||
-                        this._lastColorPalette !== config.color_palette ||
-                        this._lastUseGradient !== config.use_gradient ||
-                        this._lastReversePalette !== config.reverse_palette ||
-                        this._lastGradientStart !== config.gradient_start_color ||
-                        this._lastGradientEnd !== config.gradient_end_color;
-
-    if (colorChanged) {
-      this._drillStack = [];
+      this._lastNestedLayout = config.nested_layout;
       this._lastColorBy = config.color_by;
       this._lastColorPalette = config.color_palette;
-      this._lastUseGradient = config.use_gradient;
-      this._lastReversePalette = config.reverse_palette;
-      this._lastGradientStart = config.gradient_start_color;
-      this._lastGradientEnd = config.gradient_end_color;
     }
 
-    // Reset drill if dimensions changed
     if (this._lastDimensionCount !== dimensions.length) {
       this._drillStack = [];
       this._lastDimensionCount = dimensions.length;
-    }
-
-    // Reset drill if pivot grouping changed
-    if (this._lastPivotGrouping !== config.pivot_grouping) {
-      this._drillStack = [];
-      this._lastPivotGrouping = config.pivot_grouping;
     }
 
     this.drawTreemap(data, config, queryResponse);
@@ -403,14 +410,12 @@ looker.plugins.visualizations.add({
   drawTreemap: function(data, config, queryResponse) {
     const dimensions = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
-    const hasPivot = this._hasPivot;
     const currentLevel = this._drillStack.length;
 
     // Determine Active Data
     let activeData = data;
     if (!activeData) {
       activeData = this._allData;
-      // Re-apply all filters up to the current level
       for (let i = 0; i < currentLevel; i++) {
         const dimName = dimensions[i].name;
         const filterVal = this._drillStack[i];
@@ -418,122 +423,625 @@ looker.plugins.visualizations.add({
       }
     }
 
-    const dimIndex = Math.min(currentLevel, dimensions.length - 1);
-    const dimension = dimensions[dimIndex].name;
     const measure = measures[0].name;
+
+    // Check if we should use nested layout
+    // Only use nested layout at top level (drillStack empty) and when we have 2+ dimensions
+    const useNestedLayout = config.nested_layout &&
+                            dimensions.length >= 2 &&
+                            currentLevel === 0;
 
     let treemapData;
 
-    // Handle pivot grouping
-    if (hasPivot && config.pivot_grouping !== 'none') {
-      treemapData = this.buildPivotGroupedData(activeData, dimension, measure, config, queryResponse, currentLevel, dimensions.length);
+    if (useNestedLayout) {
+      treemapData = this.buildNestedData(activeData, dimensions, measure, config);
     } else {
-      treemapData = this.groupData(activeData, dimension, measure, currentLevel, dimensions.length, queryResponse);
-    }
+      const dimIndex = Math.min(currentLevel, dimensions.length - 1);
+      const dimension = dimensions[dimIndex].name;
+      treemapData = this.groupData(activeData, dimension, measure, currentLevel, dimensions.length);
 
-    if (config.others_toggle && treemapData.length > 5) {
-      const threshold = (config.others_threshold || 0.5) / 100;
-      treemapData = this.groupSmallItems(treemapData, threshold);
-    }
+      if (config.others_toggle && treemapData.length > 5) {
+        const threshold = (config.others_threshold || 0.5) / 100;
+        treemapData = this.groupSmallItems(treemapData, threshold);
+      }
 
-    treemapData.sort((a, b) => {
-      if (a.isOthers) return 1;
-      if (b.isOthers) return -1;
-      return b.value - a.value;
-    });
+      treemapData.sort((a, b) => {
+        if (a.isOthers) return 1;
+        if (b.isOthers) return -1;
+        return b.value - a.value;
+      });
+    }
 
     this.updateBreadcrumb();
-    this.renderTreemap(treemapData, config, dimension, queryResponse);
+
+    if (useNestedLayout) {
+      this.renderNestedTreemap(treemapData, config, queryResponse);
+    } else {
+      const dimIndex = Math.min(currentLevel, dimensions.length - 1);
+      const dimension = dimensions[dimIndex].name;
+      this.renderTreemap(treemapData, config, dimension, queryResponse);
+    }
   },
 
-  // NEW: Build pivot-grouped data
-  buildPivotGroupedData: function(data, dimension, measure, config, queryResponse, level, maxDepth) {
-    const pivots = queryResponse.pivots;
-    const pivotGrouping = config.pivot_grouping;
+  // Build nested hierarchical data structure
+  buildNestedData: function(data, dimensions, measure, config) {
+    const parentDim = dimensions[0].name;
+    const childDim = dimensions[1].name;
 
-    if (pivotGrouping === 'pivot') {
-      // Group by pivot values first, then by dimension within each pivot
-      const grouped = {};
+    // Group by parent dimension
+    const parentGroups = {};
 
-      pivots.forEach(pivot => {
-        const pivotKey = pivot.key;
-        const pivotLabel = pivot.data ? Object.values(pivot.data).join(' - ') : pivotKey;
+    data.forEach(row => {
+      const parentKey = row[parentDim].value;
+      const childKey = row[childDim].value;
+      const val = row[measure] && row[measure].value !== null ? Number(row[measure].value) : 0;
+      const rendered = row[measure] && row[measure].rendered ? row[measure].rendered : null;
 
-        if (!grouped[pivotKey]) {
-          grouped[pivotKey] = {
-            name: pivotLabel,
-            value: 0,
-            rawValue: 0,
-            children: [],
-            level: level,
-            isDrillable: true,
-            isPivotGroup: true,
-            pivotKey: pivotKey
-          };
-        }
+      if (!parentGroups[parentKey]) {
+        parentGroups[parentKey] = {
+          name: parentKey,
+          value: 0,
+          rawValue: 0,
+          children: {},
+          childrenArray: [],
+          rows: []
+        };
+      }
 
-        data.forEach(row => {
-          const cell = row[measure] && row[measure][pivotKey];
-          if (cell && cell.value !== null && cell.value !== undefined) {
-            const val = Number(cell.value) || 0;
-            grouped[pivotKey].value += Math.max(0, val);
-            grouped[pivotKey].rawValue += val;
-            grouped[pivotKey].children.push({
-              row: row,
-              pivotKey: pivotKey,
-              value: val,
-              rendered: cell.rendered
-            });
+      parentGroups[parentKey].value += Math.max(0, val);
+      parentGroups[parentKey].rawValue += val;
+      parentGroups[parentKey].rows.push(row);
+
+      // Group children within parent
+      if (!parentGroups[parentKey].children[childKey]) {
+        parentGroups[parentKey].children[childKey] = {
+          name: childKey,
+          value: 0,
+          rawValue: 0,
+          rendered: null,
+          rows: [],
+          parentName: parentKey
+        };
+      }
+
+      parentGroups[parentKey].children[childKey].value += Math.max(0, val);
+      parentGroups[parentKey].children[childKey].rawValue += val;
+      if (!parentGroups[parentKey].children[childKey].rendered && rendered) {
+        parentGroups[parentKey].children[childKey].rendered = rendered;
+      }
+      parentGroups[parentKey].children[childKey].rows.push(row);
+    });
+
+    // Convert to array and sort
+    const result = Object.values(parentGroups).map(parent => {
+      let childrenArray = Object.values(parent.children).filter(c => c.value > 0);
+
+      // Apply "Others" grouping to children if enabled
+      if (config.others_toggle && childrenArray.length > 5) {
+        const threshold = (config.others_threshold || 0.5) / 100;
+        const parentTotal = parent.value;
+        const visible = [];
+        const others = [];
+
+        childrenArray.forEach(child => {
+          if ((child.value / parentTotal) >= threshold) {
+            visible.push(child);
+          } else {
+            others.push(child);
           }
         });
-      });
 
-      return Object.values(grouped).filter(d => d.value > 0);
-
-    } else if (pivotGrouping === 'dimension') {
-      // Group by dimension first, aggregate all pivot values
-      const grouped = {};
-
-      data.forEach(row => {
-        const key = row[dimension].value;
-        const safeKey = "k_" + key;
-
-        if (!grouped[safeKey]) {
-          grouped[safeKey] = {
-            name: key,
-            value: 0,
-            rawValue: 0,
-            children: [],
-            level: level,
-            isDrillable: level < maxDepth - 1
-          };
+        if (others.length > 1) {
+          visible.push({
+            name: "Others",
+            value: others.reduce((s, c) => s + c.value, 0),
+            rawValue: others.reduce((s, c) => s + c.rawValue, 0),
+            rows: others.flatMap(c => c.rows),
+            isOthers: true,
+            parentName: parent.name
+          });
+        } else if (others.length === 1) {
+          visible.push(others[0]);
         }
 
-        // Sum all pivot values for this dimension
-        pivots.forEach(pivot => {
-          const cell = row[measure] && row[measure][pivot.key];
-          if (cell && cell.value !== null && cell.value !== undefined) {
-            const val = Number(cell.value) || 0;
-            grouped[safeKey].value += Math.max(0, val);
-            grouped[safeKey].rawValue += val;
-            grouped[safeKey].children.push({
-              row: row,
-              pivotKey: pivot.key,
-              value: val,
-              rendered: cell.rendered
-            });
-          }
-        });
+        childrenArray = visible;
+      }
+
+      // Sort children by value
+      childrenArray.sort((a, b) => {
+        if (a.isOthers) return 1;
+        if (b.isOthers) return -1;
+        return b.value - a.value;
       });
 
-      return Object.values(grouped).filter(d => d.value > 0);
+      return {
+        ...parent,
+        childrenArray: childrenArray
+      };
+    }).filter(p => p.value > 0);
+
+    // Sort parent groups by value
+    result.sort((a, b) => b.value - a.value);
+
+    return result;
+  },
+
+  // Render nested treemap with parent groups and children
+  renderNestedTreemap: function(data, config, queryResponse) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    this._svg.innerHTML = '';
+
+    const rect = this._container.getBoundingClientRect();
+    const breadcrumbHeight = this._drillStack.length > 0 ? 36 : 0;
+    const width = Math.floor(rect.width);
+    const height = Math.floor(rect.height - breadcrumbHeight);
+
+    if (width <= 0 || height <= 0) return;
+
+    this._svg.style.marginTop = `${breadcrumbHeight}px`;
+    this._svg.style.height = `calc(100% - ${breadcrumbHeight}px)`;
+    this._svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    const totalValue = data.reduce((sum, d) => sum + d.value, 0);
+    const rootArea = width * height;
+    const headerHeight = config.group_header_height || 20;
+    const groupPadding = config.group_padding || 2;
+
+    // Calculate parent group areas
+    const parentNodes = data.map(d => ({
+      ...d,
+      area: (d.value / totalValue) * rootArea
+    }));
+
+    // Layout parent groups
+    const parentLayout = this.squarify(parentNodes, 0, 0, width, height);
+
+    // Get colors for parent groups
+    const parentColors = this.getCategoricalColors(data.length, config);
+
+    parentLayout.forEach((parent, parentIndex) => {
+      const g = document.createElementNS(svgNS, 'g');
+
+      const px = Math.round(parent.x);
+      const py = Math.round(parent.y);
+      const pw = Math.round(parent.width);
+      const ph = Math.round(parent.height);
+
+      // Draw parent border/background
+      const parentRect = document.createElementNS(svgNS, 'rect');
+      parentRect.setAttribute('x', px);
+      parentRect.setAttribute('y', py);
+      parentRect.setAttribute('width', pw);
+      parentRect.setAttribute('height', ph);
+      parentRect.setAttribute('fill', 'none');
+      parentRect.setAttribute('stroke', config.border_color || '#FFFFFF');
+      parentRect.setAttribute('stroke-width', Math.max(1, config.border_width || 1));
+      parentRect.setAttribute('class', 'treemap-group-rect');
+      g.appendChild(parentRect);
+
+      // Draw header background
+      if (headerHeight > 0) {
+        const headerRect = document.createElementNS(svgNS, 'rect');
+        headerRect.setAttribute('x', px);
+        headerRect.setAttribute('y', py);
+        headerRect.setAttribute('width', pw);
+        headerRect.setAttribute('height', Math.min(headerHeight, ph));
+        headerRect.setAttribute('fill', parentColors[parentIndex % parentColors.length]);
+        headerRect.setAttribute('class', 'treemap-group-rect');
+        g.appendChild(headerRect);
+
+        // Draw header label
+        if (pw > 40) {
+          const headerLabel = document.createElementNS(svgNS, 'text');
+          headerLabel.setAttribute('x', px + 5);
+          headerLabel.setAttribute('y', py + Math.min(headerHeight, ph) - 5);
+          headerLabel.setAttribute('fill', config.group_label_color || '#FFFFFF');
+          headerLabel.setAttribute('class', 'treemap-group-label');
+
+          let labelText = parent.name;
+          if (this.estimateTextWidth(labelText, 11) > pw - 10) {
+            labelText = this.ellipsize(labelText, pw - 10, 11);
+          }
+          headerLabel.textContent = labelText;
+          g.appendChild(headerLabel);
+        }
+      }
+
+      // Calculate child area
+      const childX = px + groupPadding;
+      const childY = py + headerHeight + groupPadding;
+      const childW = pw - (groupPadding * 2);
+      const childH = ph - headerHeight - (groupPadding * 2);
+
+      if (childW > 0 && childH > 0 && parent.childrenArray && parent.childrenArray.length > 0) {
+        const childTotal = parent.childrenArray.reduce((sum, c) => sum + c.value, 0);
+        const childArea = childW * childH;
+
+        // Create child nodes
+        const childNodes = parent.childrenArray.map(child => ({
+          ...child,
+          area: (child.value / childTotal) * childArea,
+          percent: (child.value / totalValue) * 100,
+          parentColor: parentColors[parentIndex % parentColors.length]
+        }));
+
+        // Layout children within parent
+        const childLayout = this.squarify(childNodes, childX, childY, childW, childH);
+
+        // Get child colors based on config
+        let childColors;
+        if (config.color_by === 'parent') {
+          // Shade variations of parent color
+          childColors = this.getShadeVariations(parentColors[parentIndex % parentColors.length], childLayout.length);
+        } else if (config.color_by === 'metric' && config.use_gradient) {
+          childColors = null; // Will be calculated per-child
+        } else {
+          childColors = this.getColors(childLayout, config);
+        }
+
+        childLayout.forEach((child, childIndex) => {
+          const childG = document.createElementNS(svgNS, 'g');
+
+          const cx = Math.round(child.x);
+          const cy = Math.round(child.y);
+          const cw = Math.max(1, Math.round(child.width));
+          const ch = Math.max(1, Math.round(child.height));
+
+          const childRect = document.createElementNS(svgNS, 'rect');
+          childRect.setAttribute('x', cx);
+          childRect.setAttribute('y', cy);
+          childRect.setAttribute('width', cw);
+          childRect.setAttribute('height', ch);
+
+          // Determine fill color
+          let fillColor;
+          if (config.color_by === 'metric' && config.use_gradient) {
+            const allValues = parent.childrenArray.map(c => c.value);
+            const min = Math.min(...allValues);
+            const max = Math.max(...allValues);
+            const ratio = (max === min) ? 0.5 : (child.value - min) / (max - min);
+            let startColor = config.gradient_start_color || '#F1F8E9';
+            let endColor = config.gradient_end_color || '#33691E';
+            if (config.reverse_palette) {
+              [startColor, endColor] = [endColor, startColor];
+            }
+            fillColor = this.interpolateColor(startColor, endColor, ratio);
+          } else {
+            fillColor = childColors[childIndex % childColors.length];
+          }
+
+          childRect.setAttribute('fill', fillColor);
+          childRect.setAttribute('stroke', config.border_color || '#FFFFFF');
+          childRect.setAttribute('stroke-width', Math.max(0.5, (config.border_width || 1) * 0.5));
+          childRect.setAttribute('class', 'treemap-rect');
+
+          // Click handler - drill down to this child
+          childRect.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            if (this._config.enable_drill_down) {
+              if (child.isOthers) {
+                // For "Others", show its children as flat list
+                this._drillStack.push(parent.name);
+                this.drawTreemap(child.rows, this._config, this._queryResponse);
+              } else {
+                // Drill into this specific item
+                this._drillStack.push(parent.name);
+                this._drillStack.push(child.name);
+                this.drawTreemap(null, this._config, this._queryResponse);
+              }
+            } else {
+              // LookML drill
+              let drillLinks = [];
+              if (child.rows && child.rows.length > 0) {
+                const firstRow = child.rows[0];
+                Object.keys(firstRow).forEach(key => {
+                  if (firstRow[key] && firstRow[key].links && firstRow[key].links.length > 0) {
+                    drillLinks = firstRow[key].links;
+                  }
+                });
+              }
+              if (drillLinks.length > 0 && LookerCharts && LookerCharts.Utils) {
+                LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e });
+              }
+            }
+          });
+
+          // Tooltip
+          childRect.addEventListener('mouseenter', () => {
+            const formattedValue = this.formatValue(child.rawValue, config, child.rendered);
+            const pct = child.percent.toFixed(1);
+            this._tooltip.innerHTML = `
+              <div style="font-weight:600; margin-bottom:2px">${parent.name} › ${child.name}</div>
+              <div>${formattedValue} (${pct}%)</div>
+              <div style="font-size:10px; opacity:0.8">(Click to drill down)</div>
+            `;
+            this._tooltip.style.display = 'block';
+          });
+
+          childRect.addEventListener('mousemove', (e) => {
+            const tooltipRect = this._tooltip.getBoundingClientRect();
+            let left = e.pageX + 12;
+            let top = e.pageY + 12;
+            if (left + tooltipRect.width > window.innerWidth) left = e.pageX - tooltipRect.width - 12;
+            if (top + tooltipRect.height > window.innerHeight) top = e.pageY - tooltipRect.height - 12;
+            this._tooltip.style.left = left + 'px';
+            this._tooltip.style.top = top + 'px';
+          });
+
+          childRect.addEventListener('mouseleave', () => {
+            this._tooltip.style.display = 'none';
+          });
+
+          childG.appendChild(childRect);
+
+          // Add labels if space permits
+          if (cw > 25 && ch > 15 && child.percent >= (config.label_threshold || 0)) {
+            this.addLabelsToRect(childG, {
+              x: cx, y: cy, width: cw, height: ch,
+              name: child.name,
+              rawValue: child.rawValue,
+              value: child.value,
+              rendered: child.rendered,
+              percent: child.percent
+            }, config, svgNS, totalValue);
+          }
+
+          g.appendChild(childG);
+        });
+      }
+
+      this._svg.appendChild(g);
+    });
+  },
+
+  // Get categorical colors for parent groups
+  getCategoricalColors: function(count, config) {
+    const palettes = {
+      categorical: ['#E07D54', '#7EB77F', '#64B5F6', '#BA68C8', '#FFB74D', '#4FC3F7', '#F06292', '#AED581', '#90A4AE', '#FFD54F'],
+      google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC', '#7BAAF7', '#F07B72', '#FCD04F'],
+      green_scale: ['#1B5E20', '#2E7D32', '#388E3C', '#43A047', '#4CAF50', '#66BB6A', '#81C784', '#A5D6A7', '#C8E6C9', '#E8F5E9'],
+      blue_scale: ['#0D47A1', '#1565C0', '#1976D2', '#1E88E5', '#2196F3', '#42A5F5', '#64B5F6', '#90CAF9', '#BBDEFB', '#E3F2FD'],
+      viridis: ['#440154', '#482475', '#414487', '#355F8D', '#2A788E', '#21908C', '#22A884', '#42BE71', '#7AD151', '#FDE725'],
+      warm: ['#7F2704', '#A63603', '#D94801', '#F16913', '#FD8D3C', '#FDAE6B', '#FDD0A2', '#FEE6CE', '#FFF5EB'],
+      cool: ['#08306B', '#08519C', '#2171B5', '#4292C6', '#6BAED6', '#9ECAE1', '#C6DBEF', '#DEEBF7', '#F0F9FF']
+    };
+
+    let palette = palettes[config.color_palette] || palettes.categorical;
+    if (config.reverse_palette) {
+      palette = [...palette].reverse();
     }
 
-    // Default: flat (no grouping)
-    return this.groupData(data, dimension, measure, level, maxDepth, queryResponse);
+    // Extend palette if needed
+    const colors = [];
+    for (let i = 0; i < count; i++) {
+      colors.push(palette[i % palette.length]);
+    }
+    return colors;
   },
 
-  // --- Grouping Function ---
+  // Get shade variations of a color
+  getShadeVariations: function(baseColor, count) {
+    const shades = [];
+    for (let i = 0; i < count; i++) {
+      const factor = 0.7 + (0.3 * (i / Math.max(1, count - 1)));
+      shades.push(this.adjustBrightness(baseColor, factor));
+    }
+    return shades;
+  },
+
+  adjustBrightness: function(color, factor) {
+    let c = color.replace('#', '');
+    if (c.length === 3) {
+      c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+    }
+    const r = Math.min(255, Math.round(parseInt(c.substring(0, 2), 16) * factor));
+    const g = Math.min(255, Math.round(parseInt(c.substring(2, 4), 16) * factor));
+    const b = Math.min(255, Math.round(parseInt(c.substring(4, 6), 16) * factor));
+    return `rgb(${r}, ${g}, ${b})`;
+  },
+
+  // Standard flat treemap rendering (existing logic)
+  renderTreemap: function(data, config, dimension, queryResponse) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    this._svg.innerHTML = '';
+
+    const rect = this._container.getBoundingClientRect();
+    const breadcrumbHeight = this._drillStack.length > 0 ? 36 : 0;
+    const width = Math.floor(rect.width);
+    const height = Math.floor(rect.height - breadcrumbHeight);
+
+    if (width <= 0 || height <= 0) return;
+
+    this._svg.style.marginTop = `${breadcrumbHeight}px`;
+    this._svg.style.height = `calc(100% - ${breadcrumbHeight}px)`;
+    this._svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    const totalValue = data.reduce((sum, d) => sum + d.value, 0);
+    const rootArea = width * height;
+
+    const nodes = data.map(d => ({
+      ...d,
+      area: (d.value / totalValue) * rootArea,
+      percent: (d.value / totalValue) * 100,
+      drillLinks: (d.children && d.children.length > 0 && dimension && d.children[0][dimension])
+        ? (d.children[0][dimension].links || [])
+        : [],
+      rawData: d.children || []
+    }));
+    let layout = this.squarify(nodes, 0, 0, width, height);
+
+    if (layout.length > 0) {
+      const lastItem = layout[layout.length - 1];
+      lastItem.width = width - lastItem.x;
+      lastItem.height = height - lastItem.y;
+    }
+
+    const colors = this.getColors(data, config);
+
+    layout.forEach((item, i) => {
+      const g = document.createElementNS(svgNS, 'g');
+      const rectEl = document.createElementNS(svgNS, 'rect');
+
+      const isLast = (i === layout.length - 1);
+      const x = Math.round(item.x);
+      const y = Math.round(item.y);
+      const w = isLast ? (width - x) : (Math.round(item.x + item.width) - x);
+      const h = isLast ? (height - y) : (Math.round(item.y + item.height) - y);
+
+      rectEl.setAttribute('x', x);
+      rectEl.setAttribute('y', y);
+      rectEl.setAttribute('width', Math.max(1, w));
+      rectEl.setAttribute('height', Math.max(1, h));
+
+      let fillColor;
+      if (config.color_by === 'metric' && config.use_gradient) {
+        const allValues = data.map(d => d.value);
+        const min = Math.min(...allValues);
+        const max = Math.max(...allValues);
+        const ratio = (max === min) ? 0.5 : (item.value - min) / (max - min);
+        let startColor = config.gradient_start_color || '#F1F8E9';
+        let endColor = config.gradient_end_color || '#33691E';
+        if (config.reverse_palette) {
+          [startColor, endColor] = [endColor, startColor];
+        }
+        fillColor = this.interpolateColor(startColor, endColor, ratio);
+      } else {
+        fillColor = colors[i % colors.length];
+      }
+
+      rectEl.setAttribute('fill', fillColor);
+      rectEl.setAttribute('stroke', config.border_color);
+      rectEl.setAttribute('stroke-width', config.border_width);
+      rectEl.setAttribute('class', 'treemap-rect');
+
+      rectEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+
+        if (this._config.enable_drill_down && (item.isDrillable || item.isOthers)) {
+          if (item.isOthers) {
+            this.drawTreemap(item.rawData, this._config, this._queryResponse);
+          } else {
+            this._drillStack.push(item.name);
+            this.drawTreemap(null, this._config, this._queryResponse);
+          }
+        } else {
+          let drillLinks = [];
+          if (item.rawData && item.rawData.length > 0) {
+            const firstRow = item.rawData[0];
+            Object.keys(firstRow).forEach(key => {
+              if (firstRow[key] && firstRow[key].links && firstRow[key].links.length > 0) {
+                drillLinks = firstRow[key].links;
+              }
+            });
+          }
+          if (drillLinks.length > 0 && LookerCharts && LookerCharts.Utils) {
+            LookerCharts.Utils.openDrillMenu({ links: drillLinks, event: e });
+          }
+        }
+      });
+
+      rectEl.addEventListener('mouseenter', () => {
+        const formattedValue = this.formatValue(item.rawValue, config, item.rendered);
+        const pct = item.percent.toFixed(1);
+        this._tooltip.innerHTML = `
+          <div style="font-weight:600; margin-bottom:2px">${item.name}</div>
+          <div>${formattedValue} (${pct}%)</div>
+          ${item.isDrillable ? '<div style="font-size:10px; opacity:0.8">(Click to drill down)</div>' : ''}
+        `;
+        this._tooltip.style.display = 'block';
+      });
+
+      rectEl.addEventListener('mousemove', (e) => {
+        const tooltipRect = this._tooltip.getBoundingClientRect();
+        let left = e.pageX + 12;
+        let top = e.pageY + 12;
+        if (left + tooltipRect.width > window.innerWidth) left = e.pageX - tooltipRect.width - 12;
+        if (top + tooltipRect.height > window.innerHeight) top = e.pageY - tooltipRect.height - 12;
+        this._tooltip.style.left = left + 'px';
+        this._tooltip.style.top = top + 'px';
+      });
+
+      rectEl.addEventListener('mouseleave', () => {
+        this._tooltip.style.display = 'none';
+      });
+
+      g.appendChild(rectEl);
+
+      if (item.percent >= (config.label_threshold || 0)) {
+        this.addLabelsToRect(g, {
+          x: x, y: y, width: w, height: h,
+          name: item.name,
+          rawValue: item.rawValue,
+          value: item.value,
+          rendered: item.rendered,
+          percent: item.percent
+        }, config, svgNS, totalValue);
+      }
+
+      this._svg.appendChild(g);
+    });
+  },
+
+  // Unified label adding function
+  addLabelsToRect: function(g, item, config, svgNS, totalValue) {
+    const labelFontSize = config.label_font_size || 12;
+    const valueFontSize = config.value_font_size || 12;
+    const padding = 4;
+
+    if (item.width < 20 || item.height < 15) return;
+
+    const maxWidth = item.width - (padding * 2);
+    const maxHeight = item.height - (padding * 2);
+
+    const showLabel = config.show_labels && (maxWidth >= 30) && (maxHeight >= labelFontSize + 4);
+    const showValue = config.show_values && (maxWidth >= 30) && (maxHeight >= valueFontSize + 4);
+
+    if (!showLabel && !showValue) return;
+
+    const labelText = item.name;
+    const valueText = this.getValueDisplayText(item, config, totalValue);
+    const canFitStacked = showLabel && showValue && (maxHeight >= (labelFontSize + valueFontSize + 8));
+    let currentY = item.y + (item.height / 2);
+
+    if (canFitStacked) currentY -= 2;
+
+    if (showLabel) {
+      const labelEl = document.createElementNS(svgNS, 'text');
+      labelEl.setAttribute('x', item.x + (item.width / 2));
+      labelEl.setAttribute('y', canFitStacked ? currentY - (valueFontSize / 2) : currentY + (labelFontSize / 3));
+      labelEl.setAttribute('text-anchor', 'middle');
+      labelEl.setAttribute('fill', config.label_color);
+      labelEl.setAttribute('font-size', labelFontSize);
+      labelEl.setAttribute('class', 'treemap-label');
+
+      let finalLabel = labelText;
+      if (this.estimateTextWidth(labelText, labelFontSize) > maxWidth) {
+        finalLabel = this.ellipsize(labelText, maxWidth, labelFontSize);
+      }
+      labelEl.textContent = finalLabel;
+      g.appendChild(labelEl);
+    }
+
+    if (showValue) {
+      if (!canFitStacked && showLabel) return;
+
+      const valEl = document.createElementNS(svgNS, 'text');
+      valEl.setAttribute('x', item.x + (item.width / 2));
+      valEl.setAttribute('y', canFitStacked ? currentY + valueFontSize + 2 : currentY + (valueFontSize / 3));
+      valEl.setAttribute('text-anchor', 'middle');
+      valEl.setAttribute('fill', config.value_color);
+      valEl.setAttribute('font-size', valueFontSize);
+      valEl.setAttribute('class', 'treemap-value');
+      valEl.textContent = valueText;
+
+      if (this.estimateTextWidth(valueText, valueFontSize) <= maxWidth) {
+        g.appendChild(valEl);
+      }
+    }
+  },
+
+  // Grouping functions
   groupSmallItems: function(data, threshold) {
     const total = data.reduce((sum, d) => sum + d.value, 0);
     const visible = [];
@@ -565,16 +1073,11 @@ looker.plugins.visualizations.add({
     return data;
   },
 
-  // Modified groupData to handle rendered values
-  groupData: function(data, dimension, measure, level, maxDepth, queryResponse) {
+  groupData: function(data, dimension, measure, level, maxDepth) {
     const grouped = {};
-    const hasPivot = this._hasPivot;
-    const pivots = queryResponse.pivots;
-
     data.forEach(row => {
       const key = row[dimension].value;
       const safeKey = "k_" + key;
-
       if (!grouped[safeKey]) {
         grouped[safeKey] = {
           name: key,
@@ -586,27 +1089,10 @@ looker.plugins.visualizations.add({
           isDrillable: level < maxDepth - 1
         };
       }
-
-      let val = 0;
-      let rendered = null;
-
-      if (hasPivot && pivots && pivots.length > 0) {
-        // Sum all pivot values
-        pivots.forEach(pivot => {
-          const cell = row[measure] && row[measure][pivot.key];
-          if (cell && cell.value !== null && cell.value !== undefined) {
-            val += Number(cell.value) || 0;
-            // Keep first rendered value as reference
-            if (!rendered && cell.rendered) {
-              rendered = cell.rendered;
-            }
-          }
-        });
-      } else {
-        const cell = row[measure];
-        val = cell && cell.value !== null ? Number(cell.value) : 0;
-        rendered = cell && cell.rendered ? cell.rendered : null;
-      }
+      const measureField = this._measureField;
+      const cell = row[measureField.name];
+      const val = cell && cell.value !== null ? Number(cell.value) : 0;
+      const rendered = cell && cell.rendered ? cell.rendered : null;
 
       grouped[safeKey].value += Math.max(0, val);
       grouped[safeKey].rawValue += val;
@@ -619,155 +1105,7 @@ looker.plugins.visualizations.add({
     return Object.values(grouped).filter(d => d.value > 0);
   },
 
-  renderTreemap: function(data, config, dimension, queryResponse) {
-    const svgNS = "http://www.w3.org/2000/svg";
-    this._svg.innerHTML = '';
-
-    const rect = this._container.getBoundingClientRect();
-    const breadcrumbHeight = this._drillStack.length > 0 ? 36 : 0;
-    const width = Math.floor(rect.width);
-    const height = Math.floor(rect.height - breadcrumbHeight);
-
-    if (width <= 0 || height <= 0) return;
-
-    this._svg.style.marginTop = `${breadcrumbHeight}px`;
-    this._svg.style.height = `calc(100% - ${breadcrumbHeight}px)`;
-    this._svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-
-    const totalValue = data.reduce((sum, d) => sum + d.value, 0);
-    const rootArea = width * height;
-
-    const nodes = data.map(d => ({
-      ...d,
-      area: (d.value / totalValue) * rootArea,
-      percent: (d.value / totalValue) * 100,
-      drillLinks: (d.children && d.children.length > 0 && dimension && d.children[0][dimension])
-        ? (d.children[0][dimension].links || [])
-        : [],
-      rawData: d.children || []
-    }));
-    let layout = this.squarify(nodes, 0, 0, width, height);
-
-    // Force last item to fill to edges
-    if (layout.length > 0) {
-      const lastItem = layout[layout.length - 1];
-      lastItem.width = width - lastItem.x;
-      lastItem.height = height - lastItem.y;
-    }
-
-    const colors = this.getColors(data, config);
-
-    layout.forEach((item, i) => {
-      const g = document.createElementNS(svgNS, 'g');
-      const rectEl = document.createElementNS(svgNS, 'rect');
-
-      const isLast = (i === layout.length - 1);
-      const x = Math.round(item.x);
-      const y = Math.round(item.y);
-      const w = isLast ? (width - x) : (Math.round(item.x + item.width) - x);
-      const h = isLast ? (height - y) : (Math.round(item.y + item.height) - y);
-
-      rectEl.setAttribute('x', x);
-      rectEl.setAttribute('y', y);
-      rectEl.setAttribute('width', Math.max(1, w));
-      rectEl.setAttribute('height', Math.max(1, h));
-
-      let fillColor;
-      if (config.color_by === 'metric' && config.use_gradient) {
-        const allValues = data.map(d => d.value);
-        const min = Math.min(...allValues);
-        const max = Math.max(...allValues);
-        const ratio = (max === min) ? 0.5 : (item.value - min) / (max - min);
-
-        let startColor = config.gradient_start_color || '#F1F8E9';
-        let endColor = config.gradient_end_color || '#33691E';
-
-        if (config.reverse_palette) {
-          [startColor, endColor] = [endColor, startColor];
-        }
-
-        fillColor = this.interpolateColor(startColor, endColor, ratio);
-      } else {
-        fillColor = colors[i % colors.length];
-      }
-
-      rectEl.setAttribute('fill', fillColor);
-      rectEl.setAttribute('stroke', config.border_color);
-      rectEl.setAttribute('stroke-width', config.border_width);
-      rectEl.setAttribute('class', 'treemap-rect');
-
-      // Click handler for drill-down
-      rectEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-
-        if (this._config.enable_drill_down && (item.isDrillable || item.isOthers || item.isPivotGroup)) {
-          if (item.isOthers) {
-            this.drawTreemap(item.rawData, this._config, this._queryResponse);
-          } else {
-            this._drillStack.push(item.name);
-            this.drawTreemap(null, this._config, this._queryResponse);
-          }
-        } else {
-          // LookML drill fields
-          let drillLinks = [];
-          if (item.rawData && item.rawData.length > 0) {
-            const firstRow = item.rawData[0];
-            Object.keys(firstRow).forEach(key => {
-              if (firstRow[key] && firstRow[key].links && firstRow[key].links.length > 0) {
-                drillLinks = firstRow[key].links;
-              }
-            });
-          }
-
-          if (drillLinks.length > 0 && LookerCharts && LookerCharts.Utils) {
-            try {
-              LookerCharts.Utils.openDrillMenu({
-                links: drillLinks,
-                event: e
-              });
-            } catch (error) {
-              console.error('Error opening drill menu:', error);
-            }
-          }
-        }
-      });
-
-      // Tooltip with formatted values
-      rectEl.addEventListener('mouseenter', () => {
-        const formattedValue = this.formatValue(item.rawValue, config, item.rendered);
-        const pct = item.percent.toFixed(1);
-        this._tooltip.innerHTML = `
-        <div style="font-weight:600; margin-bottom:2px">${item.name}</div>
-        <div>${formattedValue} (${pct}%)</div>
-        ${item.children && item.children.length > 0 ? '<div style="font-size:10px; opacity:0.8">(Click to drill down)</div>' : ''}
-        `;
-        this._tooltip.style.display = 'block';
-      });
-
-      rectEl.addEventListener('mousemove', (e) => {
-        const tooltipRect = this._tooltip.getBoundingClientRect();
-        let left = e.pageX + 12;
-        let top = e.pageY + 12;
-        if (left + tooltipRect.width > window.innerWidth) left = e.pageX - tooltipRect.width - 12;
-        if (top + tooltipRect.height > window.innerHeight) top = e.pageY - tooltipRect.height - 12;
-        this._tooltip.style.left = left + 'px';
-        this._tooltip.style.top = top + 'px';
-      });
-
-      rectEl.addEventListener('mouseleave', () => {
-        this._tooltip.style.display = 'none';
-      });
-
-      g.appendChild(rectEl);
-
-      if ((item.value / totalValue) * 100 >= (config.label_threshold || 0)) {
-        this.addLabels(g, item, config, svgNS, totalValue);
-      }
-
-      this._svg.appendChild(g);
-    });
-  },
-
+  // Squarify algorithm
   squarify: function(nodes, x, y, width, height) {
     const results = [];
     if (nodes.length === 0) return results;
@@ -779,14 +1117,14 @@ looker.plugins.visualizations.add({
     while (remainingNodes.length > 0) {
       const nextNode = remainingNodes[0];
       if (this.improvesRatio(currentRow, nextNode, container)) {
-         currentRow.push(remainingNodes.shift());
+        currentRow.push(remainingNodes.shift());
       } else {
-         this.layoutRow(currentRow, container, results);
-         currentRow = [];
+        this.layoutRow(currentRow, container, results);
+        currentRow = [];
       }
     }
     if (currentRow.length > 0) {
-       this.layoutLastRow(currentRow, container, results);
+      this.layoutLastRow(currentRow, container, results);
     }
     return results;
   },
@@ -800,54 +1138,54 @@ looker.plugins.visualizations.add({
   },
 
   calculateWorstRatio: function(row, container) {
-     if (row.length === 0) return Infinity;
-     const sideLength = Math.min(container.width, container.height);
-     const totalArea = row.reduce((sum, node) => sum + node.area, 0);
-     const rowThickness = totalArea / sideLength;
-     let maxRatio = 0;
-     for (let i = 0; i < row.length; i++) {
-        const itemLength = row[i].area / rowThickness;
-        const ratio = Math.max(rowThickness / itemLength, itemLength / rowThickness);
-        if (ratio > maxRatio) maxRatio = ratio;
-     }
-     return maxRatio;
+    if (row.length === 0) return Infinity;
+    const sideLength = Math.min(container.width, container.height);
+    const totalArea = row.reduce((sum, node) => sum + node.area, 0);
+    const rowThickness = totalArea / sideLength;
+    let maxRatio = 0;
+    for (let i = 0; i < row.length; i++) {
+      const itemLength = row[i].area / rowThickness;
+      const ratio = Math.max(rowThickness / itemLength, itemLength / rowThickness);
+      if (ratio > maxRatio) maxRatio = ratio;
+    }
+    return maxRatio;
   },
 
   layoutRow: function(row, container, results) {
-     const totalArea = row.reduce((sum, node) => sum + node.area, 0);
-     const useWidth = container.width < container.height;
+    const totalArea = row.reduce((sum, node) => sum + node.area, 0);
+    const useWidth = container.width < container.height;
 
-     if (useWidth) {
-        const rowHeight = totalArea / container.width;
-        let runningX = container.x;
-        row.forEach((node, i) => {
-           let nodeWidth;
-           if (i === row.length - 1) {
-              nodeWidth = Math.max(0, (container.x + container.width) - runningX);
-           } else {
-              nodeWidth = node.area / rowHeight;
-           }
-           results.push({ ...node, x: runningX, y: container.y, width: nodeWidth, height: rowHeight });
-           runningX += nodeWidth;
-        });
-        container.y += rowHeight;
-        container.height -= rowHeight;
-     } else {
-        const rowWidth = totalArea / container.height;
-        let runningY = container.y;
-        row.forEach((node, i) => {
-           let nodeHeight;
-           if (i === row.length - 1) {
-             nodeHeight = Math.max(0, (container.y + container.height) - runningY);
-           } else {
-             nodeHeight = node.area / rowWidth;
-           }
-           results.push({ ...node, x: container.x, y: runningY, width: rowWidth, height: nodeHeight });
-           runningY += nodeHeight;
-        });
-        container.x += rowWidth;
-        container.width -= rowWidth;
-     }
+    if (useWidth) {
+      const rowHeight = totalArea / container.width;
+      let runningX = container.x;
+      row.forEach((node, i) => {
+        let nodeWidth;
+        if (i === row.length - 1) {
+          nodeWidth = Math.max(0, (container.x + container.width) - runningX);
+        } else {
+          nodeWidth = node.area / rowHeight;
+        }
+        results.push({ ...node, x: runningX, y: container.y, width: nodeWidth, height: rowHeight });
+        runningX += nodeWidth;
+      });
+      container.y += rowHeight;
+      container.height -= rowHeight;
+    } else {
+      const rowWidth = totalArea / container.height;
+      let runningY = container.y;
+      row.forEach((node, i) => {
+        let nodeHeight;
+        if (i === row.length - 1) {
+          nodeHeight = Math.max(0, (container.y + container.height) - runningY);
+        } else {
+          nodeHeight = node.area / rowWidth;
+        }
+        results.push({ ...node, x: container.x, y: runningY, width: rowWidth, height: nodeHeight });
+        runningY += nodeHeight;
+      });
+      container.x += rowWidth;
+      container.width -= rowWidth;
+    }
   },
 
   layoutLastRow: function(row, container, results) {
@@ -898,67 +1236,7 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // Modified addLabels to support value display format
-  addLabels: function(g, item, config, svgNS, totalValue) {
-    const labelFontSize = config.label_font_size || 12;
-    const valueFontSize = config.value_font_size || 12;
-    const padding = 4;
-
-    if (item.width < 20 || item.height < 15) return;
-
-    const maxWidth = item.width - (padding * 2);
-    const maxHeight = item.height - (padding * 2);
-
-    const showLabel = config.show_labels && (maxWidth >= 30) && (maxHeight >= labelFontSize + 4);
-    const showValue = config.show_values && (maxWidth >= 30) && (maxHeight >= valueFontSize + 4);
-
-    if (!showLabel && !showValue) return;
-
-    const labelText = item.name;
-    const valueText = this.getValueDisplayText(item, config, totalValue);
-    const canFitStacked = showLabel && showValue && (maxHeight >= (labelFontSize + valueFontSize + 8));
-    let currentY = item.y + (item.height / 2);
-
-    if (canFitStacked) currentY -= 2;
-
-    if (showLabel) {
-       const labelEl = document.createElementNS(svgNS, 'text');
-       labelEl.setAttribute('x', item.x + (item.width / 2));
-       labelEl.setAttribute('y', canFitStacked ? currentY - (valueFontSize / 2) : currentY + (labelFontSize/3));
-       labelEl.setAttribute('text-anchor', 'middle');
-       labelEl.setAttribute('fill', config.label_color);
-       labelEl.setAttribute('font-size', labelFontSize);
-       labelEl.setAttribute('class', 'treemap-label');
-
-       let finalLabel = labelText;
-       if (this.estimateTextWidth(labelText, labelFontSize) > maxWidth) {
-          finalLabel = this.ellipsize(labelText, maxWidth, labelFontSize);
-       }
-       labelEl.textContent = finalLabel;
-       g.appendChild(labelEl);
-    }
-
-    if (showValue) {
-       if (!canFitStacked && showLabel) return;
-
-       const valEl = document.createElementNS(svgNS, 'text');
-       valEl.setAttribute('x', item.x + (item.width / 2));
-       valEl.setAttribute('y', canFitStacked ? currentY + valueFontSize + 2 : currentY + (valueFontSize/3));
-       valEl.setAttribute('text-anchor', 'middle');
-       valEl.setAttribute('fill', config.value_color);
-       valEl.setAttribute('font-size', valueFontSize);
-       valEl.setAttribute('class', 'treemap-value');
-       valEl.textContent = valueText;
-
-       if (this.estimateTextWidth(valueText, valueFontSize) > maxWidth) {
-          // Don't add if too wide
-       } else {
-          g.appendChild(valEl);
-       }
-    }
-  },
-
-  // NEW: Get value display text based on config
+  // Value formatting
   getValueDisplayText: function(item, config, totalValue) {
     const displayFormat = config.value_display_format || 'value';
     const formattedValue = this.formatValue(item.rawValue, config, item.rendered);
@@ -975,33 +1253,26 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // NEW: Enhanced formatValue with LookML support (inspired by bar_chart)
   formatValue: function(value, config, renderedValue) {
     const formatType = config.value_format || 'auto';
     const customFormat = config.value_format_custom || '';
     const field = this._measureField;
 
-    // PRIORITY 1: Custom format string takes precedence
     if (customFormat && customFormat.trim() !== '') {
       return this.applyCustomFormat(value, customFormat);
     }
 
     if (isNaN(value)) return String(value);
 
-    // PRIORITY 2: AUTO uses LookML's rendered value if available
     if (formatType === 'auto') {
-      // First try to use the rendered value passed from Looker data
       if (renderedValue !== null && renderedValue !== undefined) {
         return renderedValue;
       }
-
-      // Fallback: Parse LookML value_format
       if (field && field.value_format) {
         return this.applyLookMLFormat(value, field.value_format);
       }
     }
 
-    // PRIORITY 3: Preset formats
     switch (formatType) {
       case 'currency':
         return '$' + (value >= 1000 ? (value / 1000).toFixed(1) + 'K' : value.toFixed(0));
@@ -1017,15 +1288,12 @@ looker.plugins.visualizations.add({
         return this.abbreviateValue(value);
     }
 
-    // PRIORITY 4: Auto fallback - smart number formatting
     return this.abbreviateValue(value);
   },
 
-  // NEW: Apply LookML format string
   applyLookMLFormat: function(value, fmt) {
     const num = Number(value);
 
-    // Pattern: "$0.0," k"" or similar -> thousands with k suffix
     if (fmt.includes('," k"') || fmt.includes(",'k'")) {
       const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
       const sign = (num < 0) ? '-' : '';
@@ -1038,7 +1306,6 @@ looker.plugins.visualizations.add({
       return `${sign}$${formattedNum} k`;
     }
 
-    // Pattern: standard currency format (e.g. $#,##0.00)
     if (fmt.startsWith('$')) {
       const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
       return '$' + num.toLocaleString('en-US', {
@@ -1047,16 +1314,6 @@ looker.plugins.visualizations.add({
       });
     }
 
-    // Pattern: Euro currency
-    if (fmt.startsWith('€') || fmt.includes('€')) {
-      const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-      return '€' + num.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      });
-    }
-
-    // Pattern: standard number format (e.g. #,##0.0)
     if (fmt.includes('#,##0')) {
       const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
       return num.toLocaleString('en-US', {
@@ -1065,23 +1322,19 @@ looker.plugins.visualizations.add({
       });
     }
 
-    // Pattern: percentage format
     if (fmt.includes('%')) {
       const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
       return (num * 100).toFixed(decimals) + '%';
     }
 
-    // Default: use abbreviated format
     return this.abbreviateValue(value);
   },
 
-  // NEW: Apply custom format string
   applyCustomFormat: function(value, customFormat) {
     if (isNaN(value)) return String(value);
 
     const num = Number(value);
 
-    // Handle currency formats
     if (customFormat.includes('$') || customFormat.includes('€') || customFormat.includes('£')) {
       let currency = customFormat.match(/[$€£]/)?.[0] || '';
       let decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
@@ -1107,13 +1360,11 @@ looker.plugins.visualizations.add({
       return `${currency}${formattedNumber}${scaledSuffix}`;
     }
 
-    // Handle percentage format
     if (customFormat.includes('%')) {
       const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
       return (num * 100).toFixed(decimals) + '%';
     }
 
-    // Default number formatting
     const decimals = (customFormat.match(/0\.([0#]+)/) || [])[1]?.length || 0;
     return num.toLocaleString('en-US', {
       minimumFractionDigits: decimals,
@@ -1121,7 +1372,6 @@ looker.plugins.visualizations.add({
     });
   },
 
-  // Abbreviated value formatting (K/M/B)
   abbreviateValue: function(value) {
     if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
     if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
@@ -1129,11 +1379,12 @@ looker.plugins.visualizations.add({
     return value.toFixed(0);
   },
 
+  // Utility functions
   ellipsize: function(text, maxWidth, fontSize) {
-     const estimatedCharWidth = fontSize * 0.6;
-     const maxChars = Math.floor(maxWidth / estimatedCharWidth);
-     if (text.length <= maxChars) return text;
-     return text.substring(0, Math.max(0, maxChars - 2)) + '..';
+    const estimatedCharWidth = fontSize * 0.6;
+    const maxChars = Math.floor(maxWidth / estimatedCharWidth);
+    if (text.length <= maxChars) return text;
+    return text.substring(0, Math.max(0, maxChars - 2)) + '..';
   },
 
   estimateTextWidth: function(text, fontSize) {
@@ -1168,7 +1419,8 @@ looker.plugins.visualizations.add({
       google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC', '#7BAAF7', '#F07B72', '#FCD04F', '#71C287'],
       viridis: ['#440154', '#482475', '#414487', '#355F8D', '#2A788E', '#21908C', '#22A884', '#42BE71', '#7AD151', '#BDDF26', '#FDE725'],
       warm: ['#FFF5EB', '#FEE6CE', '#FDD0A2', '#FDAE6B', '#FD8D3C', '#F16913', '#E6550D', '#D94801', '#A63603', '#7F2704'],
-      cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B', '#041E42']
+      cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B', '#041E42'],
+      categorical: ['#E07D54', '#7EB77F', '#64B5F6', '#BA68C8', '#FFB74D', '#4FC3F7', '#F06292', '#AED581', '#90A4AE', '#FFD54F']
     };
 
     let palette = palettes[config.color_palette] || palettes.green_scale;
@@ -1183,7 +1435,6 @@ looker.plugins.visualizations.add({
       return palette.slice(0, itemCount);
     }
 
-    // Interpolate for many items
     const colors = [];
     for (let i = 0; i < itemCount; i++) {
       const position = i / Math.max(1, itemCount - 1);
@@ -1200,12 +1451,16 @@ looker.plugins.visualizations.add({
 
   interpolateColor: function(color1, color2, ratio) {
     const hex = (c) => {
-       c = c.replace('#', '');
-       return {
-         r: parseInt(c.substring(0, 2), 16),
-         g: parseInt(c.substring(2, 4), 16),
-         b: parseInt(c.substring(4, 6), 16)
-       };
+      c = c.replace('#', '');
+      if (c.startsWith('rgb')) {
+        const match = c.match(/\d+/g);
+        return { r: parseInt(match[0]), g: parseInt(match[1]), b: parseInt(match[2]) };
+      }
+      return {
+        r: parseInt(c.substring(0, 2), 16),
+        g: parseInt(c.substring(2, 4), 16),
+        b: parseInt(c.substring(4, 6), 16)
+      };
     };
     const c1 = hex(color1), c2 = hex(color2);
     const r = Math.round(c1.r + (c2.r - c1.r) * ratio);

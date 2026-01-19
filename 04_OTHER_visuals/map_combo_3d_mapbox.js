@@ -1,5 +1,5 @@
 /**
- * Multi-Layer 3D Map for Looker - v6 Stable (Crash Proof)
+ * Multi-Layer 3D Map for Looker - v7 Ultimate (Crash Proof)
  * * * DEPENDENCIES (Add to manifest.lkml):
  * {
  * "dependencies": {
@@ -105,8 +105,8 @@ const getLayerOptions = (n) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v6",
-  label: "Combo Map 3D (Stable)",
+  id: "combo_map_ultimate_v7",
+  label: "Combo Map 3D (Crash Proof)",
   options: {
     // --- MAP SETTINGS ---
     mapbox_token: {
@@ -281,7 +281,9 @@ looker.plugins.visualizations.add({
     try {
         geojson = await this._loadGeoJSON(url);
     } catch (error) {
-        throw new Error(`Failed to load Map Data. Check network/CORS.`);
+        // Fallback for empty/failed geojson
+        console.warn("GeoJSON Load Fail", error);
+        geojson = { type: "FeatureCollection", features: [] };
     }
 
     const dims = queryResponse.fields.dimension_like;
@@ -346,8 +348,12 @@ looker.plugins.visualizations.add({
     // Loop through Layer 1, 2, 3, 4
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`]) {
-        const layer = this._buildSingleLayer(i, config, processed);
-        if (layer) layers.push(layer);
+        try {
+          const layer = this._buildSingleLayer(i, config, processed);
+          if (layer) layers.push(layer);
+        } catch(e) {
+          console.error(`Layer ${i} failed to build`, e);
+        }
       }
     }
 
@@ -376,14 +382,11 @@ looker.plugins.visualizations.add({
       return { html, style: { backgroundColor: '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
     };
 
-    // --- VIEW STATE LOGIC (CRASH FIX) ---
-    // 1. Ensure config values are valid Numbers
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
     const cfgPitch = Number(config.pitch) || 45;
 
-    // 2. Initialize view state if null
     if (!this._viewState) {
       this._viewState = {
         longitude: cfgLng,
@@ -393,42 +396,48 @@ looker.plugins.visualizations.add({
         bearing: 0
       };
     }
-    // 3. Optional: Sync viewstate if config changes significantly?
-    // For now, we respect the user's manual navigation.
 
-    // 4. Update the stored view state when user interacts
     const onViewStateChange = ({viewState}) => {
       this._viewState = viewState;
-      // Re-render to update the camera position
       this._deck.setProps({ viewState: this._viewState });
     };
 
-    const isPrint = details && details.print;
-
     if (!this._deck) {
-      // INITIAL RENDER
       this._deck = new deck.DeckGL({
         container: this._container,
         mapStyle: config.map_style,
         mapboxApiAccessToken: config.mapbox_token,
-        viewState: this._viewState, // Controlled Mode
+        viewState: this._viewState,
         onViewStateChange: onViewStateChange,
         controller: true,
         layers: layers,
         getTooltip: getTooltip,
-        glOptions: { preserveDrawingBuffer: true }
+        glOptions: { preserveDrawingBuffer: true },
+        // Add basic error handler for deck.gl
+        onError: (err) => console.warn("DeckGL Error:", err)
       });
     } else {
-      // UPDATE RENDER
       this._deck.setProps({
         layers: layers,
         mapStyle: config.map_style,
         mapboxApiAccessToken: config.mapbox_token,
         getTooltip: getTooltip,
-        viewState: this._viewState, // Maintain current view
+        viewState: this._viewState,
         onViewStateChange: onViewStateChange
       });
     }
+  },
+
+  // NEW HELPER: Strict Data Validator
+  _validateLayerData: function(data) {
+    if(!data || !Array.isArray(data) || data.length === 0) return [];
+    return data.filter(d =>
+        d.position &&
+        d.position.length === 2 &&
+        !isNaN(d.position[0]) &&
+        !isNaN(d.position[1]) &&
+        d.position[1] >= -90 && d.position[1] <= 90 // Valid Latitude check
+    );
   },
 
   _buildSingleLayer: function(idx, config, processed) {
@@ -439,9 +448,6 @@ looker.plugins.visualizations.add({
     const heightScale = config[`layer${idx}_height`];
     const opacity = config[`layer${idx}_opacity`];
     const iconUrl = config[`layer${idx}_icon_url`];
-
-    // SKIP EMPTY DATA LAYERS TO PREVENT CRASH
-    if (!processed.data || processed.data.length === 0) return null;
 
     const getValue = (d) => {
       const arr = d.values || (d.properties && d.properties._values);
@@ -460,11 +466,17 @@ looker.plugins.visualizations.add({
       pointData = processed.data;
     }
 
+    // Validate coordinates to prevent "invalid latitude" crash
+    const safePointData = this._validateLayerData(pointData);
+    if (safePointData.length === 0 && type !== 'geojson') return null;
+
     const id = `layer-${idx}`;
 
     switch (type) {
       case 'geojson':
         if (processed.type !== 'regions') return null;
+        if (!processed.data || processed.data.length === 0) return null;
+
         const allVals = processed.data.map(d => d.values[measureIdx] || 0);
         const maxVal = Math.max(...allVals, 0.1);
 
@@ -490,7 +502,7 @@ looker.plugins.visualizations.add({
       case 'column':
         return new deck.ColumnLayer({
           id: id,
-          data: pointData,
+          data: safePointData,
           diskResolution: 6,
           radius: radius,
           extruded: true,
@@ -506,7 +518,7 @@ looker.plugins.visualizations.add({
       case 'point':
         return new deck.ScatterplotLayer({
           id: id,
-          data: pointData,
+          data: safePointData,
           pickable: true,
           opacity: opacity,
           stroked: true,
@@ -520,11 +532,11 @@ looker.plugins.visualizations.add({
         });
 
       case 'bubble':
-        const bVals = pointData.map(d => getValue(d));
+        const bVals = safePointData.map(d => getValue(d));
         const bMax = Math.max(...bVals, 1);
         return new deck.ScatterplotLayer({
           id: id,
-          data: pointData,
+          data: safePointData,
           pickable: true,
           opacity: opacity,
           stroked: true,
@@ -541,7 +553,7 @@ looker.plugins.visualizations.add({
         if (!iconUrl || iconUrl.length < 5) return null;
         return new deck.IconLayer({
             id: id,
-            data: pointData,
+            data: safePointData,
             pickable: true,
             opacity: opacity,
             iconAtlas: iconUrl,
@@ -553,13 +565,14 @@ looker.plugins.visualizations.add({
             getSize: d => radius,
             sizeScale: 1,
             sizeMinPixels: 20,
+            autoHighlight: false, // Fixes getTexture crash
             onIconError: (err) => console.warn("Icon error", err)
         });
 
       case 'heatmap':
         return new deck.HeatmapLayer({
           id: id,
-          data: pointData,
+          data: safePointData,
           pickable: false,
           getPosition: d => d.position,
           getWeight: d => getValue(d),
@@ -569,7 +582,7 @@ looker.plugins.visualizations.add({
       case 'hexagon':
         return new deck.HexagonLayer({
           id: id,
-          data: pointData,
+          data: safePointData,
           pickable: true,
           extruded: true,
           radius: radius,
@@ -588,7 +601,6 @@ looker.plugins.visualizations.add({
   _getGeoJSONUrl: function(config) {
     if (config.map_layer_source === 'custom') return config.custom_geojson_url;
 
-    // CORS-COMPATIBLE SOURCES
     const URLS = {
         world_countries: 'https://unpkg.com/world-atlas@2/countries-110m.json',
         us_states: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
