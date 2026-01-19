@@ -1,7 +1,7 @@
 /**
- * Multi-Layer 3D Map for Looker - v20 Ultimate
- * * * RESTORED V17 RENDER LOGIC (Proven to work for PDF)
- * * * UI FIX: Increased Layer Setting Spacing to prevent overlap.
+ * Multi-Layer 3D Map for Looker - v21 Ultimate
+ * * * REVERTED TO V17 ENGINE (Stable PDF Map)
+ * * * UI FIX: Corrected Icon URL Field Positioning
  */
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -14,9 +14,8 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
-  // FIX: Use 100 spacing to prevent Layer 1 settings from overlapping Layer 2
-  // Layer 1 starts at 100, Layer 2 at 200, etc.
-  const b = n * 100;
+  // UI FIX: Use wide spacing (50) so fields don't overlap into next layer
+  const b = 100 + (n * 50);
 
   return {
     [`layer${n}_divider_top`]: {
@@ -121,12 +120,12 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: V17 PRELOADER ---
+// Helper: V17 Image Preloader
 const preloadImage = (url) => {
     return new Promise((resolve) => {
         if (!url || url.length < 5) return resolve();
         const img = new Image();
-        img.crossOrigin = "Anonymous"; // Crucial for PDF
+        img.crossOrigin = "Anonymous";
         img.onload = () => resolve();
         img.onerror = () => resolve();
         img.src = url;
@@ -134,8 +133,8 @@ const preloadImage = (url) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v20",
-  label: "Combo Map 3D (V17 Logic + UI Fix)",
+  id: "combo_map_ultimate_v21",
+  label: "Combo Map 3D (V17 Stable + UI Fix)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -388,8 +387,9 @@ looker.plugins.visualizations.add({
         // --- V17 LOGIC: PDF RENDER WAIT ---
         if (details && details.print) {
             console.log("PDF Mode: Freezing for 3s to load tiles...");
-            // Force a redraw to flush the buffer
+            // Force redraw ensures buffer is fresh
             if(this._deck) this._deck.redraw(true);
+
             setTimeout(() => {
                 done();
             }, 3000);
@@ -648,7 +648,6 @@ looker.plugins.visualizations.add({
       }
 
       if (links && links.length > 0) {
-        // Safe Event Mock for Looker Drill Menu
         const mockEvent = {
             pageX: info.x,
             pageY: info.y,
