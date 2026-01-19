@@ -1,13 +1,12 @@
 /**
- * Multi-Layer 3D Map for Looker - v9 Ultimate (Ordered Layers + Combined Colors)
+ * Multi-Layer 3D Map for Looker - v10 Ultimate (Single Tab + Perf Fix)
  * Features:
  * - "Plot" Tab: General Map & Data settings.
- * - "Layer X" Tabs: Specific settings per layer.
- * - Layer Ordering (Z-Index) to control draw order.
- * - Combined "Color" field for Solid/Gradient Start.
+ * - "Layers" Tab: All Layer settings consolidated with Z-Index ordering.
+ * - Performance: Added garbage collection (destroy) to fix console errors.
  */
 
-// --- HELPER: GENERATE LAYER OPTIONS ---
+// --- HELPER: GENERATE LAYER OPTIONS (Consolidated Section) ---
 const getLayerOptions = (n) => {
   const defaults = [
     { type: 'geojson', color: '#2E7D32', radius: 1000, height: 1000 },
@@ -17,17 +16,27 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
+  // Base order helps keep the UI clean: L1=100, L2=200, etc.
+  const b = n * 100;
+
   return {
+    [`layer${n}_divider_top`]: {
+      type: "string",
+      label: `────────── LAYER ${n} ──────────`,
+      display: "divider",
+      section: "Layers",
+      order: b + 1
+    },
     [`layer${n}_enabled`]: {
       type: "boolean",
-      label: "Enable Layer",
+      label: `Enable Layer ${n}`,
       default: n <= 2,
-      section: `Layer ${n}`,
-      order: 1
+      section: "Layers",
+      order: b + 2
     },
     [`layer${n}_type`]: {
       type: "string",
-      label: "Visualization Type",
+      label: `Layer ${n} Type`,
       display: "select",
       values: [
         {"Choropleth (Region Only)": "geojson"},
@@ -39,89 +48,87 @@ const getLayerOptions = (n) => {
         {"Hexagon Grid": "hexagon"}
       ],
       default: def.type,
-      section: `Layer ${n}`,
-      order: 2
+      section: "Layers",
+      order: b + 3
     },
     [`layer${n}_measure_idx`]: {
       type: "number",
-      label: "Measure Index (0, 1...)",
+      label: `L${n} Measure Index`,
       default: n-1,
-      section: `Layer ${n}`,
-      order: 3
+      section: "Layers",
+      order: b + 4
     },
-    // NEW: Layer Order Control
     [`layer${n}_z_index`]: {
       type: "number",
-      label: "Layer Order (1 = Bottom, 10 = Top)",
+      label: `L${n} Layer Order (Z-Index)`,
       default: n,
-      section: `Layer ${n}`,
-      order: 4
+      section: "Layers",
+      placeholder: "Higher # is on top",
+      order: b + 5
     },
-    [`layer${n}_divider1`]: { type: "string", label: "── COLOR ──", display: "divider", section: `Layer ${n}`, order: 5 },
 
     // COMBINED COLOR LOGIC
     [`layer${n}_use_gradient`]: {
       type: "boolean",
-      label: "Use Gradient?",
+      label: `L${n} Use Gradient?`,
       default: false,
-      section: `Layer ${n}`,
-      order: 6
+      section: "Layers",
+      order: b + 6
     },
     [`layer${n}_color_main`]: {
       type: "string",
-      label: "Color (Solid / Gradient Start)",
+      label: `L${n} Color (Solid / Start)`,
       display: "color",
       default: def.color,
-      section: `Layer ${n}`,
-      order: 7
+      section: "Layers",
+      order: b + 7
     },
     [`layer${n}_gradient_end`]: {
       type: "string",
-      label: "Gradient End (if enabled)",
+      label: `L${n} Gradient End`,
       display: "color",
       default: "#1B5E20",
-      section: `Layer ${n}`,
-      order: 8
+      section: "Layers",
+      order: b + 8
     },
 
-    [`layer${n}_divider2`]: { type: "string", label: "── SIZE ──", display: "divider", section: `Layer ${n}`, order: 9 },
-
+    // SIZE SETTINGS
     [`layer${n}_radius`]: {
       type: "number",
-      label: "Radius / Size",
+      label: `L${n} Radius / Size`,
       default: def.radius,
-      section: `Layer ${n}`,
-      order: 10
+      section: "Layers",
+      order: b + 9
     },
     [`layer${n}_height`]: {
       type: "number",
-      label: "Height (3D)",
+      label: `L${n} Height (3D)`,
       default: def.height,
-      section: `Layer ${n}`,
-      order: 11
+      section: "Layers",
+      order: b + 10
     },
     [`layer${n}_opacity`]: {
       type: "number",
-      label: "Opacity (0-1)",
+      label: `L${n} Opacity`,
       default: 0.7,
       min: 0, max: 1, step: 0.1,
-      section: `Layer ${n}`,
-      order: 12
+      section: "Layers",
+      order: b + 11
     },
     [`layer${n}_icon_url`]: {
       type: "string",
-      label: "Icon URL (for Icon type)",
+      label: `L${n} Icon URL`,
       default: "",
       placeholder: "https://...",
-      section: `Layer ${n}`,
-      order: 13
+      section: "Layers",
+      order: b + 12
     }
   };
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v9",
-  label: "Combo Map 3D (Layer Ordered)",
+  id: "combo_map_ultimate_v10",
+  label: "Combo Map 3D (Clean & Fast)",
   options: {
     // --- 1. REGION DATA SETTINGS (Plot Tab) ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -201,7 +208,7 @@ looker.plugins.visualizations.add({
     zoom: { type: "number", label: "Zoom", default: 4, section: "Plot", order: 15 },
     pitch: { type: "number", label: "3D Tilt (0-60)", default: 45, section: "Plot", order: 16 },
 
-    // --- 3. LAYERS (Generated into separate tabs) ---
+    // --- 3. LAYERS (Consolidated) ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
     ...getLayerOptions(3),
@@ -231,6 +238,14 @@ looker.plugins.visualizations.add({
     this._container = element.querySelector('#map');
     this._geojsonCache = {};
     this._viewState = null;
+  },
+
+  // NEW: Proper cleanup to fix connection errors
+  destroy: function() {
+    if (this._deck) {
+      this._deck.finalize();
+      this._deck = null;
+    }
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
@@ -343,13 +358,12 @@ looker.plugins.visualizations.add({
   _render: function(processed, config, queryResponse, details) {
     const layerObjects = [];
 
-    // Build layers but don't add to deck.gl yet
+    // Build layers
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`]) {
         try {
           const layer = this._buildSingleLayer(i, config, processed);
           if (layer) {
-            // Store layer along with its Z-Index preference
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
           }
@@ -359,7 +373,7 @@ looker.plugins.visualizations.add({
       }
     }
 
-    // Sort layers by Z-Index (Lower Z = Bottom, Higher Z = Top)
+    // Sort layers by Z-Index
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
@@ -417,7 +431,11 @@ looker.plugins.visualizations.add({
         controller: true,
         layers: layers,
         getTooltip: getTooltip,
-        glOptions: { preserveDrawingBuffer: true },
+        // PERFORMANCE SETTINGS
+        glOptions: {
+          preserveDrawingBuffer: true, // Needed for PDF
+          powerPreference: "high-performance" // Tries to use better GPU
+        },
         onError: (err) => console.warn("DeckGL Error:", err)
       });
     } else {
@@ -450,7 +468,7 @@ looker.plugins.visualizations.add({
 
     // COMBINED COLOR LOGIC
     const useGradient = config[`layer${idx}_use_gradient`];
-    const mainColor = this._hexToRgb(config[`layer${idx}_color_main`]); // Acts as Solid OR Start
+    const mainColor = this._hexToRgb(config[`layer${idx}_color_main`]);
     const gradEnd = config[`layer${idx}_gradient_end`];
 
     const radius = config[`layer${idx}_radius`];
@@ -478,7 +496,6 @@ looker.plugins.visualizations.add({
     const safePointData = this._validateLayerData(pointData);
     const id = `layer-${idx}-${type}`;
 
-    // Helper for gradient calc
     const allVals = safePointData.map(d => getValue(d));
     const maxVal = Math.max(...allVals, 0.1);
 
@@ -486,7 +503,6 @@ looker.plugins.visualizations.add({
         if (!useGradient) return mainColor;
         const val = getValue(d);
         const ratio = val / maxVal;
-        // Pass the Main Color as the START color
         return this._interpolateColor(config[`layer${idx}_color_main`], gradEnd, ratio);
     };
 
