@@ -81,6 +81,22 @@ looker.plugins.visualizations.add({
       section: "Plot",
       order: 9
     },
+    group_header_bg_color: {
+      type: "string",
+      label: "Group Header Background",
+      default: "#4285F4",
+      display: "color",
+      section: "Plot",
+      order: 10
+    },
+    group_header_text_color: {
+      type: "string",
+      label: "Group Header Text Color",
+      default: "#FFFFFF",
+      display: "color",
+      section: "Plot",
+      order: 11
+    },
 
     // ========== SERIES SECTION ==========
     color_by: {
@@ -233,14 +249,6 @@ looker.plugins.visualizations.add({
       display: "color",
       section: "Values",
       order: 11
-    },
-    group_label_color: {
-      type: "string",
-      label: "Group Label Color",
-      default: "#FFFFFF",
-      display: "color",
-      section: "Values",
-      order: 12
     }
   },
 
@@ -652,7 +660,7 @@ looker.plugins.visualizations.add({
         headerRect.setAttribute('y', py);
         headerRect.setAttribute('width', pw);
         headerRect.setAttribute('height', Math.min(headerHeight, ph));
-        headerRect.setAttribute('fill', parentColors[parentIndex % parentColors.length]);
+        headerRect.setAttribute('fill', config.group_header_bg_color || '#4285F4');
         headerRect.setAttribute('class', 'treemap-group-rect');
         g.appendChild(headerRect);
 
@@ -661,7 +669,7 @@ looker.plugins.visualizations.add({
           const headerLabel = document.createElementNS(svgNS, 'text');
           headerLabel.setAttribute('x', px + 5);
           headerLabel.setAttribute('y', py + Math.min(headerHeight, ph) - 5);
-          headerLabel.setAttribute('fill', config.group_label_color || '#FFFFFF');
+          headerLabel.setAttribute('fill', config.group_header_text_color || '#FFFFFF');
           headerLabel.setAttribute('class', 'treemap-group-label');
 
           let labelText = parent.name;

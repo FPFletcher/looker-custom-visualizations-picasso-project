@@ -1,12 +1,13 @@
 /**
- * Multi-Layer 3D Map for Looker - v10 Ultimate (Single Tab + Perf Fix)
+ * Multi-Layer 3D Map for Looker - v12 Ultimate (PDF Safe + Single Layers Tab)
  * Features:
- * - "Plot" Tab: General Map & Data settings.
- * - "Layers" Tab: All Layer settings consolidated with Z-Index ordering.
- * - Performance: Added garbage collection (destroy) to fix console errors.
+ * - "Plot" Tab: Map Style, Lat/Lon/Zoom, Data Mode, Tooltips.
+ * - "Layers" Tab: All 4 layers consolidated in one place.
+ * - PDF Fix: Disables animations during export to prevent TILE_ERROR.
+ * - Mapbox Token Warning: Displays UI message instead of crashing.
  */
 
-// --- HELPER: GENERATE LAYER OPTIONS (Consolidated Section) ---
+// --- HELPER: GENERATE LAYER OPTIONS ---
 const getLayerOptions = (n) => {
   const defaults = [
     { type: 'geojson', color: '#2E7D32', radius: 1000, height: 1000 },
@@ -16,7 +17,7 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
-  // Base order helps keep the UI clean: L1=100, L2=200, etc.
+  // Base order: Layer 1 = 100, Layer 2 = 200...
   const b = n * 100;
 
   return {
@@ -24,7 +25,7 @@ const getLayerOptions = (n) => {
       type: "string",
       label: `────────── LAYER ${n} ──────────`,
       display: "divider",
-      section: "Layers",
+      section: "Layers", // ALL IN ONE TAB
       order: b + 1
     },
     [`layer${n}_enabled`]: {
@@ -127,10 +128,10 @@ const getLayerOptions = (n) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v10",
-  label: "Combo Map 3D (Clean & Fast)",
+  id: "combo_map_ultimate_v12",
+  label: "Combo Map 3D (PDF Safe)",
   options: {
-    // --- 1. REGION DATA SETTINGS (Plot Tab) ---
+    // --- 1. DATA (Plot Tab) ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
 
     data_mode: {
@@ -179,7 +180,7 @@ looker.plugins.visualizations.add({
       order: 5
     },
 
-    // --- 2. BASE MAP SETTINGS (Plot Tab) ---
+    // --- 2. BASE MAP (Plot Tab) ---
     map_header: { type: "string", label: "─── BASE MAP ───", display: "divider", section: "Plot", order: 10 },
 
     mapbox_token: {
@@ -208,7 +209,33 @@ looker.plugins.visualizations.add({
     zoom: { type: "number", label: "Zoom", default: 4, section: "Plot", order: 15 },
     pitch: { type: "number", label: "3D Tilt (0-60)", default: 45, section: "Plot", order: 16 },
 
-    // --- 3. LAYERS (Consolidated) ---
+    // --- 3. TOOLTIP SETTINGS (Plot Tab) ---
+    tooltip_header: { type: "string", label: "─── TOOLTIP ───", display: "divider", section: "Plot", order: 20 },
+
+    tooltip_mode: {
+      type: "string",
+      label: "Tooltip Content",
+      display: "select",
+      values: [
+        {"Name & Values": "all"},
+        {"Name Only": "name"},
+        {"Values Only": "values"},
+        {"None": "none"}
+      ],
+      default: "all",
+      section: "Plot",
+      order: 21
+    },
+    tooltip_bg_color: {
+      type: "string",
+      label: "Tooltip Background",
+      display: "color",
+      default: "#FFFFFF",
+      section: "Plot",
+      order: 22
+    },
+
+    // --- 4. LAYERS (Single Tab) ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
     ...getLayerOptions(3),
@@ -230,17 +257,23 @@ looker.plugins.visualizations.add({
       <style>
         #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; background: #111; }
         #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .deck-tooltip { font-family: sans-serif; font-size: 12px; }
+        #token-error {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #FF5252; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 8px;
+            font-family: sans-serif; font-weight: bold; text-align: center; display: none; z-index: 999;
+        }
+        .deck-tooltip { font-family: sans-serif; font-size: 12px; pointer-events: none; }
       </style>
       <div id="map-wrapper">
         <div id="map"></div>
+        <div id="token-error">MISSING MAPBOX TOKEN<br><span style="font-size:0.8em; font-weight:normal">Please enter your token in the "Plot" settings.</span></div>
       </div>`;
     this._container = element.querySelector('#map');
+    this._tokenError = element.querySelector('#token-error');
     this._geojsonCache = {};
     this._viewState = null;
   },
 
-  // NEW: Proper cleanup to fix connection errors
   destroy: function() {
     if (this._deck) {
       this._deck.finalize();
@@ -251,23 +284,38 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
+    // 1. Check Token
+    if (!config.mapbox_token) {
+        if(this._deck) {
+            this._deck.finalize();
+            this._deck = null;
+        }
+        this._tokenError.style.display = 'block';
+        done();
+        return;
+    } else {
+        this._tokenError.style.display = 'none';
+    }
+
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
       this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
       done(); return;
     }
-    if (!config.mapbox_token) {
-      this.addError({ title: "Mapbox Token Required", message: "Enter token in Plot settings." });
-      done(); return;
-    }
 
-    this._prepareData(data, config, queryResponse).then(processedData => {
-      this._render(processedData, config, queryResponse, details);
+    // Try/Catch around the whole process to ensure done() is called so PDF generator doesn't hang
+    try {
+      this._prepareData(data, config, queryResponse).then(processedData => {
+        this._render(processedData, config, queryResponse, details);
+        done();
+      }).catch(err => {
+        console.error("Data Prep Error:", err);
+        this.addError({ title: "Error", message: err.message });
+        done();
+      });
+    } catch(e) {
+      console.error("Render Error:", e);
       done();
-    }).catch(err => {
-      console.error("Data Prep Error:", err);
-      this.addError({ title: "Error", message: err.message });
-      done();
-    });
+    }
   },
 
   _prepareData: async function(data, config, queryResponse) {
@@ -377,8 +425,9 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
+    // TOOLTIP BUILDER
     const getTooltip = ({object}) => {
-      if (!object) return null;
+      if (!object || config.tooltip_mode === 'none') return null;
       let name, values, formatted;
       if (object.properties && object.properties._name) {
         name = object.properties._name;
@@ -391,29 +440,53 @@ looker.plugins.visualizations.add({
       } else {
         return null;
       }
-      let html = `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
-      queryResponse.fields.measure_like.forEach((m, idx) => {
-        html += `<div style="display:flex; justify-content:space-between; gap:10px;">
-          <span>${m.label_short || m.label}:</span>
-          <span style="font-weight:bold;">${formatted[idx]}</span>
-        </div>`;
-      });
-      return { html, style: { backgroundColor: '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
+
+      let html = "";
+      if (config.tooltip_mode !== 'values') {
+          html += `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
+      }
+      if (config.tooltip_mode !== 'name') {
+          queryResponse.fields.measure_like.forEach((m, idx) => {
+            html += `<div style="display:flex; justify-content:space-between; gap:10px;">
+              <span>${m.label_short || m.label}:</span>
+              <span style="font-weight:bold;">${formatted[idx]}</span>
+            </div>`;
+          });
+      }
+      return { html, style: { backgroundColor: config.tooltip_bg_color || '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
     };
 
+    // --- VIEW STATE & PDF SAFEGUARD ---
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
     const cfgPitch = Number(config.pitch) || 45;
 
-    if (!this._viewState) {
-      this._viewState = {
-        longitude: cfgLng,
-        latitude: cfgLat,
-        zoom: cfgZoom,
-        pitch: cfgPitch,
-        bearing: 0
-      };
+    // Check if we are printing (downloading PDF)
+    const isPrint = details && details.print;
+
+    // Check if config coordinates changed significantly to force update view
+    let forceUpdate = false;
+    if (this._viewState) {
+       if (Math.abs(this._viewState.latitude - cfgLat) > 0.001 ||
+           Math.abs(this._viewState.longitude - cfgLng) > 0.001 ||
+           Math.abs(this._viewState.zoom - cfgZoom) > 0.1 ||
+           Math.abs(this._viewState.pitch - cfgPitch) > 1) {
+           forceUpdate = true;
+       }
+    }
+
+    if (!this._viewState || forceUpdate) {
+        this._viewState = {
+            longitude: cfgLng,
+            latitude: cfgLat,
+            zoom: cfgZoom,
+            pitch: cfgPitch,
+            bearing: 0,
+            // CRITICAL FOR PDF: If printing, set duration to 0 to snap instantly.
+            // If dragging manually, deck.gl handles it. If updating via config, we animate.
+            transitionDuration: isPrint ? 0 : 500
+        };
     }
 
     const onViewStateChange = ({viewState}) => {
@@ -431,10 +504,10 @@ looker.plugins.visualizations.add({
         controller: true,
         layers: layers,
         getTooltip: getTooltip,
-        // PERFORMANCE SETTINGS
+        // PERFORMANCE & PDF SETTINGS
         glOptions: {
-          preserveDrawingBuffer: true, // Needed for PDF
-          powerPreference: "high-performance" // Tries to use better GPU
+          preserveDrawingBuffer: true,
+          willReadFrequently: true
         },
         onError: (err) => console.warn("DeckGL Error:", err)
       });
