@@ -1,5 +1,5 @@
 /**
- * Multi-Layer 3D Map for Looker - v5 Ultimate (Stable Icon + PDF Fix)
+ * Multi-Layer 3D Map for Looker - v6 Stable (Crash Proof)
  * * * DEPENDENCIES (Add to manifest.lkml):
  * {
  * "dependencies": {
@@ -11,7 +11,7 @@
  * }
  */
 
-// --- HELPER TO GENERATE REPETITIVE LAYER OPTIONS (Now all in one tab) ---
+// --- HELPER TO GENERATE REPETITIVE LAYER OPTIONS ---
 const getLayerOptions = (n) => {
   const defaults = [
     { type: 'geojson', color: '#2E7D32', radius: 1000, height: 1000 }, // L1
@@ -26,7 +26,7 @@ const getLayerOptions = (n) => {
       type: "string",
       label: `────────── LAYER ${n} ──────────`,
       display: "divider",
-      section: "Layers", // Combined Tab
+      section: "Layers",
       order: n * 10
     },
     [`layer${n}_enabled`]: {
@@ -105,8 +105,8 @@ const getLayerOptions = (n) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v5",
-  label: "Combo Map 3D (PDF Safe)",
+  id: "combo_map_ultimate_v6",
+  label: "Combo Map 3D (Stable)",
   options: {
     // --- MAP SETTINGS ---
     mapbox_token: {
@@ -146,13 +146,13 @@ looker.plugins.visualizations.add({
       section: "Data"
     },
 
-    // --- LAYERS (Combined) ---
+    // --- LAYERS ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
     ...getLayerOptions(3),
     ...getLayerOptions(4),
 
-    // --- GEOJSON SETTINGS ---
+    // --- REGION SETTINGS ---
     region_settings_div: { type: "string", label: "─── REGION MAPPING ───", display: "divider", section: "Data" },
     map_layer_source: {
       type: "string",
@@ -185,7 +185,7 @@ looker.plugins.visualizations.add({
       placeholder: "Auto-detect if empty"
     },
 
-    // --- COLOR RANGES ---
+    // --- COLORS ---
     color_range_start: {
       type: "string",
       label: "Gradient Start",
@@ -215,7 +215,7 @@ looker.plugins.visualizations.add({
     // 2. Set up container
     element.innerHTML = `
       <style>
-        #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; }
+        #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; background: #000; }
         #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         .deck-tooltip { font-family: sans-serif; font-size: 12px; }
       </style>
@@ -224,6 +224,9 @@ looker.plugins.visualizations.add({
       </div>`;
     this._container = element.querySelector('#map');
     this._geojsonCache = {};
+
+    // 3. Initialize View State Storage
+    this._viewState = null;
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
@@ -278,7 +281,7 @@ looker.plugins.visualizations.add({
     try {
         geojson = await this._loadGeoJSON(url);
     } catch (error) {
-        throw new Error(`Failed to load Map Data: ${error.message}.`);
+        throw new Error(`Failed to load Map Data. Check network/CORS.`);
     }
 
     const dims = queryResponse.fields.dimension_like;
@@ -373,39 +376,57 @@ looker.plugins.visualizations.add({
       return { html, style: { backgroundColor: '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
     };
 
-    const isPrint = details && details.print; // Check if generating PDF
+    // --- VIEW STATE LOGIC (CRASH FIX) ---
+    // 1. Ensure config values are valid Numbers
+    const cfgLat = Number(config.center_lat) || 46;
+    const cfgLng = Number(config.center_lng) || 2;
+    const cfgZoom = Number(config.zoom) || 4;
+    const cfgPitch = Number(config.pitch) || 45;
 
-    const viewState = {
-      longitude: config.center_lng,
-      latitude: config.center_lat,
-      zoom: config.zoom,
-      pitch: config.pitch,
-      bearing: 0,
-      transitionDuration: isPrint ? 0 : 300 // Disable animation for PDF
+    // 2. Initialize view state if null
+    if (!this._viewState) {
+      this._viewState = {
+        longitude: cfgLng,
+        latitude: cfgLat,
+        zoom: cfgZoom,
+        pitch: cfgPitch,
+        bearing: 0
+      };
+    }
+    // 3. Optional: Sync viewstate if config changes significantly?
+    // For now, we respect the user's manual navigation.
+
+    // 4. Update the stored view state when user interacts
+    const onViewStateChange = ({viewState}) => {
+      this._viewState = viewState;
+      // Re-render to update the camera position
+      this._deck.setProps({ viewState: this._viewState });
     };
 
+    const isPrint = details && details.print;
+
     if (!this._deck) {
+      // INITIAL RENDER
       this._deck = new deck.DeckGL({
         container: this._container,
         mapStyle: config.map_style,
         mapboxApiAccessToken: config.mapbox_token,
-        initialViewState: viewState,
+        viewState: this._viewState, // Controlled Mode
+        onViewStateChange: onViewStateChange,
         controller: true,
         layers: layers,
         getTooltip: getTooltip,
-        // CRITICAL FOR PDF EXPORTS
         glOptions: { preserveDrawingBuffer: true }
       });
     } else {
+      // UPDATE RENDER
       this._deck.setProps({
         layers: layers,
-        initialViewState: viewState,
         mapStyle: config.map_style,
         mapboxApiAccessToken: config.mapbox_token,
         getTooltip: getTooltip,
-        // Ensure map resizes correctly
-        width: '100%',
-        height: '100%'
+        viewState: this._viewState, // Maintain current view
+        onViewStateChange: onViewStateChange
       });
     }
   },
@@ -418,6 +439,9 @@ looker.plugins.visualizations.add({
     const heightScale = config[`layer${idx}_height`];
     const opacity = config[`layer${idx}_opacity`];
     const iconUrl = config[`layer${idx}_icon_url`];
+
+    // SKIP EMPTY DATA LAYERS TO PREVENT CRASH
+    if (!processed.data || processed.data.length === 0) return null;
 
     const getValue = (d) => {
       const arr = d.values || (d.properties && d.properties._values);
@@ -514,9 +538,7 @@ looker.plugins.visualizations.add({
         });
 
       case 'icon':
-        // SAFETY FIX: If no URL is provided, return null to prevent Crash
         if (!iconUrl || iconUrl.length < 5) return null;
-
         return new deck.IconLayer({
             id: id,
             data: pointData,
@@ -531,8 +553,7 @@ looker.plugins.visualizations.add({
             getSize: d => radius,
             sizeScale: 1,
             sizeMinPixels: 20,
-            // Add fallback to prevent texture errors
-            onIconError: (err) => console.warn("Icon load error:", err)
+            onIconError: (err) => console.warn("Icon error", err)
         });
 
       case 'heatmap':

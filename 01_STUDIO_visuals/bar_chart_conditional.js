@@ -1760,14 +1760,6 @@ looker.plugins.visualizations.add({
     this._lastSeriesPositioning = config.series_positioning;
     this._lastChartType = config.chart_type;
 
-    // FIX FOR PDF RENDERING: Force reflow at the end of the update cycle
-    if(this.chart) {
-      this.chart.reflow();
-    }
-    done();
-  },
-
-
   // FIX 1.2: Implement getStackedColors inspired by the provided file to ensure non-matched categories revert to their base color.
   getStackedColors: function(values, config) {
     const defaultColor = '#EEEEEE';
