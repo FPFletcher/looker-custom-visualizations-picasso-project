@@ -1,6 +1,6 @@
 /**
  * Conditional Bar Chart for Looker
- * COMPLETE VERSION - All features restored & Improved for PDF/Gradients
+ * COMPLETE VERSION - All features restored
  */
 
 looker.plugins.visualizations.add({
@@ -404,26 +404,10 @@ looker.plugins.visualizations.add({
       section: "Series",
       order: 2
     },
-    // NEW: Gradient Options
-    series_gradient_start: {
-      type: "string",
-      label: "Custom Gradient Start (if above is empty)",
-      display: "color",
-      section: "Series",
-      order: 2.1
-    },
-    series_gradient_end: {
-      type: "string",
-      label: "Custom Gradient End (if above is empty)",
-      display: "color",
-      section: "Series",
-      order: 2.2
-    },
     series_labels: {
       type: "string",
       label: "Custom Series Labels (comma-separated)",
-      placeholder: "Series 1, Series 2",
-      display: "text", // Fixed: Explicitly set display text to avoid object placeholders
+      placeholder: "Sales,Returns,Profit",
       default: "",
       section: "Series",
       order: 3
@@ -826,13 +810,7 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
-    // FIX FOR PDF RENDERING:
-    // Sometimes PDF export containers have 0 height. We force a reasonable default if so.
-    if (element.clientHeight === 0) {
-      element.style.height = '500px';
-    } else {
-      element.style.height = '100%';
-    }
+    element.style.height = '100%';
     element.style.width = '100%';
     element.style.position = 'relative';
     element.style.overflow = 'visible';
@@ -858,7 +836,7 @@ looker.plugins.visualizations.add({
   },
 
   // --- NEW: Centralized Palette Getter ---
-  getPalette: function(config, seriesCount = 0) {
+  getPalette: function(config) {
     const palettes = {
       google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC'],
       looker: ['#7FCDAE', '#7ED09C', '#7DD389', '#85D67C', '#9AD97B', '#B1DB7A'],
@@ -926,25 +904,9 @@ looker.plugins.visualizations.add({
     let palette = palettes[config.color_collection] || palettes.google;
 
     // Custom colors override the collection entirely
-    const customColors = config.series_colors && config.series_colors.trim() !== '' ? String(config.series_colors).split(',').map(c => c.trim()) : null;
-
+    const customColors = config.series_colors ? String(config.series_colors).split(',').map(c => c.trim()) : null;
     if (customColors) {
         palette = customColors;
-    } else if (config.series_gradient_start && config.series_gradient_end && seriesCount > 0) {
-        // Generate a gradient palette if no custom list is provided, but Start/End are
-        const start = config.series_gradient_start;
-        const end = config.series_gradient_end;
-        const colors = [];
-        // If only 1 series, use the start color
-        if (seriesCount === 1) {
-            colors.push(start);
-        } else {
-            for (let i = 0; i < seriesCount; i++) {
-                const ratio = i / (seriesCount - 1);
-                colors.push(this.interpolateColor(start, end, ratio));
-            }
-        }
-        palette = colors;
     }
 
     if (config.reverse_colors) {
@@ -1089,12 +1051,7 @@ looker.plugins.visualizations.add({
     const hasPivot = queryResponse.fields.pivots && queryResponse.fields.pivots.length > 0;
 
     // --- REPLACED: Moved palette definitions to getPalette() ---
-    // Calculate total series count to handle gradient generation if needed
-    let totalSeriesCount = measures.length;
-    if (hasPivot) {
-        totalSeriesCount = queryResponse.pivots.length * measures.length;
-    }
-    const palette = this.getPalette(config, totalSeriesCount);
+    const palette = this.getPalette(config);
     console.log(`[UPDATE] Final Palette (reversed=${config.reverse_colors}): ${palette.slice(0, 5).join(', ')}...`);
     // --- END REPLACED ---
 
@@ -1767,11 +1724,6 @@ looker.plugins.visualizations.add({
     this._lastReverseColors = config.reverse_colors;
     this._lastSeriesPositioning = config.series_positioning;
     this._lastChartType = config.chart_type;
-
-    // FIX FOR PDF RENDERING: Force reflow at the end of the update cycle
-    if(this.chart) {
-      this.chart.reflow();
-    }
 
     console.log('=== TRENDLINE CHECK END ===');
     done();
