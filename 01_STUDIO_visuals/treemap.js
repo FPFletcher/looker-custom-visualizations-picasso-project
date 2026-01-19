@@ -81,22 +81,6 @@ looker.plugins.visualizations.add({
       section: "Plot",
       order: 9
     },
-    group_header_bg_color: {
-      type: "string",
-      label: "Group Header Background",
-      default: "#4285F4",
-      display: "color",
-      section: "Plot",
-      order: 10
-    },
-    group_header_text_color: {
-      type: "string",
-      label: "Group Header Text Color",
-      default: "#FFFFFF",
-      display: "color",
-      section: "Plot",
-      order: 11
-    },
 
     // ========== SERIES SECTION ==========
     color_by: {
@@ -109,7 +93,8 @@ looker.plugins.visualizations.add({
         {"Parent Group": "parent"}
       ],
       default: "parent",
-      section: "Series"
+      section: "Series",
+      order: 1
     },
     color_palette: {
       type: "string",
@@ -125,33 +110,92 @@ looker.plugins.visualizations.add({
         {"Categorical": "categorical"}
       ],
       default: "categorical",
-      section: "Series"
+      section: "Series",
+      order: 2
     },
     use_gradient: {
       type: "boolean",
       label: "Use Gradient (Metric Color)",
       default: true,
-      section: "Series"
+      section: "Series",
+      order: 3
     },
     reverse_palette: {
       type: "boolean",
       label: "Reverse Palette",
       default: false,
-      section: "Series"
+      section: "Series",
+      order: 4
     },
     gradient_start_color: {
       type: "string",
       label: "Gradient Start Color",
       default: "#F1F8E9",
       display: "color",
-      section: "Series"
+      section: "Series",
+      order: 5
     },
     gradient_end_color: {
       type: "string",
       label: "Gradient End Color",
       default: "#33691E",
       display: "color",
-      section: "Series"
+      section: "Series",
+      order: 6
+    },
+    // Group Header Styling (Nested Layout)
+    series_divider_1: {
+      type: "string",
+      label: "── Group Header (Nested) ──",
+      display: "divider",
+      section: "Series",
+      order: 10
+    },
+    use_group_header_color: {
+      type: "boolean",
+      label: "Custom Group Header Background",
+      default: false,
+      section: "Series",
+      order: 11
+    },
+    group_header_color: {
+      type: "string",
+      label: "Header Background Color",
+      default: "#37474F",
+      display: "color",
+      section: "Series",
+      order: 12
+    },
+    use_group_header_gradient: {
+      type: "boolean",
+      label: "Use Header Gradient",
+      default: false,
+      section: "Series",
+      order: 13
+    },
+    group_header_gradient_start: {
+      type: "string",
+      label: "Header Gradient Start",
+      default: "#37474F",
+      display: "color",
+      section: "Series",
+      order: 14
+    },
+    group_header_gradient_end: {
+      type: "string",
+      label: "Header Gradient End",
+      default: "#263238",
+      display: "color",
+      section: "Series",
+      order: 15
+    },
+    group_label_color: {
+      type: "string",
+      label: "Header Font Color",
+      default: "#FFFFFF",
+      display: "color",
+      section: "Series",
+      order: 16
     },
 
     // ========== VALUES SECTION ==========
@@ -371,32 +415,6 @@ looker.plugins.visualizations.add({
       this._svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#999">No data to display</text>';
       done();
       return;
-    }
-
-    // Handle pivot data transformation
-    const hasPivot = queryResponse.pivots && queryResponse.pivots.length > 0;
-
-    if (hasPivot) {
-      // Flatten pivoted data into standard format
-      const flatData = [];
-      const firstDimField = Object.keys(data[0])[0];
-
-      data.forEach(row => {
-        Object.keys(row).forEach(key => {
-          // Looker pivot format: field$$$pivotValue
-          if (key.includes('$$$')) {
-            const [fieldName, pivotValue] = key.split('$$$');
-            const dimValue = row[firstDimField]?.value || row[firstDimField];
-
-            flatData.push({
-              [firstDimField]: { value: `${dimValue} - ${pivotValue}` },
-              [fieldName]: row[key]
-            });
-          }
-        });
-      });
-
-      data = flatData;
     }
 
     const dimensions = queryResponse.fields.dimension_like;
@@ -655,12 +673,50 @@ looker.plugins.visualizations.add({
 
       // Draw header background
       if (headerHeight > 0) {
+        // Determine header fill color
+        let headerFillColor;
+        const defaultParentColor = parentColors[parentIndex % parentColors.length];
+
+        if (config.use_group_header_gradient) {
+          // Create gradient definition
+          const gradientId = `header-gradient-${parentIndex}`;
+          const defs = this._svg.querySelector('defs') || document.createElementNS(svgNS, 'defs');
+          if (!this._svg.querySelector('defs')) {
+            this._svg.insertBefore(defs, this._svg.firstChild);
+          }
+
+          const gradient = document.createElementNS(svgNS, 'linearGradient');
+          gradient.setAttribute('id', gradientId);
+          gradient.setAttribute('x1', '0%');
+          gradient.setAttribute('y1', '0%');
+          gradient.setAttribute('x2', '100%');
+          gradient.setAttribute('y2', '0%');
+
+          const stop1 = document.createElementNS(svgNS, 'stop');
+          stop1.setAttribute('offset', '0%');
+          stop1.setAttribute('stop-color', config.group_header_gradient_start || '#37474F');
+
+          const stop2 = document.createElementNS(svgNS, 'stop');
+          stop2.setAttribute('offset', '100%');
+          stop2.setAttribute('stop-color', config.group_header_gradient_end || '#263238');
+
+          gradient.appendChild(stop1);
+          gradient.appendChild(stop2);
+          defs.appendChild(gradient);
+
+          headerFillColor = `url(#${gradientId})`;
+        } else if (config.use_group_header_color) {
+          headerFillColor = config.group_header_color || '#37474F';
+        } else {
+          headerFillColor = defaultParentColor;
+        }
+
         const headerRect = document.createElementNS(svgNS, 'rect');
         headerRect.setAttribute('x', px);
         headerRect.setAttribute('y', py);
         headerRect.setAttribute('width', pw);
         headerRect.setAttribute('height', Math.min(headerHeight, ph));
-        headerRect.setAttribute('fill', config.group_header_bg_color || '#4285F4');
+        headerRect.setAttribute('fill', headerFillColor);
         headerRect.setAttribute('class', 'treemap-group-rect');
         g.appendChild(headerRect);
 
@@ -669,7 +725,7 @@ looker.plugins.visualizations.add({
           const headerLabel = document.createElementNS(svgNS, 'text');
           headerLabel.setAttribute('x', px + 5);
           headerLabel.setAttribute('y', py + Math.min(headerHeight, ph) - 5);
-          headerLabel.setAttribute('fill', config.group_header_text_color || '#FFFFFF');
+          headerLabel.setAttribute('fill', config.group_label_color || '#FFFFFF');
           headerLabel.setAttribute('class', 'treemap-group-label');
 
           let labelText = parent.name;

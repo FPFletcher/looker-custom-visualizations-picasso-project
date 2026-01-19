@@ -1,10 +1,10 @@
 /**
- * Multi-Layer 3D Map for Looker - v12 Ultimate (PDF Safe + Single Layers Tab)
- * Features:
- * - "Plot" Tab: Map Style, Lat/Lon/Zoom, Data Mode, Tooltips.
- * - "Layers" Tab: All 4 layers consolidated in one place.
- * - PDF Fix: Disables animations during export to prevent TILE_ERROR.
- * - Mapbox Token Warning: Displays UI message instead of crashing.
+ * Multi-Layer 3D Map for Looker - v14 Ultimate (Drill Support + PDF Background Fix)
+ * * * FEATURES:
+ * - Drill Menus: Click any shape/point to see Looker drill options.
+ * - PDF Background Fix: Adds a loading delay during export so map tiles can appear.
+ * - Sticky View: Map only moves if you change settings.
+ * - Single Tab: All layers in one "Layers" tab.
  */
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -17,7 +17,6 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
-  // Base order: Layer 1 = 100, Layer 2 = 200...
   const b = n * 100;
 
   return {
@@ -25,7 +24,7 @@ const getLayerOptions = (n) => {
       type: "string",
       label: `────────── LAYER ${n} ──────────`,
       display: "divider",
-      section: "Layers", // ALL IN ONE TAB
+      section: "Layers",
       order: b + 1
     },
     [`layer${n}_enabled`]: {
@@ -67,8 +66,6 @@ const getLayerOptions = (n) => {
       placeholder: "Higher # is on top",
       order: b + 5
     },
-
-    // COMBINED COLOR LOGIC
     [`layer${n}_use_gradient`]: {
       type: "boolean",
       label: `L${n} Use Gradient?`,
@@ -92,8 +89,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 8
     },
-
-    // SIZE SETTINGS
     [`layer${n}_radius`]: {
       type: "number",
       label: `L${n} Radius / Size`,
@@ -128,8 +123,8 @@ const getLayerOptions = (n) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v12",
-  label: "Combo Map 3D (PDF Safe)",
+  id: "combo_map_ultimate_v14",
+  label: "Combo Map 3D (Drill + PDF Fix)",
   options: {
     // --- 1. DATA (Plot Tab) ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -209,7 +204,7 @@ looker.plugins.visualizations.add({
     zoom: { type: "number", label: "Zoom", default: 4, section: "Plot", order: 15 },
     pitch: { type: "number", label: "3D Tilt (0-60)", default: 45, section: "Plot", order: 16 },
 
-    // --- 3. TOOLTIP SETTINGS (Plot Tab) ---
+    // --- 3. TOOLTIP (Plot Tab) ---
     tooltip_header: { type: "string", label: "─── TOOLTIP ───", display: "divider", section: "Plot", order: 20 },
 
     tooltip_mode: {
@@ -235,7 +230,7 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
-    // --- 4. LAYERS (Single Tab) ---
+    // --- 4. LAYERS (Consolidated) ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
     ...getLayerOptions(3),
@@ -243,7 +238,6 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
-    // 1. Force Load Mapbox CSS
     if (!document.getElementById('mapbox-css-fix')) {
       const link = document.createElement('link');
       link.id = 'mapbox-css-fix';
@@ -252,7 +246,6 @@ looker.plugins.visualizations.add({
       document.head.appendChild(link);
     }
 
-    // 2. Container
     element.innerHTML = `
       <style>
         #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; background: #111; }
@@ -268,10 +261,12 @@ looker.plugins.visualizations.add({
         <div id="map"></div>
         <div id="token-error">MISSING MAPBOX TOKEN<br><span style="font-size:0.8em; font-weight:normal">Please enter your token in the "Plot" settings.</span></div>
       </div>`;
+
     this._container = element.querySelector('#map');
     this._tokenError = element.querySelector('#token-error');
     this._geojsonCache = {};
     this._viewState = null;
+    this._prevConfig = {};
   },
 
   destroy: function() {
@@ -279,12 +274,13 @@ looker.plugins.visualizations.add({
       this._deck.finalize();
       this._deck = null;
     }
+    this._geojsonCache = {};
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    // 1. Check Token
+    // 1. Token Check
     if (!config.mapbox_token) {
         if(this._deck) {
             this._deck.finalize();
@@ -302,11 +298,22 @@ looker.plugins.visualizations.add({
       done(); return;
     }
 
-    // Try/Catch around the whole process to ensure done() is called so PDF generator doesn't hang
+    // 2. Main Logic
     try {
       this._prepareData(data, config, queryResponse).then(processedData => {
         this._render(processedData, config, queryResponse, details);
-        done();
+
+        // --- PDF BACKGROUND FIX ---
+        // If printing, we delay calling done() to allow Mapbox tiles to load
+        if (details && details.print) {
+            console.log("PDF Mode: Waiting for tiles...");
+            setTimeout(() => {
+                done();
+            }, 1500); // 1.5s delay allows map tiles to fetch before screenshot
+        } else {
+            done();
+        }
+
       }).catch(err => {
         console.error("Data Prep Error:", err);
         this.addError({ title: "Error", message: err.message });
@@ -333,6 +340,8 @@ looker.plugins.visualizations.add({
         position: [parseFloat(row[lngF.name].value), parseFloat(row[latF.name].value)],
         values: measures.map(m => row[m.name].value),
         formattedValues: measures.map(m => row[m.name].rendered || row[m.name].value),
+        // DRILL LINKS: Capture drill links for every measure
+        links: measures.map(m => row[m.name].links),
         name: "Point"
       })).filter(p => !isNaN(p.position[0]) && !isNaN(p.position[1]));
 
@@ -365,6 +374,8 @@ looker.plugins.visualizations.add({
         dataMap[clean] = {
           values: measures.map(m => row[m.name].value),
           formattedValues: measures.map(m => row[m.name].rendered || row[m.name].value),
+          // DRILL LINKS: Capture for regions too
+          links: measures.map(m => row[m.name].links),
           rawName: rawName
         };
       }
@@ -394,6 +405,7 @@ looker.plugins.visualizations.add({
                     centroid: centroid,
                     values: match.values,
                     formattedValues: match.formattedValues,
+                    links: match.links, // Pass links to feature
                     name: match.rawName
                 });
             }
@@ -406,7 +418,6 @@ looker.plugins.visualizations.add({
   _render: function(processed, config, queryResponse, details) {
     const layerObjects = [];
 
-    // Build layers
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`]) {
         try {
@@ -421,11 +432,9 @@ looker.plugins.visualizations.add({
       }
     }
 
-    // Sort layers by Z-Index
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // TOOLTIP BUILDER
     const getTooltip = ({object}) => {
       if (!object || config.tooltip_mode === 'none') return null;
       let name, values, formatted;
@@ -456,37 +465,28 @@ looker.plugins.visualizations.add({
       return { html, style: { backgroundColor: config.tooltip_bg_color || '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
     };
 
-    // --- VIEW STATE & PDF SAFEGUARD ---
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
     const cfgPitch = Number(config.pitch) || 45;
 
-    // Check if we are printing (downloading PDF)
-    const isPrint = details && details.print;
+    // View State Logic: Only update if config actually changed
+    const configChanged =
+        this._prevConfig.lat !== cfgLat ||
+        this._prevConfig.lng !== cfgLng ||
+        this._prevConfig.zoom !== cfgZoom ||
+        this._prevConfig.pitch !== cfgPitch;
 
-    // Check if config coordinates changed significantly to force update view
-    let forceUpdate = false;
-    if (this._viewState) {
-       if (Math.abs(this._viewState.latitude - cfgLat) > 0.001 ||
-           Math.abs(this._viewState.longitude - cfgLng) > 0.001 ||
-           Math.abs(this._viewState.zoom - cfgZoom) > 0.1 ||
-           Math.abs(this._viewState.pitch - cfgPitch) > 1) {
-           forceUpdate = true;
-       }
-    }
-
-    if (!this._viewState || forceUpdate) {
+    if (!this._viewState || configChanged) {
         this._viewState = {
             longitude: cfgLng,
             latitude: cfgLat,
             zoom: cfgZoom,
             pitch: cfgPitch,
             bearing: 0,
-            // CRITICAL FOR PDF: If printing, set duration to 0 to snap instantly.
-            // If dragging manually, deck.gl handles it. If updating via config, we animate.
-            transitionDuration: isPrint ? 0 : 500
+            transitionDuration: (details && details.print) ? 0 : 500
         };
+        this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
     }
 
     const onViewStateChange = ({viewState}) => {
@@ -504,7 +504,6 @@ looker.plugins.visualizations.add({
         controller: true,
         layers: layers,
         getTooltip: getTooltip,
-        // PERFORMANCE & PDF SETTINGS
         glOptions: {
           preserveDrawingBuffer: true,
           willReadFrequently: true
@@ -523,7 +522,6 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // --- Strict Data Validator ---
   _validateLayerData: function(data) {
     if(!data || !Array.isArray(data) || data.length === 0) return [];
     return data.filter(d =>
@@ -539,7 +537,6 @@ looker.plugins.visualizations.add({
     const type = config[`layer${idx}_type`];
     const measureIdx = config[`layer${idx}_measure_idx`] || 0;
 
-    // COMBINED COLOR LOGIC
     const useGradient = config[`layer${idx}_use_gradient`];
     const mainColor = this._hexToRgb(config[`layer${idx}_color_main`]);
     const gradEnd = config[`layer${idx}_gradient_end`];
@@ -554,12 +551,28 @@ looker.plugins.visualizations.add({
       return arr && arr[measureIdx] ? parseFloat(arr[measureIdx]) : 0;
     };
 
+    // DRILL HANDLER
+    const onClickHandler = (info) => {
+      // Looker Drill logic
+      if (info && info.object && info.object.links) {
+        // Get links specifically for this measure
+        const links = info.object.links[measureIdx];
+        if (links && links.length > 0) {
+          LookerCharts.Utils.openDrillMenu({
+            links: links,
+            event: info.srcEvent || info.event
+          });
+        }
+      }
+    };
+
     let pointData = [];
     if (processed.type === 'regions') {
       pointData = processed.data.map(d => ({
         position: d.centroid,
         values: d.values,
         formattedValues: d.formattedValues,
+        links: d.links,
         name: d.name
       }));
     } else {
@@ -596,6 +609,7 @@ looker.plugins.visualizations.add({
           getLineWidth: 1,
           getLineColor: [255,255,255],
           opacity: opacity,
+          onClick: onClickHandler, // Add click handler
           getFillColor: d => {
              if (!useGradient) return mainColor;
              const val = getValue(d);
@@ -621,6 +635,7 @@ looker.plugins.visualizations.add({
           getLineColor: [255, 255, 255],
           getElevation: d => getValue(d),
           opacity: opacity,
+          onClick: onClickHandler,
           updateTriggers: {
             getFillColor: [measureIdx, useGradient, config[`layer${idx}_color_main`], gradEnd]
           }
@@ -641,6 +656,7 @@ looker.plugins.visualizations.add({
           getRadius: radius,
           getFillColor: d => getMyColor(d),
           getLineColor: [255,255,255],
+          onClick: onClickHandler,
           updateTriggers: {
             getFillColor: [measureIdx, useGradient, config[`layer${idx}_color_main`], gradEnd]
           }
@@ -661,6 +677,7 @@ looker.plugins.visualizations.add({
           getRadius: d => Math.sqrt(getValue(d) / maxVal) * radius,
           getFillColor: d => getMyColor(d),
           getLineColor: [255,255,255],
+          onClick: onClickHandler,
           updateTriggers: {
             getFillColor: [measureIdx, useGradient, config[`layer${idx}_color_main`], gradEnd]
           }
@@ -684,6 +701,7 @@ looker.plugins.visualizations.add({
             sizeScale: 1,
             sizeMinPixels: 20,
             autoHighlight: false,
+            onClick: onClickHandler,
             onIconError: (err) => console.warn("Icon error", err)
         });
 
@@ -708,15 +726,14 @@ looker.plugins.visualizations.add({
           radius: radius,
           elevationScale: heightScale,
           getPosition: d => d.position,
-          getElevationWeight: d => getValue(d)
+          getElevationWeight: d => getValue(d),
+          onClick: onClickHandler
         });
 
       default:
         return null;
     }
   },
-
-  // --- UTILITIES ---
 
   _getGeoJSONUrl: function(config) {
     if (config.map_layer_source === 'custom') return config.custom_geojson_url;
