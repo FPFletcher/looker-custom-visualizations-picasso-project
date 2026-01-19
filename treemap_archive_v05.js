@@ -365,32 +365,6 @@ looker.plugins.visualizations.add({
       return;
     }
 
-    // Handle pivot data transformation
-    const hasPivot = queryResponse.pivots && queryResponse.pivots.length > 0;
-
-    if (hasPivot) {
-      // Flatten pivoted data into standard format
-      const flatData = [];
-      const firstDimField = Object.keys(data[0])[0];
-
-      data.forEach(row => {
-        Object.keys(row).forEach(key => {
-          // Looker pivot format: field$$$pivotValue
-          if (key.includes('$$$')) {
-            const [fieldName, pivotValue] = key.split('$$$');
-            const dimValue = row[firstDimField]?.value || row[firstDimField];
-
-            flatData.push({
-              [firstDimField]: { value: `${dimValue} - ${pivotValue}` },
-              [fieldName]: row[key]
-            });
-          }
-        });
-      });
-
-      data = flatData;
-    }
-
     const dimensions = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
 
