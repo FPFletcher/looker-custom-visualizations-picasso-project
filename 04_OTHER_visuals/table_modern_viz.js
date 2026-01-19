@@ -1,19 +1,18 @@
 /**
  * Advanced Table Visualization for Looker
- * Version: 16.0 - Stability & Pivot Features Restored
+ * Version: 17.0 - Themes, Gradients & Cleanup
  * Build: 2026-01-18
  * * CHANGE LOG:
- * ✅ CRITICAL: Restored 'renderCellContent' (Fixed white screen crash).
- * ✅ FIXED: Pivot Column Formatting now works on Dimensions (Left columns).
- * ✅ FIXED: "Freeze First Column" is now a simple Toggle.
- * ✅ FIXED: Pivot Header Colors now work (CSS Specificity increased).
- * ✅ FIXED: Row Numbers now appear in Pivot Mode + Alignment fixed.
- * ✅ FEATURE: Added "Pivot Row Total BG" setting.
+ * ✅ REMOVED: "Width" fields and "Freeze Legacy" option.
+ * ✅ FIXED: Heatmap now uses True Gradient (Start -> End Color Interpolation).
+ * ✅ MOVED: Pivot Header settings to "Formatting > Headers".
+ * ✅ FEATURE: Added Palette-based Themes (Professional, Ocean, Forest, Dark).
+ * ✅ PRESERVED: All Pivot sorting, drilling, and layout fixes.
  */
 
 const visObject = {
-  id: "advanced_table_visual_v16_0",
-  label: "Advanced Table v16.0",
+  id: "advanced_table_visual_v17_0",
+  label: "Advanced Table v17.0",
   options: {
     // ══════════════════════════════════════════════════════════════
     // TAB: PLOT
@@ -29,8 +28,6 @@ const visObject = {
     dynamic_pagination: { type: "boolean", label: "Dynamic Pagination (Respects Subtotals)", default: true, section: "Plot", order: 14 },
 
     plot_divider_pivot: { type: "string", label: "━━━ Pivot Settings ━━━", display: "divider", section: "Plot", order: 20 },
-    pivot_header_bg_color: { type: "string", label: "Pivot Header BG", display: "color", default: "#e0e7ff", section: "Plot", order: 21 },
-    pivot_header_text_color: { type: "string", label: "Pivot Header Text", display: "color", default: "#3730a3", section: "Plot", order: 22 },
     pivot_show_row_totals: { type: "boolean", label: "Show Row Totals", default: false, section: "Plot", order: 23 },
     pivot_row_total_label: { type: "string", label: "Row Total Label", default: "Total", section: "Plot", order: 24 },
     pivot_row_total_bg: { type: "string", label: "Pivot Row Total BG", display: "color", default: "#f3f4f6", section: "Plot", order: 25 },
@@ -61,8 +58,7 @@ const visObject = {
     enable_column_filters: { type: "boolean", label: "Enable Column Filters", default: false, section: "Plot", order: 52 },
 
     plot_divider_freezing: { type: "string", label: "━━━ Freezing ━━━", display: "divider", section: "Plot", order: 60 },
-    freeze_columns: { type: "number", label: "Freeze Left Columns (Legacy)", default: 0, section: "Plot", order: 61 },
-    freeze_first_column: { type: "boolean", label: "Freeze First Column", default: true, section: "Plot", order: 61.5 },
+    freeze_first_column: { type: "boolean", label: "Freeze First Column", default: true, section: "Plot", order: 61 },
     freeze_header_row: { type: "boolean", label: "Freeze Header Row", default: true, section: "Plot", order: 62 },
 
     // ══════════════════════════════════════════════════════════════
@@ -122,7 +118,22 @@ const visObject = {
     // TAB: FORMATTING
     // ══════════════════════════════════════════════════════════════
     formatting_divider_theme: { type: "string", label: "━━━ Theme ━━━", display: "divider", section: "Formatting", order: 0 },
-    table_theme: { type: "string", label: "Table Theme", display: "select", values: [{ "Modern": "modern" }, { "Compact": "compact" }, { "Striped": "striped" }], default: "modern", section: "Formatting", order: 1 },
+    table_theme: {
+      type: "string",
+      label: "Table Theme",
+      display: "select",
+      values: [
+        { "Modern": "modern" },
+        { "Professional (Gray/Blue)": "professional" },
+        { "Ocean (Blues)": "ocean" },
+        { "Forest (Greens)": "forest" },
+        { "Dark Mode": "dark" },
+        { "Custom": "custom" }
+      ],
+      default: "modern",
+      section: "Formatting",
+      order: 1
+    },
     stripe_color: { type: "string", label: "Stripe color", display: "color", default: "#f9fafb", section: "Formatting", order: 2 },
 
     formatting_divider_headers: { type: "string", label: "━━━ Headers ━━━", display: "divider", section: "Formatting", order: 10 },
@@ -131,6 +142,9 @@ const visObject = {
     header_font_size: { type: "number", label: "Header Font Size (px)", default: 12, section: "Formatting", order: 11 },
     header_text_color: { type: "string", label: "Header Text Color", display: "color", default: "#1f2937", section: "Formatting", order: 12 },
     header_bg_color: { type: "string", label: "Header Background Color", display: "color", default: "#f9fafb", section: "Formatting", order: 13 },
+    // MOVED PIVOT SETTINGS HERE
+    pivot_header_bg_color: { type: "string", label: "Pivot Header BG", display: "color", default: "#e0e7ff", section: "Formatting", order: 14 },
+    pivot_header_text_color: { type: "string", label: "Pivot Header Text", display: "color", default: "#3730a3", section: "Formatting", order: 15 },
 
     formatting_divider_cells: { type: "string", label: "━━━ Cells ━━━", display: "divider", section: "Formatting", order: 20 },
     null_measure_value: { type: "string", label: "Null Measure Value", default: "-", section: "Formatting", order: 20.1 },
@@ -207,6 +221,14 @@ const visObject = {
     return this.rgbToHex(r, g, b);
   },
 
+  // PREDEFINED THEMES
+  themes: {
+     professional: { headerBg: '#e2e8f0', headerText: '#1e293b', pivotBg: '#cbd5e1', pivotText: '#0f172a', border: '#cbd5e1', rowBg: '#ffffff', stripe: '#f8fafc' },
+     ocean: { headerBg: '#dbeafe', headerText: '#1e40af', pivotBg: '#bfdbfe', pivotText: '#172554', border: '#93c5fd', rowBg: '#ffffff', stripe: '#eff6ff' },
+     forest: { headerBg: '#dcfce7', headerText: '#166534', pivotBg: '#bbf7d0', pivotText: '#14532d', border: '#86efac', rowBg: '#ffffff', stripe: '#f0fdf4' },
+     dark: { headerBg: '#374151', headerText: '#f9fafb', pivotBg: '#1f2937', pivotText: '#f3f4f6', border: '#4b5563', rowBg: '#111827', stripe: '#1f2937', cellText: '#f9fafb' }
+  },
+
   create: function (element, config) {
     this.container = element.appendChild(document.createElement("div"));
     this.container.id = "advanced-table-container";
@@ -230,6 +252,20 @@ const visObject = {
 
     this.currentConfig = config;
 
+    // THEME APPLICATION
+    if (config.table_theme !== 'custom' && config.table_theme !== 'modern') {
+       const t = this.themes[config.table_theme];
+       if (t) {
+           this.currentConfig.header_bg_color = t.headerBg;
+           this.currentConfig.header_text_color = t.headerText;
+           this.currentConfig.pivot_header_bg_color = t.pivotBg;
+           this.currentConfig.pivot_header_text_color = t.pivotText;
+           this.currentConfig.border_color = t.border;
+           this.currentConfig.stripe_color = t.stripe;
+           if(t.cellText) this.currentConfig.cell_text_color = t.cellText;
+       }
+    }
+
     const dims = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
     const hasPivot = queryResponse.fields.pivots && queryResponse.fields.pivots.length > 0;
@@ -251,7 +287,6 @@ const visObject = {
         this.options[`field_divider_${fieldKey}`] = { type: "string", label: `━━━ ${field.label_short || field.label} ━━━`, display: "divider", section: "Series", order: baseOrder };
         this.options[`field_label_${fieldKey}`] = { type: "string", label: "Label", display: "text", default: field.label_short || field.label, section: "Series", order: baseOrder + 1 };
         this.options[`field_format_${fieldKey}`] = { type: "string", label: "Value Format", display: "text", default: "", section: "Series", order: baseOrder + 2 };
-        this.options[`field_width_${fieldKey}`] = { type: "string", label: "Width (px or %)", display: "text", default: "", placeholder: "e.g., 150px or 20%", section: "Series", order: baseOrder + 3 };
       }
     });
 
@@ -269,7 +304,6 @@ const visObject = {
 
     let processedData = [...data];
 
-    // Filter Logic
     if (config.enable_table_filter && this.state.tableFilter) {
       const filterText = this.state.tableFilter;
       const allFields = queryResponse.fields.dimension_like.concat(queryResponse.fields.measure_like);
@@ -300,7 +334,6 @@ const visObject = {
 
     if (this.state.sortField) processedData = this.sortData(processedData, this.state.sortField, this.state.sortDirection);
 
-    // Subtotal / Hierarchy Logic
     if (config.enable_bo_hierarchy && config.hierarchy_dimensions) {
       const hierarchyList = String(config.hierarchy_dimensions || "").split(',').map(f => f.trim()).filter(f => f);
       if (hierarchyList.length > 0) {
@@ -335,7 +368,6 @@ const visObject = {
     this.state.fullProcessedData = [...processedData];
     this.state.totalRowCount = processedData.length + (grandTotalRow ? 1 : 0);
 
-    // PAGINATION LOGIC
     let paginatedData = processedData;
     if (config.enable_pagination) {
       const pageSize = config.page_size || 25;
@@ -371,7 +403,7 @@ const visObject = {
     if (grandTotalRow) paginatedData = [...paginatedData, grandTotalRow];
 
     this.state.renderData = paginatedData;
-    this.renderTable(paginatedData, config, queryResponse);
+    this.renderTable(paginatedData, this.currentConfig, queryResponse);
     done();
   },
 
@@ -640,8 +672,7 @@ const visObject = {
 
     const getColumnWidth = (key) => {
       if (this.state.columnWidths[key]) return `${this.state.columnWidths[key]}px`;
-      const configWidth = config[`field_width_${key}`];
-      return configWidth && String(configWidth).trim() !== '' ? configWidth : 'auto';
+      return 'auto';
     };
 
     const headerPosition = config.freeze_header_row ? 'sticky' : 'relative';
@@ -1160,22 +1191,26 @@ const visObject = {
 
       if (isSet1 || isSet2) {
           if (mode === 'heatmap') {
-             // HEATMAP LOGIC
+             // HEATMAP LOGIC (Interpolated Gradient)
              const color = isSet1 ? config.cell_bar_color_1 : config.cell_bar_color_2;
+             const endColor = isSet1 ? config.gradient_end_1 : config.gradient_end_2;
              const textColor = isSet1 ? config.heatmap_text_color_1 : config.heatmap_text_color_2;
 
-             // Calculate Max for Opacity
              let maxVal = 1;
              if(isPivot) {
-                maxVal = 5000;
+                maxVal = 5000; // Simplified max for performance
              } else {
                 const peers = data.filter(r => !r.__isGrandTotal && r.__level === (row.__level || 0));
                 maxVal = Math.max(...peers.map(r => parseFloat(r[field.name]?.value || 0)), 1);
              }
              const ratio = Math.min(1, Math.max(0, (parseFloat(val)/maxVal)));
 
-             // FIXED: Heatmap now applies background via style wrapper
-             rendered = `<div style="background-color: ${color}; opacity: ${0.2 + (ratio * 0.8)}; width:100%; height:100%; position:absolute; top:0; left:0; z-index:0;"></div>
+             // NEW: INTERPOLATE COLOR
+             let finalColor = color;
+             if (config.use_gradient_1 && isSet1) finalColor = this.interpolateColor(color, endColor, ratio);
+             if (config.use_gradient_2 && isSet2) finalColor = this.interpolateColor(color, endColor, ratio);
+
+             rendered = `<div style="background-color: ${finalColor}; width:100%; height:100%; position:absolute; top:0; left:0; z-index:0;"></div>
                          <span style="position:relative; z-index:1; font-weight:600; color: ${textColor};">${rendered}</span>`;
           } else {
              // BAR LOGIC
