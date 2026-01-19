@@ -1,69 +1,82 @@
 /**
- * Water Picture Visualization for Looker - IMPROVED VERSION
+ * Water Picture Visualization for Looker
  * Combined JavaScript file with embedded HTML and CSS
- * Displays two values in water Picture images with a percentage indicator
  *
- * IMPROVEMENTS:
- * 1. PDF Export Support - Primary picture displays correctly in PDF exports
- * 2. LookML Value Formatting - Respects value_format from LookML
- * 3. Dashboard Drill Support - Drill menus work from both Explore and Dashboard
+ * FEATURES:
+ * 1. PDF Export Support (Image Preloading)
+ * 2. LookML Value Formatting
+ * 3. Dashboard & Explore Drill Support
+ * 4. Organized Menu Structure (Plot & Formatting tabs)
  */
 
 looker.plugins.visualizations.add({
   id: "single_value_picture_background",
   label: "Single Value (Picture)",
   options: {
-    // ========== PLOT SECTION ==========
+    // ==================================================================
+    // TAB 1: PLOT (Layout, Backgrounds, Images)
+    // ==================================================================
+
+    // --- SECTION: Background ---
+    plot_section_divider: {
+      type: "string",
+      label: "Background Settings",
+      display: "divider",
+      section: "Plot",
+      order: 1
+    },
     background_color: {
       type: "string",
       label: "Background Color",
       default: "#5C6BC0",
       display: "color",
       section: "Plot",
-      order: 1
+      order: 2
     },
     background_image_url: {
       type: "string",
-      label: "Background Image URL (optional)",
+      label: "Background Image URL (Optional)",
       placeholder: "https://example.com/background.jpg",
       section: "Plot",
-      order: 2
+      order: 3
     },
     background_image_opacity: {
       type: "number",
-      label: "Background Image Opacity",
+      label: "Background Opacity",
       default: 1.0,
       display: "range",
       min: 0,
       max: 1,
       step: 0.1,
       section: "Plot",
-      order: 3
+      order: 4
     },
 
-
-    // Primary Image subsection (under Plot)
-
-    primary_image_url_00_divider: {
+    // --- SECTION: Primary Image ---
+    primary_image_section_divider: {
       type: "string",
-      label: "─────────────────────────────",
+      label: "Primary Image Settings",
       display: "divider",
       section: "Plot",
-      default: "",
-      order: 11
+      order: 10
     },
-
     primary_image_url: {
       type: "string",
-      label: "Primary Picture Image URL (reliable CDN preffered)",
-      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png",
+      label: "Primary Image URL",
+      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png",
+      section: "Plot",
+      order: 11
+    },
+    primary_Picture_size: {
+      type: "number",
+      label: "Primary Image Size",
+      default: 240,
       section: "Plot",
       order: 12
     },
-
     primary_image_opacity: {
       type: "number",
-      label: "Primary Picture Image Opacity",
+      label: "Primary Image Opacity",
       default: 1.0,
       display: "range",
       min: 0,
@@ -72,43 +85,46 @@ looker.plugins.visualizations.add({
       section: "Plot",
       order: 13
     },
-
     primary_x_position: {
       type: "number",
-      label: "Primary Picture X Position",
+      label: "Primary X Position",
       default: 280,
       section: "Plot",
       order: 14
     },
     primary_y_position: {
       type: "number",
-      label: "Primary Picture Y Position",
+      label: "Primary Y Position",
       default: 350,
       section: "Plot",
       order: 15
     },
 
-    // Secondary Image subsection (under Plot)
-
-    secondary_image_url_00_divider: {
+    // --- SECTION: Secondary Image ---
+    secondary_image_section_divider: {
       type: "string",
-      label: "─────────────────────────────",
+      label: "Secondary Image Settings",
       display: "divider",
       section: "Plot",
-      default: "",
-      order: 21
+      order: 20
     },
-
     secondary_image_url: {
       type: "string",
-      label: "Secondary Picture Image URL",
-      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png",
+      label: "Secondary Image URL",
+      default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png",
+      section: "Plot",
+      order: 21
+    },
+    secondary_Picture_size: {
+      type: "number",
+      label: "Secondary Image Size",
+      default: 190,
       section: "Plot",
       order: 22
     },
     secondary_image_opacity: {
       type: "number",
-      label: "Secondary Picture Image Opacity",
+      label: "Secondary Image Opacity",
       default: 0.9,
       display: "range",
       min: 0,
@@ -119,108 +135,113 @@ looker.plugins.visualizations.add({
     },
     secondary_x_position: {
       type: "number",
-      label: "Secondary Picture X Position",
+      label: "Secondary X Position",
       default: 520,
       section: "Plot",
       order: 24
     },
     secondary_y_position: {
       type: "number",
-      label: "Secondary Picture Y Position",
+      label: "Secondary Y Position",
       default: 250,
       section: "Plot",
       order: 25
     },
 
-    // ========== FONT SECTION ==========
-    font_size_primary_value: {
-      type: "number",
-      label: "Primary Value Font Size",
-      default: 52,
-      section: "Font",
+    // ==================================================================
+    // TAB 2: FORMATTING (Text, Colors, Percentages)
+    // ==================================================================
+
+    // --- SECTION: Primary Text ---
+    primary_text_divider: {
+      type: "string",
+      label: "Primary Value Styling",
+      display: "divider",
+      section: "Formatting",
       order: 1
     },
-    font_size_primary_label: {
-      type: "number",
-      label: "Primary Label Font Size",
-      default: 18,
-      section: "Font",
-      order: 2
-    },
-    font_size_secondary_value: {
-      type: "number",
-      label: "Secondary Value Font Size",
-      default: 44,
-      section: "Font",
-      order: 3
-    },
-    font_size_secondary_label: {
-      type: "number",
-      label: "Secondary Label Font Size",
-      default: 16,
-      section: "Font",
-      order: 4
-    },
-    font_size_percentage: {
-      type: "number",
-      label: "Percentage Font Size",
-      default: 28,
-      section: "Font",
-      order: 5
-    },
-
-    // ========== PRIMARY SECTION ==========
     primary_label: {
       type: "string",
-      label: "Primary Picture Label",
+      label: "Primary Label (Override)",
       default: "",
-      section: "Primary"
+      section: "Formatting",
+      order: 2
     },
     primary_text_color: {
       type: "string",
       label: "Primary Text Color",
       default: "#FFFFFF",
       display: "color",
-      section: "Primary"
+      section: "Formatting",
+      order: 3
     },
-    primary_Picture_size: {
+    font_size_primary_value: {
       type: "number",
-      label: "Primary Picture Size",
-      default: 240,
-      section: "Primary"
+      label: "Primary Value Font Size",
+      default: 52,
+      section: "Formatting",
+      order: 4
+    },
+    font_size_primary_label: {
+      type: "number",
+      label: "Primary Label Font Size",
+      default: 18,
+      section: "Formatting",
+      order: 5
     },
 
-    // ========== SECONDARY SECTION ==========
+    // --- SECTION: Secondary Text ---
+    secondary_text_divider: {
+      type: "string",
+      label: "Secondary Value Styling",
+      display: "divider",
+      section: "Formatting",
+      order: 10
+    },
     secondary_label: {
       type: "string",
-      label: "Secondary Picture Label",
+      label: "Secondary Label (Override)",
       default: "",
-      section: "Secondary",
-      order: 1
-    },
-    secondary_Picture_size: {
-      type: "number",
-      label: "Secondary Picture Size",
-      default: 190,
-      section: "Secondary",
-      order: 2
+      section: "Formatting",
+      order: 11
     },
     secondary_text_color: {
       type: "string",
       label: "Secondary Text Color",
       default: "#E53935",
       display: "color",
-      section: "Secondary",
-      order: 3
+      section: "Formatting",
+      order: 12
+    },
+    font_size_secondary_value: {
+      type: "number",
+      label: "Secondary Value Font Size",
+      default: 44,
+      section: "Formatting",
+      order: 13
+    },
+    font_size_secondary_label: {
+      type: "number",
+      label: "Secondary Label Font Size",
+      default: 16,
+      section: "Formatting",
+      order: 14
     },
 
-    // Percentage settings (now under Secondary)
+    // --- SECTION: Percentage ---
+    percentage_divider: {
+      type: "string",
+      label: "Percentage Indicator",
+      display: "divider",
+      section: "Formatting",
+      order: 20
+    },
     show_percentage: {
       type: "boolean",
       label: "Show Percentage",
       default: true,
-      section: "Secondary",
-      order: 11
+      section: "Formatting",
+      order: 21
     },
     percentage_calculation: {
       type: "string",
@@ -234,24 +255,31 @@ looker.plugins.visualizations.add({
         }
       ],
       default: "secondary_over_primary",
-      section: "Secondary",
-      order: 12
+      section: "Formatting",
+      order: 22
     },
     percentage_color: {
       type: "string",
       label: "Percentage Color",
       default: "#E53935",
       display: "color",
-      section: "Secondary",
-      order: 13
+      section: "Formatting",
+      order: 23
+    },
+    font_size_percentage: {
+      type: "number",
+      label: "Percentage Font Size",
+      default: 28,
+      section: "Formatting",
+      order: 24
     },
     percentage_decimals: {
       type: "number",
       label: "Percentage Decimals",
       default: 1,
       display: "number",
-      section: "Secondary",
-      order: 14
+      section: "Formatting",
+      order: 25
     }
   },
 
@@ -285,15 +313,6 @@ looker.plugins.visualizations.add({
         z-index: 1;
       }
 
-      .background-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 0;
-      }
-
       .Picture-value {
         font-weight: 700;
         text-anchor: middle;
@@ -319,34 +338,17 @@ looker.plugins.visualizations.add({
       }
 
       .water-Picture-image {
-        filter: Picture-shadow(0px 4px 12px rgba(0, 0, 0, 0.25));
+        filter: drop-shadow(0px 4px 12px rgba(0, 0, 0, 0.25));
         transition: all 0.3s ease;
       }
 
       .water-Picture-image:hover {
-        filter: Picture-shadow(0px 6px 16px rgba(0, 0, 0, 0.35));
-      }
-
-      .error-message {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-        color: #666;
-        font-size: 14px;
-        font-family: 'Open Sans', Arial, sans-serif;
+        filter: drop-shadow(0px 6px 16px rgba(0, 0, 0, 0.35));
       }
 
       @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: scale(1);
-        }
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
       }
 
       .water-Picture-image {
@@ -362,7 +364,7 @@ looker.plugins.visualizations.add({
 
     // Create HTML structure
     element.innerHTML = `
-      <div class="water-Picture-container" id="water-Picture-container-${Date.now()}">
+      <div class="water-Picture-container">
         <svg class="water-Picture-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
         </svg>
       </div>
@@ -377,7 +379,6 @@ looker.plugins.visualizations.add({
    * Update the visualization with new data
    */
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    // Clear any errors
     this.clearErrors();
 
     if (!this._svg || !this._container) {
@@ -410,10 +411,10 @@ looker.plugins.visualizations.add({
       return;
     }
 
-    // Get measures from query
+    // Get measures
     const measures = queryResponse.fields.measure_like;
     if (measures.length < 2) {
-      this.showError('At least 2 measures required (Primary Value, Secondary Value, Optional: Percentage)');
+      this.showError('At least 2 measures required');
       done();
       return;
     }
@@ -428,19 +429,15 @@ looker.plugins.visualizations.add({
     let secondaryValue = row[secondaryField.name].value;
     let percentageValue;
 
-    // Get percentage calculation method
     const percentageCalc = config.percentage_calculation || "secondary_over_primary";
 
-    // Calculate or get percentage based on configuration
     if (percentageCalc === "use_third_measure" && percentageField) {
-      // Use the third measure directly
       percentageValue = row[percentageField.name].value;
     } else {
-      // Default: secondary / primary (will be multiplied by 100 in formatting)
       percentageValue = primaryValue !== 0 ? (secondaryValue / primaryValue) : 0;
     }
 
-    // IMPROVEMENT 2: Format values using LookML value_format
+    // Format values
     const primaryFormatted = this.formatValueWithLookML(primaryValue, primaryField, row[primaryField.name].rendered);
     const secondaryFormatted = this.formatValueWithLookML(secondaryValue, secondaryField, row[secondaryField.name].rendered);
     const percentageFormatted = this.formatPercentage(percentageValue, config.percentage_decimals || 1, percentageCalc);
@@ -449,16 +446,7 @@ looker.plugins.visualizations.add({
     const primaryLabel = config.primary_label || measures[0].label_short || measures[0].label || "Primary Value";
     const secondaryLabel = config.secondary_label || measures[1].label_short || measures[1].label || "Secondary Value";
 
-    // Debug logging (will appear in browser console)
-    console.log('Water Picture Debug Info:');
-    console.log('Primary Value:', primaryValue, '→', primaryFormatted);
-    console.log('Secondary Value:', secondaryValue, '→', secondaryFormatted);
-    console.log('Percentage Value:', percentageValue, '→', percentageFormatted);
-    console.log('Calculation Method:', percentageCalc);
-    console.log('Primary Field:', primaryField);
-    console.log('Secondary Field:', secondaryField);
-
-    // Draw visualization
+    // Draw
     this.drawWaterPictures(
       primaryFormatted,
       secondaryFormatted,
@@ -476,7 +464,7 @@ looker.plugins.visualizations.add({
   },
 
   /**
-   * Show error message in the visualization
+   * Helper: Show error message
    */
   showError: function(message) {
     this._svg.innerHTML = `
@@ -484,185 +472,90 @@ looker.plugins.visualizations.add({
         <text x="400" y="280" text-anchor="middle" fill="#666" font-size="16" font-family="Arial, sans-serif">
           ${message}
         </text>
-        <text x="400" y="310" text-anchor="middle" fill="#999" font-size="12" font-family="Arial, sans-serif">
-          Please check your query configuration
-        </text>
       </g>
     `;
   },
 
   /**
-   * IMPROVEMENT 2: Format numeric values using LookML value_format
-   * This respects the value_format defined in LookML
+   * Helper: Format values respecting LookML
    */
   formatValueWithLookML: function(value, field, renderedValue) {
     if (value === null || value === undefined) return '';
+    if (renderedValue) return renderedValue;
 
-    // Priority 1: Use Looker's rendered value if available (most accurate)
-    if (renderedValue !== null && renderedValue !== undefined && renderedValue !== '') {
-      return renderedValue;
-    }
-
-    // Priority 2: Parse LookML value_format if available
     if (field && field.value_format) {
       const fmt = field.value_format;
       const num = Number(value);
 
-      // Pattern: "$0.0,\" k\"" or similar -> thousands with k suffix
       if (fmt.includes('," k"') || fmt.includes(",'k'")) {
-        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-        const sign = (num < 0) ? '-' : '';
-        const baseVal = Math.abs(num) / 1000;
-        const formattedNum = baseVal.toLocaleString('en-US', {
-          minimumFractionDigits: decimals,
-          maximumFractionDigits: decimals,
-          useGrouping: true
-        });
-        return `${sign}$${formattedNum} k`;
+        return (num / 1000).toLocaleString() + 'k';
       }
-
-      // Pattern: "$0.0,\" M\"" or similar -> millions with M suffix
       if (fmt.includes('," M"') || fmt.includes(",'M'")) {
-        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-        const sign = (num < 0) ? '-' : '';
-        const baseVal = Math.abs(num) / 1000000;
-        const formattedNum = baseVal.toLocaleString('en-US', {
-          minimumFractionDigits: decimals,
-          maximumFractionDigits: decimals,
-          useGrouping: true
-        });
-        return `${sign}$${formattedNum} M`;
+        return (num / 1000000).toLocaleString() + 'M';
       }
-
-      // Pattern: standard currency format (e.g. $#,##0.00)
-      if (fmt.startsWith('$') || fmt.includes('$#')) {
-        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-        const sign = (num < 0) ? '-' : '';
-        return `${sign}$${Math.abs(num).toLocaleString('en-US', {
-          minimumFractionDigits: decimals,
-          maximumFractionDigits: decimals
-        })}`;
-      }
-
-      // Pattern: Euro currency
-      if (fmt.startsWith('€') || fmt.includes('€#')) {
-        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-        return `€${num.toLocaleString('en-US', {
-          minimumFractionDigits: decimals,
-          maximumFractionDigits: decimals
-        })}`;
-      }
-
-      // Pattern: standard number format (e.g. #,##0.0)
-      if (fmt.includes('#,##0') || fmt.includes('#,###')) {
-        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-        return num.toLocaleString('en-US', {
-          minimumFractionDigits: decimals,
-          maximumFractionDigits: decimals
-        });
-      }
-
-      // Pattern: percentage format
       if (fmt.includes('%')) {
-        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 1;
-        return (num * 100).toFixed(decimals) + '%';
-      }
-
-      // Pattern: simple decimal format
-      if (fmt.match(/^0\.([0#]+)$/)) {
-        const decimals = (fmt.match(/0\.([0#]+)/) || [])[1]?.length || 0;
-        return num.toFixed(decimals);
+        return (num * 100).toFixed(1) + '%';
       }
     }
-
-    // Priority 3: Fallback to smart formatting
     return this.formatValue(value);
   },
 
   /**
-   * Format numeric values with M/K suffixes (fallback)
+   * Helper: Fallback formatting
    */
   formatValue: function(value) {
     const absValue = Math.abs(value);
     const sign = value < 0 ? '-' : '';
-
-    if (absValue >= 1000000) {
-      return sign + (absValue / 1000000).toFixed(2) + 'M';
-    } else if (absValue >= 1000) {
-      return sign + (absValue / 1000).toFixed(2) + 'K';
-    }
+    if (absValue >= 1000000) return sign + (absValue / 1000000).toFixed(2) + 'M';
+    if (absValue >= 1000) return sign + (absValue / 1000).toFixed(2) + 'K';
     return sign + absValue.toFixed(2);
   },
 
   /**
-   * Format percentage values
-   * Handles both decimal (0.4693) and percentage (46.93) formats
+   * Helper: Format Percentage
    */
   formatPercentage: function(value, decimals, calculationMethod) {
-    let percentage;
-
-    // Determine if value is already in percentage format or decimal format
-    if (calculationMethod === "use_third_measure") {
-      // Value is already a percentage number (e.g., 46.93 or -46.93)
-      percentage = value;
-    } else {
-      // Value is a decimal (e.g., 0.4693 or -0.4693), convert to percentage
-      percentage = value * 100;
-    }
-
-    // Format without sign prefix
+    let percentage = (calculationMethod === "use_third_measure") ? value : value * 100;
     return percentage.toFixed(decimals) + '%';
   },
 
   /**
-   * Draw the water Picture images and text
-   * IMPROVEMENT 1 & 3: PDF support and Dashboard drill support
-   */
-  /**
-   * Draw the water Picture images and text
-   * IMPROVEMENT 1 & 3: PDF support and Dashboard drill support
+   * MAIN DRAWING FUNCTION
+   * Includes fix for PDF Export and Syntax Errors
    */
   drawWaterPictures: function(primaryValue, secondaryValue, percentage, primaryLabel, secondaryLabel, config, data, row, primaryFieldName, secondaryFieldName) {
     const svg = this._svg;
     const svgNS = "http://www.w3.org/2000/svg";
 
-    // Get configuration values
+    // Config extraction
     const primaryX = config.primary_x_position || 280;
     const primaryY = config.primary_y_position || 350;
     const secondaryX = config.secondary_x_position || 520;
     const secondaryY = config.secondary_y_position || 250;
-
     const primarySize = config.primary_Picture_size || 240;
     const secondarySize = config.secondary_Picture_size || 190;
 
-    const primaryImageUrl = config.primary_image_url || "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png";
-    const secondaryImageUrl = config.secondary_image_url || "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-Picture-on-transparent-background-free-png.png";
+    // Image URLs (Defaults to the water drop image provided)
+    const primaryImageUrl = config.primary_image_url || "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png";
+    const secondaryImageUrl = config.secondary_image_url || "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png";
 
     const primaryOpacity = config.primary_image_opacity !== undefined ? config.primary_image_opacity : 1.0;
     const secondaryOpacity = config.secondary_image_opacity !== undefined ? config.secondary_image_opacity : 0.9;
 
-    // Create defs for filters if needed
+    // Filters
     const defs = document.createElementNS(svgNS, 'defs');
     svg.appendChild(defs);
 
-    // IMPROVEMENT 1: PRIMARY Picture IMAGE - Enhanced for PDF export
-    const primaryGroup = document.createElementNS(svgNS, 'g');
-    primaryGroup.setAttribute('class', 'primary-picture-group');
-
-    // ============================================================
-    // INSERTED CODE START: Preload Logic for PDF Compatibility
-    // ============================================================
+    // ---------------------------------------------------------
+    // PDF EXPORT FIX: Preload Primary Image
+    // ---------------------------------------------------------
     const primaryImg = new Image();
     primaryImg.crossOrigin = "anonymous";
-    primaryImg.onload = () => {
-      console.log('✓ Primary image loaded successfully');
-    };
+    primaryImg.onload = () => { console.log('✓ Primary image loaded'); };
     primaryImg.src = primaryImageUrl;
-    // ============================================================
-    // INSERTED CODE END
-    // ============================================================
+    // ---------------------------------------------------------
 
-    // Create the SVG image element (using the preloaded URL)
+    // 1. Draw Primary Image
     const primaryImage = document.createElementNS(svgNS, 'image');
     primaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', primaryImageUrl);
     primaryImage.setAttribute('x', primaryX - primarySize / 2);
@@ -672,10 +565,9 @@ looker.plugins.visualizations.add({
     primaryImage.setAttribute('class', 'water-Picture-image');
     primaryImage.setAttribute('opacity', primaryOpacity);
     primaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    svg.appendChild(primaryImage);
 
-    svg.appendChild(primaryImage); // Append directly to svg, not to a group
-
-    // IMPROVEMENT 3: Primary value text with ENHANCED drill functionality
+    // 2. Draw Primary Text (Value)
     const primaryValueText = document.createElementNS(svgNS, 'text');
     primaryValueText.setAttribute('x', primaryX);
     primaryValueText.setAttribute('y', primaryY - 10);
@@ -685,28 +577,17 @@ looker.plugins.visualizations.add({
     primaryValueText.setAttribute('cursor', 'pointer');
     primaryValueText.textContent = primaryValue;
 
-    // Get drill links from the row data
+    // Drill Logic Primary
     const primaryCell = row[primaryFieldName];
-    const primaryMeasureLinks = primaryCell && primaryCell.links ? primaryCell.links : [];
-
-    if (primaryMeasureLinks.length > 0) {
+    const primaryLinks = primaryCell && primaryCell.links ? primaryCell.links : [];
+    if (primaryLinks.length > 0) {
       primaryValueText.addEventListener('click', (e) => {
-        if (LookerCharts && LookerCharts.Utils) {
-          try {
-            LookerCharts.Utils.openDrillMenu({
-              links: primaryMeasureLinks,
-              event: e
-            });
-          } catch (error) {
-            console.error('✗ Error opening drill menu:', error);
-          }
-        }
+        LookerCharts.Utils.openDrillMenu({ links: primaryLinks, event: e });
       });
     }
-
     svg.appendChild(primaryValueText);
 
-    // Primary label text
+    // 3. Draw Primary Label
     const primaryLabelText = document.createElementNS(svgNS, 'text');
     primaryLabelText.setAttribute('x', primaryX);
     primaryLabelText.setAttribute('y', primaryY + 50);
@@ -717,7 +598,7 @@ looker.plugins.visualizations.add({
     primaryLabelText.textContent = primaryLabel;
     svg.appendChild(primaryLabelText);
 
-    // SECONDARY Picture IMAGE (smaller, top-right)
+    // 4. Draw Secondary Image
     const secondaryImage = document.createElementNS(svgNS, 'image');
     secondaryImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', secondaryImageUrl);
     secondaryImage.setAttribute('x', secondaryX - secondarySize / 2);
@@ -729,7 +610,7 @@ looker.plugins.visualizations.add({
     secondaryImage.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     svg.appendChild(secondaryImage);
 
-    // Percentage indicator
+    // 5. Draw Percentage
     if (config.show_percentage !== false) {
       const percentageText = document.createElementNS(svgNS, 'text');
       percentageText.setAttribute('x', secondaryX);
@@ -741,7 +622,7 @@ looker.plugins.visualizations.add({
       svg.appendChild(percentageText);
     }
 
-    // Secondary value text
+    // 6. Draw Secondary Text (Value)
     const secondaryValueText = document.createElementNS(svgNS, 'text');
     secondaryValueText.setAttribute('x', secondaryX);
     secondaryValueText.setAttribute('y', secondaryY - 5);
@@ -751,27 +632,17 @@ looker.plugins.visualizations.add({
     secondaryValueText.setAttribute('cursor', 'pointer');
     secondaryValueText.textContent = secondaryValue;
 
+    // Drill Logic Secondary
     const secondaryCell = row[secondaryFieldName];
-    const secondaryMeasureLinks = secondaryCell && secondaryCell.links ? secondaryCell.links : [];
-
-    if (secondaryMeasureLinks.length > 0) {
+    const secondaryLinks = secondaryCell && secondaryCell.links ? secondaryCell.links : [];
+    if (secondaryLinks.length > 0) {
       secondaryValueText.addEventListener('click', (e) => {
-        if (LookerCharts && LookerCharts.Utils) {
-          try {
-            LookerCharts.Utils.openDrillMenu({
-              links: secondaryMeasureLinks,
-              event: e
-            });
-          } catch (error) {
-            console.error('✗ Error opening drill menu:', error);
-          }
-        }
+        LookerCharts.Utils.openDrillMenu({ links: secondaryLinks, event: e });
       });
     }
-
     svg.appendChild(secondaryValueText);
 
-    // Secondary label text
+    // 7. Draw Secondary Label
     const secondaryLabelText = document.createElementNS(svgNS, 'text');
     secondaryLabelText.setAttribute('x', secondaryX);
     secondaryLabelText.setAttribute('y', secondaryY + 45);
@@ -782,7 +653,4 @@ looker.plugins.visualizations.add({
     secondaryLabelText.textContent = secondaryLabel;
     svg.appendChild(secondaryLabelText);
   }
-
-
-
 });
