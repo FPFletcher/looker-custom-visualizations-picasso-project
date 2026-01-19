@@ -1147,7 +1147,6 @@ looker.plugins.visualizations.add({
           const seriesName = getSeriesLabel(seriesIndex, defaultName);
 
           const baseColor = palette[seriesIndex % palette.length];
-          console.log(`[BASE COLOR PIVOT] Series ${seriesIndex} (Index % Length = ${seriesIndex % palette.length}): Color=${baseColor}`);
 
 
           const shouldApplyFormatting = isConditionalEnabled &&
@@ -1194,14 +1193,10 @@ looker.plugins.visualizations.add({
                                       (config.conditional_formatting_apply_to === 'all' || config.conditional_formatting_apply_to === 'first' && index === 0);
 
         const baseColor = palette[index % palette.length];
-        console.log(`[BASE COLOR NON-PIVOT] Series ${index} (Index % Length = ${index % palette.length}): Color=${baseColor}`);
-
 
         const measureName = measure;
         const defaultName = queryResponse.fields.measures[index].label_short || queryResponse.fields.measures[index].label;
         const seriesName = getSeriesLabel(index, defaultName);
-
-        console.log(`Series ${index}: measureName=${measureName}, defaultName=${defaultName}, seriesName=${seriesName}`);
 
         if (shouldApplyFormatting) {
           // Apply Conditional Formatting
@@ -1556,10 +1551,6 @@ looker.plugins.visualizations.add({
     };
 
     // TRENDLINE
-    console.log('=== TRENDLINE CHECK START ===');
-    console.log('config.trend_line_enabled:', config.trend_line_enabled);
-    console.log('seriesData.length:', seriesData.length);
-
     if (config.trend_line_enabled) {
       if (seriesData.length > 0) {
         let trendSourceData;
@@ -1708,8 +1699,6 @@ looker.plugins.visualizations.add({
                 }
               }
             };
-
-            console.log('[TRENDLINE DEBUG] Trend Series generated successfully. Pushing to chartOptions.');
             chartOptions.series.push(trendSeries);
 
           } else {
@@ -1784,8 +1773,6 @@ looker.plugins.visualizations.add({
     if(this.chart) {
       this.chart.reflow();
     }
-
-    console.log('=== TRENDLINE CHECK END ===');
     done();
   },
 
@@ -1857,7 +1844,6 @@ looker.plugins.visualizations.add({
 
   // Note: Removed unused arguments (paletteForFallback, seriesIndex, isReversed)
   getColors: function(values, config, baseColor, callerInfo = 'unknown') {
-  console.log(`[getColors] Called from: ${callerInfo}, baseColor: ${baseColor}.`);
 
   if (!config.conditional_formatting_enabled) {
     // This should never happen now, but good practice to keep

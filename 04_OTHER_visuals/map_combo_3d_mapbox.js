@@ -1,5 +1,5 @@
 /**
- * Multi-Layer 3D Map for Looker - v4 Ultimate (CORS Fixed + Image Support)
+ * Multi-Layer 3D Map for Looker - v5 Ultimate (Stable Icon + PDF Fix)
  * * * DEPENDENCIES (Add to manifest.lkml):
  * {
  * "dependencies": {
@@ -11,7 +11,7 @@
  * }
  */
 
-// --- HELPER TO GENERATE REPETITIVE LAYER OPTIONS ---
+// --- HELPER TO GENERATE REPETITIVE LAYER OPTIONS (Now all in one tab) ---
 const getLayerOptions = (n) => {
   const defaults = [
     { type: 'geojson', color: '#2E7D32', radius: 1000, height: 1000 }, // L1
@@ -26,87 +26,87 @@ const getLayerOptions = (n) => {
       type: "string",
       label: `────────── LAYER ${n} ──────────`,
       display: "divider",
-      section: `Layer ${n}`,
-      order: 0
+      section: "Layers", // Combined Tab
+      order: n * 10
     },
     [`layer${n}_enabled`]: {
       type: "boolean",
-      label: "Enable Layer",
-      default: n <= 2, // Enable first 2 by default
-      section: `Layer ${n}`,
-      order: 1
+      label: `Enable Layer ${n}`,
+      default: n <= 2,
+      section: "Layers",
+      order: n * 10 + 1
     },
     [`layer${n}_type`]: {
       type: "string",
-      label: "Visualization Type",
+      label: `Layer ${n} Type`,
       display: "select",
       values: [
         {"Choropleth (Region Only)": "geojson"},
         {"3D Columns": "column"},
         {"Points (Fixed Size)": "point"},
         {"Bubbles (Value Size)": "bubble"},
-        {"Icon (Custom Image)": "icon"},  // NEW FEATURE
+        {"Icon (Custom Image)": "icon"},
         {"Heatmap": "heatmap"},
         {"Hexagon Grid": "hexagon"}
       ],
       default: def.type,
-      section: `Layer ${n}`,
-      order: 2
+      section: "Layers",
+      order: n * 10 + 2
     },
     [`layer${n}_icon_url`]: {
       type: "string",
-      label: "Custom Image URL (for Icon type)",
+      label: `L${n} Icon URL`,
       default: "https://static.vecteezy.com/system/resources/thumbnails/044/570/540/small_2x/single-water-drop-on-transparent-background-free-png.png",
       placeholder: "https://...",
-      section: `Layer ${n}`,
-      order: 3
+      section: "Layers",
+      order: n * 10 + 3
     },
     [`layer${n}_measure_idx`]: {
       type: "number",
-      label: "Measure Index (0, 1, 2...)",
+      label: `L${n} Measure Index`,
       default: n-1,
-      section: `Layer ${n}`,
-      placeholder: "0 = First Measure",
-      order: 4
+      section: "Layers",
+      placeholder: "0 = 1st Measure",
+      order: n * 10 + 4
     },
     [`layer${n}_radius`]: {
       type: "number",
-      label: "Size / Radius (Meters)",
+      label: `L${n} Radius/Size`,
       default: def.radius,
-      section: `Layer ${n}`,
-      order: 5
+      section: "Layers",
+      order: n * 10 + 5
     },
     [`layer${n}_height`]: {
       type: "number",
-      label: "Height Scale (for 3D)",
+      label: `L${n} Height (3D)`,
       default: def.height,
-      section: `Layer ${n}`,
-      order: 6
+      section: "Layers",
+      order: n * 10 + 6
     },
     [`layer${n}_color`]: {
       type: "string",
-      label: "Color (Solid)",
+      label: `L${n} Color`,
       display: "color",
       default: def.color,
-      section: `Layer ${n}`,
-      order: 7
+      section: "Layers",
+      order: n * 10 + 7
     },
     [`layer${n}_opacity`]: {
       type: "number",
-      label: "Opacity (0-1)",
+      label: `L${n} Opacity`,
       default: 0.7,
       min: 0,
       max: 1,
       step: 0.1,
-      section: `Layer ${n}`,
-      order: 8
+      section: "Layers",
+      order: n * 10 + 8
     }
   };
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v4",
-  label: "Combo Map 3D (Fixed + Images)",
+  id: "combo_map_ultimate_v5",
+  label: "Combo Map 3D (PDF Safe)",
   options: {
     // --- MAP SETTINGS ---
     mapbox_token: {
@@ -146,7 +146,13 @@ looker.plugins.visualizations.add({
       section: "Data"
     },
 
-    // --- GEOJSON SETTINGS (For Region Mode) ---
+    // --- LAYERS (Combined) ---
+    ...getLayerOptions(1),
+    ...getLayerOptions(2),
+    ...getLayerOptions(3),
+    ...getLayerOptions(4),
+
+    // --- GEOJSON SETTINGS ---
     region_settings_div: { type: "string", label: "─── REGION MAPPING ───", display: "divider", section: "Data" },
     map_layer_source: {
       type: "string",
@@ -158,7 +164,7 @@ looker.plugins.visualizations.add({
         {"USA States": "us_states"},
         {"USA Counties": "us_counties"},
         {"Europe Major Combined": "combined_europe_major"},
-        {"France Regions (Fixed)": "france_regions"},
+        {"France Regions": "france_regions"},
         {"Germany States": "germany_states"},
         {"UK Regions": "uk_regions"},
         {"Spain Communities": "spain_communities"}
@@ -179,13 +185,7 @@ looker.plugins.visualizations.add({
       placeholder: "Auto-detect if empty"
     },
 
-    // --- GENERATE OPTIONS FOR LAYERS 1-4 ---
-    ...getLayerOptions(1),
-    ...getLayerOptions(2),
-    ...getLayerOptions(3),
-    ...getLayerOptions(4),
-
-    // --- COLOR RANGES (For Heatmaps/Choropleths) ---
+    // --- COLOR RANGES ---
     color_range_start: {
       type: "string",
       label: "Gradient Start",
@@ -203,7 +203,7 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
-    // 1. Force Load Mapbox CSS (Fixes the shaking/missing styles)
+    // 1. Force Load Mapbox CSS (Prevents Shaking)
     if (!document.getElementById('mapbox-css-fix')) {
       const link = document.createElement('link');
       link.id = 'mapbox-css-fix';
@@ -212,16 +212,16 @@ looker.plugins.visualizations.add({
       document.head.appendChild(link);
     }
 
-    // 2. Set up container with strict sizing
+    // 2. Set up container
     element.innerHTML = `
-    <style>
-    #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; }
-    #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-    </style>
-    <div id="map-wrapper">
-    <div id="map"></div>
-    </div>`;
-
+      <style>
+        #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; }
+        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .deck-tooltip { font-family: sans-serif; font-size: 12px; }
+      </style>
+      <div id="map-wrapper">
+        <div id="map"></div>
+      </div>`;
     this._container = element.querySelector('#map');
     this._geojsonCache = {};
   },
@@ -231,7 +231,7 @@ looker.plugins.visualizations.add({
 
     // 1. Dependency Check
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
-      this.addError({ title: "Missing Dependencies", message: "Please add deck.gl and mapbox-gl to manifest." });
+      this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
       done(); return;
     }
     if (!config.mapbox_token) {
@@ -241,7 +241,7 @@ looker.plugins.visualizations.add({
 
     // 2. Prepare Data
     this._prepareData(data, config, queryResponse).then(processedData => {
-      this._render(processedData, config, queryResponse);
+      this._render(processedData, config, queryResponse, details);
       done();
     }).catch(err => {
       console.error("Data Prep Error:", err);
@@ -278,10 +278,9 @@ looker.plugins.visualizations.add({
     try {
         geojson = await this._loadGeoJSON(url);
     } catch (error) {
-        throw new Error(`Failed to load Map Data: ${error.message}. Check Internet or CORS.`);
+        throw new Error(`Failed to load Map Data: ${error.message}.`);
     }
 
-    // Find region dimension
     const dims = queryResponse.fields.dimension_like;
     const regionDim = config.region_dim_name
       ? dims.find(d => d.name === config.region_dim_name)
@@ -289,7 +288,6 @@ looker.plugins.visualizations.add({
 
     if (!regionDim) throw new Error("No Region Name dimension found.");
 
-    // Normalize Data Map
     const dataMap = {};
     data.forEach(row => {
       const rawName = row[regionDim.name].value;
@@ -303,21 +301,19 @@ looker.plugins.visualizations.add({
       }
     });
 
-    // Match features
     const matchedFeatures = [];
     if (geojson && geojson.features) {
         geojson.features.forEach(feature => {
             const props = feature.properties;
             let match = null;
 
-            // Try to find match in properties
             for (let key in props) {
                 if (props[key]) {
-                const cleanProp = this._normalizeName(props[key]);
-                if (dataMap[cleanProp]) {
-                    match = dataMap[cleanProp];
-                    break;
-                }
+                  const cleanProp = this._normalizeName(props[key]);
+                  if (dataMap[cleanProp]) {
+                      match = dataMap[cleanProp];
+                      break;
+                  }
                 }
             }
 
@@ -325,7 +321,6 @@ looker.plugins.visualizations.add({
                 feature.properties._values = match.values;
                 feature.properties._formatted = match.formattedValues;
                 feature.properties._name = match.rawName;
-
                 const centroid = this._getCentroid(feature.geometry);
 
                 matchedFeatures.push({
@@ -342,7 +337,7 @@ looker.plugins.visualizations.add({
     return { type: 'regions', data: matchedFeatures, geojson: geojson, measures };
   },
 
-  _render: function(processed, config, queryResponse) {
+  _render: function(processed, config, queryResponse, details) {
     const layers = [];
 
     // Loop through Layer 1, 2, 3, 4
@@ -355,7 +350,6 @@ looker.plugins.visualizations.add({
 
     const getTooltip = ({object}) => {
       if (!object) return null;
-
       let name, values, formatted;
       if (object.properties && object.properties._name) {
         name = object.properties._name;
@@ -379,12 +373,15 @@ looker.plugins.visualizations.add({
       return { html, style: { backgroundColor: '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
     };
 
+    const isPrint = details && details.print; // Check if generating PDF
+
     const viewState = {
       longitude: config.center_lng,
       latitude: config.center_lat,
       zoom: config.zoom,
       pitch: config.pitch,
-      bearing: 0
+      bearing: 0,
+      transitionDuration: isPrint ? 0 : 300 // Disable animation for PDF
     };
 
     if (!this._deck) {
@@ -395,7 +392,9 @@ looker.plugins.visualizations.add({
         initialViewState: viewState,
         controller: true,
         layers: layers,
-        getTooltip: getTooltip
+        getTooltip: getTooltip,
+        // CRITICAL FOR PDF EXPORTS
+        glOptions: { preserveDrawingBuffer: true }
       });
     } else {
       this._deck.setProps({
@@ -403,7 +402,10 @@ looker.plugins.visualizations.add({
         initialViewState: viewState,
         mapStyle: config.map_style,
         mapboxApiAccessToken: config.mapbox_token,
-        getTooltip: getTooltip
+        getTooltip: getTooltip,
+        // Ensure map resizes correctly
+        width: '100%',
+        height: '100%'
       });
     }
   },
@@ -511,7 +513,10 @@ looker.plugins.visualizations.add({
           getLineColor: [255,255,255]
         });
 
-      case 'icon': // NEW ICON LAYER
+      case 'icon':
+        // SAFETY FIX: If no URL is provided, return null to prevent Crash
+        if (!iconUrl || iconUrl.length < 5) return null;
+
         return new deck.IconLayer({
             id: id,
             data: pointData,
@@ -523,9 +528,11 @@ looker.plugins.visualizations.add({
             },
             getIcon: d => 'marker',
             getPosition: d => d.position,
-            getSize: d => radius, // Use the radius slider to control image size
+            getSize: d => radius,
             sizeScale: 1,
-            sizeMinPixels: 20
+            sizeMinPixels: 20,
+            // Add fallback to prevent texture errors
+            onIconError: (err) => console.warn("Icon load error:", err)
         });
 
       case 'heatmap':
@@ -560,12 +567,11 @@ looker.plugins.visualizations.add({
   _getGeoJSONUrl: function(config) {
     if (config.map_layer_source === 'custom') return config.custom_geojson_url;
 
-    // UPDATED URLS TO CORS-COMPATIBLE SOURCES (GitHub Raw/Unpkg)
+    // CORS-COMPATIBLE SOURCES
     const URLS = {
         world_countries: 'https://unpkg.com/world-atlas@2/countries-110m.json',
         us_states: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
         us_counties: 'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json',
-        // Fixed France URL (Using GitHub Raw instead of gregoiredavid.fr which blocks CORS)
         france_regions: 'https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/regions.geojson',
         uk_regions: 'https://martinjc.github.io/UK-GeoJSON/json/eng/topo_eer.json',
         germany_states: 'https://raw.githubusercontent.com/isellsoap/deutschlandGeoJSON/main/2_bundeslaender/3_mittel.geo.json',
@@ -639,19 +645,19 @@ looker.plugins.visualizations.add({
     return name.toString().toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   },
 
- _hexToRgb: function(hex) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [0,0,0];
-},
+  _hexToRgb: function(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [0,0,0];
+  },
 
-_interpolateColor: function(c1, c2, factor) {
-  const rgb1 = this._hexToRgb(c1);
-  const rgb2 = this._hexToRgb(c2);
-  const f = Math.min(Math.max(factor, 0), 1);
-  return [
-    Math.round(rgb1[0] + (rgb2[0] - rgb1[0]) * f),
-  Math.round(rgb1[1] + (rgb2[1] - rgb1[1]) * f),
-  Math.round(rgb1[2] + (rgb2[2] - rgb1[2]) * f)
-];
-}
+  _interpolateColor: function(c1, c2, factor) {
+    const rgb1 = this._hexToRgb(c1);
+    const rgb2 = this._hexToRgb(c2);
+    const f = Math.min(Math.max(factor, 0), 1);
+    return [
+      Math.round(rgb1[0] + (rgb2[0] - rgb1[0]) * f),
+      Math.round(rgb1[1] + (rgb2[1] - rgb1[1]) * f),
+      Math.round(rgb1[2] + (rgb2[2] - rgb1[2]) * f)
+    ];
+  }
 });
