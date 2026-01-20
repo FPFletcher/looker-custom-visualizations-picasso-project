@@ -1,50 +1,35 @@
 /**
- * Multi-Layer 3D Map for Looker - v27 Ultimate
+ * Multi-Layer 3D Map for Looker - v28 Ultimate
  * * * FEATURES:
- * - Smart Dimension Detection: Prioritizes user input for region mapping.
- * - Robust Icons: Switched to jsDelivr for reliable icon loading.
- * - Clustering: Added "Clustered Points" and "Clustered Icons" modes.
- * - PDF Fix: Extended wait time and token retry loop.
+ * - PDF Fix: Removed Retry Loop (Reverted to standard check).
+ * - Icons: Added Base64 Fallback (Works 100% offline/PDF).
+ * - Clustering: Hexagon Layer now weights by Measure Value (Sum), not just count.
+ * - Dimension Detection: "Fuzzy Match" logic added.
  */
 
-// --- CONSTANTS: PREDEFINED ICONS (jsDelivr - Best for CORS) ---
+// --- INTERNAL ASSET: BASE64 MARKER (Fallback if URL fails) ---
+// Simple white pin with shadow, safe for any background
+const BASE64_MARKER = "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyYzAgNS41MiA0LjQ4IDEwIDEwIDEwczEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAybTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LThzOCAzLjU5IDggOC0zLjU5IDggOCA4em0tMS0xM2gydjZIMTF6bTAgOGgydjJIMTF6IiBmaWxsPSIjRkZGRkZGIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==";
+
+// Using jsDelivr for external icons (Better CORS)
 const CDN_BASE = "https://cdn.jsdelivr.net/npm/@mapbox/maki@8.0.0/icons";
 
 const ICON_PRESETS = {
   "custom": "Custom URL",
+  "marker-15": "Marker (Standard)",
   "airport-15": "Airplane",
-  "alcohol-shop-15": "Alcohol/Bar",
-  "amusement-park-15": "Amusement Park",
   "bank-15": "Bank",
-  "bar-15": "Bar",
   "bus-15": "Bus",
-  "cafe-15": "Cafe",
   "car-15": "Car",
   "cinema-15": "Cinema",
-  "fire-station-15": "Fire Station",
-  "fuel-15": "Fuel/Gas",
+  "cross-15": "Cross/Hospital",
+  "fuel-15": "Fuel",
   "grocery-15": "Grocery",
-  "hospital-15": "Hospital",
-  "ice-cream-15": "Ice Cream",
+  "home-15": "House",
   "industry-15": "Industry",
-  "laundry-15": "Laundry",
-  "library-15": "Library",
-  "lodging-15": "Lodging/Hotel",
-  "marker-15": "Marker (Standard)",
-  "museum-15": "Museum",
-  "music-15": "Music",
-  "park-15": "Park",
-  "parking-15": "Parking",
-  "pharmacy-15": "Pharmacy",
-  "police-15": "Police",
-  "post-15": "Post Office",
-  "restaurant-15": "Restaurant",
-  "school-15": "School",
+  "lodging-15": "Hotel",
   "shop-15": "Shop",
-  "soccer-15": "Soccer",
   "star-15": "Star",
-  "theatre-15": "Theatre",
-  "toilet-15": "Toilet",
   "warehouse-15": "Warehouse"
 };
 
@@ -64,12 +49,9 @@ const getLayerOptions = (n) => {
   const def = defaults[n-1];
   const b = 100 + (n * 100);
 
-  // Generate Icon Options Array
   const iconOptions = [];
   for (const [value, label] of Object.entries(ICON_PRESETS)) {
-      const obj = {};
-      obj[label] = value;
-      iconOptions.push(obj);
+      iconOptions.push({[label]: value});
   }
 
   return {
@@ -120,7 +102,7 @@ const getLayerOptions = (n) => {
       order: b + 5
     },
 
-    // COLORS & GRADIENTS
+    // COLORS
     [`layer${n}_use_gradient`]: {
       type: "boolean",
       label: `L${n} Use Gradient?`,
@@ -145,7 +127,7 @@ const getLayerOptions = (n) => {
       order: b + 8
     },
 
-    // SIZE & OPACITY
+    // SIZE
     [`layer${n}_radius`]: {
       type: "number",
       label: `L${n} Radius / Size`,
@@ -169,7 +151,7 @@ const getLayerOptions = (n) => {
       order: b + 11
     },
 
-    // ICON SETTINGS
+    // ICON
     [`layer${n}_icon_type`]: {
       type: "string",
       label: `L${n} Icon Source`,
@@ -190,24 +172,24 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: IMAGE PRELOADER ---
+// --- HELPER: IMAGE PRELOADER WITH FALLBACK ---
 const preloadImage = (url) => {
     return new Promise((resolve) => {
-        if (!url || url.length < 5) return resolve();
+        if (!url || url.length < 5) return resolve(BASE64_MARKER);
         const img = new Image();
-        img.crossOrigin = "Anonymous"; // Crucial for PDF
-        img.onload = () => resolve();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => resolve(url);
         img.onerror = () => {
-            console.warn(`[Viz] Failed to load icon: ${url}`);
-            resolve(); // Resolve anyway to not block render
+            console.warn(`[Viz] Failed to load icon: ${url}. Using fallback.`);
+            resolve(BASE64_MARKER); // Resolve with Fallback
         };
         img.src = url;
     });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v26",
-  label: "Combo Map 3D (Smart Dimensions + Icons)",
+  id: "combo_map_ultimate_v28",
+  label: "Combo Map 3D (V28 Stable)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -336,7 +318,6 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
-    // Mapbox CSS
     if (!document.getElementById('mapbox-css-fix')) {
       const link = document.createElement('link');
       link.id = 'mapbox-css-fix';
@@ -362,7 +343,6 @@ looker.plugins.visualizations.add({
             display: flex; align-items: center; gap: 6px; user-select: none;
         }
         #interaction-toggle:hover { background: #f0f0f0; }
-        #interaction-icon { font-size: 16px; }
         .deck-tooltip { font-family: sans-serif; font-size: 12px; pointer-events: none; }
       </style>
 
@@ -426,24 +406,13 @@ looker.plugins.visualizations.add({
 
     this.clearErrors();
 
-    // --- TOKEN RETRY LOGIC (Fix for PDF) ---
+    // REMOVED RETRY LOOP - Standard Check
     if (!config.mapbox_token) {
-        if (!this._retryCount) this._retryCount = 0;
-        if (this._retryCount < 5) {
-            console.warn(`[Viz] Token missing. Retrying (${this._retryCount+1}/5)...`);
-            this._retryCount++;
-            setTimeout(() => {
-                this.updateAsync(data, element, config, queryResponse, details, done);
-            }, 500);
-            return;
-        }
-        console.error("[Viz] Token missing after retries.");
         if(this._deck) { this._deck.finalize(); this._deck = null; }
         this._tokenError.style.display = 'block';
         this._toggleBtn.style.display = 'none';
         done(); return;
     } else {
-        this._retryCount = 0;
         this._tokenError.style.display = 'none';
         this._toggleBtn.style.display = isPrint ? 'none' : 'flex';
     }
@@ -460,8 +429,7 @@ looker.plugins.visualizations.add({
             const preset = config[`layer${i}_icon_type`];
             const custom = config[`layer${i}_icon_url`];
             const finalUrl = getIconUrl(preset, custom);
-
-            console.log(`[Viz] Preloading Icon for Layer ${i}: ${finalUrl}`);
+            // Preloader now returns a Valid URL or Base64 Fallback
             iconPromises.push(preloadImage(finalUrl));
         }
     }
@@ -471,18 +439,18 @@ looker.plugins.visualizations.add({
     Promise.all([
         this._prepareData(data, config, queryResponse),
         ...iconPromises
-    ]).then(([processedData]) => {
-        console.log("[Viz] 3. Data & Icons Ready. Rendering...");
-        this._render(processedData, config, queryResponse, details);
+    ]).then(([processedData, ...loadedIcons]) => {
 
-        // --- SMART PDF WAIT ---
+        // Pass loaded icons to render
+        this._render(processedData, config, queryResponse, details, loadedIcons);
+
         if (isPrint) {
-            console.log("[Viz] PDF Mode Active. Freezing map for capture.");
+            console.log("[Viz] PDF Mode Active. Freezing map.");
             if(this._deck) this._deck.redraw(true);
             setTimeout(() => {
-                console.log("[Viz] PDF Wait Complete (Calling done)");
+                console.log("[Viz] PDF Wait Complete");
                 done();
-            }, 4000); // 4s for safety
+            }, 4000);
         } else {
             console.log("[Viz] Interactive Mode (Done)");
             done();
@@ -498,7 +466,6 @@ looker.plugins.visualizations.add({
   _prepareData: async function(data, config, queryResponse) {
     const measures = queryResponse.fields.measure_like;
 
-    // A. POINT MODE (Lat/Lng)
     if (config.data_mode === 'points') {
       const dims = queryResponse.fields.dimension_like;
       const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
@@ -517,7 +484,6 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures };
     }
 
-    // B. REGION MODE (Name Matching)
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
 
@@ -531,18 +497,20 @@ looker.plugins.visualizations.add({
 
     const dims = queryResponse.fields.dimension_like;
 
-    // SMART DIMENSION DETECTION
+    // --- SMART DIMENSION DETECTION (Fuzzy Match) ---
     let regionDim = null;
-    // 1. Try explicit user config
     if (config.region_dim_name) {
-        regionDim = dims.find(d => d.name === config.region_dim_name);
+        const needle = config.region_dim_name.toLowerCase();
+        regionDim = dims.find(d => d.name === config.region_dim_name) ||
+                    dims.find(d => d.name.toLowerCase().includes(needle)) ||
+                    dims.find(d => d.label.toLowerCase().includes(needle));
     }
-    // 2. Try identifying a dimension with 'map_layer' or string type
     if (!regionDim) {
+        // Fallback: finding first map_layer or string field
         regionDim = dims.find(d => d.map_layer_name) || dims.find(d => d.type === 'string');
     }
 
-    if (!regionDim) throw new Error("No Region Name dimension found. Please specify in settings.");
+    if (!regionDim) throw new Error(`Could not find a region dimension. Please check the "Region Dimension Name" setting.`);
 
     const dataMap = {};
     data.forEach(row => {
@@ -594,13 +562,23 @@ looker.plugins.visualizations.add({
     return { type: 'regions', data: matchedFeatures, geojson: geojson, measures };
   },
 
-  _render: function(processed, config, queryResponse, details) {
+  _render: function(processed, config, queryResponse, details, loadedIcons) {
     const layerObjects = [];
+
+    // Map icons to layers
+    let iconIndex = 0;
 
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`]) {
         try {
-          const layer = this._buildSingleLayer(i, config, processed);
+          // If this is an icon layer, grab its preloaded URL
+          let iconUrlOverride = null;
+          if (config[`layer${i}_type`] === 'icon') {
+              iconUrlOverride = loadedIcons[iconIndex] || BASE64_MARKER;
+              iconIndex++;
+          }
+
+          const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
@@ -657,7 +635,6 @@ looker.plugins.visualizations.add({
         this._prevConfig.pitch !== cfgPitch;
 
     if (!this._viewState || configChanged) {
-        console.log("[Viz] Resetting View State (Config changed or First Load)");
         this._viewState = {
             longitude: cfgLng,
             latitude: cfgLat,
@@ -721,7 +698,7 @@ looker.plugins.visualizations.add({
     );
   },
 
-  _buildSingleLayer: function(idx, config, processed) {
+  _buildSingleLayer: function(idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
     const measureIdx = config[`layer${idx}_measure_idx`] || 0;
 
@@ -735,10 +712,13 @@ looker.plugins.visualizations.add({
     const heightScale = config[`layer${idx}_height`];
     const opacity = config[`layer${idx}_opacity`];
 
-    // Icon Logic
-    const iconPreset = config[`layer${idx}_icon_type`];
-    const iconCustom = config[`layer${idx}_icon_url`];
-    const iconUrl = getIconUrl(iconPreset, iconCustom);
+    // Use the overridden (preloaded) URL if available, else derive it
+    let iconUrl = iconUrlOverride;
+    if (!iconUrl) {
+        const iconPreset = config[`layer${idx}_icon_type`];
+        const iconCustom = config[`layer${idx}_icon_url`];
+        iconUrl = getIconUrl(iconPreset, iconCustom);
+    }
 
     const getValue = (d) => {
       const arr = d.values || (d.properties && d.properties._values);
@@ -892,13 +872,12 @@ looker.plugins.visualizations.add({
 
       case 'icon':
         if (safePointData.length === 0) return null;
-        if (!iconUrl || iconUrl.length < 5) return null;
         return new deck.IconLayer({
             id: id,
             data: safePointData,
             pickable: true,
             opacity: opacity,
-            iconAtlas: iconUrl,
+            iconAtlas: iconUrl, // Uses passed-in Safe URL or Fallback
             iconMapping: {
                 marker: { x: 0, y: 0, width: 512, height: 512, mask: false }
             },
@@ -909,7 +888,7 @@ looker.plugins.visualizations.add({
             sizeMinPixels: 20,
             autoHighlight: false,
             onClick: onClickHandler,
-            onIconError: (err) => console.warn("[Viz] Icon error", err)
+            onIconError: (err) => console.warn("[Viz] Icon error (Fallback active)", err)
         });
 
       case 'heatmap':
@@ -934,7 +913,9 @@ looker.plugins.visualizations.add({
           radius: radius,
           elevationScale: heightScale,
           getPosition: d => d.position,
+          // Use MEASURE VALUE for clustering weight, NOT count
           getElevationWeight: d => getValue(d),
+          getColorWeight: d => getValue(d),
           colorRange: this._generateColorRange(startColorHex, endColorHex),
           onClick: onClickHandler
         });
