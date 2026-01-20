@@ -1,15 +1,14 @@
 /**
- * Multi-Layer 3D Map for Looker - v26 Ultimate
+ * Multi-Layer 3D Map for Looker - v27 Ultimate
  * * * FEATURES:
  * - Smart Dimension Detection: Prioritizes user input for region mapping.
- * - Robust Icons: Switched to CDN for reliable icon loading.
+ * - Robust Icons: Switched to jsDelivr for reliable icon loading.
  * - Clustering: Added "Clustered Points" and "Clustered Icons" modes.
  * - PDF Fix: Extended wait time and token retry loop.
  */
 
-// --- CONSTANTS: PREDEFINED ICONS (CDN Hosted) ---
-// Using unpkg for better CORS support than raw GitHub
-const CDN_BASE = "https://unpkg.com/@mapbox/maki@8.0.0/icons";
+// --- CONSTANTS: PREDEFINED ICONS (jsDelivr - Best for CORS) ---
+const CDN_BASE = "https://cdn.jsdelivr.net/npm/@mapbox/maki@8.0.0/icons";
 
 const ICON_PRESETS = {
   "custom": "Custom URL",
@@ -120,6 +119,8 @@ const getLayerOptions = (n) => {
       placeholder: "Higher # is on top",
       order: b + 5
     },
+
+    // COLORS & GRADIENTS
     [`layer${n}_use_gradient`]: {
       type: "boolean",
       label: `L${n} Use Gradient?`,
@@ -143,6 +144,8 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 8
     },
+
+    // SIZE & OPACITY
     [`layer${n}_radius`]: {
       type: "number",
       label: `L${n} Radius / Size`,
@@ -165,6 +168,8 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 11
     },
+
+    // ICON SETTINGS
     [`layer${n}_icon_type`]: {
       type: "string",
       label: `L${n} Icon Source`,
@@ -760,6 +765,7 @@ looker.plugins.visualizations.add({
         };
         const safeEvent = (info.srcEvent && info.srcEvent.pageX) ? info.srcEvent : mockEvent;
 
+        console.log("[Viz] Opening Drill Menu", links);
         LookerCharts.Utils.openDrillMenu({
           links: links,
           event: safeEvent
