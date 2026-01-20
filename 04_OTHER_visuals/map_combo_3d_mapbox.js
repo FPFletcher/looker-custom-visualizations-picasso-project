@@ -1,11 +1,11 @@
 /**
- * Multi-Layer 3D Map for Looker - v30 Ultimate
+ * Multi-Layer 3D Map for Looker - v31 Debug Edition
  *
- * IMPROVEMENTS FROM v29:
- * - FIX: 3D columns now work correctly with multiple dimensions
- * - NEW: Layer Dimension Index - each layer can use a different dimension
- * - NEW: Pivot Support - pivoted measures display all pivot values with proper tooltips
- * - NEW: Auto-detect pivoted data and aggregate properly
+ * FIXES FROM v30:
+ * - FIXED: Dimension Index now properly filters data per layer
+ * - FIXED: Pivot detection and display working correctly
+ * - ADDED: Extensive console logging for debugging
+ * - IMPROVED: PDF/Print mode handling
  *
  * FEATURES:
  * - Icons: 100% Embedded (Base64). No external network requests.
@@ -193,7 +193,7 @@ const preloadImage = (type, customUrl) => {
         img.crossOrigin = "Anonymous";
         img.onload = () => resolve(url);
         img.onerror = () => {
-            console.warn(`[Viz] Failed to load icon: ${url}. Using fallback.`);
+            console.warn(`[Viz V31] Failed to load icon: ${url}. Using fallback.`);
             resolve(ICONS['marker']);
         };
         img.src = url;
@@ -201,8 +201,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v30",
-  label: "Combo Map 3D (V30 Pivot & Dimension Support)",
+  id: "combo_map_ultimate_v31",
+  label: "Combo Map 3D (V31 Debug)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -315,6 +315,8 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
+    console.log("[Viz V31] CREATE called");
+
     if (!document.getElementById('mapbox-css-fix')) {
       const link = document.createElement('link');
       link.id = 'mapbox-css-fix';
@@ -351,6 +353,7 @@ looker.plugins.visualizations.add({
   },
 
   destroy: function() {
+    console.log("[Viz V31] DESTROY called");
     if (this._deck) {
       this._deck.finalize();
       this._deck = null;
@@ -359,96 +362,171 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    console.log(`[Viz V30] Update Started (${data.length} rows)`);
     const isPrint = details && details.print;
+
+    console.log("=".repeat(60));
+    console.log("[Viz V31] UPDATE ASYNC START");
+    console.log("[Viz V31] Rows:", data.length);
+    console.log("[Viz V31] PDF Mode:", isPrint);
+    console.log("[Viz V31] Config:", JSON.stringify(config, null, 2));
+    console.log("=".repeat(60));
 
     this.clearErrors();
 
+    // --- CHECK MAPBOX TOKEN ---
     if (!config.mapbox_token) {
+        console.error("[Viz V31] ERROR: Missing Mapbox Token");
         if(this._deck) { this._deck.finalize(); this._deck = null; }
         this._tokenError.style.display = 'block';
-        done(); return;
+        done();
+        return;
     } else {
         this._tokenError.style.display = 'none';
     }
 
+    // --- CHECK DEPENDENCIES ---
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
+      console.error("[Viz V31] ERROR: Missing deck.gl or mapbox-gl");
       this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
-      done(); return;
+      done();
+      return;
     }
 
-    // Store queryResponse for later use
+    // --- STORE QUERY RESPONSE ---
     this._queryResponse = queryResponse;
 
-    // Detect pivot information
-    this._pivotInfo = this._detectPivots(queryResponse);
-    console.log("[Viz V30] Pivot Info:", this._pivotInfo);
+    // --- LOG QUERY STRUCTURE ---
+    console.log("[Viz V31] QUERY RESPONSE STRUCTURE:");
+    console.log("[Viz V31]   Dimensions:", queryResponse.fields.dimension_like.map(d => d.name));
+    console.log("[Viz V31]   Measures:", queryResponse.fields.measure_like.map(m => m.name));
+    console.log("[Viz V31]   Pivots field:", queryResponse.fields.pivots);
+    console.log("[Viz V31]   Pivots data:", queryResponse.pivots);
 
-    // --- PRE-LOAD ASSETS ---
+    // --- LOG SAMPLE ROW ---
+    if (data.length > 0) {
+      console.log("[Viz V31] SAMPLE ROW (first row):");
+      console.log(JSON.stringify(data[0], null, 2));
+    }
+
+    // --- DETECT PIVOTS ---
+    this._pivotInfo = this._detectPivots(queryResponse);
+    console.log("[Viz V31] PIVOT INFO:", JSON.stringify(this._pivotInfo, null, 2));
+
+    // --- PRE-LOAD ICONS ---
     const iconPromises = [];
     for(let i=1; i<=4; i++) {
         if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
             const preset = config[`layer${i}_icon_type`];
             const custom = config[`layer${i}_icon_url`];
+            console.log(`[Viz V31] Preloading icon for Layer ${i}: preset=${preset}, custom=${custom}`);
             iconPromises.push(preloadImage(preset, custom));
         }
     }
 
+    // --- MAIN PROCESSING ---
     Promise.all([
         this._prepareData(data, config, queryResponse),
         ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
+        console.log("[Viz V31] DATA PREPARED SUCCESSFULLY");
+        console.log("[Viz V31]   Type:", processedData.type);
+        console.log("[Viz V31]   Data points:", processedData.data ? processedData.data.length : 0);
+        console.log("[Viz V31]   DataMaps keys:", processedData.dataMaps ? Object.keys(processedData.dataMaps) : 'N/A');
+
+        if (processedData.dataMaps) {
+          Object.keys(processedData.dataMaps).forEach(dimIdx => {
+            const map = processedData.dataMaps[dimIdx];
+            console.log(`[Viz V31]   DataMap[${dimIdx}] has ${Object.keys(map).length} entries`);
+            // Log first entry as sample
+            const firstKey = Object.keys(map)[0];
+            if (firstKey) {
+              console.log(`[Viz V31]   DataMap[${dimIdx}] sample entry "${firstKey}":`, JSON.stringify(map[firstKey], null, 2));
+            }
+          });
+        }
+
         this._render(processedData, config, queryResponse, details, loadedIcons);
 
         if (isPrint) {
-            console.log("[Viz] PDF Mode. Waiting 4s.");
+            console.log("[Viz V31] PDF Mode - Waiting 4s for render");
             if(this._deck) this._deck.redraw(true);
-            setTimeout(() => { done(); }, 4000);
+            setTimeout(() => {
+              console.log("[Viz V31] PDF Mode - Done waiting, calling done()");
+              done();
+            }, 4000);
         } else {
             done();
         }
 
     }).catch(err => {
-        console.error("[Viz] Error:", err);
+        console.error("[Viz V31] FATAL ERROR:", err);
+        console.error("[Viz V31] Stack:", err.stack);
         this.addError({ title: "Error", message: err.message });
         done();
     });
   },
 
-  // NEW: Detect pivot configuration
+  // --- DETECT PIVOT CONFIGURATION ---
   _detectPivots: function(queryResponse) {
-    const pivots = queryResponse.fields.pivots || [];
-    const hasPivot = pivots.length > 0;
+    console.log("[Viz V31] _detectPivots called");
+
+    const pivotFields = queryResponse.fields.pivots || [];
+    const hasPivot = pivotFields.length > 0;
+
+    console.log("[Viz V31]   Pivot fields:", pivotFields);
+    console.log("[Viz V31]   Has pivot:", hasPivot);
 
     if (!hasPivot) {
-      return { hasPivot: false, pivotKeys: [], pivotField: null };
+      console.log("[Viz V31]   No pivots detected");
+      return { hasPivot: false, pivotKeys: [], pivotField: null, pivotLabels: [] };
     }
 
-    // Get pivot keys from the data
+    // Get pivot keys from queryResponse.pivots array
     const pivotKeys = queryResponse.pivots ? queryResponse.pivots.map(p => p.key) : [];
+    const pivotLabels = queryResponse.pivots ? queryResponse.pivots.map(p => {
+      // p.data contains the actual pivot values
+      if (typeof p.data === 'object') {
+        return Object.values(p.data).join(' | ');
+      }
+      return p.key;
+    }) : pivotKeys;
+
+    console.log("[Viz V31]   Pivot keys:", pivotKeys);
+    console.log("[Viz V31]   Pivot labels:", pivotLabels);
 
     return {
       hasPivot: true,
       pivotKeys: pivotKeys,
-      pivotField: pivots[0],
-      pivotLabels: queryResponse.pivots ? queryResponse.pivots.map(p => p.data || p.key) : pivotKeys
+      pivotField: pivotFields[0],
+      pivotLabels: pivotLabels
     };
   },
 
+  // --- PREPARE DATA ---
   _prepareData: async function(data, config, queryResponse) {
+    console.log("[Viz V31] _prepareData called");
+
     const measures = queryResponse.fields.measure_like;
     const dims = queryResponse.fields.dimension_like;
 
+    console.log("[Viz V31]   Dimensions:", dims.map(d => `${d.name} (${d.type})`));
+    console.log("[Viz V31]   Measures:", measures.map(m => m.name));
+
     // A. POINT MODE (Lat/Lng)
     if (config.data_mode === 'points') {
+      console.log("[Viz V31]   Mode: POINTS");
+
       const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
       const lngF = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lon'));
 
+      console.log("[Viz V31]   Lat field:", latF ? latF.name : 'NOT FOUND');
+      console.log("[Viz V31]   Lng field:", lngF ? lngF.name : 'NOT FOUND');
+
       if (!latF || !lngF) throw new Error("Latitude/Longitude dimensions missing.");
 
-      const points = data.map(row => {
-        const pointData = this._extractRowData(row, measures, dims);
+      const points = data.map((row, idx) => {
+        const pointData = this._extractRowData(row, measures, dims, idx);
         return {
           position: [parseFloat(row[lngF.name].value), parseFloat(row[latF.name].value)],
           ...pointData,
@@ -456,25 +534,34 @@ looker.plugins.visualizations.add({
         };
       }).filter(p => !isNaN(p.position[0]) && !isNaN(p.position[1]));
 
+      console.log("[Viz V31]   Valid points:", points.length);
       return { type: 'points', data: points, measures, dims };
     }
 
     // B. REGION MODE (Name Matching)
+    console.log("[Viz V31]   Mode: REGIONS");
+
     const url = this._getGeoJSONUrl(config);
+    console.log("[Viz V31]   GeoJSON URL:", url);
+
     let geojson = null;
 
     try {
         geojson = await this._loadGeoJSON(url);
+        console.log("[Viz V31]   GeoJSON loaded, features:", geojson.features ? geojson.features.length : 0);
     } catch (error) {
-        console.warn("[Viz] GeoJSON Load Fail", error);
+        console.warn("[Viz V31]   GeoJSON load failed:", error);
         geojson = { type: "FeatureCollection", features: [] };
     }
 
-    // Build data map per dimension for multi-dimension support
+    // Build data maps per dimension
+    console.log("[Viz V31]   Building data maps for each dimension...");
     const dataMaps = this._buildDataMaps(data, dims, measures);
 
-    // Match features using primary dimension (can be overridden per layer)
+    // Match features using primary dimension (index 0)
+    console.log("[Viz V31]   Matching features to GeoJSON...");
     const matchedFeatures = this._matchFeatures(geojson, dataMaps, config, dims);
+    console.log("[Viz V31]   Matched features:", matchedFeatures.length);
 
     return {
       type: 'regions',
@@ -486,13 +573,18 @@ looker.plugins.visualizations.add({
     };
   },
 
-  // NEW: Extract all data from a row including pivot handling
-  _extractRowData: function(row, measures, dims) {
+  // --- EXTRACT ROW DATA (handles pivots) ---
+  _extractRowData: function(row, measures, dims, rowIdx) {
     const hasPivot = this._pivotInfo && this._pivotInfo.hasPivot;
+
+    if (rowIdx === 0) {
+      console.log("[Viz V31] _extractRowData (first row)");
+      console.log("[Viz V31]   Has pivot:", hasPivot);
+    }
 
     if (!hasPivot) {
       // Standard non-pivoted data
-      return {
+      const result = {
         values: measures.map(m => {
           const cell = row[m.name];
           return cell ? parseFloat(cell.value) || 0 : 0;
@@ -511,30 +603,50 @@ looker.plugins.visualizations.add({
         }),
         pivotData: null
       };
+
+      if (rowIdx === 0) {
+        console.log("[Viz V31]   Non-pivot result:", JSON.stringify(result, null, 2));
+      }
+
+      return result;
     }
 
-    // Pivoted data - extract all pivot values
+    // --- PIVOTED DATA ---
     const pivotData = {};
     const pivotKeys = this._pivotInfo.pivotKeys;
 
+    if (rowIdx === 0) {
+      console.log("[Viz V31]   Processing pivoted data");
+      console.log("[Viz V31]   Pivot keys:", pivotKeys);
+    }
+
     measures.forEach((m, mIdx) => {
       pivotData[m.name] = {};
+      const measureCell = row[m.name];
 
-      pivotKeys.forEach((pivotKey, pIdx) => {
-        const cell = row[m.name];
-        if (cell && cell[pivotKey]) {
-          pivotData[m.name][pivotKey] = {
-            value: parseFloat(cell[pivotKey].value) || 0,
-            formatted: cell[pivotKey].rendered || cell[pivotKey].value,
-            links: cell[pivotKey].links || []
-          };
-        } else {
-          pivotData[m.name][pivotKey] = { value: 0, formatted: '0', links: [] };
-        }
-      });
+      if (rowIdx === 0) {
+        console.log(`[Viz V31]   Measure ${m.name} cell:`, JSON.stringify(measureCell, null, 2));
+      }
+
+      if (measureCell && typeof measureCell === 'object') {
+        pivotKeys.forEach((pivotKey, pIdx) => {
+          // In Looker, pivoted values are accessed as row[measure.name][pivotKey]
+          const pivotCell = measureCell[pivotKey];
+
+          if (pivotCell) {
+            pivotData[m.name][pivotKey] = {
+              value: parseFloat(pivotCell.value) || 0,
+              formatted: pivotCell.rendered || pivotCell.value || '0',
+              links: pivotCell.links || []
+            };
+          } else {
+            pivotData[m.name][pivotKey] = { value: 0, formatted: '0', links: [] };
+          }
+        });
+      }
     });
 
-    // Calculate totals for non-pivoted access
+    // Calculate totals
     const values = measures.map(m => {
       let total = 0;
       pivotKeys.forEach(pk => {
@@ -545,15 +657,12 @@ looker.plugins.visualizations.add({
       return total;
     });
 
-    const formattedValues = measures.map((m, idx) => {
-      return this._formatNumber(values[idx]);
-    });
+    const formattedValues = values.map(v => this._formatNumber(v));
 
-    return {
+    const result = {
       values,
       formattedValues,
       links: measures.map(m => {
-        // Aggregate all links from pivot values
         const allLinks = [];
         pivotKeys.forEach(pk => {
           if (pivotData[m.name] && pivotData[m.name][pk] && pivotData[m.name][pk].links) {
@@ -568,40 +677,53 @@ looker.plugins.visualizations.add({
       }),
       pivotData
     };
+
+    if (rowIdx === 0) {
+      console.log("[Viz V31]   Pivot result:", JSON.stringify(result, null, 2));
+    }
+
+    return result;
   },
 
-  // NEW: Build data maps for each dimension
+  // --- BUILD DATA MAPS FOR EACH DIMENSION ---
   _buildDataMaps: function(data, dims, measures) {
+    console.log("[Viz V31] _buildDataMaps called");
+    console.log("[Viz V31]   Number of dimensions:", dims.length);
+    console.log("[Viz V31]   Number of rows:", data.length);
+
     const dataMaps = {};
 
     dims.forEach((dim, dimIdx) => {
       dataMaps[dimIdx] = {};
+      console.log(`[Viz V31]   Building map for dimension ${dimIdx}: ${dim.name}`);
 
-      data.forEach(row => {
+      data.forEach((row, rowIdx) => {
         const rawName = row[dim.name] ? row[dim.name].value : null;
+
         if (rawName) {
           const clean = this._normalizeName(rawName);
-          const rowData = this._extractRowData(row, measures, dims);
+          const rowData = this._extractRowData(row, measures, dims, rowIdx);
 
-          // If same key exists, aggregate values
+          // Aggregate if same key exists
           if (dataMaps[dimIdx][clean]) {
             const existing = dataMaps[dimIdx][clean];
             existing.values = existing.values.map((v, i) => v + (rowData.values[i] || 0));
-            // Keep first formatted values (or recalculate)
             existing.formattedValues = existing.values.map(v => this._formatNumber(v));
+
             // Merge links
             rowData.links.forEach((links, i) => {
               if (links && links.length) {
                 existing.links[i] = [...(existing.links[i] || []), ...links];
               }
             });
+
             // Merge pivot data
             if (rowData.pivotData && existing.pivotData) {
               Object.keys(rowData.pivotData).forEach(mName => {
                 Object.keys(rowData.pivotData[mName]).forEach(pk => {
                   if (!existing.pivotData[mName]) existing.pivotData[mName] = {};
                   if (!existing.pivotData[mName][pk]) {
-                    existing.pivotData[mName][pk] = rowData.pivotData[mName][pk];
+                    existing.pivotData[mName][pk] = { ...rowData.pivotData[mName][pk] };
                   } else {
                     existing.pivotData[mName][pk].value += rowData.pivotData[mName][pk].value;
                     existing.pivotData[mName][pk].formatted = this._formatNumber(existing.pivotData[mName][pk].value);
@@ -617,28 +739,37 @@ looker.plugins.visualizations.add({
           }
         }
       });
+
+      console.log(`[Viz V31]   Dimension ${dimIdx} map has ${Object.keys(dataMaps[dimIdx]).length} unique entries`);
     });
 
     return dataMaps;
   },
 
-  // NEW: Match features with support for different dimensions per layer
+  // --- MATCH FEATURES TO GEOJSON ---
   _matchFeatures: function(geojson, dataMaps, config, dims) {
+    console.log("[Viz V31] _matchFeatures called");
+
     // Use dimension index 0 as default for feature matching
     const primaryDataMap = dataMaps[0] || {};
+    console.log("[Viz V31]   Using primary data map (dimension 0) with", Object.keys(primaryDataMap).length, "entries");
 
     const matchedFeatures = [];
 
     if (geojson && geojson.features) {
-      geojson.features.forEach(feature => {
+      console.log("[Viz V31]   Checking", geojson.features.length, "GeoJSON features");
+
+      geojson.features.forEach((feature, fIdx) => {
         const props = feature.properties;
         let match = null;
+        let matchedProp = null;
 
         for (let key in props) {
           if (props[key]) {
             const cleanProp = this._normalizeName(props[key]);
             if (primaryDataMap[cleanProp]) {
               match = primaryDataMap[cleanProp];
+              matchedProp = props[key];
               break;
             }
           }
@@ -663,22 +794,38 @@ looker.plugins.visualizations.add({
             pivotData: match.pivotData,
             dimensionValues: match.dimensionValues
           });
+
+          if (fIdx < 3) {
+            console.log(`[Viz V31]   Matched feature ${fIdx}: "${matchedProp}" -> "${match.rawName}"`);
+          }
         }
       });
     }
 
+    console.log("[Viz V31]   Total matched features:", matchedFeatures.length);
     return matchedFeatures;
   },
 
+  // --- RENDER ---
   _render: function(processed, config, queryResponse, details, loadedIcons) {
+    console.log("[Viz V31] _render called");
+
     const layerObjects = [];
     let iconIndex = 0;
 
     for (let i = 1; i <= 4; i++) {
-      if (config[`layer${i}_enabled`]) {
+      const enabled = config[`layer${i}_enabled`];
+      const type = config[`layer${i}_type`];
+      const dimIdx = config[`layer${i}_dimension_idx`];
+      const measureIdx = config[`layer${i}_measure_idx`];
+      const showAllPivots = config[`layer${i}_show_all_pivots`];
+
+      console.log(`[Viz V31] Layer ${i}: enabled=${enabled}, type=${type}, dimIdx=${dimIdx}, measureIdx=${measureIdx}, showAllPivots=${showAllPivots}`);
+
+      if (enabled) {
         try {
           let iconUrlOverride = null;
-          if (config[`layer${i}_type`] === 'icon') {
+          if (type === 'icon') {
               iconUrlOverride = loadedIcons[iconIndex] || ICONS['marker'];
               iconIndex++;
           }
@@ -687,15 +834,19 @@ looker.plugins.visualizations.add({
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
+            console.log(`[Viz V31]   Layer ${i} built successfully`);
+          } else {
+            console.log(`[Viz V31]   Layer ${i} returned null`);
           }
         } catch(e) {
-          console.error(`[Viz] Layer ${i} failed`, e);
+          console.error(`[Viz V31]   Layer ${i} build FAILED:`, e);
         }
       }
     }
 
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
+    console.log("[Viz V31] Total layers to render:", layers.length);
 
     // Enhanced tooltip with pivot support
     const getTooltip = ({object}) => {
@@ -773,6 +924,7 @@ looker.plugins.visualizations.add({
       };
     };
 
+    // View state management
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
@@ -785,6 +937,7 @@ looker.plugins.visualizations.add({
         this._prevConfig.pitch !== cfgPitch;
 
     if (!this._viewState || configChanged) {
+        console.log("[Viz V31] Resetting view state");
         this._viewState = {
             longitude: cfgLng,
             latitude: cfgLat,
@@ -802,6 +955,7 @@ looker.plugins.visualizations.add({
     };
 
     if (!this._deck) {
+      console.log("[Viz V31] Creating new DeckGL instance");
       this._deck = new deck.DeckGL({
         container: this._container,
         mapStyle: config.map_style,
@@ -816,9 +970,10 @@ looker.plugins.visualizations.add({
           willReadFrequently: true,
           failIfMajorPerformanceCaveat: false
         },
-        onError: (err) => console.warn("DeckGL Error:", err)
+        onError: (err) => console.warn("[Viz V31] DeckGL Error:", err)
       });
     } else {
+      console.log("[Viz V31] Updating existing DeckGL instance");
       this._deck.setProps({
         layers: layers,
         mapStyle: config.map_style,
@@ -829,6 +984,8 @@ looker.plugins.visualizations.add({
         onViewStateChange: onViewStateChange
       });
     }
+
+    console.log("[Viz V31] _render complete");
   },
 
   _validateLayerData: function(data) {
@@ -842,11 +999,15 @@ looker.plugins.visualizations.add({
     );
   },
 
+  // --- BUILD SINGLE LAYER ---
   _buildSingleLayer: function(idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
     const measureIdx = Number(config[`layer${idx}_measure_idx`]) || 0;
     const dimensionIdx = Number(config[`layer${idx}_dimension_idx`]) || 0;
     const showAllPivots = config[`layer${idx}_show_all_pivots`];
+
+    console.log(`[Viz V31] _buildSingleLayer ${idx}:`);
+    console.log(`[Viz V31]   type=${type}, measureIdx=${measureIdx}, dimensionIdx=${dimensionIdx}, showAllPivots=${showAllPivots}`);
 
     // Gradient Colors
     const useGradient = config[`layer${idx}_use_gradient`];
@@ -858,22 +1019,29 @@ looker.plugins.visualizations.add({
     const heightScale = Number(config[`layer${idx}_height`]) || 1000;
     const opacity = Number(config[`layer${idx}_opacity`]) || 0.7;
 
+    console.log(`[Viz V31]   radius=${radius}, heightScale=${heightScale}, opacity=${opacity}`);
+
     let iconUrl = iconUrlOverride;
     if (!iconUrl) {
         iconUrl = ICONS[config[`layer${idx}_icon_type`]] || ICONS['marker'];
     }
 
-    // FIXED: Improved getValue that properly handles measure index and aggregation
+    // Store for getValue closure
+    const pivotInfo = this._pivotInfo;
+    const queryResponse = this._queryResponse;
+
+    // VALUE GETTER - handles pivots and measure index
     const getValue = (d) => {
       // Check for pivot data first if showing all pivots
-      if (showAllPivots && this._pivotInfo && this._pivotInfo.hasPivot) {
-        const measures = this._queryResponse.fields.measure_like;
+      if (showAllPivots && pivotInfo && pivotInfo.hasPivot) {
+        const measures = queryResponse.fields.measure_like;
         const mName = measures[measureIdx] ? measures[measureIdx].name : null;
 
-        if (mName && d.pivotData && d.pivotData[mName]) {
-          // Sum all pivot values for this measure
+        const pData = d.pivotData || (d.properties && d.properties._pivotData);
+
+        if (mName && pData && pData[mName]) {
           let total = 0;
-          Object.values(d.pivotData[mName]).forEach(pv => {
+          Object.values(pData[mName]).forEach(pv => {
             total += pv.value || 0;
           });
           return total;
@@ -888,6 +1056,7 @@ looker.plugins.visualizations.add({
       return val !== undefined && val !== null ? parseFloat(val) || 0 : 0;
     };
 
+    // Click handler
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
 
@@ -915,14 +1084,18 @@ looker.plugins.visualizations.add({
       }
     };
 
-    // Prepare point data based on dimension index
+    // --- PREPARE POINT DATA BASED ON DIMENSION INDEX ---
     let pointData = [];
+
     if (processed.type === 'regions') {
-      // If we have dataMaps and a specific dimension index, use that
+      console.log(`[Viz V31]   Building point data from regions, dimensionIdx=${dimensionIdx}`);
+
+      // Use the specific dimension's data map
       if (processed.dataMaps && processed.dataMaps[dimensionIdx]) {
         const dataMap = processed.dataMaps[dimensionIdx];
+        console.log(`[Viz V31]   Using DataMap[${dimensionIdx}] with ${Object.keys(dataMap).length} entries`);
 
-        // Need to re-match with geojson for this dimension
+        // Re-match with geojson for this specific dimension
         if (processed.geojson && processed.geojson.features) {
           processed.geojson.features.forEach(feature => {
             const props = feature.properties;
@@ -947,13 +1120,16 @@ looker.plugins.visualizations.add({
                 links: match.links,
                 name: match.rawName,
                 pivotData: match.pivotData,
-                dimensionValues: match.dimensionValues
+                dimensionValues: match.dimensionValues,
+                feature: feature // Include feature for GeoJSON layer
               });
             }
           });
         }
+        console.log(`[Viz V31]   Matched ${pointData.length} points for dimension ${dimensionIdx}`);
       } else {
-        // Fallback to processed.data
+        console.log(`[Viz V31]   No DataMap[${dimensionIdx}], falling back to processed.data`);
+        // Fallback to processed.data (dimension 0)
         pointData = processed.data.map(d => ({
           position: d.centroid,
           values: d.values,
@@ -961,32 +1137,61 @@ looker.plugins.visualizations.add({
           links: d.links,
           name: d.name,
           pivotData: d.pivotData,
-          dimensionValues: d.dimensionValues
+          dimensionValues: d.dimensionValues,
+          feature: d.feature
         }));
       }
     } else {
+      // Points mode
       pointData = processed.data;
     }
 
     const safePointData = this._validateLayerData(pointData);
-    const id = `layer-${idx}-${type}-${dimensionIdx}`;
+    console.log(`[Viz V31]   Safe point data: ${safePointData.length} points`);
+
+    // Log sample values
+    if (safePointData.length > 0) {
+      const sampleVals = safePointData.slice(0, 3).map(d => ({
+        name: d.name,
+        value: getValue(d),
+        rawValues: d.values
+      }));
+      console.log(`[Viz V31]   Sample values:`, JSON.stringify(sampleVals, null, 2));
+    }
+
+    const id = `layer-${idx}-${type}-dim${dimensionIdx}`;
 
     // Calculate max value for gradient scaling
     const allVals = safePointData.map(d => getValue(d));
     const maxVal = Math.max(...allVals, 0.1);
+    console.log(`[Viz V31]   Max value for layer: ${maxVal}`);
 
-    // For geojson, we need to recalculate based on features
-    const geoVals = processed.data ? processed.data.map(d => getValue(d)) : [];
-    const geoMax = Math.max(...geoVals, 0.1);
+    // For geojson, we also need features
+    const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
+      // Attach updated values to feature properties
+      d.feature.properties._values = d.values;
+      d.feature.properties._formatted = d.formattedValues;
+      d.feature.properties._pivotData = d.pivotData;
+      d.feature.properties._name = d.name;
+      d.feature.properties._links = d.links;
+      return d.feature;
+    });
 
     switch (type) {
       case 'geojson':
-        if (processed.type !== 'regions') return null;
-        if (!processed.data || processed.data.length === 0) return null;
+        if (processed.type !== 'regions') {
+          console.log(`[Viz V31]   GeoJSON layer requires regions mode`);
+          return null;
+        }
+        if (geoJsonFeatures.length === 0) {
+          console.log(`[Viz V31]   No GeoJSON features to render`);
+          return null;
+        }
 
+        console.log(`[Viz V31]   Creating GeoJsonLayer with ${geoJsonFeatures.length} features`);
         return new deck.GeoJsonLayer({
           id: id,
-          data: { type: "FeatureCollection", features: processed.data.map(d => d.feature) },
+          data: { type: "FeatureCollection", features: geoJsonFeatures },
           pickable: true,
           stroked: true,
           filled: true,
@@ -997,17 +1202,20 @@ looker.plugins.visualizations.add({
           getFillColor: d => {
              if (!useGradient) return startColor;
              const val = getValue(d);
-             return this._interpolateColor(startColorHex, endColorHex, val / geoMax);
+             return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
           updateTriggers: {
-            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex, showAllPivots]
+            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex, showAllPivots, dimensionIdx]
           }
         });
 
       case 'column':
-        if (safePointData.length === 0) return null;
+        if (safePointData.length === 0) {
+          console.log(`[Viz V31]   No data for column layer`);
+          return null;
+        }
 
-        // FIXED: Proper column layer with correct height calculation
+        console.log(`[Viz V31]   Creating ColumnLayer with ${safePointData.length} columns`);
         return new deck.ColumnLayer({
           id: id,
           data: safePointData,
@@ -1022,22 +1230,24 @@ looker.plugins.visualizations.add({
              return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
           getLineColor: [255, 255, 255],
-          // FIXED: Height is now value * heightScale, not elevationScale
+          // Height = value * heightScale
           getElevation: d => {
             const val = getValue(d);
-            return val * heightScale;
+            const elevation = val * heightScale;
+            return elevation;
           },
-          elevationScale: 1, // Use 1 since we multiply in getElevation
+          elevationScale: 1,
           opacity: opacity,
           onClick: onClickHandler,
           updateTriggers: {
-            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex, showAllPivots],
-            getElevation: [measureIdx, heightScale, showAllPivots]
+            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex, showAllPivots, dimensionIdx],
+            getElevation: [measureIdx, heightScale, showAllPivots, dimensionIdx]
           }
         });
 
       case 'point':
         if (safePointData.length === 0) return null;
+        console.log(`[Viz V31]   Creating ScatterplotLayer (point) with ${safePointData.length} points`);
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
@@ -1057,12 +1267,13 @@ looker.plugins.visualizations.add({
           getLineColor: [255,255,255],
           onClick: onClickHandler,
           updateTriggers: {
-            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex, showAllPivots]
+            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex, showAllPivots, dimensionIdx]
           }
         });
 
       case 'bubble':
         if (safePointData.length === 0) return null;
+        console.log(`[Viz V31]   Creating ScatterplotLayer (bubble) with ${safePointData.length} points`);
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
@@ -1082,13 +1293,14 @@ looker.plugins.visualizations.add({
           getLineColor: [255,255,255],
           onClick: onClickHandler,
           updateTriggers: {
-            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex, showAllPivots],
-            getRadius: [measureIdx, radius, showAllPivots]
+            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex, showAllPivots, dimensionIdx],
+            getRadius: [measureIdx, radius, showAllPivots, dimensionIdx]
           }
         });
 
       case 'icon':
         if (safePointData.length === 0) return null;
+        console.log(`[Viz V31]   Creating IconLayer with ${safePointData.length} icons`);
         return new deck.IconLayer({
             id: id,
             data: safePointData,
@@ -1109,6 +1321,7 @@ looker.plugins.visualizations.add({
 
       case 'heatmap':
         if (safePointData.length === 0) return null;
+        console.log(`[Viz V31]   Creating HeatmapLayer with ${safePointData.length} points`);
         return new deck.HeatmapLayer({
           id: id,
           data: safePointData,
@@ -1118,12 +1331,13 @@ looker.plugins.visualizations.add({
           radiusPixels: radius / 500,
           colorRange: this._generateColorRange(startColorHex, endColorHex),
           updateTriggers: {
-            getWeight: [measureIdx, showAllPivots]
+            getWeight: [measureIdx, showAllPivots, dimensionIdx]
           }
         });
 
       case 'hexagon':
         if (safePointData.length === 0) return null;
+        console.log(`[Viz V31]   Creating HexagonLayer with ${safePointData.length} points`);
         return new deck.HexagonLayer({
           id: id,
           data: safePointData,
@@ -1139,12 +1353,13 @@ looker.plugins.visualizations.add({
           colorRange: this._generateColorRange(startColorHex, endColorHex),
           onClick: onClickHandler,
           updateTriggers: {
-            getElevationWeight: [measureIdx, showAllPivots],
-            getColorWeight: [measureIdx, showAllPivots]
+            getElevationWeight: [measureIdx, showAllPivots, dimensionIdx],
+            getColorWeight: [measureIdx, showAllPivots, dimensionIdx]
           }
         });
 
       default:
+        console.log(`[Viz V31]   Unknown layer type: ${type}`);
         return null;
     }
   },
@@ -1191,11 +1406,14 @@ looker.plugins.visualizations.add({
   },
 
   _loadGeoJSON: async function(urlOrList) {
+    console.log("[Viz V31] _loadGeoJSON:", urlOrList);
+
     if (Array.isArray(urlOrList)) {
       const promises = urlOrList.map(u => this._loadSingleGeoJSON(u));
       const results = await Promise.all(promises);
       const features = [];
       results.forEach(r => { if(r && r.features) features.push(...r.features); });
+      console.log("[Viz V31]   Combined GeoJSON features:", features.length);
       return { type: "FeatureCollection", features };
     }
     return this._loadSingleGeoJSON(urlOrList);
@@ -1203,8 +1421,12 @@ looker.plugins.visualizations.add({
 
   _loadSingleGeoJSON: async function(url) {
     if (!url) return { type: "FeatureCollection", features: [] };
-    if (this._geojsonCache[url]) return this._geojsonCache[url];
+    if (this._geojsonCache[url]) {
+      console.log("[Viz V31]   Using cached GeoJSON for:", url);
+      return this._geojsonCache[url];
+    }
 
+    console.log("[Viz V31]   Fetching GeoJSON:", url);
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
     const data = await res.json();
@@ -1217,6 +1439,7 @@ looker.plugins.visualizations.add({
     }
 
     this._geojsonCache[url] = geojson;
+    console.log("[Viz V31]   Loaded GeoJSON with", geojson.features ? geojson.features.length : 0, "features");
     return geojson;
   },
 
