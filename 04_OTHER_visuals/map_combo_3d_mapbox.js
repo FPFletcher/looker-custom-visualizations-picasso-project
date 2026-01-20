@@ -1,41 +1,20 @@
 /**
- * Multi-Layer 3D Map for Looker - v28 Ultimate
+ * Multi-Layer 3D Map for Looker - v29 Ultimate
  * * * FEATURES:
- * - PDF Fix: Removed Retry Loop (Reverted to standard check).
- * - Icons: Added Base64 Fallback (Works 100% offline/PDF).
- * - Clustering: Hexagon Layer now weights by Measure Value (Sum), not just count.
- * - Dimension Detection: "Fuzzy Match" logic added.
+ * - Icons: 100% Embedded (Base64). No external network requests.
+ * - Logic: Hexagon Layer aggregates by SUM of measure (Density = Value).
+ * - UX: Toggle removed. Pan/Zoom and Drill work simultaneously.
+ * - Data: "Fuzzy Match" dimension detection improved.
  */
 
-// --- INTERNAL ASSET: BASE64 MARKER (Fallback if URL fails) ---
-// Simple white pin with shadow, safe for any background
-const BASE64_MARKER = "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyYzAgNS41MiA0LjQ4IDEwIDEwIDEwczEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAybTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LThzOCAzLjU5IDggOC0zLjU5IDggOCA4em0tMS0xM2gydjZIMTF6bTAgOGgydjJIMTF6IiBmaWxsPSIjRkZGRkZGIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==";
-
-// Using jsDelivr for external icons (Better CORS)
-const CDN_BASE = "https://cdn.jsdelivr.net/npm/@mapbox/maki@8.0.0/icons";
-
-const ICON_PRESETS = {
-  "custom": "Custom URL",
-  "marker-15": "Marker (Standard)",
-  "airport-15": "Airplane",
-  "bank-15": "Bank",
-  "bus-15": "Bus",
-  "car-15": "Car",
-  "cinema-15": "Cinema",
-  "cross-15": "Cross/Hospital",
-  "fuel-15": "Fuel",
-  "grocery-15": "Grocery",
-  "home-15": "House",
-  "industry-15": "Industry",
-  "lodging-15": "Hotel",
-  "shop-15": "Shop",
-  "star-15": "Star",
-  "warehouse-15": "Warehouse"
-};
-
-const getIconUrl = (preset, customUrl) => {
-    if (!preset || preset === 'custom') return customUrl;
-    return `${CDN_BASE}/${preset}.svg`;
+// --- EMBEDDED ICONS (Base64) - NO NETWORK REQUIRED ---
+const ICONS = {
+  "marker": "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyYzAgNS41MiA0LjQ4IDEwIDEwIDEwczEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAybTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LThzOCAzLjU5IDggOC0zLjU5IDggOCA4em0tMS0xM2gydjZIMTF6bTAgOGgydjJIMTF6IiBmaWxsPSIjRkZGRkZGIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==",
+  "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png", // Keeping your URL as an option
+  "star": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0ZGQzEwNyI+PHBhdGggZD0iTTEyIDE3LjI3TDUuMTUgMjFsMS42NC03LjAzTDEuNDUgOS4yNGw3LjE5LS42MUwxMiAyIDE1LjM2IDguNmw3LjE5LjYxLTUuMzMgNC43MyAxLjY0IDcuMDNMMTIgMTcuMjd6Ii8+PC9zdmc+",
+  "circle": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzIxOTZGMyI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48L3N2Zz4=",
+  "warning": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0Y0NDMzNiI+PHBhdGggZD0iTTEgMjFoMjJMMTIgMiAxIDIxem0xMi0zaC0ydjJgxMm0wLTRoLTJ2LTRoMnoiLz48L3N2Zz4=",
+  "shop": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzRDQUY1MCI+PHBhdGggZD0iTTIwIDRINHYyaDE2VjR6bTEgMTB2LTJsLTEtNWgtMmwtMSA1SDhsLTEtNWgtMmwtMSA1SDRsLTEtNXYySDJ2Nmg5djZoMnYtNmg5ek02IDE5djZoMTJ2LTZINnoiLz48L3N2Zz4="
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -48,11 +27,6 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
   const b = 100 + (n * 100);
-
-  const iconOptions = [];
-  for (const [value, label] of Object.entries(ICON_PRESETS)) {
-      iconOptions.push({[label]: value});
-  }
 
   return {
     [`layer${n}_divider_top`]: {
@@ -79,8 +53,8 @@ const getLayerOptions = (n) => {
         {"Points (Fixed Size)": "point"},
         {"Bubbles (Value Size)": "bubble"},
         {"Icon (Image)": "icon"},
-        {"Clustered Hexagons (Density)": "hexagon"},
-        {"Heatmap (Density)": "heatmap"}
+        {"Clustered Hexagons (Sum Density)": "hexagon"},
+        {"Heatmap (Sum Density)": "heatmap"}
       ],
       default: def.type,
       section: "Layers",
@@ -154,10 +128,18 @@ const getLayerOptions = (n) => {
     // ICON
     [`layer${n}_icon_type`]: {
       type: "string",
-      label: `L${n} Icon Source`,
+      label: `L${n} Icon Preset`,
       display: "select",
-      values: iconOptions,
-      default: "custom",
+      values: [
+          {"Custom URL": "custom"},
+          {"Marker (White Pin)": "marker"},
+          {"Star (Yellow)": "star"},
+          {"Circle (Blue)": "circle"},
+          {"Warning (Red)": "warning"},
+          {"Shop (Green)": "shop"},
+          {"Blue Truck (Demo)": "truck"}
+      ],
+      default: "marker",
       section: "Layers",
       order: b + 12
     },
@@ -165,31 +147,40 @@ const getLayerOptions = (n) => {
       type: "string",
       label: `L${n} Custom Icon URL`,
       default: "",
-      placeholder: "https://... (Only if Source = Custom)",
+      placeholder: "https://...",
       section: "Layers",
       order: b + 13
     }
   };
 };
 
-// --- HELPER: IMAGE PRELOADER WITH FALLBACK ---
-const preloadImage = (url) => {
+// --- HELPER: PRELOADER (Returns Base64 directly if preset) ---
+const preloadImage = (type, customUrl) => {
     return new Promise((resolve) => {
-        if (!url || url.length < 5) return resolve(BASE64_MARKER);
+        let url = ICONS[type] || customUrl;
+
+        // If it's a Base64 string, resolve immediately (no network needed)
+        if (url.startsWith("data:")) {
+            return resolve(url);
+        }
+
+        // If it's a URL, fetch it
+        if (!url || url.length < 5) return resolve(ICONS['marker']);
+
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.onload = () => resolve(url);
         img.onerror = () => {
             console.warn(`[Viz] Failed to load icon: ${url}. Using fallback.`);
-            resolve(BASE64_MARKER); // Resolve with Fallback
+            resolve(ICONS['marker']);
         };
         img.src = url;
     });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v28",
-  label: "Combo Map 3D (V28 Stable)",
+  id: "combo_map_ultimate_v29",
+  label: "Combo Map 3D (V29 Embedded Icons)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -214,7 +205,6 @@ looker.plugins.visualizations.add({
         {"Custom URL": "custom"},
         {"World Countries": "world_countries"},
         {"USA States": "us_states"},
-        {"USA Counties": "us_counties"},
         {"Europe Major Combined": "combined_europe_major"},
         {"France Regions": "france_regions"},
         {"Germany States": "germany_states"},
@@ -236,23 +226,8 @@ looker.plugins.visualizations.add({
       type: "string",
       label: "Region Dimension Name",
       section: "Plot",
-      placeholder: "e.g. users.state (leave empty to auto-detect)",
+      placeholder: "e.g. state (Auto-detects if empty)",
       order: 5
-    },
-
-    // --- INTERACTION MODE ---
-    interaction_header: { type: "string", label: "─── INTERACTION ───", display: "divider", section: "Plot", order: 8 },
-    interaction_mode: {
-        type: "string",
-        label: "Interaction Mode",
-        display: "select",
-        values: [
-            {"Pan & Zoom (Hand)": "pan"},
-            {"Drill / Click (Crosshair)": "drill"}
-        ],
-        default: "pan",
-        section: "Plot",
-        order: 9
     },
 
     // --- BASE MAP ---
@@ -335,60 +310,19 @@ looker.plugins.visualizations.add({
             color: #FF5252; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 8px;
             font-family: sans-serif; font-weight: bold; text-align: center; display: none; z-index: 999;
         }
-        #interaction-toggle {
-            position: absolute; top: 10px; right: 10px; z-index: 10;
-            background: #fff; padding: 8px 12px; border-radius: 4px;
-            font-family: sans-serif; font-size: 12px; font-weight: 600;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3); cursor: pointer;
-            display: flex; align-items: center; gap: 6px; user-select: none;
-        }
-        #interaction-toggle:hover { background: #f0f0f0; }
         .deck-tooltip { font-family: sans-serif; font-size: 12px; pointer-events: none; }
       </style>
 
       <div id="map-wrapper">
         <div id="map"></div>
         <div id="token-error">MISSING MAPBOX TOKEN<br><span style="font-size:0.8em; font-weight:normal">Please enter your token in the "Plot" settings.</span></div>
-        <div id="interaction-toggle">
-            <span id="interaction-icon">✋</span>
-            <span id="interaction-text">Pan/Zoom</span>
-        </div>
       </div>`;
 
     this._container = element.querySelector('#map');
-    this._mapWrapper = element.querySelector('#map-wrapper');
     this._tokenError = element.querySelector('#token-error');
-    this._toggleBtn = element.querySelector('#interaction-toggle');
-    this._toggleText = element.querySelector('#interaction-text');
-    this._toggleIcon = element.querySelector('#interaction-icon');
-
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
-    this._isDrillMode = false;
-
-    this._toggleBtn.onclick = () => {
-        this._isDrillMode = !this._isDrillMode;
-        this._updateInteractionMode();
-        if (this._deck) {
-            const controllerSettings = this._isDrillMode
-                ? { dragPan: false, dragRotate: false, scrollZoom: false, doubleClickZoom: false }
-                : true;
-            this._deck.setProps({ controller: controllerSettings });
-        }
-    };
-  },
-
-  _updateInteractionMode: function() {
-      if (this._isDrillMode) {
-          this._mapWrapper.style.cursor = 'crosshair';
-          this._toggleText.innerText = "Drill/Click";
-          this._toggleIcon.innerText = "👆";
-      } else {
-          this._mapWrapper.style.cursor = 'grab';
-          this._toggleText.innerText = "Pan/Zoom";
-          this._toggleIcon.innerText = "✋";
-      }
   },
 
   destroy: function() {
@@ -402,19 +336,15 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     console.log(`[Viz] 1. Update Async Started (${data.length} rows)`);
     const isPrint = details && details.print;
-    if (isPrint) { console.log("[Viz] PDF/Print Mode DETECTED"); }
 
     this.clearErrors();
 
-    // REMOVED RETRY LOOP - Standard Check
     if (!config.mapbox_token) {
         if(this._deck) { this._deck.finalize(); this._deck = null; }
         this._tokenError.style.display = 'block';
-        this._toggleBtn.style.display = 'none';
         done(); return;
     } else {
         this._tokenError.style.display = 'none';
-        this._toggleBtn.style.display = isPrint ? 'none' : 'flex';
     }
 
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
@@ -428,36 +358,28 @@ looker.plugins.visualizations.add({
         if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
             const preset = config[`layer${i}_icon_type`];
             const custom = config[`layer${i}_icon_url`];
-            const finalUrl = getIconUrl(preset, custom);
-            // Preloader now returns a Valid URL or Base64 Fallback
-            iconPromises.push(preloadImage(finalUrl));
+            // Preload returns PROMISE of valid URL (internal or external)
+            iconPromises.push(preloadImage(preset, custom));
         }
     }
-
-    console.log(`[Viz] 2. Starting Parallel Load (Data + ${iconPromises.length} Icons)`);
 
     Promise.all([
         this._prepareData(data, config, queryResponse),
         ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
-        // Pass loaded icons to render
         this._render(processedData, config, queryResponse, details, loadedIcons);
 
         if (isPrint) {
-            console.log("[Viz] PDF Mode Active. Freezing map.");
+            console.log("[Viz] PDF Mode. Waiting 4s.");
             if(this._deck) this._deck.redraw(true);
-            setTimeout(() => {
-                console.log("[Viz] PDF Wait Complete");
-                done();
-            }, 4000);
+            setTimeout(() => { done(); }, 4000);
         } else {
-            console.log("[Viz] Interactive Mode (Done)");
             done();
         }
 
     }).catch(err => {
-        console.error("[Viz] Data/Render Error:", err);
+        console.error("[Viz] Error:", err);
         this.addError({ title: "Error", message: err.message });
         done();
     });
@@ -466,6 +388,7 @@ looker.plugins.visualizations.add({
   _prepareData: async function(data, config, queryResponse) {
     const measures = queryResponse.fields.measure_like;
 
+    // A. POINT MODE (Lat/Lng)
     if (config.data_mode === 'points') {
       const dims = queryResponse.fields.dimension_like;
       const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
@@ -484,11 +407,11 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures };
     }
 
+    // B. REGION MODE (Name Matching)
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
 
     try {
-        console.log(`[Viz] Fetching GeoJSON: ${url}`);
         geojson = await this._loadGeoJSON(url);
     } catch (error) {
         console.warn("[Viz] GeoJSON Load Fail", error);
@@ -497,20 +420,24 @@ looker.plugins.visualizations.add({
 
     const dims = queryResponse.fields.dimension_like;
 
-    // --- SMART DIMENSION DETECTION (Fuzzy Match) ---
+    // SMART DIMENSION DETECTION
     let regionDim = null;
     if (config.region_dim_name) {
-        const needle = config.region_dim_name.toLowerCase();
-        regionDim = dims.find(d => d.name === config.region_dim_name) ||
-                    dims.find(d => d.name.toLowerCase().includes(needle)) ||
-                    dims.find(d => d.label.toLowerCase().includes(needle));
+        const needle = config.region_dim_name.toLowerCase().trim();
+        // 1. Exact Match
+        regionDim = dims.find(d => d.name === config.region_dim_name);
+        // 2. Fuzzy match in Name
+        if (!regionDim) regionDim = dims.find(d => d.name.toLowerCase().includes(needle));
+        // 3. Fuzzy match in Label
+        if (!regionDim) regionDim = dims.find(d => d.label.toLowerCase().includes(needle));
     }
+
+    // 4. Fallback: Map Layer or First String
     if (!regionDim) {
-        // Fallback: finding first map_layer or string field
         regionDim = dims.find(d => d.map_layer_name) || dims.find(d => d.type === 'string');
     }
 
-    if (!regionDim) throw new Error(`Could not find a region dimension. Please check the "Region Dimension Name" setting.`);
+    if (!regionDim) throw new Error("Region Dimension not found. Please check your settings.");
 
     const dataMap = {};
     data.forEach(row => {
@@ -541,6 +468,7 @@ looker.plugins.visualizations.add({
                 }
             }
             if (match) {
+                // Attach drill links to feature properties for easy access
                 feature.properties._links = match.links;
                 feature.properties._name = match.rawName;
                 feature.properties._values = match.values;
@@ -558,23 +486,19 @@ looker.plugins.visualizations.add({
             }
         });
     }
-    console.log(`[Viz] Matched ${matchedFeatures.length} GeoJSON features`);
     return { type: 'regions', data: matchedFeatures, geojson: geojson, measures };
   },
 
   _render: function(processed, config, queryResponse, details, loadedIcons) {
     const layerObjects = [];
-
-    // Map icons to layers
     let iconIndex = 0;
 
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`]) {
         try {
-          // If this is an icon layer, grab its preloaded URL
           let iconUrlOverride = null;
           if (config[`layer${i}_type`] === 'icon') {
-              iconUrlOverride = loadedIcons[iconIndex] || BASE64_MARKER;
+              iconUrlOverride = loadedIcons[iconIndex] || ICONS['marker'];
               iconIndex++;
           }
 
@@ -651,12 +575,6 @@ looker.plugins.visualizations.add({
       this._deck.setProps({ viewState: this._viewState });
     };
 
-    const controllerSettings = this._isDrillMode
-        ? { dragPan: false, dragRotate: false, scrollZoom: false, doubleClickZoom: false }
-        : true;
-
-    this._updateInteractionMode();
-
     if (!this._deck) {
       this._deck = new deck.DeckGL({
         container: this._container,
@@ -664,7 +582,7 @@ looker.plugins.visualizations.add({
         mapboxApiAccessToken: config.mapbox_token,
         viewState: this._viewState,
         onViewStateChange: onViewStateChange,
-        controller: controllerSettings,
+        controller: true, // Enables Pan/Zoom AND Click
         layers: layers,
         getTooltip: getTooltip,
         glOptions: {
@@ -681,7 +599,7 @@ looker.plugins.visualizations.add({
         mapboxApiAccessToken: config.mapbox_token,
         getTooltip: getTooltip,
         viewState: this._viewState,
-        controller: controllerSettings,
+        controller: true,
         onViewStateChange: onViewStateChange
       });
     }
@@ -712,12 +630,10 @@ looker.plugins.visualizations.add({
     const heightScale = config[`layer${idx}_height`];
     const opacity = config[`layer${idx}_opacity`];
 
-    // Use the overridden (preloaded) URL if available, else derive it
     let iconUrl = iconUrlOverride;
     if (!iconUrl) {
-        const iconPreset = config[`layer${idx}_icon_type`];
-        const iconCustom = config[`layer${idx}_icon_url`];
-        iconUrl = getIconUrl(iconPreset, iconCustom);
+        // Fallback if not using preloader
+        iconUrl = ICONS[config[`layer${idx}_icon_type`]] || ICONS['marker'];
     }
 
     const getValue = (d) => {
@@ -745,7 +661,6 @@ looker.plugins.visualizations.add({
         };
         const safeEvent = (info.srcEvent && info.srcEvent.pageX) ? info.srcEvent : mockEvent;
 
-        console.log("[Viz] Opening Drill Menu", links);
         LookerCharts.Utils.openDrillMenu({
           links: links,
           event: safeEvent
@@ -769,23 +684,13 @@ looker.plugins.visualizations.add({
     const safePointData = this._validateLayerData(pointData);
     const id = `layer-${idx}-${type}`;
 
-    const allVals = safePointData.map(d => getValue(d));
-    const maxVal = Math.max(...allVals, 0.1);
-
-    const getMyColor = (d) => {
-        if (!useGradient) return startColor;
-        const val = getValue(d);
-        const ratio = val / maxVal;
-        return this._interpolateColor(startColorHex, endColorHex, ratio);
-    };
+    const geoVals = processed.data ? processed.data.map(d => getValue(d)) : [];
+    const geoMax = Math.max(...geoVals, 0.1);
 
     switch (type) {
       case 'geojson':
         if (processed.type !== 'regions') return null;
         if (!processed.data || processed.data.length === 0) return null;
-
-        const geoVals = processed.data.map(d => d.values[measureIdx] || 0);
-        const geoMax = Math.max(...geoVals, 0.1);
 
         return new deck.GeoJsonLayer({
           id: id,
@@ -818,7 +723,11 @@ looker.plugins.visualizations.add({
           pickable: true,
           elevationScale: heightScale,
           getPosition: d => d.position,
-          getFillColor: d => getMyColor(d),
+          getFillColor: d => {
+             if (!useGradient) return startColor;
+             const val = getValue(d);
+             return this._interpolateColor(startColorHex, endColorHex, val / geoMax);
+          },
           getLineColor: [255, 255, 255],
           getElevation: d => getValue(d),
           opacity: opacity,
@@ -841,7 +750,11 @@ looker.plugins.visualizations.add({
           radiusMinPixels: 2,
           getPosition: d => d.position,
           getRadius: radius,
-          getFillColor: d => getMyColor(d),
+          getFillColor: d => {
+             if (!useGradient) return startColor;
+             const val = getValue(d);
+             return this._interpolateColor(startColorHex, endColorHex, val / geoMax);
+          },
           getLineColor: [255,255,255],
           onClick: onClickHandler,
           updateTriggers: {
@@ -861,8 +774,12 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          getRadius: d => Math.sqrt(getValue(d) / maxVal) * radius,
-          getFillColor: d => getMyColor(d),
+          getRadius: d => Math.sqrt(getValue(d) / geoMax) * radius,
+          getFillColor: d => {
+             if (!useGradient) return startColor;
+             const val = getValue(d);
+             return this._interpolateColor(startColorHex, endColorHex, val / geoMax);
+          },
           getLineColor: [255,255,255],
           onClick: onClickHandler,
           updateTriggers: {
@@ -877,7 +794,7 @@ looker.plugins.visualizations.add({
             data: safePointData,
             pickable: true,
             opacity: opacity,
-            iconAtlas: iconUrl, // Uses passed-in Safe URL or Fallback
+            iconAtlas: iconUrl,
             iconMapping: {
                 marker: { x: 0, y: 0, width: 512, height: 512, mask: false }
             },
@@ -887,8 +804,7 @@ looker.plugins.visualizations.add({
             sizeScale: 1,
             sizeMinPixels: 20,
             autoHighlight: false,
-            onClick: onClickHandler,
-            onIconError: (err) => console.warn("[Viz] Icon error (Fallback active)", err)
+            onClick: onClickHandler
         });
 
       case 'heatmap':
@@ -898,7 +814,7 @@ looker.plugins.visualizations.add({
           data: safePointData,
           pickable: false,
           getPosition: d => d.position,
-          getWeight: d => getValue(d),
+          getWeight: d => getValue(d), // Weighted by Measure Value
           radiusPixels: radius / 500,
           colorRange: this._generateColorRange(startColorHex, endColorHex)
         });
@@ -913,9 +829,11 @@ looker.plugins.visualizations.add({
           radius: radius,
           elevationScale: heightScale,
           getPosition: d => d.position,
-          // Use MEASURE VALUE for clustering weight, NOT count
+          // CRITICAL: Aggregation logic for density
           getElevationWeight: d => getValue(d),
           getColorWeight: d => getValue(d),
+          colorAggregation: 'SUM',
+          elevationAggregation: 'SUM',
           colorRange: this._generateColorRange(startColorHex, endColorHex),
           onClick: onClickHandler
         });
@@ -1023,7 +941,6 @@ looker.plugins.visualizations.add({
     ];
   },
 
-  // Generates a 6-color gradient array for Hexagon/Heatmap layers
   _generateColorRange: function(startHex, endHex) {
       const colors = [];
       for(let i=0; i<6; i++) {
