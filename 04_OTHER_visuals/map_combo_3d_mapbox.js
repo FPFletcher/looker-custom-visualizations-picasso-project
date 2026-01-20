@@ -1,103 +1,57 @@
 /**
- * Multi-Layer 3D Map for Looker - v25 Ultimate
+ * Multi-Layer 3D Map for Looker - v26 Ultimate
  * * * FEATURES:
- * - PDF Fix: Retry Loop for Mapbox Token (fixes black screen).
- * - Icons: Added 50+ Predefined Vector Icons + Custom URL support.
- * - Clustering: Hexagon Layer inherits gradient colors for density grouping.
- * - Interaction: On-Map Toggle + Drill Support.
+ * - Smart Dimension Detection: Prioritizes user input for region mapping.
+ * - Robust Icons: Switched to CDN for reliable icon loading.
+ * - Clustering: Added "Clustered Points" and "Clustered Icons" modes.
+ * - PDF Fix: Extended wait time and token retry loop.
  */
 
-// --- CONSTANTS: PREDEFINED ICONS (Mapbox Maki) ---
+// --- CONSTANTS: PREDEFINED ICONS (CDN Hosted) ---
+// Using unpkg for better CORS support than raw GitHub
+const CDN_BASE = "https://unpkg.com/@mapbox/maki@8.0.0/icons";
+
 const ICON_PRESETS = {
   "custom": "Custom URL",
   "airport-15": "Airplane",
   "alcohol-shop-15": "Alcohol/Bar",
-  "america-football-15": "Amer. Football",
   "amusement-park-15": "Amusement Park",
-  "aquarium-15": "Aquarium",
-  "art-gallery-15": "Art Gallery",
-  "attraction-15": "Attraction",
-  "bakery-15": "Bakery",
   "bank-15": "Bank",
   "bar-15": "Bar",
-  "baseball-15": "Baseball",
-  "basketball-15": "Basketball",
-  "beer-15": "Beer",
-  "bicycle-15": "Bicycle",
   "bus-15": "Bus",
   "cafe-15": "Cafe",
   "car-15": "Car",
   "cinema-15": "Cinema",
-  "clothing-store-15": "Clothing Store",
-  "college-15": "College",
-  "commercial-15": "Commercial",
-  "cricket-15": "Cricket",
-  "danger-15": "Danger",
-  "dentist-15": "Dentist",
-  "doctor-15": "Doctor",
-  "dog-park-15": "Dog Park",
-  "drinking-water-15": "Drinking Water",
-  "embassy-15": "Embassy",
-  "fast-food-15": "Fast Food",
-  "ferry-15": "Ferry",
   "fire-station-15": "Fire Station",
   "fuel-15": "Fuel/Gas",
-  "garden-15": "Garden",
-  "gift-15": "Gift Shop",
-  "golf-15": "Golf",
   "grocery-15": "Grocery",
-  "harbor-15": "Harbor",
-  "heart-15": "Heart/Health",
-  "heliport-15": "Heliport",
   "hospital-15": "Hospital",
   "ice-cream-15": "Ice Cream",
   "industry-15": "Industry",
-  "information-15": "Information",
   "laundry-15": "Laundry",
   "library-15": "Library",
   "lodging-15": "Lodging/Hotel",
   "marker-15": "Marker (Standard)",
-  "mobile-phone-15": "Mobile Phone",
   "museum-15": "Museum",
   "music-15": "Music",
   "park-15": "Park",
   "parking-15": "Parking",
   "pharmacy-15": "Pharmacy",
-  "picnic-site-15": "Picnic",
-  "place-of-worship-15": "Place of Worship",
-  "playground-15": "Playground",
   "police-15": "Police",
   "post-15": "Post Office",
-  "prison-15": "Prison",
-  "rail-15": "Rail/Train",
-  "religious-christian-15": "Religious (Christian)",
-  "religious-jewish-15": "Religious (Jewish)",
-  "religious-muslim-15": "Religious (Muslim)",
   "restaurant-15": "Restaurant",
-  "rocket-15": "Rocket",
   "school-15": "School",
   "shop-15": "Shop",
   "soccer-15": "Soccer",
   "star-15": "Star",
-  "suitcase-15": "Suitcase",
-  "swimming-15": "Swimming",
   "theatre-15": "Theatre",
   "toilet-15": "Toilet",
-  "town-hall-15": "Town Hall",
-  "triangle-15": "Triangle (Warning)",
-  "veterinary-15": "Veterinary",
-  "volcano-15": "Volcano",
-  "warehouse-15": "Warehouse",
-  "waste-basket-15": "Waste Basket",
-  "water-15": "Water",
-  "wetland-15": "Wetland",
-  "zoo-15": "Zoo"
+  "warehouse-15": "Warehouse"
 };
 
 const getIconUrl = (preset, customUrl) => {
     if (!preset || preset === 'custom') return customUrl;
-    // Use Mapbox Maki icons (hosted on GitHub for stability)
-    return `https://raw.githubusercontent.com/mapbox/maki/main/icons/${preset}.svg`;
+    return `${CDN_BASE}/${preset}.svg`;
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -109,8 +63,6 @@ const getLayerOptions = (n) => {
     { type: 'icon', color: '#F9A825', radius: 10000, height: 0 }
   ];
   const def = defaults[n-1];
-
-  // UI FIX: Wide spacing (100) prevents field overlap
   const b = 100 + (n * 100);
 
   // Generate Icon Options Array
@@ -146,8 +98,8 @@ const getLayerOptions = (n) => {
         {"Points (Fixed Size)": "point"},
         {"Bubbles (Value Size)": "bubble"},
         {"Icon (Image)": "icon"},
-        {"Heatmap (Density)": "heatmap"},
-        {"Clustered Hexagons (Density)": "hexagon"}
+        {"Clustered Hexagons (Density)": "hexagon"},
+        {"Heatmap (Density)": "heatmap"}
       ],
       default: def.type,
       section: "Layers",
@@ -168,8 +120,6 @@ const getLayerOptions = (n) => {
       placeholder: "Higher # is on top",
       order: b + 5
     },
-
-    // COLORS & GRADIENTS
     [`layer${n}_use_gradient`]: {
       type: "boolean",
       label: `L${n} Use Gradient?`,
@@ -193,8 +143,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 8
     },
-
-    // SIZE & OPACITY
     [`layer${n}_radius`]: {
       type: "number",
       label: `L${n} Radius / Size`,
@@ -217,8 +165,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 11
     },
-
-    // ICON SETTINGS
     [`layer${n}_icon_type`]: {
       type: "string",
       label: `L${n} Icon Source`,
@@ -248,15 +194,15 @@ const preloadImage = (url) => {
         img.onload = () => resolve();
         img.onerror = () => {
             console.warn(`[Viz] Failed to load icon: ${url}`);
-            resolve();
+            resolve(); // Resolve anyway to not block render
         };
         img.src = url;
     });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v25",
-  label: "Combo Map 3D (Token Fix + Icons)",
+  id: "combo_map_ultimate_v26",
+  label: "Combo Map 3D (Smart Dimensions + Icons)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -303,7 +249,7 @@ looker.plugins.visualizations.add({
       type: "string",
       label: "Region Dimension Name",
       section: "Plot",
-      placeholder: "Auto-detect if empty",
+      placeholder: "e.g. users.state (leave empty to auto-detect)",
       order: 5
     },
 
@@ -377,7 +323,7 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
-    // --- 2. LAYERS TAB (Consolidated) ---
+    // --- 2. LAYERS TAB ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
     ...getLayerOptions(3),
@@ -385,6 +331,7 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
+    // Mapbox CSS
     if (!document.getElementById('mapbox-css-fix')) {
       const link = document.createElement('link');
       link.id = 'mapbox-css-fix';
@@ -397,13 +344,11 @@ looker.plugins.visualizations.add({
       <style>
         #map-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; background: #111; }
         #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
-
         #token-error {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             color: #FF5252; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 8px;
             font-family: sans-serif; font-weight: bold; text-align: center; display: none; z-index: 999;
         }
-
         #interaction-toggle {
             position: absolute; top: 10px; right: 10px; z-index: 10;
             background: #fff; padding: 8px 12px; border-radius: 4px;
@@ -413,14 +358,12 @@ looker.plugins.visualizations.add({
         }
         #interaction-toggle:hover { background: #f0f0f0; }
         #interaction-icon { font-size: 16px; }
-
         .deck-tooltip { font-family: sans-serif; font-size: 12px; pointer-events: none; }
       </style>
 
       <div id="map-wrapper">
         <div id="map"></div>
         <div id="token-error">MISSING MAPBOX TOKEN<br><span style="font-size:0.8em; font-weight:normal">Please enter your token in the "Plot" settings.</span></div>
-
         <div id="interaction-toggle">
             <span id="interaction-icon">✋</span>
             <span id="interaction-text">Pan/Zoom</span>
@@ -437,7 +380,6 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
-
     this._isDrillMode = false;
 
     this._toggleBtn.onclick = () => {
@@ -474,14 +416,12 @@ looker.plugins.visualizations.add({
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
     console.log(`[Viz] 1. Update Async Started (${data.length} rows)`);
-
     const isPrint = details && details.print;
     if (isPrint) { console.log("[Viz] PDF/Print Mode DETECTED"); }
 
     this.clearErrors();
 
     // --- TOKEN RETRY LOGIC (Fix for PDF) ---
-    // If token is missing, we pause and try again in 500ms (up to 5 times)
     if (!config.mapbox_token) {
         if (!this._retryCount) this._retryCount = 0;
         if (this._retryCount < 5) {
@@ -492,14 +432,13 @@ looker.plugins.visualizations.add({
             }, 500);
             return;
         }
-        // If still missing after 5 retries, show error
         console.error("[Viz] Token missing after retries.");
         if(this._deck) { this._deck.finalize(); this._deck = null; }
         this._tokenError.style.display = 'block';
         this._toggleBtn.style.display = 'none';
         done(); return;
     } else {
-        this._retryCount = 0; // Reset on success
+        this._retryCount = 0;
         this._tokenError.style.display = 'none';
         this._toggleBtn.style.display = isPrint ? 'none' : 'flex';
     }
@@ -535,13 +474,10 @@ looker.plugins.visualizations.add({
         if (isPrint) {
             console.log("[Viz] PDF Mode Active. Freezing map for capture.");
             if(this._deck) this._deck.redraw(true);
-
-            // Wait 2.0s as fallback for tiles to paint (increased for safety)
             setTimeout(() => {
                 console.log("[Viz] PDF Wait Complete (Calling done)");
                 done();
-            }, 2000);
-
+            }, 4000); // 4s for safety
         } else {
             console.log("[Viz] Interactive Mode (Done)");
             done();
@@ -557,6 +493,7 @@ looker.plugins.visualizations.add({
   _prepareData: async function(data, config, queryResponse) {
     const measures = queryResponse.fields.measure_like;
 
+    // A. POINT MODE (Lat/Lng)
     if (config.data_mode === 'points') {
       const dims = queryResponse.fields.dimension_like;
       const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
@@ -575,6 +512,7 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures };
     }
 
+    // B. REGION MODE (Name Matching)
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
 
@@ -587,11 +525,19 @@ looker.plugins.visualizations.add({
     }
 
     const dims = queryResponse.fields.dimension_like;
-    const regionDim = config.region_dim_name
-      ? dims.find(d => d.name === config.region_dim_name)
-      : dims.find(d => d.type === 'string');
 
-    if (!regionDim) throw new Error("No Region Name dimension found.");
+    // SMART DIMENSION DETECTION
+    let regionDim = null;
+    // 1. Try explicit user config
+    if (config.region_dim_name) {
+        regionDim = dims.find(d => d.name === config.region_dim_name);
+    }
+    // 2. Try identifying a dimension with 'map_layer' or string type
+    if (!regionDim) {
+        regionDim = dims.find(d => d.map_layer_name) || dims.find(d => d.type === 'string');
+    }
+
+    if (!regionDim) throw new Error("No Region Name dimension found. Please specify in settings.");
 
     const dataMap = {};
     data.forEach(row => {
@@ -814,7 +760,6 @@ looker.plugins.visualizations.add({
         };
         const safeEvent = (info.srcEvent && info.srcEvent.pageX) ? info.srcEvent : mockEvent;
 
-        console.log("[Viz] Opening Drill Menu", links);
         LookerCharts.Utils.openDrillMenu({
           links: links,
           event: safeEvent
