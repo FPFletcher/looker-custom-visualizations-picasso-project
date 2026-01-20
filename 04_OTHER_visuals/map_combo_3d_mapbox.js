@@ -1001,6 +1001,8 @@ looker.plugins.visualizations.add({
   },
 
   // --- BUILD SINGLE LAYER ---
+
+ // --- BUILD SINGLE LAYER ---
   _buildSingleLayer: function(idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
     const measureIdx = Number(config[`layer${idx}_measure_idx`]) || 0;
@@ -1020,20 +1022,17 @@ looker.plugins.visualizations.add({
     const heightScale = Number(config[`layer${idx}_height`]) || 1000;
     const opacity = Number(config[`layer${idx}_opacity`]) || 0.7;
 
-    console.log(`[Viz V31]   radius=${radius}, heightScale=${heightScale}, opacity=${opacity}`);
-
     let iconUrl = iconUrlOverride;
     if (!iconUrl) {
         iconUrl = ICONS[config[`layer${idx}_icon_type`]] || ICONS['marker'];
     }
 
-    // Store for getValue closure
     const pivotInfo = this._pivotInfo;
     const queryResponse = this._queryResponse;
 
     // VALUE GETTER - handles pivots and measure index
     const getValue = (d) => {
-      // Check for pivot data first if showing all pivots
+      // 1. If showing all pivots, sum the specific measure across columns
       if (showAllPivots && pivotInfo && pivotInfo.hasPivot) {
         const measures = queryResponse.fields.measure_like;
         const mName = measures[measureIdx] ? measures[measureIdx].name : null;
@@ -1049,7 +1048,7 @@ looker.plugins.visualizations.add({
         }
       }
 
-      // Standard value access
+      // 2. Default: Use the pre-calculated row total
       const arr = d.values || (d.properties && d.properties._values);
       if (!arr) return 0;
 
@@ -1069,6 +1068,7 @@ looker.plugins.visualizations.add({
       }
 
       if (links && links.length > 0) {
+        // ... (existing click logic)
         const mockEvent = {
             pageX: info.x,
             pageY: info.y,
@@ -1089,87 +1089,98 @@ looker.plugins.visualizations.add({
     let pointData = [];
 
     if (processed.type === 'regions') {
-      console.log(`[Viz V31]   Building point data from regions, dimensionIdx=${dimensionIdx}`);
+      console.log(`[Viz V31]   Building data from regions mode, dimensionIdx=${dimensionIdx}`);
 
-      // Use the specific dimension's data map
-      if (processed.dataMaps && processed.dataMaps[dimensionIdx]) {
-        const dataMap = processed.dataMaps[dimensionIdx];
+      const dataMap = processed.dataMaps ? processed.dataMaps[dimensionIdx] : null;
+
+      if (dataMap) {
         console.log(`[Viz V31]   Using DataMap[${dimensionIdx}] with ${Object.keys(dataMap).length} entries`);
 
-        // Re-match with geojson for this specific dimension
-        if (processed.geojson && processed.geojson.features) {
-          processed.geojson.features.forEach(feature => {
-            const props = feature.properties;
-            let match = null;
+        // CASE A: Primary Dimension (Index 0) -> Match against GeoJSON Region Names
+        if (dimensionIdx === 0) {
+            if (processed.geojson && processed.geojson.features) {
+              processed.geojson.features.forEach(feature => {
+                const props = feature.properties;
+                let match = null;
 
-            for (let key in props) {
-              if (props[key]) {
-                const cleanProp = this._normalizeName(props[key]);
-                if (dataMap[cleanProp]) {
-                  match = dataMap[cleanProp];
-                  break;
+                for (let key in props) {
+                  if (props[key]) {
+                    const cleanProp = this._normalizeName(props[key]);
+                    if (dataMap[cleanProp]) {
+                      match = dataMap[cleanProp];
+                      break;
+                    }
+                  }
                 }
-              }
-            }
 
-            if (match) {
-              const centroid = this._getCentroid(feature.geometry);
-              pointData.push({
-                position: centroid,
-                values: match.values,
-                formattedValues: match.formattedValues,
-                links: match.links,
-                name: match.rawName,
-                pivotData: match.pivotData,
-                dimensionValues: match.dimensionValues,
-                feature: feature // Include feature for GeoJSON layer
+                if (match) {
+                  const centroid = this._getCentroid(feature.geometry);
+                  pointData.push({
+                    position: centroid,
+                    values: match.values,
+                    formattedValues: match.formattedValues,
+                    links: match.links,
+                    name: match.rawName,
+                    pivotData: match.pivotData,
+                    dimensionValues: match.dimensionValues,
+                    feature: feature
+                  });
+                }
               });
             }
-          });
         }
-        console.log(`[Viz V31]   Matched ${pointData.length} points for dimension ${dimensionIdx}`);
+        // CASE B: Secondary Dimension (Index > 0) -> Treat as Points (e.g. Lat/Lon)
+        else {
+            console.log(`[Viz V31]   Dimension Index > 0 detected. Treating as points (bypassing GeoJSON match).`);
+            Object.keys(dataMap).forEach(key => {
+                const item = dataMap[key];
+                let pos = [0,0];
+
+                // Check if rawName is a Looker Location Array [Lat, Lng]
+                if (Array.isArray(item.rawName) && item.rawName.length === 2) {
+                    // Swap to [Lng, Lat] for DeckGL
+                    pos = [ Number(item.rawName[1]), Number(item.rawName[0]) ];
+                }
+                // Check if rawName is a string "Lat,Lng"
+                else if (typeof item.rawName === 'string' && item.rawName.includes(',')) {
+                    const parts = item.rawName.split(',');
+                    if (parts.length === 2) {
+                         pos = [ parseFloat(parts[1]), parseFloat(parts[0]) ];
+                    }
+                }
+
+                if (pos[0] || pos[1]) {
+                    pointData.push({
+                        position: pos,
+                        values: item.values,
+                        formattedValues: item.formattedValues,
+                        links: item.links,
+                        name: item.rawName.toString(),
+                        pivotData: item.pivotData,
+                        dimensionValues: item.dimensionValues,
+                        feature: null // No feature for raw points
+                    });
+                }
+            });
+        }
       } else {
-        console.log(`[Viz V31]   No DataMap[${dimensionIdx}], falling back to processed.data`);
-        // Fallback to processed.data (dimension 0)
-        pointData = processed.data.map(d => ({
-          position: d.centroid,
-          values: d.values,
-          formattedValues: d.formattedValues,
-          links: d.links,
-          name: d.name,
-          pivotData: d.pivotData,
-          dimensionValues: d.dimensionValues,
-          feature: d.feature
-        }));
+        // Fallback if datamap missing
+        console.warn(`[Viz V31]   No DataMap found for dimension ${dimensionIdx}`);
       }
     } else {
-      // Points mode
+      // Points mode (original fallback)
       pointData = processed.data;
     }
 
     const safePointData = this._validateLayerData(pointData);
     console.log(`[Viz V31]   Safe point data: ${safePointData.length} points`);
 
-    // Log sample values
-    if (safePointData.length > 0) {
-      const sampleVals = safePointData.slice(0, 3).map(d => ({
-        name: d.name,
-        value: getValue(d),
-        rawValues: d.values
-      }));
-      console.log(`[Viz V31]   Sample values:`, JSON.stringify(sampleVals, null, 2));
-    }
-
     const id = `layer-${idx}-${type}-dim${dimensionIdx}`;
-
-    // Calculate max value for gradient scaling
     const allVals = safePointData.map(d => getValue(d));
     const maxVal = Math.max(...allVals, 0.1);
-    console.log(`[Viz V31]   Max value for layer: ${maxVal}`);
 
-    // For geojson, we also need features
+    // Filter features for GeoJSON layer
     const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
-      // Attach updated values to feature properties
       d.feature.properties._values = d.values;
       d.feature.properties._formatted = d.formattedValues;
       d.feature.properties._pivotData = d.pivotData;
@@ -1180,16 +1191,9 @@ looker.plugins.visualizations.add({
 
     switch (type) {
       case 'geojson':
-        if (processed.type !== 'regions') {
-          console.log(`[Viz V31]   GeoJSON layer requires regions mode`);
-          return null;
-        }
-        if (geoJsonFeatures.length === 0) {
-          console.log(`[Viz V31]   No GeoJSON features to render`);
-          return null;
-        }
+        if (processed.type !== 'regions') return null;
+        if (geoJsonFeatures.length === 0) return null;
 
-        console.log(`[Viz V31]   Creating GeoJsonLayer with ${geoJsonFeatures.length} features`);
         return new deck.GeoJsonLayer({
           id: id,
           data: { type: "FeatureCollection", features: geoJsonFeatures },
@@ -1211,12 +1215,7 @@ looker.plugins.visualizations.add({
         });
 
       case 'column':
-        if (safePointData.length === 0) {
-          console.log(`[Viz V31]   No data for column layer`);
-          return null;
-        }
-
-        console.log(`[Viz V31]   Creating ColumnLayer with ${safePointData.length} columns`);
+        if (safePointData.length === 0) return null;
         return new deck.ColumnLayer({
           id: id,
           data: safePointData,
@@ -1231,12 +1230,7 @@ looker.plugins.visualizations.add({
              return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
           getLineColor: [255, 255, 255],
-          // Height = value * heightScale
-          getElevation: d => {
-            const val = getValue(d);
-            const elevation = val * heightScale;
-            return elevation;
-          },
+          getElevation: d => getValue(d) * heightScale,
           elevationScale: 1,
           opacity: opacity,
           onClick: onClickHandler,
@@ -1248,7 +1242,6 @@ looker.plugins.visualizations.add({
 
       case 'point':
         if (safePointData.length === 0) return null;
-        console.log(`[Viz V31]   Creating ScatterplotLayer (point) with ${safePointData.length} points`);
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
@@ -1274,7 +1267,6 @@ looker.plugins.visualizations.add({
 
       case 'bubble':
         if (safePointData.length === 0) return null;
-        console.log(`[Viz V31]   Creating ScatterplotLayer (bubble) with ${safePointData.length} points`);
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
@@ -1301,7 +1293,6 @@ looker.plugins.visualizations.add({
 
       case 'icon':
         if (safePointData.length === 0) return null;
-        console.log(`[Viz V31]   Creating IconLayer with ${safePointData.length} icons`);
         return new deck.IconLayer({
             id: id,
             data: safePointData,
@@ -1322,7 +1313,6 @@ looker.plugins.visualizations.add({
 
       case 'heatmap':
         if (safePointData.length === 0) return null;
-        console.log(`[Viz V31]   Creating HeatmapLayer with ${safePointData.length} points`);
         return new deck.HeatmapLayer({
           id: id,
           data: safePointData,
@@ -1338,7 +1328,6 @@ looker.plugins.visualizations.add({
 
       case 'hexagon':
         if (safePointData.length === 0) return null;
-        console.log(`[Viz V31]   Creating HexagonLayer with ${safePointData.length} points`);
         return new deck.HexagonLayer({
           id: id,
           data: safePointData,
@@ -1360,7 +1349,6 @@ looker.plugins.visualizations.add({
         });
 
       default:
-        console.log(`[Viz V31]   Unknown layer type: ${type}`);
         return null;
     }
   },
@@ -1471,6 +1459,14 @@ looker.plugins.visualizations.add({
     if (!hex) return [0,0,0];
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [0,0,0];
+  },
+
+  _isCoordinate: function(value) {
+    if (!value) return false;
+    // Check if string looks like "12.34, 56.78" or array [12.34, 56.78]
+    if (Array.isArray(value) && value.length === 2) return true;
+    const str = String(value);
+    return /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(str);
   },
 
   _interpolateColor: function(c1, c2, factor) {
