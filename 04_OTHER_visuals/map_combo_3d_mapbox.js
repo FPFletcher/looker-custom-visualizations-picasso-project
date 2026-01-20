@@ -1,11 +1,104 @@
 /**
- * Multi-Layer 3D Map for Looker - v24 Ultimate (Debug Edition)
+ * Multi-Layer 3D Map for Looker - v25 Ultimate
  * * * FEATURES:
- * - Smart PDF Fix: Waits for Mapbox 'idle' state instead of hard delay.
- * - Debugging: Console logs added to track render lifecycle.
- * - Performance: Faster PDF generation (no unnecessary waiting).
- * - UI/UX: On-Map Toggle, Correct Tab Ordering, Drill Cursors.
+ * - PDF Fix: Retry Loop for Mapbox Token (fixes black screen).
+ * - Icons: Added 50+ Predefined Vector Icons + Custom URL support.
+ * - Clustering: Hexagon Layer inherits gradient colors for density grouping.
+ * - Interaction: On-Map Toggle + Drill Support.
  */
+
+// --- CONSTANTS: PREDEFINED ICONS (Mapbox Maki) ---
+const ICON_PRESETS = {
+  "custom": "Custom URL",
+  "airport-15": "Airplane",
+  "alcohol-shop-15": "Alcohol/Bar",
+  "america-football-15": "Amer. Football",
+  "amusement-park-15": "Amusement Park",
+  "aquarium-15": "Aquarium",
+  "art-gallery-15": "Art Gallery",
+  "attraction-15": "Attraction",
+  "bakery-15": "Bakery",
+  "bank-15": "Bank",
+  "bar-15": "Bar",
+  "baseball-15": "Baseball",
+  "basketball-15": "Basketball",
+  "beer-15": "Beer",
+  "bicycle-15": "Bicycle",
+  "bus-15": "Bus",
+  "cafe-15": "Cafe",
+  "car-15": "Car",
+  "cinema-15": "Cinema",
+  "clothing-store-15": "Clothing Store",
+  "college-15": "College",
+  "commercial-15": "Commercial",
+  "cricket-15": "Cricket",
+  "danger-15": "Danger",
+  "dentist-15": "Dentist",
+  "doctor-15": "Doctor",
+  "dog-park-15": "Dog Park",
+  "drinking-water-15": "Drinking Water",
+  "embassy-15": "Embassy",
+  "fast-food-15": "Fast Food",
+  "ferry-15": "Ferry",
+  "fire-station-15": "Fire Station",
+  "fuel-15": "Fuel/Gas",
+  "garden-15": "Garden",
+  "gift-15": "Gift Shop",
+  "golf-15": "Golf",
+  "grocery-15": "Grocery",
+  "harbor-15": "Harbor",
+  "heart-15": "Heart/Health",
+  "heliport-15": "Heliport",
+  "hospital-15": "Hospital",
+  "ice-cream-15": "Ice Cream",
+  "industry-15": "Industry",
+  "information-15": "Information",
+  "laundry-15": "Laundry",
+  "library-15": "Library",
+  "lodging-15": "Lodging/Hotel",
+  "marker-15": "Marker (Standard)",
+  "mobile-phone-15": "Mobile Phone",
+  "museum-15": "Museum",
+  "music-15": "Music",
+  "park-15": "Park",
+  "parking-15": "Parking",
+  "pharmacy-15": "Pharmacy",
+  "picnic-site-15": "Picnic",
+  "place-of-worship-15": "Place of Worship",
+  "playground-15": "Playground",
+  "police-15": "Police",
+  "post-15": "Post Office",
+  "prison-15": "Prison",
+  "rail-15": "Rail/Train",
+  "religious-christian-15": "Religious (Christian)",
+  "religious-jewish-15": "Religious (Jewish)",
+  "religious-muslim-15": "Religious (Muslim)",
+  "restaurant-15": "Restaurant",
+  "rocket-15": "Rocket",
+  "school-15": "School",
+  "shop-15": "Shop",
+  "soccer-15": "Soccer",
+  "star-15": "Star",
+  "suitcase-15": "Suitcase",
+  "swimming-15": "Swimming",
+  "theatre-15": "Theatre",
+  "toilet-15": "Toilet",
+  "town-hall-15": "Town Hall",
+  "triangle-15": "Triangle (Warning)",
+  "veterinary-15": "Veterinary",
+  "volcano-15": "Volcano",
+  "warehouse-15": "Warehouse",
+  "waste-basket-15": "Waste Basket",
+  "water-15": "Water",
+  "wetland-15": "Wetland",
+  "zoo-15": "Zoo"
+};
+
+const getIconUrl = (preset, customUrl) => {
+    if (!preset || preset === 'custom') return customUrl;
+    // Use Mapbox Maki icons (hosted on GitHub for stability)
+    return `https://raw.githubusercontent.com/mapbox/maki/main/icons/${preset}.svg`;
+};
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
 const getLayerOptions = (n) => {
@@ -17,7 +110,16 @@ const getLayerOptions = (n) => {
   ];
   const def = defaults[n-1];
 
+  // UI FIX: Wide spacing (100) prevents field overlap
   const b = 100 + (n * 100);
+
+  // Generate Icon Options Array
+  const iconOptions = [];
+  for (const [value, label] of Object.entries(ICON_PRESETS)) {
+      const obj = {};
+      obj[label] = value;
+      iconOptions.push(obj);
+  }
 
   return {
     [`layer${n}_divider_top`]: {
@@ -43,9 +145,9 @@ const getLayerOptions = (n) => {
         {"3D Columns": "column"},
         {"Points (Fixed Size)": "point"},
         {"Bubbles (Value Size)": "bubble"},
-        {"Icon (Custom Image)": "icon"},
-        {"Heatmap": "heatmap"},
-        {"Hexagon Grid": "hexagon"}
+        {"Icon (Image)": "icon"},
+        {"Heatmap (Density)": "heatmap"},
+        {"Clustered Hexagons (Density)": "hexagon"}
       ],
       default: def.type,
       section: "Layers",
@@ -66,6 +168,8 @@ const getLayerOptions = (n) => {
       placeholder: "Higher # is on top",
       order: b + 5
     },
+
+    // COLORS & GRADIENTS
     [`layer${n}_use_gradient`]: {
       type: "boolean",
       label: `L${n} Use Gradient?`,
@@ -75,7 +179,7 @@ const getLayerOptions = (n) => {
     },
     [`layer${n}_color_main`]: {
       type: "string",
-      label: `L${n} Color (Solid / Start)`,
+      label: `L${n} Color (Start / Low Density)`,
       display: "color",
       default: def.color,
       section: "Layers",
@@ -83,12 +187,14 @@ const getLayerOptions = (n) => {
     },
     [`layer${n}_gradient_end`]: {
       type: "string",
-      label: `L${n} Gradient End`,
+      label: `L${n} Gradient End (High Density)`,
       display: "color",
       default: "#1B5E20",
       section: "Layers",
       order: b + 8
     },
+
+    // SIZE & OPACITY
     [`layer${n}_radius`]: {
       type: "number",
       label: `L${n} Radius / Size`,
@@ -111,13 +217,24 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 11
     },
-    [`layer${n}_icon_url`]: {
+
+    // ICON SETTINGS
+    [`layer${n}_icon_type`]: {
       type: "string",
-      label: `L${n} Icon URL`,
-      default: "",
-      placeholder: "https://...",
+      label: `L${n} Icon Source`,
+      display: "select",
+      values: iconOptions,
+      default: "custom",
       section: "Layers",
       order: b + 12
+    },
+    [`layer${n}_icon_url`]: {
+      type: "string",
+      label: `L${n} Custom Icon URL`,
+      default: "",
+      placeholder: "https://... (Only if Source = Custom)",
+      section: "Layers",
+      order: b + 13
     }
   };
 };
@@ -125,18 +242,12 @@ const getLayerOptions = (n) => {
 // --- HELPER: IMAGE PRELOADER ---
 const preloadImage = (url) => {
     return new Promise((resolve) => {
-        if (!url || url.length < 5) {
-            // console.log(`[Viz] Skipping invalid icon URL: ${url}`);
-            return resolve();
-        }
+        if (!url || url.length < 5) return resolve();
         const img = new Image();
         img.crossOrigin = "Anonymous"; // Crucial for PDF
-        img.onload = () => {
-            // console.log(`[Viz] Icon Loaded: ${url}`);
-            resolve();
-        };
+        img.onload = () => resolve();
         img.onerror = () => {
-            console.warn(`[Viz] Icon Load Failed: ${url}`);
+            console.warn(`[Viz] Failed to load icon: ${url}`);
             resolve();
         };
         img.src = url;
@@ -144,8 +255,8 @@ const preloadImage = (url) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v24",
-  label: "Combo Map 3D (Debug Mode)",
+  id: "combo_map_ultimate_v25",
+  label: "Combo Map 3D (Token Fix + Icons)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -216,7 +327,7 @@ looker.plugins.visualizations.add({
 
     mapbox_token: {
       type: "string",
-      label: "Mapbox Token",
+      label: "Mapbox Token (Required)",
       section: "Plot",
       placeholder: "pk.eyJ1...",
       order: 11
@@ -361,77 +472,87 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
   },
 
-updateAsync: function(data, element, config, queryResponse, details, done) {
-  console.log(`[Viz] 1. Update Async Started (${data.length} rows)`);
+  updateAsync: function(data, element, config, queryResponse, details, done) {
+    console.log(`[Viz] 1. Update Async Started (${data.length} rows)`);
 
-  // --- 1. DEFINE PRINT MODE ---
-  // Change this to 'true' temporarily to simulate PDF mode in your browser console!
-  const isPrint = true;
-  //details && details.print
+    const isPrint = details && details.print;
+    if (isPrint) { console.log("[Viz] PDF/Print Mode DETECTED"); }
 
-  if (isPrint) { console.log("[Viz] PDF/Print Mode DETECTED"); }
+    this.clearErrors();
 
-  this.clearErrors();
-
-  if (!config.mapbox_token) {
-    console.warn("[Viz] Missing Mapbox Token");
-    if(this._deck) { this._deck.finalize(); this._deck = null; }
-    this._tokenError.style.display = 'block';
-    this._toggleBtn.style.display = 'none';
-    done(); return;
-  } else {
-    this._tokenError.style.display = 'none';
-    // Use the variable here to hide the toggle button in PDF
-    this._toggleBtn.style.display = isPrint ? 'none' : 'flex';
-  }
-
-  if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
-    this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
-    done(); return;
-  }
-
-  // --- PRE-LOAD ASSETS ---
-  const iconPromises = [];
-  for(let i=1; i<=4; i++) {
-    if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
-      console.log(`[Viz] Preloading Icon for Layer ${i}: ${config[`layer${i}_icon_url`]}`);
-      iconPromises.push(preloadImage(config[`layer${i}_icon_url`]));
-    }
-  }
-
-  console.log(`[Viz] 2. Starting Parallel Load (Data + ${iconPromises.length} Icons)`);
-
-  Promise.all([
-    this._prepareData(data, config, queryResponse),
-    ...iconPromises
-  ]).then(([processedData]) => {
-    console.log("[Viz] 3. Data & Icons Ready. Rendering...");
-    this._render(processedData, config, queryResponse, details);
-
-    // --- SMART PDF WAIT ---
-    // Use the variable here for logic
-    if (isPrint) {
-      console.log("[Viz] PDF Mode Active. Freezing map for capture.");
-
-      if(this._deck) this._deck.redraw(true);
-
-      // Wait 1.5s as fallback for tiles to paint
-      setTimeout(() => {
-        console.log("[Viz] PDF Wait Complete (Calling done)");
-        done();
-      }, 1500);
-
+    // --- TOKEN RETRY LOGIC (Fix for PDF) ---
+    // If token is missing, we pause and try again in 500ms (up to 5 times)
+    if (!config.mapbox_token) {
+        if (!this._retryCount) this._retryCount = 0;
+        if (this._retryCount < 5) {
+            console.warn(`[Viz] Token missing. Retrying (${this._retryCount+1}/5)...`);
+            this._retryCount++;
+            setTimeout(() => {
+                this.updateAsync(data, element, config, queryResponse, details, done);
+            }, 500);
+            return;
+        }
+        // If still missing after 5 retries, show error
+        console.error("[Viz] Token missing after retries.");
+        if(this._deck) { this._deck.finalize(); this._deck = null; }
+        this._tokenError.style.display = 'block';
+        this._toggleBtn.style.display = 'none';
+        done(); return;
     } else {
-      console.log("[Viz] Interactive Mode (Done)");
-      done();
+        this._retryCount = 0; // Reset on success
+        this._tokenError.style.display = 'none';
+        this._toggleBtn.style.display = isPrint ? 'none' : 'flex';
     }
 
-  }).catch(err => {
-    console.error("[Viz] Data/Render Error:", err);
-    this.addError({ title: "Error", message: err.message });
-  done();
-});
-},
+    if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
+      this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
+      done(); return;
+    }
+
+    // --- PRE-LOAD ASSETS ---
+    const iconPromises = [];
+    for(let i=1; i<=4; i++) {
+        if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
+            const preset = config[`layer${i}_icon_type`];
+            const custom = config[`layer${i}_icon_url`];
+            const finalUrl = getIconUrl(preset, custom);
+
+            console.log(`[Viz] Preloading Icon for Layer ${i}: ${finalUrl}`);
+            iconPromises.push(preloadImage(finalUrl));
+        }
+    }
+
+    console.log(`[Viz] 2. Starting Parallel Load (Data + ${iconPromises.length} Icons)`);
+
+    Promise.all([
+        this._prepareData(data, config, queryResponse),
+        ...iconPromises
+    ]).then(([processedData]) => {
+        console.log("[Viz] 3. Data & Icons Ready. Rendering...");
+        this._render(processedData, config, queryResponse, details);
+
+        // --- SMART PDF WAIT ---
+        if (isPrint) {
+            console.log("[Viz] PDF Mode Active. Freezing map for capture.");
+            if(this._deck) this._deck.redraw(true);
+
+            // Wait 2.0s as fallback for tiles to paint (increased for safety)
+            setTimeout(() => {
+                console.log("[Viz] PDF Wait Complete (Calling done)");
+                done();
+            }, 2000);
+
+        } else {
+            console.log("[Viz] Interactive Mode (Done)");
+            done();
+        }
+
+    }).catch(err => {
+        console.error("[Viz] Data/Render Error:", err);
+        this.addError({ title: "Error", message: err.message });
+        done();
+    });
+  },
 
   _prepareData: async function(data, config, queryResponse) {
     const measures = queryResponse.fields.measure_like;
@@ -653,14 +774,20 @@ updateAsync: function(data, element, config, queryResponse, details, done) {
     const type = config[`layer${idx}_type`];
     const measureIdx = config[`layer${idx}_measure_idx`] || 0;
 
+    // Gradient Colors
     const useGradient = config[`layer${idx}_use_gradient`];
-    const mainColor = this._hexToRgb(config[`layer${idx}_color_main`]);
-    const gradEnd = config[`layer${idx}_gradient_end`];
+    const startColorHex = config[`layer${idx}_color_main`];
+    const endColorHex = config[`layer${idx}_gradient_end`];
+    const startColor = this._hexToRgb(startColorHex);
 
     const radius = config[`layer${idx}_radius`];
     const heightScale = config[`layer${idx}_height`];
     const opacity = config[`layer${idx}_opacity`];
-    const iconUrl = config[`layer${idx}_icon_url`];
+
+    // Icon Logic
+    const iconPreset = config[`layer${idx}_icon_type`];
+    const iconCustom = config[`layer${idx}_icon_url`];
+    const iconUrl = getIconUrl(iconPreset, iconCustom);
 
     const getValue = (d) => {
       const arr = d.values || (d.properties && d.properties._values);
@@ -715,10 +842,10 @@ updateAsync: function(data, element, config, queryResponse, details, done) {
     const maxVal = Math.max(...allVals, 0.1);
 
     const getMyColor = (d) => {
-        if (!useGradient) return mainColor;
+        if (!useGradient) return startColor;
         const val = getValue(d);
         const ratio = val / maxVal;
-        return this._interpolateColor(config[`layer${idx}_color_main`], gradEnd, ratio);
+        return this._interpolateColor(startColorHex, endColorHex, ratio);
     };
 
     switch (type) {
@@ -740,12 +867,12 @@ updateAsync: function(data, element, config, queryResponse, details, done) {
           opacity: opacity,
           onClick: onClickHandler,
           getFillColor: d => {
-             if (!useGradient) return mainColor;
+             if (!useGradient) return startColor;
              const val = getValue(d);
-             return this._interpolateColor(config[`layer${idx}_color_main`], gradEnd, val / geoMax);
+             return this._interpolateColor(startColorHex, endColorHex, val / geoMax);
           },
           updateTriggers: {
-            getFillColor: [measureIdx, useGradient, config[`layer${idx}_color_main`], gradEnd]
+            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex]
           }
         });
 
@@ -766,7 +893,7 @@ updateAsync: function(data, element, config, queryResponse, details, done) {
           opacity: opacity,
           onClick: onClickHandler,
           updateTriggers: {
-            getFillColor: [measureIdx, useGradient, config[`layer${idx}_color_main`], gradEnd]
+            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex]
           }
         });
 
@@ -787,7 +914,7 @@ updateAsync: function(data, element, config, queryResponse, details, done) {
           getLineColor: [255,255,255],
           onClick: onClickHandler,
           updateTriggers: {
-            getFillColor: [measureIdx, useGradient, config[`layer${idx}_color_main`], gradEnd]
+            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex]
           }
         });
 
@@ -808,7 +935,7 @@ updateAsync: function(data, element, config, queryResponse, details, done) {
           getLineColor: [255,255,255],
           onClick: onClickHandler,
           updateTriggers: {
-            getFillColor: [measureIdx, useGradient, config[`layer${idx}_color_main`], gradEnd]
+            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex]
           }
         });
 
@@ -842,7 +969,8 @@ updateAsync: function(data, element, config, queryResponse, details, done) {
           pickable: false,
           getPosition: d => d.position,
           getWeight: d => getValue(d),
-          radiusPixels: radius / 500
+          radiusPixels: radius / 500,
+          colorRange: this._generateColorRange(startColorHex, endColorHex)
         });
 
       case 'hexagon':
@@ -856,6 +984,7 @@ updateAsync: function(data, element, config, queryResponse, details, done) {
           elevationScale: heightScale,
           getPosition: d => d.position,
           getElevationWeight: d => getValue(d),
+          colorRange: this._generateColorRange(startColorHex, endColorHex),
           onClick: onClickHandler
         });
 
@@ -863,6 +992,8 @@ updateAsync: function(data, element, config, queryResponse, details, done) {
         return null;
     }
   },
+
+  // --- UTILITIES ---
 
   _getGeoJSONUrl: function(config) {
     if (config.map_layer_source === 'custom') return config.custom_geojson_url;
@@ -958,5 +1089,14 @@ updateAsync: function(data, element, config, queryResponse, details, done) {
       Math.round(rgb1[1] + (rgb2[1] - rgb1[1]) * f),
       Math.round(rgb1[2] + (rgb2[2] - rgb1[2]) * f)
     ];
+  },
+
+  // Generates a 6-color gradient array for Hexagon/Heatmap layers
+  _generateColorRange: function(startHex, endHex) {
+      const colors = [];
+      for(let i=0; i<6; i++) {
+          colors.push(this._interpolateColor(startHex, endHex, i/5));
+      }
+      return colors;
   }
 });
