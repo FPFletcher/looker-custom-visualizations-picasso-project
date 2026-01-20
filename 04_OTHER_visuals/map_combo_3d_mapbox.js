@@ -1,15 +1,16 @@
 /**
- * Multi-Layer 3D Map for Looker - v31 Ultimate
+ * Multi-Layer 3D Map for Looker - v30 Ultimate
  * * * FEATURES:
- * - Real Clustering: Points merge into circles/counts (Supercluster style).
- * - Layer Source Control: Choose "Region" vs "Point" per layer.
- * - Pivot Support: Tooltips handle pivoted measures automatically.
- * - Embedded Icons: No network blocking.
+ * - 3D Column Fix: Height slider now updates correctly.
+ * - Icons: 100% Embedded (Base64) - No network blocks.
+ * - Clustering: Hexagons aggregate by SUM of measure (Density = Value).
+ * - Logic: Toggle removed (Pan & Click enabled simultaneously).
  */
 
-// --- EMBEDDED ICONS (Base64) ---
+// --- EMBEDDED ICONS (Base64) - Works Offline/PDF ---
 const ICONS = {
   "marker": "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyYzAgNS41MiA0LjQ4IDEwIDEwIDEwczEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAybTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LThzOCAzLjU5IDggOC0zLjU5IDggOCA4em0tMS0xM2gydjZIMTF6bTAgOGgydjJIMTF6IiBmaWxsPSIjRkZGRkZGIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==",
+  // Keeping your custom truck for reference
   "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
   "star": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0ZGQzEwNyI+PHBhdGggZD0iTTEyIDE3LjI3TDUuMTUgMjFsMS42NC03LjAzTDEuNDUgOS4yNGw3LjE5LS42MUwxMiAyIDE1LjM2IDguNmw3LjE5LjYxLTUuMzMgNC43MyAxLjY0IDcuMDNMMTIgMTcuMjd6Ii8+PC9zdmc+",
   "circle": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzIxOTZGMyI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48L3N2Zz4=",
@@ -26,13 +27,17 @@ const getLayerOptions = (n) => {
     { type: 'icon', color: '#F9A825', radius: 10000, height: 0 }
   ];
   const def = defaults[n-1];
+
+  // Spacing set to 100 to prevent overlap
   const b = 100 + (n * 100);
 
   const iconOptions = [];
   for (const [key, value] of Object.entries(ICONS)) {
+      // Create readable labels
       const label = key.charAt(0).toUpperCase() + key.slice(1);
       iconOptions.push({[label]: key});
   }
+  // Add option for custom URL
   iconOptions.unshift({"Custom URL": "custom"});
 
   return {
@@ -50,19 +55,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 2
     },
-    // NEW: Source Selector (Regions vs Points)
-    [`layer${n}_data_source`]: {
-      type: "string",
-      label: `L${n} Data Source`,
-      display: "select",
-      values: [
-        {"Region Polygons (Choropleth/Columns)": "regions"},
-        {"Point Lat/Lng (Icons/Clusters)": "points"}
-      ],
-      default: n === 1 ? "regions" : "points", // Smart default: L1=Map, L2=Points
-      section: "Layers",
-      order: b + 2.5
-    },
     [`layer${n}_type`]: {
       type: "string",
       label: `Layer ${n} Type`,
@@ -73,8 +65,8 @@ const getLayerOptions = (n) => {
         {"Points (Fixed Size)": "point"},
         {"Bubbles (Value Size)": "bubble"},
         {"Icon (Image)": "icon"},
-        {"Cluster Circle (Aggregated)": "cluster_circle"}, // Renamed
-        {"Heatmap (Density)": "heatmap"}
+        {"Clustered Hexagons (Sum Density)": "hexagon"},
+        {"Heatmap (Sum Density)": "heatmap"}
       ],
       default: def.type,
       section: "Layers",
@@ -166,28 +158,46 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER ---
+// --- HELPER: PRELOADER WITH FALLBACK ---
 const preloadImage = (type, customUrl) => {
     return new Promise((resolve) => {
         let url = ICONS[type] || customUrl;
-        if (!url || url.startsWith("data:")) return resolve(url || ICONS['marker']);
+
+        // Resolve immediately for Base64 (no network needed)
+        if (!url || url.startsWith("data:")) {
+            return resolve(url || ICONS['marker']);
+        }
+
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.onload = () => resolve(url);
-        img.onerror = () => resolve(ICONS['marker']);
+        img.onerror = () => {
+            console.warn(`[Viz] Failed to load icon: ${url}. Using marker fallback.`);
+            resolve(ICONS['marker']);
+        };
         img.src = url;
     });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v31",
-  label: "Combo Map 3D (Clustering + Dual Source)",
+  id: "combo_map_ultimate_v30",
+  label: "Combo Map 3D (Fixed Columns + Icons)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
 
-    // REMOVED "Data Mode" Toggle - Now handled per layer
-
+    data_mode: {
+      type: "string",
+      label: "Data Mode",
+      display: "select",
+      values: [
+        {"Region Data (Names)" : "regions"},
+        {"Point Data (Lat/Lng)": "points"}
+      ],
+      default: "regions",
+      section: "Plot",
+      order: 2
+    },
     map_layer_source: {
       type: "string",
       label: "Region Map Source",
@@ -310,7 +320,9 @@ looker.plugins.visualizations.add({
       </div>`;
 
     this._container = element.querySelector('#map');
+    this._mapWrapper = element.querySelector('#map-wrapper');
     this._tokenError = element.querySelector('#token-error');
+
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
@@ -325,7 +337,9 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
+    console.log(`[Viz] 1. Update Async Started (${data.length} rows)`);
     const isPrint = details && details.print;
+
     this.clearErrors();
 
     if (!config.mapbox_token) {
@@ -347,6 +361,7 @@ looker.plugins.visualizations.add({
         if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
             const preset = config[`layer${i}_icon_type`];
             const custom = config[`layer${i}_icon_url`];
+            // Preload now returns Safe Base64 if URL fails
             iconPromises.push(preloadImage(preset, custom));
         }
     }
@@ -356,6 +371,7 @@ looker.plugins.visualizations.add({
         ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
+        // Pass loaded icons to render
         this._render(processedData, config, queryResponse, details, loadedIcons);
 
         if (isPrint) {
@@ -375,99 +391,104 @@ looker.plugins.visualizations.add({
 
   _prepareData: async function(data, config, queryResponse) {
     const measures = queryResponse.fields.measure_like;
+
+    // A. POINT MODE (Lat/Lng)
+    if (config.data_mode === 'points') {
+      const dims = queryResponse.fields.dimension_like;
+      const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
+      const lngF = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lon'));
+
+      if (!latF || !lngF) throw new Error("Latitude/Longitude dimensions missing.");
+
+      const points = data.map(row => ({
+        position: [parseFloat(row[lngF.name].value), parseFloat(row[latF.name].value)],
+        values: measures.map(m => row[m.name].value),
+        formattedValues: measures.map(m => row[m.name].rendered || row[m.name].value),
+        links: measures.map(m => row[m.name].links),
+        name: "Point"
+      })).filter(p => !isNaN(p.position[0]) && !isNaN(p.position[1]));
+
+      return { type: 'points', data: points, measures };
+    }
+
+    // B. REGION MODE
+    const url = this._getGeoJSONUrl(config);
+    let geojson = null;
+
+    try {
+        geojson = await this._loadGeoJSON(url);
+    } catch (error) {
+        console.warn("[Viz] GeoJSON Load Fail", error);
+        geojson = { type: "FeatureCollection", features: [] };
+    }
+
     const dims = queryResponse.fields.dimension_like;
 
-    // 1. Identify Point Dimensions (Lat/Long)
-    const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
-    const lngF = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lon'));
-
-    // 2. Identify Region Dimension
+    // --- SMART DIMENSION DETECTION (Fuzzy Match) ---
     let regionDim = null;
     if (config.region_dim_name) {
         const needle = config.region_dim_name.toLowerCase().trim();
-        regionDim = dims.find(d => d.name === config.region_dim_name) ||
-                    dims.find(d => d.name.toLowerCase().includes(needle));
+        // Check for substring match in Name or Label
+        regionDim = dims.find(d =>
+            d.name.toLowerCase().includes(needle) ||
+            d.label.toLowerCase().includes(needle)
+        );
     }
+
+    // Fallback detection
     if (!regionDim) {
         regionDim = dims.find(d => d.map_layer_name) || dims.find(d => d.type === 'string');
     }
 
-    // 3. Process Points
-    let points = [];
-    if (latF && lngF) {
-        points = data.map(row => ({
-            position: [parseFloat(row[lngF.name].value), parseFloat(row[latF.name].value)],
-            values: measures.map(m => row[m.name].value),
-            formattedValues: measures.map(m => row[m.name].rendered || row[m.name].value),
-            links: measures.map(m => row[m.name].links),
-            name: "Point"
-        })).filter(p => !isNaN(p.position[0]) && !isNaN(p.position[1]));
-    }
+    if (!regionDim) throw new Error("Region Dimension not found. Please check your settings.");
 
-    // 4. Process Regions
-    let regions = [];
-    let geojson = { type: "FeatureCollection", features: [] };
+    const dataMap = {};
+    data.forEach(row => {
+      const rawName = row[regionDim.name].value;
+      if (rawName) {
+        const clean = this._normalizeName(rawName);
+        dataMap[clean] = {
+          values: measures.map(m => row[m.name].value),
+          formattedValues: measures.map(m => row[m.name].rendered || row[m.name].value),
+          links: measures.map(m => row[m.name].links),
+          rawName: rawName
+        };
+      }
+    });
 
-    if (regionDim) {
-        const url = this._getGeoJSONUrl(config);
-        try {
-            geojson = await this._loadGeoJSON(url);
-        } catch (e) { console.warn("GeoJSON Error", e); }
+    const matchedFeatures = [];
+    if (geojson && geojson.features) {
+        geojson.features.forEach(feature => {
+            const props = feature.properties;
+            let match = null;
+            for (let key in props) {
+                if (props[key]) {
+                  const cleanProp = this._normalizeName(props[key]);
+                  if (dataMap[cleanProp]) {
+                      match = dataMap[cleanProp];
+                      break;
+                  }
+                }
+            }
+            if (match) {
+                feature.properties._links = match.links;
+                feature.properties._name = match.rawName;
+                feature.properties._values = match.values;
+                feature.properties._formatted = match.formattedValues;
 
-        const dataMap = {};
-        data.forEach(row => {
-            const rawName = row[regionDim.name].value;
-            if (rawName) {
-                const clean = this._normalizeName(rawName);
-                dataMap[clean] = {
-                    values: measures.map(m => row[m.name].value),
-                    formattedValues: measures.map(m => row[m.name].rendered || row[m.name].value),
-                    links: measures.map(m => row[m.name].links),
-                    rawName: rawName
-                };
+                const centroid = this._getCentroid(feature.geometry);
+                matchedFeatures.push({
+                    feature: feature,
+                    centroid: centroid,
+                    values: match.values,
+                    formattedValues: match.formattedValues,
+                    links: match.links,
+                    name: match.rawName
+                });
             }
         });
-
-        if (geojson && geojson.features) {
-            geojson.features.forEach(feature => {
-                const props = feature.properties;
-                let match = null;
-                for (let key in props) {
-                    if (props[key]) {
-                        const cleanProp = this._normalizeName(props[key]);
-                        if (dataMap[cleanProp]) {
-                            match = dataMap[cleanProp];
-                            break;
-                        }
-                    }
-                }
-                if (match) {
-                    feature.properties._values = match.values;
-                    feature.properties._formatted = match.formattedValues;
-                    feature.properties._name = match.rawName;
-                    feature.properties._links = match.links;
-
-                    const centroid = this._getCentroid(feature.geometry);
-                    regions.push({
-                        feature: feature,
-                        centroid: centroid, // Fallback center for columns
-                        values: match.values,
-                        formattedValues: match.formattedValues,
-                        links: match.links,
-                        name: match.rawName
-                    });
-                }
-            });
-        }
     }
-
-    return {
-        type: 'mixed',
-        points: points,
-        regions: regions,
-        geojson: geojson,
-        measures
-    };
+    return { type: 'regions', data: matchedFeatures, geojson: geojson, measures };
   },
 
   _render: function(processed, config, queryResponse, details, loadedIcons) {
@@ -497,7 +518,37 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // View State Logic
+    const getTooltip = ({object}) => {
+      if (!object || config.tooltip_mode === 'none') return null;
+      let name, values, formatted;
+
+      if (object.properties && object.properties._name) {
+        name = object.properties._name;
+        values = object.properties._values;
+        formatted = object.properties._formatted;
+      } else if (object.name && object.values) {
+        name = object.name;
+        values = object.values;
+        formatted = object.formattedValues;
+      } else {
+        return null;
+      }
+
+      let html = "";
+      if (config.tooltip_mode !== 'values') {
+          html += `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
+      }
+      if (config.tooltip_mode !== 'name') {
+          queryResponse.fields.measure_like.forEach((m, idx) => {
+            html += `<div style="display:flex; justify-content:space-between; gap:10px;">
+              <span>${m.label_short || m.label}:</span>
+              <span style="font-weight:bold;">${formatted[idx]}</span>
+            </div>`;
+          });
+      }
+      return { html, style: { backgroundColor: config.tooltip_bg_color || '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
+    };
+
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
@@ -526,50 +577,6 @@ looker.plugins.visualizations.add({
       this._deck.setProps({ viewState: this._viewState });
     };
 
-    // Tooltip Logic (Handles Pivots)
-    const getTooltip = ({object}) => {
-      if (!object || config.tooltip_mode === 'none') return null;
-      let name, values, formatted;
-
-      // Regions (GeoJSON)
-      if (object.properties && object.properties._name) {
-        name = object.properties._name;
-        values = object.properties._values;
-        formatted = object.properties._formatted;
-      }
-      // Points/Clusters
-      else if (object.name && object.formattedValues) {
-        name = object.name;
-        values = object.values;
-        formatted = object.formattedValues;
-      }
-      // Cluster Aggregates (Hexagon/Circle)
-      else if (object.colorValue || object.elevationValue) {
-          name = "Cluster";
-          formatted = [`${(object.colorValue || object.elevationValue).toLocaleString()}`];
-      }
-      else {
-        return null;
-      }
-
-      let html = "";
-      if (config.tooltip_mode !== 'values') {
-          html += `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
-      }
-      if (config.tooltip_mode !== 'name' && formatted) {
-          // Loop through measures (including pivots)
-          queryResponse.fields.measure_like.forEach((m, idx) => {
-            if (formatted[idx]) {
-                html += `<div style="display:flex; justify-content:space-between; gap:10px;">
-                  <span>${m.label_short || m.label}:</span>
-                  <span style="font-weight:bold;">${formatted[idx]}</span>
-                </div>`;
-            }
-          });
-      }
-      return { html, style: { backgroundColor: config.tooltip_bg_color || '#fff', color: '#000', fontSize: '0.8em', padding: '8px', borderRadius: '4px' } };
-    };
-
     if (!this._deck) {
       this._deck = new deck.DeckGL({
         container: this._container,
@@ -577,10 +584,14 @@ looker.plugins.visualizations.add({
         mapboxApiAccessToken: config.mapbox_token,
         viewState: this._viewState,
         onViewStateChange: onViewStateChange,
-        controller: true,
+        controller: true, // Auto handles Pan + Click
         layers: layers,
         getTooltip: getTooltip,
-        glOptions: { preserveDrawingBuffer: true },
+        glOptions: {
+          preserveDrawingBuffer: true,
+          willReadFrequently: true,
+          failIfMajorPerformanceCaveat: false
+        },
         onError: (err) => console.warn("DeckGL Error:", err)
       });
     } else {
@@ -596,34 +607,22 @@ looker.plugins.visualizations.add({
     }
   },
 
+  _validateLayerData: function(data) {
+    if(!data || !Array.isArray(data) || data.length === 0) return [];
+    return data.filter(d =>
+        d.position &&
+        d.position.length === 2 &&
+        !isNaN(d.position[0]) &&
+        !isNaN(d.position[1]) &&
+        d.position[1] >= -90 && d.position[1] <= 90
+    );
+  },
+
   _buildSingleLayer: function(idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
-    const source = config[`layer${idx}_data_source`]; // 'regions' or 'points'
     const measureIdx = config[`layer${idx}_measure_idx`] || 0;
 
-    // --- DATA SELECTION ---
-    let layerData = [];
-    if (source === 'points' && processed.points.length > 0) {
-        layerData = processed.points;
-    } else if (source === 'regions' && processed.regions.length > 0) {
-        // For non-GeoJSON layers requesting 'regions', we use the centroid
-        if (type !== 'geojson') {
-            layerData = processed.regions.map(r => ({
-                position: r.centroid,
-                values: r.values,
-                formattedValues: r.formattedValues,
-                links: r.links,
-                name: r.name
-            }));
-        } else {
-            // GeoJSON layer uses raw features
-            layerData = processed.regions;
-        }
-    }
-
-    if (!layerData || layerData.length === 0) return null;
-
-    // Styles
+    // Gradient Colors
     const useGradient = config[`layer${idx}_use_gradient`];
     const startColorHex = config[`layer${idx}_color_main`];
     const endColorHex = config[`layer${idx}_gradient_end`];
@@ -633,43 +632,71 @@ looker.plugins.visualizations.add({
     const heightScale = config[`layer${idx}_height`];
     const opacity = config[`layer${idx}_opacity`];
 
-    let iconUrl = iconUrlOverride || ICONS[config[`layer${idx}_icon_type`]] || ICONS['marker'];
+    let iconUrl = iconUrlOverride;
+    if (!iconUrl) {
+        // Fallback if not using preloader
+        iconUrl = ICONS[config[`layer${idx}_icon_type`]] || ICONS['marker'];
+    }
 
     const getValue = (d) => {
-        // Handle GeoJSON feature props vs Point object props
-        const vals = d.values || (d.properties && d.properties._values);
-        return vals && vals[measureIdx] ? parseFloat(vals[measureIdx]) : 0;
-    };
-
-    // Calculate Max for Gradient
-    const allVals = layerData.map(d => getValue(d));
-    const maxVal = Math.max(...allVals, 0.1);
-
-    const getMyColor = (d) => {
-        if (!useGradient) return startColor;
-        const val = getValue(d);
-        return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
+      const arr = d.values || (d.properties && d.properties._values);
+      return arr && arr[measureIdx] ? parseFloat(arr[measureIdx]) : 0;
     };
 
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
-      let links = info.object.links || (info.object.properties && info.object.properties._links);
-      if (links) {
-          const specificLinks = links[measureIdx];
-          if (specificLinks) {
-              LookerCharts.Utils.openDrillMenu({ links: specificLinks, event: info.srcEvent });
-          }
+
+      let links = null;
+      if (info.object.properties && info.object.properties._links) {
+          links = info.object.properties._links[measureIdx];
+      } else if (info.object.links) {
+          links = info.object.links[measureIdx];
+      }
+
+      if (links && links.length > 0) {
+        const mockEvent = {
+            pageX: info.x,
+            pageY: info.y,
+            clientX: info.x,
+            clientY: info.y,
+            target: info.target || document.elementFromPoint(info.x, info.y)
+        };
+        const safeEvent = (info.srcEvent && info.srcEvent.pageX) ? info.srcEvent : mockEvent;
+
+        LookerCharts.Utils.openDrillMenu({
+          links: links,
+          event: safeEvent
+        });
       }
     };
 
-    const id = `layer-${idx}`;
+    let pointData = [];
+    if (processed.type === 'regions') {
+      pointData = processed.data.map(d => ({
+        position: d.centroid,
+        values: d.values,
+        formattedValues: d.formattedValues,
+        links: d.links,
+        name: d.name
+      }));
+    } else {
+      pointData = processed.data;
+    }
+
+    const safePointData = this._validateLayerData(pointData);
+    const id = `layer-${idx}-${type}`;
+
+    const geoVals = processed.data ? processed.data.map(d => getValue(d)) : [];
+    const geoMax = Math.max(...geoVals, 0.1);
 
     switch (type) {
       case 'geojson':
-        if (source !== 'regions') return null; // GeoJSON only works with Regions
+        if (processed.type !== 'regions') return null;
+        if (!processed.data || processed.data.length === 0) return null;
+
         return new deck.GeoJsonLayer({
           id: id,
-          data: { type: "FeatureCollection", features: layerData.map(d => d.feature) },
+          data: { type: "FeatureCollection", features: processed.data.map(d => d.feature) },
           pickable: true,
           stroked: true,
           filled: true,
@@ -677,38 +704,48 @@ looker.plugins.visualizations.add({
           getLineColor: [255,255,255],
           opacity: opacity,
           onClick: onClickHandler,
-          getFillColor: d => getMyColor(d),
+          getFillColor: d => {
+             if (!useGradient) return startColor;
+             const val = getValue(d);
+             return this._interpolateColor(startColorHex, endColorHex, val / geoMax);
+          },
           updateTriggers: {
             getFillColor: [measureIdx, useGradient, startColorHex, endColorHex]
           }
         });
 
       case 'column':
+        if (safePointData.length === 0) return null;
         return new deck.ColumnLayer({
           id: id,
-          data: layerData,
+          data: safePointData,
           diskResolution: 6,
           radius: radius,
           extruded: true,
           pickable: true,
           elevationScale: heightScale,
           getPosition: d => d.position,
-          getFillColor: d => getMyColor(d),
+          getFillColor: d => {
+             if (!useGradient) return startColor;
+             const val = getValue(d);
+             return this._interpolateColor(startColorHex, endColorHex, val / geoMax);
+          },
           getLineColor: [255, 255, 255],
           getElevation: d => getValue(d),
           opacity: opacity,
           onClick: onClickHandler,
           updateTriggers: {
+            // FIX: updateTriggers now includes heightScale so resizing works immediately
             getElevation: [measureIdx, heightScale],
             getFillColor: [measureIdx, useGradient, startColorHex, endColorHex]
           }
         });
 
       case 'point':
-      case 'bubble':
+        if (safePointData.length === 0) return null;
         return new deck.ScatterplotLayer({
           id: id,
-          data: layerData,
+          data: safePointData,
           pickable: true,
           opacity: opacity,
           stroked: true,
@@ -716,20 +753,49 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          getRadius: d => type === 'bubble' ? Math.sqrt(getValue(d)/maxVal) * radius : radius,
-          getFillColor: d => getMyColor(d),
+          getRadius: radius,
+          getFillColor: d => {
+             if (!useGradient) return startColor;
+             const val = getValue(d);
+             return this._interpolateColor(startColorHex, endColorHex, val / geoMax);
+          },
           getLineColor: [255,255,255],
           onClick: onClickHandler,
           updateTriggers: {
-            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex],
-            getRadius: [measureIdx, radius]
+            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex]
+          }
+        });
+
+      case 'bubble':
+        if (safePointData.length === 0) return null;
+        return new deck.ScatterplotLayer({
+          id: id,
+          data: safePointData,
+          pickable: true,
+          opacity: opacity,
+          stroked: true,
+          filled: true,
+          radiusScale: 1,
+          radiusMinPixels: 2,
+          getPosition: d => d.position,
+          getRadius: d => Math.sqrt(getValue(d) / geoMax) * radius,
+          getFillColor: d => {
+             if (!useGradient) return startColor;
+             const val = getValue(d);
+             return this._interpolateColor(startColorHex, endColorHex, val / geoMax);
+          },
+          getLineColor: [255,255,255],
+          onClick: onClickHandler,
+          updateTriggers: {
+            getFillColor: [measureIdx, useGradient, startColorHex, endColorHex]
           }
         });
 
       case 'icon':
+        if (safePointData.length === 0) return null;
         return new deck.IconLayer({
             id: id,
-            data: layerData,
+            data: safePointData,
             pickable: true,
             opacity: opacity,
             iconAtlas: iconUrl,
@@ -741,78 +807,117 @@ looker.plugins.visualizations.add({
             getSize: d => radius,
             sizeScale: 1,
             sizeMinPixels: 20,
+            autoHighlight: false,
             onClick: onClickHandler
         });
 
-      // --- REAL CLUSTERING (Hexagon Aggregation) ---
-      case 'hexagon':
-        return new deck.HexagonLayer({
-          id: id,
-          data: layerData,
-          pickable: true,
-          extruded: true,
-          radius: radius, // Cluster radius
-          elevationScale: heightScale,
-          getPosition: d => d.position,
-          // Aggregate by SUM of Measure
-          getElevationWeight: d => getValue(d),
-          getColorWeight: d => getValue(d),
-          elevationAggregation: 'SUM',
-          colorAggregation: 'SUM',
-          colorRange: this._generateColorRange(startColorHex, endColorHex),
-          onClick: onClickHandler
-        });
-
-      // --- REAL CLUSTERING (Circle Aggregation) ---
-      // NOTE: Deck.gl doesn't have a native "Circle Cluster" layer like Mapbox GL JS.
-      // We use Scatterplot with supercluster logic implied by Hexagon for now,
-      // or simply Heatmap for density.
-      // Replacing "Cluster Circle" with Heatmap as requested in v30 feedback
       case 'heatmap':
+        if (safePointData.length === 0) return null;
         return new deck.HeatmapLayer({
           id: id,
-          data: layerData,
+          data: safePointData,
           pickable: false,
           getPosition: d => d.position,
-          getWeight: d => getValue(d), // Weighted by Measure
-          radiusPixels: radius / 100,
+          getWeight: d => getValue(d), // Weighted by Measure Value
+          radiusPixels: radius / 500,
           colorRange: this._generateColorRange(startColorHex, endColorHex)
         });
 
-      // Placeholder for requested "Cluster Point" (requires complex Supercluster adapter)
-      // Falling back to simple Point for now to avoid crashes.
-      case 'cluster_circle':
-         return new deck.ScatterplotLayer({
+      case 'hexagon':
+        if (safePointData.length === 0) return null;
+        return new deck.HexagonLayer({
           id: id,
-          data: layerData,
+          data: safePointData,
+          pickable: true,
+          extruded: true,
+          radius: radius,
+          elevationScale: heightScale,
           getPosition: d => d.position,
-          getRadius: radius,
-          getFillColor: startColor,
-          opacity: opacity
+          // CRITICAL: Aggregation logic for density (SUM instead of count)
+          getElevationWeight: d => getValue(d),
+          getColorWeight: d => getValue(d),
+          colorAggregation: 'SUM',
+          elevationAggregation: 'SUM',
+          colorRange: this._generateColorRange(startColorHex, endColorHex),
+          onClick: onClickHandler,
+          updateTriggers: {
+            getElevationWeight: [measureIdx],
+            getColorWeight: [measureIdx]
+          }
         });
 
-      default: return null;
+      default:
+        return null;
     }
   },
 
   // --- UTILITIES ---
+
   _getGeoJSONUrl: function(config) {
     if (config.map_layer_source === 'custom') return config.custom_geojson_url;
-    // ... (Keep existing URL map)
-    return "https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/regions.geojson"; // Default fallback
+
+    const URLS = {
+        world_countries: 'https://unpkg.com/world-atlas@2/countries-110m.json',
+        us_states: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
+        us_counties: 'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json',
+        france_regions: 'https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/regions.geojson',
+        uk_regions: 'https://martinjc.github.io/UK-GeoJSON/json/eng/topo_eer.json',
+        germany_states: 'https://raw.githubusercontent.com/isellsoap/deutschlandGeoJSON/main/2_bundeslaender/3_mittel.geo.json',
+        spain_communities: 'https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/spain-communities.geojson',
+    };
+
+    const COMBOS = {
+      combined_europe_major: [
+        URLS.france_regions,
+        URLS.germany_states,
+        URLS.uk_regions,
+        URLS.spain_communities,
+        'https://raw.githubusercontent.com/openpolis/geojson-italy/master/geojson/limits_IT_regions.geojson'
+      ]
+    };
+
+    if (COMBOS[config.map_layer_source]) return COMBOS[config.map_layer_source];
+    return URLS[config.map_layer_source];
   },
 
   _loadGeoJSON: async function(urlOrList) {
-    // ... (Keep existing loader)
-    const res = await fetch(urlOrList);
-    return await res.json();
+    if (Array.isArray(urlOrList)) {
+      const promises = urlOrList.map(u => this._loadSingleGeoJSON(u));
+      const results = await Promise.all(promises);
+      const features = [];
+      results.forEach(r => { if(r && r.features) features.push(...r.features); });
+      return { type: "FeatureCollection", features };
+    }
+    return this._loadSingleGeoJSON(urlOrList);
+  },
+
+  _loadSingleGeoJSON: async function(url) {
+    if (!url) return { type: "FeatureCollection", features: [] };
+    if (this._geojsonCache[url]) return this._geojsonCache[url];
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+    const data = await res.json();
+
+    let geojson = data;
+    if (data.type === 'Topology') {
+      if (typeof topojson === 'undefined') throw new Error("TopoJSON lib missing");
+      const key = Object.keys(data.objects)[0];
+      geojson = topojson.feature(data, data.objects[key]);
+    }
+
+    this._geojsonCache[url] = geojson;
+    return geojson;
   },
 
   _getCentroid: function(geometry) {
     if (!geometry) return [0,0];
     const coords = geometry.coordinates;
-    if (geometry.type === 'Polygon') return this._polyAvg(coords[0]);
-    if (geometry.type === 'MultiPolygon') return this._polyAvg(coords[0][0]);
+    if (geometry.type === 'Polygon') {
+      return this._polyAvg(coords[0]);
+    } else if (geometry.type === 'MultiPolygon') {
+      return this._polyAvg(coords[0][0]);
+    }
     return [0,0];
   },
 
