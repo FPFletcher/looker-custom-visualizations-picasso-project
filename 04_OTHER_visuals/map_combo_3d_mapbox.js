@@ -202,7 +202,6 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  console.log("[DEBUG] Script loaded");
   id: "combo_map_ultimate_v31",
   label: "Combo Map 3D (V31 Debug)",
   options: {
