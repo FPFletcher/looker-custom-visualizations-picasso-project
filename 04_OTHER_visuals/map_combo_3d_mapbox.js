@@ -15,7 +15,7 @@
  */
 
 // --- EMBEDDED ICONS (Base64) - NO NETWORK REQUIRED ---
-console.log("[DEBUG] Script loaded");
+
 const ICONS = {
   "marker": "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyYzAgNS41MiA0LjQ4IDEwIDEwIDEwczEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAybTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LThzOCAzLjU5IDggOC0zLjU5IDggOCA4em0tMS0xM2gydjZIMTF6bTAgOGgydjJIMTF6IiBmaWxsPSIjRkZGRkZGIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==",
   "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
@@ -202,6 +202,7 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
+  console.log("[DEBUG] Script loaded");
   id: "combo_map_ultimate_v31",
   label: "Combo Map 3D (V31 Debug)",
   options: {
