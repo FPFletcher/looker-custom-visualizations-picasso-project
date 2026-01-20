@@ -361,67 +361,77 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
   },
 
-  updateAsync: function(data, element, config, queryResponse, details, done) {
-    console.log(`[Viz] 1. Update Async Started (${data.length} rows)`);
-    this.clearErrors();
+updateAsync: function(data, element, config, queryResponse, details, done) {
+  console.log(`[Viz] 1. Update Async Started (${data.length} rows)`);
 
-    if (!config.mapbox_token) {
-        console.warn("[Viz] Missing Mapbox Token");
-        if(this._deck) { this._deck.finalize(); this._deck = null; }
-        this._tokenError.style.display = 'block';
-        this._toggleBtn.style.display = 'none';
-        done(); return;
-    } else {
-        this._tokenError.style.display = 'none';
-        this._toggleBtn.style.display = (details && details.print) ? 'none' : 'flex';
+  // --- 1. DEFINE PRINT MODE ---
+  // Change this to 'true' temporarily to simulate PDF mode in your browser console!
+  const isPrint = true;
+  //details && details.print
+
+  if (isPrint) { console.log("[Viz] PDF/Print Mode DETECTED"); }
+
+  this.clearErrors();
+
+  if (!config.mapbox_token) {
+    console.warn("[Viz] Missing Mapbox Token");
+    if(this._deck) { this._deck.finalize(); this._deck = null; }
+    this._tokenError.style.display = 'block';
+    this._toggleBtn.style.display = 'none';
+    done(); return;
+  } else {
+    this._tokenError.style.display = 'none';
+    // Use the variable here to hide the toggle button in PDF
+    this._toggleBtn.style.display = isPrint ? 'none' : 'flex';
+  }
+
+  if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
+    this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
+    done(); return;
+  }
+
+  // --- PRE-LOAD ASSETS ---
+  const iconPromises = [];
+  for(let i=1; i<=4; i++) {
+    if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
+      console.log(`[Viz] Preloading Icon for Layer ${i}: ${config[`layer${i}_icon_url`]}`);
+      iconPromises.push(preloadImage(config[`layer${i}_icon_url`]));
     }
+  }
 
-    if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
-      this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
-      done(); return;
-    }
+  console.log(`[Viz] 2. Starting Parallel Load (Data + ${iconPromises.length} Icons)`);
 
-    // --- PRE-LOAD ASSETS ---
-    const iconPromises = [];
-    for(let i=1; i<=4; i++) {
-        if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
-            console.log(`[Viz] Preloading Icon for Layer ${i}: ${config[`layer${i}_icon_url`]}`);
-            iconPromises.push(preloadImage(config[`layer${i}_icon_url`]));
-        }
-    }
+  Promise.all([
+    this._prepareData(data, config, queryResponse),
+    ...iconPromises
+  ]).then(([processedData]) => {
+    console.log("[Viz] 3. Data & Icons Ready. Rendering...");
+    this._render(processedData, config, queryResponse, details);
 
-    console.log(`[Viz] 2. Starting Parallel Load (Data + ${iconPromises.length} Icons)`);
+    // --- SMART PDF WAIT ---
+    // Use the variable here for logic
+    if (isPrint) {
+      console.log("[Viz] PDF Mode Active. Freezing map for capture.");
 
-    Promise.all([
-        this._prepareData(data, config, queryResponse),
-        ...iconPromises
-    ]).then(([processedData]) => {
-        console.log("[Viz] 3. Data & Icons Ready. Rendering...");
-        this._render(processedData, config, queryResponse, details);
+      if(this._deck) this._deck.redraw(true);
 
-        // --- SMART PDF WAIT ---
-        if (details && details.print) {
-            console.log("[Viz] PDF Mode DETECTED. Freezing map.");
-
-            if(this._deck) this._deck.redraw(true);
-
-            // Wait 1.5s as fallback for tiles to paint
-            setTimeout(() => {
-                console.log("[Viz] PDF Wait Complete (Calling done)");
-                done();
-            }, 1500);
-
-        } else {
-            console.log("[Viz] Interactive Mode (Done)");
-            done();
-        }
-
-    }).catch(err => {
-        console.error("[Viz] Data/Render Error:", err);
-        this.addError({ title: "Error", message: err.message });
+      // Wait 1.5s as fallback for tiles to paint
+      setTimeout(() => {
+        console.log("[Viz] PDF Wait Complete (Calling done)");
         done();
-    });
-  },
+      }, 1500);
+
+    } else {
+      console.log("[Viz] Interactive Mode (Done)");
+      done();
+    }
+
+  }).catch(err => {
+    console.error("[Viz] Data/Render Error:", err);
+    this.addError({ title: "Error", message: err.message });
+  done();
+});
+},
 
   _prepareData: async function(data, config, queryResponse) {
     const measures = queryResponse.fields.measure_like;

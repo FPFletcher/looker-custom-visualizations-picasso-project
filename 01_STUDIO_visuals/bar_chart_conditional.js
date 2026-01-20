@@ -962,7 +962,8 @@ looker.plugins.visualizations.add({
     }
 
     // CHECK PDF MODE
-    const isPrint = details && details.print;
+    //const isPrint = details && details.print;
+    const isPrint = true; // Force print mode on my screen
     if(isPrint) { console.log("[Viz] PDF/Print Mode Detected - Animations Disabled"); }
 
     try {
