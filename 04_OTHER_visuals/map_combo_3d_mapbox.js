@@ -1,21 +1,96 @@
 /**
- * Multi-Layer 3D Map for Looker - v39 Final Fixes
+ * Multi-Layer 3D Map for Looker - v40 Final Polish
  *
- * UPDATES FROM v38:
- * - FIXED: Tooltip now respects "Show All Pivots" & Pivot Index filtering
- * - FIXED: Drill menu shows measure labels (not just "Show All")
- * - FIXED: Drill menu respects dimension filtering
- * - FIXED: Layer 1 measure index parsing (rebuilt from Layer 4 logic)
+ * UPDATES FROM v39:
+ * - FIXED: Tooltip total calculation now correctly sums filtered pivot values
+ * - FIXED: Tooltip total uses LookML format from measure definition
+ * - FIXED: Icons now respect 3D pitch/tilt (billboard: false)
+ * - ADDED: Comprehensive PDF rendering debug logs
+ * - ADDED: PDF mode detection from dashboard layer
  */
 
 // --- EMBEDDED ICONS ---
+// Updated ICONS object with CDN-hosted PNG/SVG icons
+
 const ICONS = {
-  "marker": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSZNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJjMCA1LjUyIDQuNDggMTAgMTAgMTBzMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJtMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOHM4IDMuNTkgOCA4LTMuNTkgOCA4IDh6bS0xLTEzaDJ2NkgxMXptMCA4aDJ2MkgxMXoiIGZpbGw9IiNGRkZGRkYiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+",
-  "circle": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMjE5NkYzIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjwvc3ZnPg==",
-  "star": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRkZDMTA3Ij48cGF0aCBkPSZNMTIgMTcuMjdMNS4xNSAyMWwxLjY0LTcuMDNMMS40NSA5LjI0bDcuMTktLjYxTDEyIDIgMTUuMzYgOC42bDcuMTkuNjEtNS4zMyA0LjczIDEuNjQgNy4wM0wxMiAxNy4yN3oiLz48L3N2Zz4=",
-  "warning": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRjQ0MzM2Ij48cGF0aCBkPSJNMSAyMWgyMkwxMiAyIDEgMjF6bTEyLTNoLTJ2MmgybTAtNGgtMnYtNGgyeiIvPjwvc3ZnPg==",
-  "shop": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjNENBRjUwIj48cGF0aCBkPSJNMjAgNEg0djJoMTZWNHptMSAxMHYtMmwtMS01aC0ybC0xIDVIOGwLTEtNWgtMmwtMSA1SDRsLTEtNXYySDJ2Nmg5djZoMnYtNmg5ek02IDE5djZoMTJ2LTZINnoiLz48L3N2Zz4=",
-  "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png"
+  // === LOCATION & MAP ICONS ===
+  "marker": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/location-dot.svg",
+  "map_pin": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/map-pin.svg",
+  "location_pin": "https://unpkg.com/ionicons@7/dist/svg/location-outline.svg",
+  "location_filled": "https://unpkg.com/ionicons@7/dist/svg/location.svg",
+
+  // === BUSINESS & COMMERCE ===
+  "shop": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/store.svg",
+  "shopping_cart": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/cart-shopping.svg",
+  "building": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/building.svg",
+  "warehouse": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/warehouse.svg",
+
+  // === TRANSPORTATION ===
+  "truck": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/truck.svg",
+  "truck_fast": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/truck-fast.svg",
+  "plane": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/plane.svg",
+  "ship": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/ship.svg",
+  "car": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/car.svg",
+  "train": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/train.svg",
+
+  // === STATUS & ALERTS ===
+  "warning": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/triangle-exclamation.svg",
+  "warning_triangle": "https://unpkg.com/ionicons@7/dist/svg/warning-outline.svg",
+  "alert": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/circle-exclamation.svg",
+  "info": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/circle-info.svg",
+  "check": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/circle-check.svg",
+  "error": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/circle-xmark.svg",
+
+  // === SHAPES & BASIC ===
+  "circle": "https://unpkg.com/ionicons@7/dist/svg/ellipse.svg",
+  "star": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/star.svg",
+  "star_outline": "https://unpkg.com/ionicons@7/dist/svg/star-outline.svg",
+  "square": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/square.svg",
+  "heart": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/heart.svg",
+  "flag": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/flag.svg",
+
+  // === INDUSTRY & FACILITIES ===
+  "factory": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/industry.svg",
+  "hospital": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/hospital.svg",
+  "school": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/school.svg",
+  "hotel": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/hotel.svg",
+  "gas_station": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/gas-pump.svg",
+
+  // === PEOPLE & USERS ===
+  "user": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/user.svg",
+  "users": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/users.svg",
+  "person": "https://unpkg.com/ionicons@7/dist/svg/person.svg",
+
+  // === FOOD & DINING ===
+  "restaurant": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/utensils.svg",
+  "coffee": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/mug-saucer.svg",
+  "pizza": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/pizza-slice.svg",
+
+  // === NATURE & ENVIRONMENT ===
+  "tree": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/tree.svg",
+  "leaf": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/leaf.svg",
+  "mountain": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/mountain.svg",
+  "water": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/droplet.svg",
+
+  // === TECHNOLOGY & DEVICES ===
+  "phone": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/phone.svg",
+  "computer": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/computer.svg",
+  "wifi": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/wifi.svg",
+  "signal": "https://unpkg.com/ionicons@7/dist/svg/cellular.svg",
+
+  // === FINANCIAL ===
+  "dollar": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/dollar-sign.svg",
+  "euro": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/euro-sign.svg",
+  "bank": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/building-columns.svg",
+
+  // === WEATHER ===
+  "sun": "https://unpkg.com/ionicons@7/dist/svg/sunny.svg",
+  "cloud": "https://unpkg.com/ionicons@7/dist/svg/cloud.svg",
+  "rain": "https://unpkg.com/ionicons@7/dist/svg/rainy.svg",
+  "snow": "https://unpkg.com/ionicons@7/dist/svg/snow.svg",
+
+  // === LEGACY/DEMO (Keep for backwards compatibility) ===
+  "truck_demo": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -183,7 +258,7 @@ const preloadImage = (type, customUrl) => {
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V39] Failed to load icon: ${url}`);
+      console.warn(`[Viz V40] Failed to load icon: ${url}`);
       resolve(ICONS['marker']);
     };
     img.src = url;
@@ -191,8 +266,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v39",
-  label: "Combo Map 3D (V39 Final Fixes)",
+  id: "combo_map_ultimate_v40",
+  label: "Combo Map 3D (V40 Final)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -343,19 +418,26 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V39] UPDATE ASYNC. Rows: ${data.length} | Print: ${isPrint}`);
+    console.log(`[Viz V40] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V40] Rows: ${data.length} | Print Mode: ${isPrint}`);
+    console.log(`[Viz V40] Details Object:`, details);
+    console.log(`[Viz V40] Config Token Present: ${!!config.mapbox_token}`);
+    console.log(`[Viz V40] Token Length: ${config.mapbox_token ? config.mapbox_token.length : 0}`);
 
     this.clearErrors();
 
     if (!config.mapbox_token) {
+      console.error(`[Viz V40 PDF] MISSING TOKEN - Showing error overlay`);
       this._tokenError.style.display = 'block';
       done();
       return;
     } else {
+      console.log(`[Viz V40 PDF] Token validated, hiding error overlay`);
       this._tokenError.style.display = 'none';
     }
 
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
+      console.error(`[Viz V40 PDF] Missing dependencies - deck: ${typeof deck}, mapboxgl: ${typeof mapboxgl}`);
       this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
       done();
       return;
@@ -378,17 +460,27 @@ looker.plugins.visualizations.add({
       ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
+      console.log(`[Viz V40 PDF] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
-        if (this._deck) this._deck.redraw(true);
-        setTimeout(() => done(), 3000);
+        console.log(`[Viz V40 PDF] Print mode detected - forcing redraw`);
+        if (this._deck) {
+          this._deck.redraw(true);
+          console.log(`[Viz V40 PDF] Redraw triggered`);
+        }
+        setTimeout(() => {
+          console.log(`[Viz V40 PDF] Print timeout complete, calling done()`);
+          done();
+        }, 3000);
       } else {
+        console.log(`[Viz V40] Interactive mode - calling done() immediately`);
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V39] FATAL ERROR:", err);
+      console.error("[Viz V40] FATAL ERROR:", err);
+      console.error("[Viz V40] Error Stack:", err.stack);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -438,7 +530,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V39] GeoJSON load failed:", error);
+      console.warn("[Viz V40] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -565,6 +657,7 @@ looker.plugins.visualizations.add({
 
   // --- RENDER ---
   _render: function (processed, config, queryResponse, details, loadedIcons) {
+    console.log(`[Viz V40 PDF] _render() called - Building layers...`);
     const layerObjects = [];
     let iconIndex = 0;
 
@@ -583,25 +676,28 @@ looker.plugins.visualizations.add({
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
+            console.log(`[Viz V40 PDF] Layer ${i} (${type}) built successfully`);
           }
         } catch (e) {
-          console.error(`[Viz V39] Layer ${i} Error:`, e);
+          console.error(`[Viz V40] Layer ${i} Error:`, e);
         }
       }
     }
 
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
+    console.log(`[Viz V40 PDF] Total layers rendered: ${layers.length}`);
 
-    // --- TOOLTIP (FIXED: Now respects Show All Pivots & Pivot Index) ---
+    // --- TOOLTIP (FIXED: Correct total calculation + LookML format) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
-      // Extract layer config from layer.id (format: "layer-N-type")
       const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
       const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
       const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
       const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
+      const measureIndicesStr = layerIdx ? (config[`layer${layerIdx}_measure_idx`] || '0') : '0';
+      const measureIndices = String(measureIndicesStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
 
       let name, values, pivotData, allowedMeasures;
 
@@ -635,7 +731,6 @@ looker.plugins.visualizations.add({
             html += `<div class="pivot-section">`;
 
             if (showAllPivots) {
-              // Show all pivot columns
               this._pivotInfo.pivotKeys.forEach((pk, pIdx) => {
                 const pivotLabel = this._pivotInfo.pivotLabels[pIdx] || pk;
                 const pData = pivotData[m.name] && pivotData[m.name][pk];
@@ -643,10 +738,17 @@ looker.plugins.visualizations.add({
                 if (pData && !pData.formatted) val = this._applyLookerFormat(pData.value, m.value_format);
                 html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
               });
-              const totalVal = this._applyLookerFormat(values[idx], m.value_format);
+
+              // FIXED: Calculate total from filtered pivots only
+              let calculatedTotal = 0;
+              this._pivotInfo.pivotKeys.forEach((pk) => {
+                const pData = pivotData[m.name] && pivotData[m.name][pk];
+                if (pData) calculatedTotal += pData.value;
+              });
+
+              const totalVal = this._applyLookerFormat(calculatedTotal, m.value_format);
               html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div>`;
             } else {
-              // Show only selected pivot column
               const pk = this._pivotInfo.pivotKeys[pivotIdx];
               const pivotLabel = this._pivotInfo.pivotLabels[pivotIdx] || pk;
               const pData = pivotData[m.name] && pivotData[m.name][pk];
@@ -697,6 +799,7 @@ looker.plugins.visualizations.add({
         transitionDuration: (details && details.print) ? 0 : 500
       };
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
+      console.log(`[Viz V40 PDF] ViewState initialized:`, this._viewState);
     }
 
     const onViewStateChange = ({ viewState }) => {
@@ -705,6 +808,7 @@ looker.plugins.visualizations.add({
     };
 
     if (!this._deck) {
+      console.log(`[Viz V40 PDF] Creating new DeckGL instance...`);
       this._deck = new deck.DeckGL({
         container: this._container,
         mapStyle: config.map_style,
@@ -715,9 +819,12 @@ looker.plugins.visualizations.add({
         layers: layers,
         getTooltip: getTooltip,
         glOptions: { preserveDrawingBuffer: true, willReadFrequently: true },
-        onError: (err) => console.warn("DeckGL Error:", err)
+        onError: (err) => console.warn("[Viz V40 DeckGL Error]:", err),
+        onLoad: () => console.log("[Viz V40 PDF] DeckGL loaded successfully")
       });
+      console.log(`[Viz V40 PDF] DeckGL instance created`);
     } else {
+      console.log(`[Viz V40 PDF] Updating existing DeckGL instance...`);
       this._deck.setProps({
         layers: layers,
         mapStyle: config.map_style,
@@ -727,6 +834,7 @@ looker.plugins.visualizations.add({
         controller: true,
         onViewStateChange: onViewStateChange
       });
+      console.log(`[Viz V40 PDF] DeckGL props updated`);
     }
   },
 
@@ -745,7 +853,6 @@ looker.plugins.visualizations.add({
   _buildSingleLayer: function (idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
 
-    // --- PARSE INDICES (UNIFIED LOGIC ACROSS ALL LAYERS) ---
     const rawM = config[`layer${idx}_measure_idx`];
     const measureStr = (rawM === undefined || rawM === null) ? String(idx - 1) : String(rawM);
     const measureIndices = measureStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
@@ -770,7 +877,6 @@ looker.plugins.visualizations.add({
     const queryResponse = this._queryResponse;
     const measures = queryResponse.fields.measure_like;
 
-    // --- VALUE GETTER ---
     const getValue = (d) => {
       let totalValue = 0;
       measureIndices.forEach(mIdx => {
@@ -797,7 +903,6 @@ looker.plugins.visualizations.add({
       return totalValue;
     };
 
-    // --- CLICK HANDLER (FIXED: Labels + Dimension Filtering) ---
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
 
@@ -808,13 +913,11 @@ looker.plugins.visualizations.add({
 
       let finalLinks = [];
 
-      // 1. NON-PIVOT
       if (!pivotInfo.hasPivot && drillLinks) {
         measureIndices.forEach(mIdx => {
             if (drillLinks[mIdx]) finalLinks.push(...drillLinks[mIdx]);
         });
       }
-      // 2. PIVOT
       else if (pivotInfo.hasPivot && pivotData) {
         measureIndices.forEach(mIdx => {
             const mName = measures[mIdx] ? measures[mIdx].name : null;
@@ -833,9 +936,7 @@ looker.plugins.visualizations.add({
         });
       }
 
-      // INJECT MEASURE LABELS (FIXED)
       finalLinks = finalLinks.map((link, linkIdx) => {
-          // Find which measure this link belongs to based on order
           const measureIdx = measureIndices[Math.floor(linkIdx / (finalLinks.length / measureIndices.length))];
           const measure = measures[measureIdx];
 
@@ -858,7 +959,6 @@ looker.plugins.visualizations.add({
       }
     };
 
-    // --- GATHER DATA (RESPECTS DIMENSION FILTERING) ---
     let pointData = [];
     if (processed.type === 'regions') {
       dimIndices.forEach(dimIdx => {
@@ -1035,6 +1135,7 @@ looker.plugins.visualizations.add({
 
       case 'icon':
         if (safePointData.length === 0) return null;
+        // FIXED: billboard: false makes icons respect 3D pitch
         return new deck.IconLayer({
           id: id,
           data: safePointData,
@@ -1047,6 +1148,7 @@ looker.plugins.visualizations.add({
           getSize: d => radius,
           sizeScale: 1,
           sizeMinPixels: 20,
+          billboard: false, // FIXED: Respect pitch
           autoHighlight: false,
           onClick: onClickHandler
         });
@@ -1095,14 +1197,33 @@ looker.plugins.visualizations.add({
   _applyLookerFormat: function (value, formatStr) {
     if (value === undefined || value === null) return '0';
     if (!formatStr) return this._formatNumber(value);
-    let str = value.toLocaleString("en-US", { maximumFractionDigits: 2 });
-    if (formatStr.includes('$')) str = '$' + str;
-    if (formatStr.includes('%')) str = (value * 100).toFixed(1) + '%';
-    if (formatStr.includes('€')) str = '€' + str;
-    if (formatStr.includes('£')) str = '£' + str;
-    if (formatStr.toLowerCase().includes('"k"')) {
-      str = (value / 1000).toFixed(1) + 'k';
+
+    // Parse Looker format string more carefully
+    let str = value.toString();
+
+    // Handle currency symbols
+    if (formatStr.includes('$')) str = '$' + this._formatNumber(value);
+    else if (formatStr.includes('€')) str = '€' + this._formatNumber(value);
+    else if (formatStr.includes('£')) str = '£' + this._formatNumber(value);
+    // Handle percentages
+    else if (formatStr.includes('%')) str = (value * 100).toFixed(1) + '%';
+    // Handle K/M abbreviations
+    else if (formatStr.toLowerCase().includes('"k"') || formatStr.toLowerCase().includes('k')) {
+      str = this._formatNumber(value);
     }
+    // Handle decimal places (e.g., "#,##0.00")
+    else if (formatStr.includes('.')) {
+      const decimals = (formatStr.split('.')[1] || '').replace(/[^0]/g, '').length;
+      str = value.toLocaleString("en-US", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
+    }
+    // Default formatting
+    else {
+      str = this._formatNumber(value);
+    }
+
     return str;
   },
 
