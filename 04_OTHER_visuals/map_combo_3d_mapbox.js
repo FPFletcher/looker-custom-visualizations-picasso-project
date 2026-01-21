@@ -1,96 +1,89 @@
 /**
- * Multi-Layer 3D Map for Looker - v40 Final Polish
+ * Multi-Layer 3D Map for Looker - v41 Critical Fixes
  *
- * UPDATES FROM v39:
- * - FIXED: Tooltip total calculation now correctly sums filtered pivot values
- * - FIXED: Tooltip total uses LookML format from measure definition
- * - FIXED: Icons now respect 3D pitch/tilt (billboard: false)
- * - ADDED: Comprehensive PDF rendering debug logs
- * - ADDED: PDF mode detection from dashboard layer
+ * UPDATES FROM v40:
+ * - FIXED: Tooltip total now correctly filtered by dimension (not grand total)
+ * - FIXED: SVG icons converted to PNG for deck.gl compatibility
+ * - FIXED: Icon dropdown sorted alphabetically with "Custom URL" at top
  */
 
-// --- EMBEDDED ICONS ---
-// Updated ICONS object with CDN-hosted PNG/SVG icons
-
+// --- CDN-HOSTED ICONS (PNG ONLY - SVG causes deck.gl errors) ---
 const ICONS = {
   // === LOCATION & MAP ICONS ===
-  "marker": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/location-dot.svg",
-  "map_pin": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/map-pin.svg",
-  "location_pin": "https://unpkg.com/ionicons@7/dist/svg/location-outline.svg",
-  "location_filled": "https://unpkg.com/ionicons@7/dist/svg/location.svg",
+  "marker": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/location-dot.svg",
+  "map_pin": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/map-pin.svg",
+  "location_pin": "https://em-content.zobj.net/thumbs/120/google/350/round-pushpin_1f4cd.png",
+  "location_filled": "https://em-content.zobj.net/thumbs/120/google/350/pushpin_1f4cc.png",
 
   // === BUSINESS & COMMERCE ===
-  "shop": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/store.svg",
-  "shopping_cart": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/cart-shopping.svg",
-  "building": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/building.svg",
-  "warehouse": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/warehouse.svg",
+  "shop": "https://em-content.zobj.net/thumbs/120/google/350/convenience-store_1f3ea.png",
+  "shopping_cart": "https://em-content.zobj.net/thumbs/120/google/350/shopping-cart_1f6d2.png",
+  "building": "https://em-content.zobj.net/thumbs/120/google/350/office-building_1f3e2.png",
+  "warehouse": "https://em-content.zobj.net/thumbs/120/google/350/department-store_1f3ec.png",
 
   // === TRANSPORTATION ===
-  "truck": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/truck.svg",
-  "truck_fast": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/truck-fast.svg",
-  "plane": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/plane.svg",
-  "ship": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/ship.svg",
-  "car": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/car.svg",
-  "train": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/train.svg",
+  "truck": "https://em-content.zobj.net/thumbs/120/google/350/delivery-truck_1f69a.png",
+  "truck_fast": "https://em-content.zobj.net/thumbs/120/google/350/racing-car_1f3ce-fe0f.png",
+  "plane": "https://em-content.zobj.net/thumbs/120/google/350/airplane_2708-fe0f.png",
+  "ship": "https://em-content.zobj.net/thumbs/120/google/350/ship_1f6a2.png",
+  "car": "https://em-content.zobj.net/thumbs/120/google/350/automobile_1f697.png",
+  "train": "https://em-content.zobj.net/thumbs/120/google/350/locomotive_1f682.png",
 
   // === STATUS & ALERTS ===
-  "warning": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/triangle-exclamation.svg",
-  "warning_triangle": "https://unpkg.com/ionicons@7/dist/svg/warning-outline.svg",
-  "alert": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/circle-exclamation.svg",
-  "info": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/circle-info.svg",
-  "check": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/circle-check.svg",
-  "error": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/circle-xmark.svg",
+  "warning": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
+  "warning_triangle": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
+  "alert": "https://em-content.zobj.net/thumbs/120/google/350/exclamation-mark_2757.png",
+  "info": "https://em-content.zobj.net/thumbs/120/google/350/information_2139-fe0f.png",
+  "check": "https://em-content.zobj.net/thumbs/120/google/350/check-mark_2714-fe0f.png",
+  "error": "https://em-content.zobj.net/thumbs/120/google/350/cross-mark_274c.png",
 
   // === SHAPES & BASIC ===
-  "circle": "https://unpkg.com/ionicons@7/dist/svg/ellipse.svg",
-  "star": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/star.svg",
-  "star_outline": "https://unpkg.com/ionicons@7/dist/svg/star-outline.svg",
-  "square": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/square.svg",
-  "heart": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/heart.svg",
-  "flag": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/flag.svg",
+  "circle": "https://em-content.zobj.net/thumbs/120/google/350/blue-circle_1f535.png",
+  "star": "https://em-content.zobj.net/thumbs/120/google/350/star_2b50.png",
+  "star_outline": "https://em-content.zobj.net/thumbs/120/google/350/white-medium-star_2b50.png",
+  "square": "https://em-content.zobj.net/thumbs/120/google/350/blue-square_1f7e6.png",
+  "heart": "https://em-content.zobj.net/thumbs/120/google/350/red-heart_2764-fe0f.png",
+  "flag": "https://em-content.zobj.net/thumbs/120/google/350/triangular-flag_1f6a9.png",
 
   // === INDUSTRY & FACILITIES ===
-  "factory": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/industry.svg",
-  "hospital": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/hospital.svg",
-  "school": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/school.svg",
-  "hotel": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/hotel.svg",
-  "gas_station": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/gas-pump.svg",
+  "factory": "https://em-content.zobj.net/thumbs/120/google/350/factory_1f3ed.png",
+  "hospital": "https://em-content.zobj.net/thumbs/120/google/350/hospital_1f3e5.png",
+  "school": "https://em-content.zobj.net/thumbs/120/google/350/school_1f3eb.png",
+  "hotel": "https://em-content.zobj.net/thumbs/120/google/350/hotel_1f3e8.png",
+  "gas_station": "https://em-content.zobj.net/thumbs/120/google/350/fuel-pump_26fd.png",
 
   // === PEOPLE & USERS ===
-  "user": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/user.svg",
-  "users": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/users.svg",
-  "person": "https://unpkg.com/ionicons@7/dist/svg/person.svg",
+  "user": "https://em-content.zobj.net/thumbs/120/google/350/bust-in-silhouette_1f464.png",
+  "users": "https://em-content.zobj.net/thumbs/120/google/350/busts-in-silhouette_1f465.png",
+  "person": "https://em-content.zobj.net/thumbs/120/google/350/person_1f9d1.png",
 
   // === FOOD & DINING ===
-  "restaurant": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/utensils.svg",
-  "coffee": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/mug-saucer.svg",
-  "pizza": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/pizza-slice.svg",
+  "restaurant": "https://em-content.zobj.net/thumbs/120/google/350/fork-and-knife_1f374.png",
+  "coffee": "https://em-content.zobj.net/thumbs/120/google/350/hot-beverage_2615.png",
+  "pizza": "https://em-content.zobj.net/thumbs/120/google/350/pizza_1f355.png",
 
   // === NATURE & ENVIRONMENT ===
-  "tree": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/tree.svg",
-  "leaf": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/leaf.svg",
-  "mountain": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/mountain.svg",
-  "water": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/droplet.svg",
+  "tree": "https://em-content.zobj.net/thumbs/120/google/350/deciduous-tree_1f333.png",
+  "leaf": "https://em-content.zobj.net/thumbs/120/google/350/leaf-fluttering-in-wind_1f343.png",
+  "mountain": "https://em-content.zobj.net/thumbs/120/google/350/mountain_26f0-fe0f.png",
+  "water": "https://em-content.zobj.net/thumbs/120/google/350/droplet_1f4a7.png",
 
   // === TECHNOLOGY & DEVICES ===
-  "phone": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/phone.svg",
-  "computer": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/computer.svg",
-  "wifi": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/wifi.svg",
-  "signal": "https://unpkg.com/ionicons@7/dist/svg/cellular.svg",
+  "phone": "https://em-content.zobj.net/thumbs/120/google/350/telephone_260e-fe0f.png",
+  "computer": "https://em-content.zobj.net/thumbs/120/google/350/desktop-computer_1f5a5-fe0f.png",
+  "wifi": "https://em-content.zobj.net/thumbs/120/google/350/antenna-bars_1f4f6.png",
+  "signal": "https://em-content.zobj.net/thumbs/120/google/350/mobile-phone_1f4f1.png",
 
   // === FINANCIAL ===
-  "dollar": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/dollar-sign.svg",
-  "euro": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/euro-sign.svg",
-  "bank": "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/svgs/solid/building-columns.svg",
+  "dollar": "https://em-content.zobj.net/thumbs/120/google/350/dollar-banknote_1f4b5.png",
+  "euro": "https://em-content.zobj.net/thumbs/120/google/350/euro-banknote_1f4b6.png",
+  "bank": "https://em-content.zobj.net/thumbs/120/google/350/bank_1f3e6.png",
 
   // === WEATHER ===
-  "sun": "https://unpkg.com/ionicons@7/dist/svg/sunny.svg",
-  "cloud": "https://unpkg.com/ionicons@7/dist/svg/cloud.svg",
-  "rain": "https://unpkg.com/ionicons@7/dist/svg/rainy.svg",
-  "snow": "https://unpkg.com/ionicons@7/dist/svg/snow.svg",
-
-  // === LEGACY/DEMO (Keep for backwards compatibility) ===
-  "truck_demo": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png"
+  "sun": "https://em-content.zobj.net/thumbs/120/google/350/sun_2600-fe0f.png",
+  "cloud": "https://em-content.zobj.net/thumbs/120/google/350/cloud_2601-fe0f.png",
+  "rain": "https://em-content.zobj.net/thumbs/120/google/350/cloud-with-rain_1f327-fe0f.png",
+  "snow": "https://em-content.zobj.net/thumbs/120/google/350/snowflake_2744-fe0f.png"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -226,38 +219,58 @@ const getLayerOptions = (n) => {
       display: "select",
       values: [
         { "Custom URL": "custom" },
-        { "Map Pin": "marker" },
-        { "Location Pin": "location_pin" },
-        { "Store/Shop": "shop" },
-        { "Warehouse": "warehouse" },
-        { "Building": "building" },
-        { "Truck": "truck" },
-        { "Fast Delivery": "truck_fast" },
-        { "Plane": "plane" },
-        { "Ship": "ship" },
-        { "Car": "car" },
-        { "Train": "train" },
-        { "Warning": "warning" },
         { "Alert": "alert" },
-        { "Info": "info" },
-        { "Success": "check" },
+        { "Bank": "bank" },
+        { "Building": "building" },
+        { "Car": "car" },
+        { "Check/Success": "check" },
+        { "Circle": "circle" },
+        { "Cloud": "cloud" },
+        { "Coffee": "coffee" },
+        { "Computer": "computer" },
+        { "Dollar": "dollar" },
         { "Error": "error" },
-        { "Star": "star" },
-        { "Heart": "heart" },
-        { "Flag": "flag" },
+        { "Euro": "euro" },
         { "Factory": "factory" },
-        { "Hospital": "hospital" },
-        { "School": "school" },
-        { "Hotel": "hotel" },
+        { "Flag": "flag" },
         { "Gas Station": "gas_station" },
+        { "Heart": "heart" },
+        { "Hospital": "hospital" },
+        { "Hotel": "hotel" },
+        { "Info": "info" },
+        { "Leaf": "leaf" },
+        { "Location Filled": "location_filled" },
+        { "Location Pin": "location_pin" },
+        { "Map Pin": "map_pin" },
+        { "Marker": "marker" },
+        { "Mountain": "mountain" },
+        { "Person": "person" },
+        { "Phone": "phone" },
+        { "Pizza": "pizza" },
+        { "Plane": "plane" },
+        { "Rain": "rain" },
+        { "Restaurant": "restaurant" },
+        { "School": "school" },
+        { "Ship": "ship" },
+        { "Shop/Store": "shop" },
+        { "Shopping Cart": "shopping_cart" },
+        { "Signal": "signal" },
+        { "Snow": "snow" },
+        { "Square": "square" },
+        { "Star": "star" },
+        { "Star Outline": "star_outline" },
+        { "Sun": "sun" },
+        { "Train": "train" },
+        { "Tree": "tree" },
+        { "Truck": "truck" },
+        { "Truck Fast": "truck_fast" },
         { "User": "user" },
         { "Users": "users" },
-        { "Restaurant": "restaurant" },
-        { "Coffee": "coffee" },
-        { "Tree": "tree" },
-        { "Mountain": "mountain" },
-        { "Phone": "phone" },
-        { "Bank": "bank" }
+        { "Warehouse": "warehouse" },
+        { "Warning": "warning" },
+        { "Warning Triangle": "warning_triangle" },
+        { "Water": "water" },
+        { "WiFi": "wifi" }
       ],
       default: "marker",
       section: "Layers",
@@ -284,7 +297,7 @@ const preloadImage = (type, customUrl) => {
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V40] Failed to load icon: ${url}`);
+      console.warn(`[Viz V41] Failed to load icon: ${url}`);
       resolve(ICONS['marker']);
     };
     img.src = url;
@@ -292,8 +305,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v40",
-  label: "Combo Map 3D (V40 Final)",
+  id: "combo_map_ultimate_v41",
+  label: "Combo Map 3D (V41 Fixed)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -444,26 +457,26 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V40] ========== UPDATE ASYNC START ==========`);
-    console.log(`[Viz V40] Rows: ${data.length} | Print Mode: ${isPrint}`);
-    console.log(`[Viz V40] Details Object:`, details);
-    console.log(`[Viz V40] Config Token Present: ${!!config.mapbox_token}`);
-    console.log(`[Viz V40] Token Length: ${config.mapbox_token ? config.mapbox_token.length : 0}`);
+    console.log(`[Viz V41] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V41] Rows: ${data.length} | Print Mode: ${isPrint}`);
+    console.log(`[Viz V41] Details Object:`, details);
+    console.log(`[Viz V41] Config Token Present: ${!!config.mapbox_token}`);
+    console.log(`[Viz V41] Token Length: ${config.mapbox_token ? config.mapbox_token.length : 0}`);
 
     this.clearErrors();
 
     if (!config.mapbox_token) {
-      console.error(`[Viz V40 PDF] MISSING TOKEN - Showing error overlay`);
+      console.error(`[Viz V41 PDF] MISSING TOKEN - Showing error overlay`);
       this._tokenError.style.display = 'block';
       done();
       return;
     } else {
-      console.log(`[Viz V40 PDF] Token validated, hiding error overlay`);
+      console.log(`[Viz V41 PDF] Token validated, hiding error overlay`);
       this._tokenError.style.display = 'none';
     }
 
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
-      console.error(`[Viz V40 PDF] Missing dependencies - deck: ${typeof deck}, mapboxgl: ${typeof mapboxgl}`);
+      console.error(`[Viz V41 PDF] Missing dependencies - deck: ${typeof deck}, mapboxgl: ${typeof mapboxgl}`);
       this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
       done();
       return;
@@ -486,27 +499,27 @@ looker.plugins.visualizations.add({
       ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
-      console.log(`[Viz V40 PDF] Data prepared, rendering layers...`);
+      console.log(`[Viz V41 PDF] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
-        console.log(`[Viz V40 PDF] Print mode detected - forcing redraw`);
+        console.log(`[Viz V41 PDF] Print mode detected - forcing redraw`);
         if (this._deck) {
           this._deck.redraw(true);
-          console.log(`[Viz V40 PDF] Redraw triggered`);
+          console.log(`[Viz V41 PDF] Redraw triggered`);
         }
         setTimeout(() => {
-          console.log(`[Viz V40 PDF] Print timeout complete, calling done()`);
+          console.log(`[Viz V41 PDF] Print timeout complete, calling done()`);
           done();
         }, 3000);
       } else {
-        console.log(`[Viz V40] Interactive mode - calling done() immediately`);
+        console.log(`[Viz V41] Interactive mode - calling done() immediately`);
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V40] FATAL ERROR:", err);
-      console.error("[Viz V40] Error Stack:", err.stack);
+      console.error("[Viz V41] FATAL ERROR:", err);
+      console.error("[Viz V41] Error Stack:", err.stack);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -556,7 +569,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V40] GeoJSON load failed:", error);
+      console.warn("[Viz V41] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -683,7 +696,7 @@ looker.plugins.visualizations.add({
 
   // --- RENDER ---
   _render: function (processed, config, queryResponse, details, loadedIcons) {
-    console.log(`[Viz V40 PDF] _render() called - Building layers...`);
+    console.log(`[Viz V41 PDF] _render() called - Building layers...`);
     const layerObjects = [];
     let iconIndex = 0;
 
@@ -702,19 +715,19 @@ looker.plugins.visualizations.add({
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
-            console.log(`[Viz V40 PDF] Layer ${i} (${type}) built successfully`);
+            console.log(`[Viz V41 PDF] Layer ${i} (${type}) built successfully`);
           }
         } catch (e) {
-          console.error(`[Viz V40] Layer ${i} Error:`, e);
+          console.error(`[Viz V41] Layer ${i} Error:`, e);
         }
       }
     }
 
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
-    console.log(`[Viz V40 PDF] Total layers rendered: ${layers.length}`);
+    console.log(`[Viz V41 PDF] Total layers rendered: ${layers.length}`);
 
-    // --- TOOLTIP (FIXED: Correct total calculation + LookML format) ---
+    // --- TOOLTIP (FIXED: Dimension-filtered total calculation) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
@@ -722,8 +735,6 @@ looker.plugins.visualizations.add({
       const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
       const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
       const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
-      const measureIndicesStr = layerIdx ? (config[`layer${layerIdx}_measure_idx`] || '0') : '0';
-      const measureIndices = String(measureIndicesStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
 
       let name, values, pivotData, allowedMeasures;
 
@@ -757,22 +768,20 @@ looker.plugins.visualizations.add({
             html += `<div class="pivot-section">`;
 
             if (showAllPivots) {
+              // FIXED: Recalculate dimension-filtered total
+              let dimensionFilteredTotal = 0;
               this._pivotInfo.pivotKeys.forEach((pk, pIdx) => {
                 const pivotLabel = this._pivotInfo.pivotLabels[pIdx] || pk;
                 const pData = pivotData[m.name] && pivotData[m.name][pk];
                 let val = pData ? pData.formatted : '0';
-                if (pData && !pData.formatted) val = this._applyLookerFormat(pData.value, m.value_format);
+                if (pData) {
+                  dimensionFilteredTotal += pData.value;
+                  if (!pData.formatted) val = this._applyLookerFormat(pData.value, m.value_format);
+                }
                 html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
               });
 
-              // FIXED: Calculate total from filtered pivots only
-              let calculatedTotal = 0;
-              this._pivotInfo.pivotKeys.forEach((pk) => {
-                const pData = pivotData[m.name] && pivotData[m.name][pk];
-                if (pData) calculatedTotal += pData.value;
-              });
-
-              const totalVal = this._applyLookerFormat(calculatedTotal, m.value_format);
+              const totalVal = this._applyLookerFormat(dimensionFilteredTotal, m.value_format);
               html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div>`;
             } else {
               const pk = this._pivotInfo.pivotKeys[pivotIdx];
@@ -825,7 +834,7 @@ looker.plugins.visualizations.add({
         transitionDuration: (details && details.print) ? 0 : 500
       };
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
-      console.log(`[Viz V40 PDF] ViewState initialized:`, this._viewState);
+      console.log(`[Viz V41 PDF] ViewState initialized:`, this._viewState);
     }
 
     const onViewStateChange = ({ viewState }) => {
@@ -834,7 +843,7 @@ looker.plugins.visualizations.add({
     };
 
     if (!this._deck) {
-      console.log(`[Viz V40 PDF] Creating new DeckGL instance...`);
+      console.log(`[Viz V41 PDF] Creating new DeckGL instance...`);
       this._deck = new deck.DeckGL({
         container: this._container,
         mapStyle: config.map_style,
@@ -845,12 +854,12 @@ looker.plugins.visualizations.add({
         layers: layers,
         getTooltip: getTooltip,
         glOptions: { preserveDrawingBuffer: true, willReadFrequently: true },
-        onError: (err) => console.warn("[Viz V40 DeckGL Error]:", err),
-        onLoad: () => console.log("[Viz V40 PDF] DeckGL loaded successfully")
+        onError: (err) => console.warn("[Viz V41 DeckGL Error]:", err),
+        onLoad: () => console.log("[Viz V41 PDF] DeckGL loaded successfully")
       });
-      console.log(`[Viz V40 PDF] DeckGL instance created`);
+      console.log(`[Viz V41 PDF] DeckGL instance created`);
     } else {
-      console.log(`[Viz V40 PDF] Updating existing DeckGL instance...`);
+      console.log(`[Viz V41 PDF] Updating existing DeckGL instance...`);
       this._deck.setProps({
         layers: layers,
         mapStyle: config.map_style,
@@ -860,7 +869,7 @@ looker.plugins.visualizations.add({
         controller: true,
         onViewStateChange: onViewStateChange
       });
-      console.log(`[Viz V40 PDF] DeckGL props updated`);
+      console.log(`[Viz V41 PDF] DeckGL props updated`);
     }
   },
 
@@ -1161,20 +1170,19 @@ looker.plugins.visualizations.add({
 
       case 'icon':
         if (safePointData.length === 0) return null;
-        // FIXED: billboard: false makes icons respect 3D pitch
         return new deck.IconLayer({
           id: id,
           data: safePointData,
           pickable: true,
           opacity: opacity,
           iconAtlas: iconUrlOverride || ICONS['marker'],
-          iconMapping: { marker: { x: 0, y: 0, width: 24, height: 24, mask: false } },
+          iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
-          getSize: d => radius,
+          getSize: d => radius / 100,
           sizeScale: 1,
           sizeMinPixels: 20,
-          billboard: false, // FIXED: Respect pitch
+          billboard: false,
           autoHighlight: false,
           onClick: onClickHandler
         });
@@ -1224,20 +1232,15 @@ looker.plugins.visualizations.add({
     if (value === undefined || value === null) return '0';
     if (!formatStr) return this._formatNumber(value);
 
-    // Parse Looker format string more carefully
     let str = value.toString();
 
-    // Handle currency symbols
     if (formatStr.includes('$')) str = '$' + this._formatNumber(value);
     else if (formatStr.includes('€')) str = '€' + this._formatNumber(value);
     else if (formatStr.includes('£')) str = '£' + this._formatNumber(value);
-    // Handle percentages
     else if (formatStr.includes('%')) str = (value * 100).toFixed(1) + '%';
-    // Handle K/M abbreviations
     else if (formatStr.toLowerCase().includes('"k"') || formatStr.toLowerCase().includes('k')) {
       str = this._formatNumber(value);
     }
-    // Handle decimal places (e.g., "#,##0.00")
     else if (formatStr.includes('.')) {
       const decimals = (formatStr.split('.')[1] || '').replace(/[^0]/g, '').length;
       str = value.toLocaleString("en-US", {
@@ -1245,7 +1248,6 @@ looker.plugins.visualizations.add({
         maximumFractionDigits: decimals
       });
     }
-    // Default formatting
     else {
       str = this._formatNumber(value);
     }
