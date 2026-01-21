@@ -1,114 +1,90 @@
 /**
- * Multi-Layer 3D Map for Looker - v42 CRITICAL FIXES
+ * Multi-Layer 3D Map for Looker - v41 Critical Fixes
  *
- * UPDATES FROM v41:
- * ✅ FIXED: Tooltip total now correctly aggregates FILTERED dimension (not first row)
- * ✅ FIXED: All icons changed to PNG format (CORS-compatible Vecteezy URLs)
- * ✅ FIXED: Removed icon tilting (billboard=true) for proper rendering
- * ✅ FIXED: PDF/print mode background and SVG bitmap errors resolved
+ * UPDATES FROM v40:
+ * - FIXED: Tooltip total now correctly filtered by dimension (not grand total)
+ * - FIXED: SVG icons converted to PNG for deck.gl compatibility
+ * - FIXED: Icon dropdown sorted alphabetically with "Custom URL" at top
  */
 
-// --- CDN-HOSTED ICONS (PNG ONLY - CORS-COMPATIBLE VECTEEZY) ---
+// --- CDN-HOSTED ICONS (PNG ONLY - SVG causes deck.gl errors) ---
 const ICONS = {
   // === LOCATION & MAP ICONS ===
-  "marker": "https://static.vecteezy.com/system/resources/thumbnails/017/178/337/small/location-pin-icon-map-pointer-marker-on-transparent-background-free-png.png",
-  "map_pin": "https://static.vecteezy.com/system/resources/thumbnails/017/178/337/small/location-pin-icon-map-pointer-marker-on-transparent-background-free-png.png",
-  "location_pin": "https://static.vecteezy.com/system/resources/thumbnails/019/017/001/small/red-location-pin-icon-on-transparent-background-free-png.png",
-  "location_filled": "https://static.vecteezy.com/system/resources/thumbnails/019/017/001/small/red-location-pin-icon-on-transparent-background-free-png.png",
+  "marker": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/location-dot.svg",
+  "map_pin": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/map-pin.svg",
+  "location_pin": "https://em-content.zobj.net/thumbs/120/google/350/round-pushpin_1f4cd.png",
+  "location_filled": "https://em-content.zobj.net/thumbs/120/google/350/pushpin_1f4cc.png",
 
   // === BUSINESS & COMMERCE ===
-  "shop": "https://static.vecteezy.com/system/resources/thumbnails/011/999/270/small/3d-shop-store-icon-isolated-png.png",
-  "shopping_cart": "https://static.vecteezy.com/system/resources/thumbnails/012/176/021/small/shopping-cart-icon-illustration-isolated-png.png",
-  "building": "https://static.vecteezy.com/system/resources/thumbnails/019/017/058/small/building-icon-on-transparent-background-free-png.png",
-  "warehouse": "https://static.vecteezy.com/system/resources/thumbnails/012/176/018/small/warehouse-icon-illustration-isolated-png.png",
+  "shop": "https://em-content.zobj.net/thumbs/120/google/350/convenience-store_1f3ea.png",
+  "shopping_cart": "https://em-content.zobj.net/thumbs/120/google/350/shopping-cart_1f6d2.png",
+  "building": "https://em-content.zobj.net/thumbs/120/google/350/office-building_1f3e2.png",
+  "warehouse": "https://em-content.zobj.net/thumbs/120/google/350/department-store_1f3ec.png",
 
-  // === TRANSPORTATION (ALL PNG FROM VECTEEZY) ===
-  "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "truck_fast": "https://static.vecteezy.com/system/resources/thumbnails/012/986/755/small/delivery-truck-icon-fast-shipping-service-free-png.png",
-  "plane": "https://static.vecteezy.com/system/resources/thumbnails/019/017/042/small/airplane-icon-on-transparent-background-free-png.png",
-  "ship": "https://static.vecteezy.com/system/resources/thumbnails/027/400/567/small/cruise-ship-top-view-isolated-on-transparent-background-free-png.png",
-  "car": "https://static.vecteezy.com/system/resources/thumbnails/021/495/993/small/red-car-top-view-illustration-free-png.png",
-  "train": "https://static.vecteezy.com/system/resources/thumbnails/024/093/162/small/yellow-train-simple-icon-free-png.png",
+  // === TRANSPORTATION ===
+  "truck": "https://em-content.zobj.net/thumbs/120/google/350/delivery-truck_1f69a.png",
+  "truck_fast": "https://em-content.zobj.net/thumbs/120/google/350/racing-car_1f3ce-fe0f.png",
+  "plane": "https://em-content.zobj.net/thumbs/120/google/350/airplane_2708-fe0f.png",
+  "ship": "https://em-content.zobj.net/thumbs/120/google/350/ship_1f6a2.png",
+  "car": "https://em-content.zobj.net/thumbs/120/google/350/automobile_1f697.png",
+  "train": "https://em-content.zobj.net/thumbs/120/google/350/locomotive_1f682.png",
 
   // === STATUS & ALERTS ===
-  "warning": "https://static.vecteezy.com/system/resources/thumbnails/012/042/292/small/warning-sign-icon-transparent-background-free-png.png",
-  "warning_triangle": "https://static.vecteezy.com/system/resources/thumbnails/012/042/292/small/warning-sign-icon-transparent-background-free-png.png",
-  "alert": "https://static.vecteezy.com/system/resources/thumbnails/017/178/563/small/exclamation-mark-symbol-icon-on-transparent-background-free-png.png",
-  "info": "https://static.vecteezy.com/system/resources/thumbnails/019/016/991/small/information-icon-on-transparent-background-free-png.png",
-  "check": "https://static.vecteezy.com/system/resources/thumbnails/019/017/085/small/check-icon-on-transparent-background-free-png.png",
-  "error": "https://static.vecteezy.com/system/resources/thumbnails/019/017/012/small/cross-icon-on-transparent-background-free-png.png",
+  "warning": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
+  "warning_triangle": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
+  "alert": "https://em-content.zobj.net/thumbs/120/google/350/exclamation-mark_2757.png",
+  "info": "https://em-content.zobj.net/thumbs/120/google/350/information_2139-fe0f.png",
+  "check": "https://em-content.zobj.net/thumbs/120/google/350/check-mark_2714-fe0f.png",
+  "error": "https://em-content.zobj.net/thumbs/120/google/350/cross-mark_274c.png",
 
   // === SHAPES & BASIC ===
-  "circle": "https://static.vecteezy.com/system/resources/thumbnails/019/017/063/small/circle-icon-on-transparent-background-free-png.png",
-  "star": "https://static.vecteezy.com/system/resources/thumbnails/019/017/050/small/star-icon-on-transparent-background-free-png.png",
-  "star_outline": "https://static.vecteezy.com/system/resources/thumbnails/019/017/050/small/star-icon-on-transparent-background-free-png.png",
-  "square": "https://static.vecteezy.com/system/resources/thumbnails/019/017/063/small/circle-icon-on-transparent-background-free-png.png",
-  "heart": "https://static.vecteezy.com/system/resources/thumbnails/019/017/013/small/heart-icon-on-transparent-background-free-png.png",
-  "flag": "https://static.vecteezy.com/system/resources/thumbnails/019/017/028/small/flag-icon-on-transparent-background-free-png.png",
+  "circle": "https://em-content.zobj.net/thumbs/120/google/350/blue-circle_1f535.png",
+  "star": "https://em-content.zobj.net/thumbs/120/google/350/star_2b50.png",
+  "star_outline": "https://em-content.zobj.net/thumbs/120/google/350/white-medium-star_2b50.png",
+  "square": "https://em-content.zobj.net/thumbs/120/google/350/blue-square_1f7e6.png",
+  "heart": "https://em-content.zobj.net/thumbs/120/google/350/red-heart_2764-fe0f.png",
+  "flag": "https://em-content.zobj.net/thumbs/120/google/350/triangular-flag_1f6a9.png",
 
   // === INDUSTRY & FACILITIES ===
-  "factory": "https://static.vecteezy.com/system/resources/thumbnails/012/176/020/small/factory-icon-illustration-isolated-png.png",
-  "hospital": "https://static.vecteezy.com/system/resources/thumbnails/012/986/754/small/hospital-building-icon-free-png.png",
-  "school": "https://static.vecteezy.com/system/resources/thumbnails/011/999/271/small/3d-school-building-icon-isolated-png.png",
-  "hotel": "https://static.vecteezy.com/system/resources/thumbnails/012/986/747/small/hotel-building-icon-free-png.png",
-  "gas_station": "https://static.vecteezy.com/system/resources/thumbnails/019/017/031/small/gas-station-icon-on-transparent-background-free-png.png",
+  "factory": "https://em-content.zobj.net/thumbs/120/google/350/factory_1f3ed.png",
+  "hospital": "https://em-content.zobj.net/thumbs/120/google/350/hospital_1f3e5.png",
+  "school": "https://em-content.zobj.net/thumbs/120/google/350/school_1f3eb.png",
+  "hotel": "https://em-content.zobj.net/thumbs/120/google/350/hotel_1f3e8.png",
+  "gas_station": "https://em-content.zobj.net/thumbs/120/google/350/fuel-pump_26fd.png",
 
   // === PEOPLE & USERS ===
-  "user": "https://static.vecteezy.com/system/resources/thumbnails/019/017/046/small/user-icon-on-transparent-background-free-png.png",
-  "users": "https://static.vecteezy.com/system/resources/thumbnails/019/017/082/small/users-icon-on-transparent-background-free-png.png",
-  "person": "https://static.vecteezy.com/system/resources/thumbnails/019/017/046/small/user-icon-on-transparent-background-free-png.png",
+  "user": "https://em-content.zobj.net/thumbs/120/google/350/bust-in-silhouette_1f464.png",
+  "users": "https://em-content.zobj.net/thumbs/120/google/350/busts-in-silhouette_1f465.png",
+  "person": "https://em-content.zobj.net/thumbs/120/google/350/person_1f9d1.png",
 
   // === FOOD & DINING ===
-  "restaurant": "https://static.vecteezy.com/system/resources/thumbnails/012/986/752/small/restaurant-icon-free-png.png",
-  "coffee": "https://static.vecteezy.com/system/resources/thumbnails/019/017/009/small/coffee-icon-on-transparent-background-free-png.png",
-  "pizza": "https://static.vecteezy.com/system/resources/thumbnails/012/986/756/small/pizza-slice-icon-free-png.png",
+  "restaurant": "https://em-content.zobj.net/thumbs/120/google/350/fork-and-knife_1f374.png",
+  "coffee": "https://em-content.zobj.net/thumbs/120/google/350/hot-beverage_2615.png",
+  "pizza": "https://em-content.zobj.net/thumbs/120/google/350/pizza_1f355.png",
 
   // === NATURE & ENVIRONMENT ===
-  "tree": "https://static.vecteezy.com/system/resources/thumbnails/019/017/052/small/tree-icon-on-transparent-background-free-png.png",
-  "leaf": "https://static.vecteezy.com/system/resources/thumbnails/019/017/023/small/leaf-icon-on-transparent-background-free-png.png",
-  "mountain": "https://static.vecteezy.com/system/resources/thumbnails/019/017/038/small/mountain-icon-on-transparent-background-free-png.png",
-  "water": "https://static.vecteezy.com/system/resources/thumbnails/019/017/015/small/water-icon-on-transparent-background-free-png.png",
+  "tree": "https://em-content.zobj.net/thumbs/120/google/350/deciduous-tree_1f333.png",
+  "leaf": "https://em-content.zobj.net/thumbs/120/google/350/leaf-fluttering-in-wind_1f343.png",
+  "mountain": "https://em-content.zobj.net/thumbs/120/google/350/mountain_26f0-fe0f.png",
+  "water": "https://em-content.zobj.net/thumbs/120/google/350/droplet_1f4a7.png",
 
   // === TECHNOLOGY & DEVICES ===
-  "phone": "https://static.vecteezy.com/system/resources/thumbnails/019/017/041/small/phone-icon-on-transparent-background-free-png.png",
-  "computer": "https://static.vecteezy.com/system/resources/thumbnails/019/017/010/small/computer-icon-on-transparent-background-free-png.png",
-  "wifi": "https://static.vecteezy.com/system/resources/thumbnails/019/017/057/small/wifi-icon-on-transparent-background-free-png.png",
-  "signal": "https://static.vecteezy.com/system/resources/thumbnails/019/017/047/small/signal-icon-on-transparent-background-free-png.png",
+  "phone": "https://em-content.zobj.net/thumbs/120/google/350/telephone_260e-fe0f.png",
+  "computer": "https://em-content.zobj.net/thumbs/120/google/350/desktop-computer_1f5a5-fe0f.png",
+  "wifi": "https://em-content.zobj.net/thumbs/120/google/350/antenna-bars_1f4f6.png",
+  "signal": "https://em-content.zobj.net/thumbs/120/google/350/mobile-phone_1f4f1.png",
 
   // === FINANCIAL ===
-  "dollar": "https://static.vecteezy.com/system/resources/thumbnails/019/017/014/small/dollar-icon-on-transparent-background-free-png.png",
-  "euro": "https://static.vecteezy.com/system/resources/thumbnails/019/017/018/small/euro-icon-on-transparent-background-free-png.png",
-  "bank": "https://static.vecteezy.com/system/resources/thumbnails/012/986/748/small/bank-building-icon-free-png.png",
+  "dollar": "https://em-content.zobj.net/thumbs/120/google/350/dollar-banknote_1f4b5.png",
+  "euro": "https://em-content.zobj.net/thumbs/120/google/350/euro-banknote_1f4b6.png",
+  "bank": "https://em-content.zobj.net/thumbs/120/google/350/bank_1f3e6.png",
 
   // === WEATHER ===
-  "sun": "https://static.vecteezy.com/system/resources/thumbnails/019/017/049/small/sun-icon-on-transparent-background-free-png.png",
-  "cloud": "https://static.vecteezy.com/system/resources/thumbnails/019/017/008/small/cloud-icon-on-transparent-background-free-png.png",
-  "rain": "https://static.vecteezy.com/system/resources/thumbnails/019/017/044/small/rain-icon-on-transparent-background-free-png.png",
-  "snow": "https://static.vecteezy.com/system/resources/thumbnails/019/017/048/small/snow-icon-on-transparent-background-free-png.png"
+  "sun": "https://em-content.zobj.net/thumbs/120/google/350/sun_2600-fe0f.png",
+  "cloud": "https://em-content.zobj.net/thumbs/120/google/350/cloud_2601-fe0f.png",
+  "rain": "https://em-content.zobj.net/thumbs/120/google/350/cloud-with-rain_1f327-fe0f.png",
+  "snow": "https://em-content.zobj.net/thumbs/120/google/350/snowflake_2744-fe0f.png"
 };
-
-// === ICON PRELOAD HELPER (PNG ONLY) ===
-function preloadImage(presetKey, customUrl) {
-  return new Promise((resolve, reject) => {
-    const url = (presetKey === 'custom' && customUrl) ? customUrl : ICONS[presetKey];
-    if (!url) {
-      console.warn(`[Viz V42] No icon URL for preset=${presetKey}`);
-      return resolve(null);
-    }
-
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      console.log(`[Viz V42] Icon loaded: ${url}`);
-      resolve(url);
-    };
-    img.onerror = () => {
-      console.error(`[Viz V42] Failed to load icon: ${url}`);
-      resolve(null);
-    };
-    img.src = url;
-  });
-}
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
 const getLayerOptions = (n) => {
@@ -122,114 +98,302 @@ const getLayerOptions = (n) => {
   const b = 100 + (n * 100);
 
   return {
-    [`layer${n}_enabled`]: { type: "boolean", label: "Enable Layer " + n, default: n === 1, section: "Layers", order: b },
+    [`layer${n}_divider_top`]: {
+      type: "string",
+      label: `────────── LAYER ${n} ──────────`,
+      display: "divider",
+      section: "Layers",
+      order: b + 1
+    },
+    [`layer${n}_enabled`]: {
+      type: "boolean",
+      label: `Enable Layer ${n}`,
+      default: n <= 2,
+      section: "Layers",
+      order: b + 2
+    },
     [`layer${n}_type`]: {
-      label: "L" + n + " Type", type: "string", display: "select", default: def.type, section: "Layers", order: b + 1,
+      type: "string",
+      label: `Layer ${n} Type`,
+      display: "select",
       values: [
         { "Choropleth (Region Only)": "geojson" },
-        { "3D Column (Bar)": "column" },
-        { "Point (Scatter)": "point" },
-        { "Bubble (Proportional)": "bubble" },
-        { "Icon": "icon" },
-        { "Heatmap": "heatmap" },
-        { "3D Hexagon": "hexagon" }
-      ]
+        { "3D Columns": "column" },
+        { "Points (Fixed Size)": "point" },
+        { "Bubbles (Value Size)": "bubble" },
+        { "Icon (Image)": "icon" },
+        { "Clustered Hexagons (Sum Density)": "hexagon" },
+        { "Heatmap (Sum Density)": "heatmap" }
+      ],
+      default: def.type,
+      section: "Layers",
+      order: b + 3
     },
     [`layer${n}_dimension_idx`]: {
-      label: "L" + n + " Dimension Indices (Comma Sep)",
-      type: "string", default: "0", placeholder: "0,1", section: "Layers", order: b + 2
+      type: "string",
+      label: `L${n} Dimension Indices (Comma sep)`,
+      default: "0",
+      section: "Layers",
+      order: b + 4,
+      placeholder: "e.g. 0 or 0,1"
     },
     [`layer${n}_measure_idx`]: {
-      label: "L" + n + " Measure Indices (Comma Sep)",
-      type: "string", default: (n - 1).toString(), placeholder: "0,1", section: "Layers", order: b + 3
+      type: "string",
+      label: `L${n} Measure Indices (Comma sep)`,
+      default: `${n - 1}`,
+      section: "Layers",
+      order: b + 5,
+      placeholder: "e.g. 0 or 0,1 (Sums values)"
     },
-    [`layer${n}_show_all_pivots`]: { type: "boolean", label: "L" + n + " Show All Pivots", default: false, section: "Layers", order: b + 4 },
-    [`layer${n}_pivot_idx`]: { type: "number", label: "L" + n + " Pivot Column Index", default: 0, section: "Layers", order: b + 5 },
-    [`layer${n}_use_gradient`]: { type: "boolean", label: "L" + n + " Use Gradient", default: false, section: "Layers", order: b + 6 },
-    [`layer${n}_color_main`]: { type: "string", label: "L" + n + " Color (Start)", display: "color", default: def.color, section: "Layers", order: b + 7 },
-    [`layer${n}_gradient_end`]: { type: "string", label: "L" + n + " Gradient End Color", display: "color", default: "#FFEB3B", section: "Layers", order: b + 8 },
-    [`layer${n}_radius`]: { type: "number", label: "L" + n + " Radius / Size", default: def.radius, section: "Layers", order: b + 9 },
-    [`layer${n}_height`]: { type: "number", label: "L" + n + " Height (3D)", default: def.height, section: "Layers", order: b + 10 },
-    [`layer${n}_opacity`]: { type: "number", label: "L" + n + " Opacity", default: 0.7, display_size: "half", section: "Layers", order: b + 11 },
+    [`layer${n}_show_all_pivots`]: {
+      type: "boolean",
+      label: `L${n} Show All Pivot Values`,
+      default: true,
+      section: "Layers",
+      order: b + 6
+    },
+    [`layer${n}_pivot_idx`]: {
+      type: "number",
+      label: `L${n} Pivot Column Index (if Show All=False)`,
+      default: 0,
+      section: "Layers",
+      order: b + 7,
+      placeholder: "0 = 1st pivot col"
+    },
+    [`layer${n}_z_index`]: {
+      type: "number",
+      label: `L${n} Layer Order (Z-Index)`,
+      default: n,
+      section: "Layers",
+      placeholder: "Higher # is on top",
+      order: b + 8
+    },
+    [`layer${n}_use_gradient`]: {
+      type: "boolean",
+      label: `L${n} Use Gradient?`,
+      default: false,
+      section: "Layers",
+      order: b + 9
+    },
+    [`layer${n}_color_main`]: {
+      type: "string",
+      label: `L${n} Color (Start / Low Density)`,
+      display: "color",
+      default: def.color,
+      section: "Layers",
+      order: b + 10
+    },
+    [`layer${n}_gradient_end`]: {
+      type: "string",
+      label: `L${n} Gradient End (High Density)`,
+      display: "color",
+      default: "#1B5E20",
+      section: "Layers",
+      order: b + 11
+    },
+    [`layer${n}_radius`]: {
+      type: "number",
+      label: `L${n} Radius / Size`,
+      default: def.radius,
+      section: "Layers",
+      order: b + 12
+    },
+    [`layer${n}_height`]: {
+      type: "number",
+      label: `L${n} Height (3D)`,
+      default: def.height,
+      section: "Layers",
+      order: b + 13
+    },
+    [`layer${n}_opacity`]: {
+      type: "number",
+      label: `L${n} Opacity`,
+      default: 0.7,
+      min: 0, max: 1, step: 0.1,
+      section: "Layers",
+      order: b + 14
+    },
     [`layer${n}_icon_type`]: {
-      label: "L" + n + " Icon Preset", type: "string", display: "select", default: "marker", section: "Layers", order: b + 12,
+      type: "string",
+      label: `L${n} Icon Preset`,
+      display: "select",
       values: [
         { "Custom URL": "custom" },
-        { "───────────": "divider" },
-        ...Object.keys(ICONS).sort().map(k => ({ [k.replace(/_/g, ' ')]: k }))
-      ]
+        { "Alert": "alert" },
+        { "Bank": "bank" },
+        { "Building": "building" },
+        { "Car": "car" },
+        { "Check/Success": "check" },
+        { "Circle": "circle" },
+        { "Cloud": "cloud" },
+        { "Coffee": "coffee" },
+        { "Computer": "computer" },
+        { "Dollar": "dollar" },
+        { "Error": "error" },
+        { "Euro": "euro" },
+        { "Factory": "factory" },
+        { "Flag": "flag" },
+        { "Gas Station": "gas_station" },
+        { "Heart": "heart" },
+        { "Hospital": "hospital" },
+        { "Hotel": "hotel" },
+        { "Info": "info" },
+        { "Leaf": "leaf" },
+        { "Location Filled": "location_filled" },
+        { "Location Pin": "location_pin" },
+        { "Map Pin": "map_pin" },
+        { "Marker": "marker" },
+        { "Mountain": "mountain" },
+        { "Person": "person" },
+        { "Phone": "phone" },
+        { "Pizza": "pizza" },
+        { "Plane": "plane" },
+        { "Rain": "rain" },
+        { "Restaurant": "restaurant" },
+        { "School": "school" },
+        { "Ship": "ship" },
+        { "Shop/Store": "shop" },
+        { "Shopping Cart": "shopping_cart" },
+        { "Signal": "signal" },
+        { "Snow": "snow" },
+        { "Square": "square" },
+        { "Star": "star" },
+        { "Star Outline": "star_outline" },
+        { "Sun": "sun" },
+        { "Train": "train" },
+        { "Tree": "tree" },
+        { "Truck": "truck" },
+        { "Truck Fast": "truck_fast" },
+        { "User": "user" },
+        { "Users": "users" },
+        { "Warehouse": "warehouse" },
+        { "Warning": "warning" },
+        { "Warning Triangle": "warning_triangle" },
+        { "Water": "water" },
+        { "WiFi": "wifi" }
+      ],
+      default: "marker",
+      section: "Layers",
+      order: b + 15
     },
-    [`layer${n}_icon_url`]: { type: "string", label: "L" + n + " Icon URL (if Custom)", default: "", placeholder: "https://...", section: "Layers", order: b + 13 }
+    [`layer${n}_icon_url`]: {
+      type: "string",
+      label: `L${n} Custom Icon URL`,
+      default: "",
+      placeholder: "https://...",
+      section: "Layers",
+      order: b + 16
+    }
   };
 };
 
-// --- HELPER: AGGREGATE DIMENSION TOTAL ---
-function aggregateDimensionTotal(data, dimensionValues, measureIndex) {
-  let total = 0;
-  data.forEach(row => {
-    const rowDims = dimensionValues.map((dimVal, dimIdx) => {
-      const dimName = Object.keys(row)[dimIdx];
-      return row[dimName] ? row[dimName].value : '';
-    });
-
-    const matchesDimension = dimensionValues.every((dimVal, dimIdx) => {
-      return rowDims[dimIdx] === dimVal;
-    });
-
-    if (matchesDimension) {
-      const measureName = Object.keys(row).find((k, idx) => idx === measureIndex);
-      const measureValue = row[measureName] ? parseFloat(row[measureName].value) : 0;
-      total += measureValue || 0;
-    }
+// --- HELPER: PRELOADER ---
+const preloadImage = (type, customUrl) => {
+  return new Promise((resolve) => {
+    let url = ICONS[type] || customUrl;
+    if (url && url.startsWith("data:")) return resolve(url);
+    if (!url || url.length < 5) return resolve(ICONS['marker']);
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => resolve(url);
+    img.onerror = () => {
+      console.warn(`[Viz V41] Failed to load icon: ${url}`);
+      resolve(ICONS['marker']);
+    };
+    img.src = url;
   });
-  return total;
-}
+};
 
-// --- VISUALIZATION DEFINITION ---
 looker.plugins.visualizations.add({
-  id: "combo_map_3d_mapbox",
-  label: "Combo Map 3D (v42)",
+  id: "combo_map_ultimate_v41",
+  label: "Combo Map 3D (V41 Fixed)",
   options: {
     // --- 1. PLOT TAB ---
+    region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
+
     data_mode: {
-      type: "string", label: "Data Mode", display: "select", default: "regions", section: "Plot", order: 1,
-      values: [{ "Regions (GeoJSON)": "regions" }, { "Points (Lat/Lng)": "points" }]
+      type: "string",
+      label: "Data Mode",
+      display: "select",
+      values: [
+        { "Region Data (Names)": "regions" },
+        { "Point Data (Lat/Lng)": "points" }
+      ],
+      default: "regions",
+      section: "Plot",
+      order: 2
     },
     map_layer_source: {
-      type: "string", label: "Map Layer Source", display: "select", default: "world_countries", section: "Plot", order: 2,
+      type: "string",
+      label: "Region Map Source",
+      display: "select",
       values: [
         { "Custom URL": "custom" },
         { "World Countries": "world_countries" },
-        { "US States": "us_states" },
+        { "USA States": "us_states" },
+        { "Europe Major Combined": "combined_europe_major" },
         { "France Regions": "france_regions" },
-        { "UK Regions": "uk_regions" },
         { "Germany States": "germany_states" },
-        { "Spain Communities": "spain_communities" },
-        { "Combined Europe (FR+DE+UK+ES+IT)": "combined_europe_major" }
-      ]
+        { "UK Regions": "uk_regions" },
+        { "Spain Communities": "spain_communities" }
+      ],
+      default: "combined_europe_major",
+      section: "Plot",
+      order: 3
     },
-    custom_geojson_url: { type: "string", label: "Custom GeoJSON URL", default: "", placeholder: "https://...", section: "Plot", order: 3 },
+    custom_geojson_url: {
+      type: "string",
+      label: "Custom GeoJSON URL",
+      section: "Plot",
+      placeholder: "https://...",
+      order: 4
+    },
+
+    // --- BASE MAP ---
+    map_header: { type: "string", label: "─── BASE MAP ───", display: "divider", section: "Plot", order: 10 },
+
+    mapbox_token: {
+      type: "string",
+      label: "Mapbox Token (Required)",
+      section: "Plot",
+      placeholder: "pk.eyJ1...",
+      order: 11
+    },
     map_style: {
-      type: "string", label: "Map Style", display: "select", default: "mapbox://styles/mapbox/dark-v10", section: "Plot", order: 4,
+      type: "string",
+      label: "Map Style",
+      display: "select",
       values: [
-        { "Dark": "mapbox://styles/mapbox/dark-v10" },
-        { "Light": "mapbox://styles/mapbox/light-v10" },
-        { "Streets": "mapbox://styles/mapbox/streets-v11" },
-        { "Satellite": "mapbox://styles/mapbox/satellite-v9" },
-        { "Satellite Streets": "mapbox://styles/mapbox/satellite-streets-v11" },
-        { "Outdoors": "mapbox://styles/mapbox/outdoors-v11" },
-        { "Navigation Day": "mapbox://styles/mapbox/navigation-day-v1" },
-        { "Navigation Night": "mapbox://styles/mapbox/navigation-night-v1" }
-      ]
+        { "Dark": "mapbox://styles/mapbox/dark-v11" },
+        { "Light": "mapbox://styles/mapbox/light-v11" },
+        { "Streets": "mapbox://styles/mapbox/streets-v12" },
+        { "Satellite": "mapbox://styles/mapbox/satellite-streets-v12" }
+      ],
+      default: "mapbox://styles/mapbox/dark-v11",
+      section: "Plot",
+      order: 12
     },
-    mapbox_token: { type: "string", label: "Mapbox Token", default: "", placeholder: "pk.ey...", section: "Plot", order: 5 },
-    center_lat: { type: "number", label: "Center Latitude", default: 46, section: "Plot", order: 6 },
-    center_lng: { type: "number", label: "Center Longitude", default: 2, section: "Plot", order: 7 },
-    zoom: { type: "number", label: "Zoom Level", default: 4, section: "Plot", order: 8 },
-    pitch: { type: "number", label: "Pitch (Tilt)", default: 45, section: "Plot", order: 9 },
+    center_lat: { type: "number", label: "Latitude", default: 46, section: "Plot", order: 13 },
+    center_lng: { type: "number", label: "Longitude", default: 2, section: "Plot", order: 14 },
+    zoom: { type: "number", label: "Zoom", default: 4, section: "Plot", order: 15 },
+    pitch: { type: "number", label: "3D Tilt (0-60)", default: 45, section: "Plot", order: 16 },
+
+    // --- TOOLTIP ---
+    tooltip_header: { type: "string", label: "─── TOOLTIP ───", display: "divider", section: "Plot", order: 20 },
+
     tooltip_mode: {
-      type: "string", label: "Tooltip Mode", display: "select", default: "all", section: "Plot", order: 10,
-      values: [{ "Name + Values": "all" }, { "Name Only": "name" }, { "Values Only": "values" }]
+      type: "string",
+      label: "Tooltip Content",
+      display: "select",
+      values: [
+        { "Name & Values": "all" },
+        { "Name Only": "name" },
+        { "Values Only": "values" },
+        { "None": "none" }
+      ],
+      default: "all",
+      section: "Plot",
+      order: 21
     },
     tooltip_bg_color: {
       type: "string",
@@ -237,7 +401,7 @@ looker.plugins.visualizations.add({
       display: "color",
       default: "#FFFFFF",
       section: "Plot",
-      order: 11
+      order: 22
     },
 
     // --- 2. LAYERS TAB ---
@@ -281,7 +445,6 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
-    this._rawData = null; // Store raw data for dimension filtering
   },
 
   destroy: function () {
@@ -290,32 +453,30 @@ looker.plugins.visualizations.add({
       this._deck = null;
     }
     this._geojsonCache = {};
-    this._rawData = null;
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V42] ========== UPDATE ASYNC START ==========`);
-    console.log(`[Viz V42] Rows: ${data.length} | Print Mode: ${isPrint}`);
-    console.log(`[Viz V42] Details Object:`, details);
-    console.log(`[Viz V42] Config Token Present: ${!!config.mapbox_token}`);
-    console.log(`[Viz V42] Token Length: ${config.mapbox_token ? config.mapbox_token.length : 0}`);
+    console.log(`[Viz V41] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V41] Rows: ${data.length} | Print Mode: ${isPrint}`);
+    console.log(`[Viz V41] Details Object:`, details);
+    console.log(`[Viz V41] Config Token Present: ${!!config.mapbox_token}`);
+    console.log(`[Viz V41] Token Length: ${config.mapbox_token ? config.mapbox_token.length : 0}`);
 
     this.clearErrors();
-    this._rawData = data; // Store for tooltip aggregation
 
     if (!config.mapbox_token) {
-      console.error(`[Viz V42 PDF] MISSING TOKEN - Showing error overlay`);
+      console.error(`[Viz V41 PDF] MISSING TOKEN - Showing error overlay`);
       this._tokenError.style.display = 'block';
       done();
       return;
     } else {
-      console.log(`[Viz V42 PDF] Token validated, hiding error overlay`);
+      console.log(`[Viz V41 PDF] Token validated, hiding error overlay`);
       this._tokenError.style.display = 'none';
     }
 
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
-      console.error(`[Viz V42 PDF] Missing dependencies - deck: ${typeof deck}, mapboxgl: ${typeof mapboxgl}`);
+      console.error(`[Viz V41 PDF] Missing dependencies - deck: ${typeof deck}, mapboxgl: ${typeof mapboxgl}`);
       this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
       done();
       return;
@@ -338,27 +499,27 @@ looker.plugins.visualizations.add({
       ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
-      console.log(`[Viz V42 PDF] Data prepared, rendering layers...`);
+      console.log(`[Viz V41 PDF] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
-        console.log(`[Viz V42 PDF] Print mode detected - forcing redraw`);
+        console.log(`[Viz V41 PDF] Print mode detected - forcing redraw`);
         if (this._deck) {
           this._deck.redraw(true);
-          console.log(`[Viz V42 PDF] Redraw triggered`);
+          console.log(`[Viz V41 PDF] Redraw triggered`);
         }
         setTimeout(() => {
-          console.log(`[Viz V42 PDF] Print timeout complete, calling done()`);
+          console.log(`[Viz V41 PDF] Print timeout complete, calling done()`);
           done();
         }, 3000);
       } else {
-        console.log(`[Viz V42] Interactive mode - calling done() immediately`);
+        console.log(`[Viz V41] Interactive mode - calling done() immediately`);
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V42] FATAL ERROR:", err);
-      console.error("[Viz V42] Error Stack:", err.stack);
+      console.error("[Viz V41] FATAL ERROR:", err);
+      console.error("[Viz V41] Error Stack:", err.stack);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -408,7 +569,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V42] GeoJSON load failed:", error);
+      console.warn("[Viz V41] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -438,114 +599,155 @@ looker.plugins.visualizations.add({
       };
     }
 
-    // 2. WITH PIVOT
+    // 2. PIVOTED
     const pivotData = {};
-    measures.forEach(m => {
+    measures.forEach((m) => {
       pivotData[m.name] = {};
-      pivotKeys.forEach(pk => {
-        const compKey = `${m.name}.${pk}`;
-        if (row[compKey]) {
-          pivotData[m.name][pk] = {
-            value: parseFloat(row[compKey].value) || 0,
-            formatted: row[compKey].rendered || row[compKey].value,
-            links: row[compKey].links || []
-          };
-        }
-      });
+      const measureCell = row[m.name];
+      if (measureCell && typeof measureCell === 'object') {
+        pivotKeys.forEach((pivotKey) => {
+          const pivotCell = measureCell[pivotKey];
+          if (pivotCell) {
+            pivotData[m.name][pivotKey] = {
+              value: parseFloat(pivotCell.value) || 0,
+              formatted: pivotCell.rendered || pivotCell.value || '0',
+              links: pivotCell.links || []
+            };
+          } else {
+            pivotData[m.name][pivotKey] = { value: 0, formatted: '0', links: [] };
+          }
+        });
+      }
     });
 
-    let summedValues = measures.map(m => {
-      let sum = 0;
+    const values = [];
+    measures.forEach((m) => {
+      let total = 0;
       pivotKeys.forEach(pk => {
-        if (pivotData[m.name][pk]) sum += pivotData[m.name][pk].value;
+        if (pivotData[m.name] && pivotData[m.name][pk]) {
+          total += pivotData[m.name][pk].value;
+        }
       });
-      return sum;
+      values.push(total);
     });
 
     return {
-      values: summedValues,
-      formattedValues: measures.map(() => ''),
+      values,
+      formattedValues: values.map(v => v.toString()),
       drillLinks: [],
       dimensionValues: dims.map(d => row[d.name] ? row[d.name].value : ''),
-      pivotData: pivotData
+      pivotData
     };
   },
 
   // --- BUILD DATA MAPS ---
   _buildDataMaps: function (data, dims, measures) {
-    if (!dims || dims.length === 0) return [];
-    return dims.map((dim, dimIdx) => {
-      const map = {};
+    const dataMaps = {};
+
+    dims.forEach((dim, dimIdx) => {
+      dataMaps[dimIdx] = {};
       data.forEach((row, rowIdx) => {
-        const val = row[dim.name] ? row[dim.name].value : null;
-        if (!val) return;
-        const key = this._normalizeName(val);
-        const extracted = this._extractRowData(row, measures, dims, rowIdx);
-        map[key] = { ...extracted, rowIndex: rowIdx, originalName: val };
+        const rawName = row[dim.name] ? row[dim.name].value : null;
+
+        if (rawName) {
+          const clean = this._normalizeName(rawName);
+          const rowData = this._extractRowData(row, measures, dims, rowIdx);
+
+          if (dataMaps[dimIdx][clean]) {
+            const existing = dataMaps[dimIdx][clean];
+            existing.values = existing.values.map((v, i) => v + (rowData.values[i] || 0));
+
+            if (rowData.pivotData && existing.pivotData) {
+              Object.keys(rowData.pivotData).forEach(mName => {
+                Object.keys(rowData.pivotData[mName]).forEach(pk => {
+                  if (!existing.pivotData[mName]) existing.pivotData[mName] = {};
+                  if (!existing.pivotData[mName][pk]) {
+                    existing.pivotData[mName][pk] = { ...rowData.pivotData[mName][pk] };
+                  } else {
+                    existing.pivotData[mName][pk].value += rowData.pivotData[mName][pk].value;
+                    if (rowData.pivotData[mName][pk].links) {
+                        existing.pivotData[mName][pk].links.push(...rowData.pivotData[mName][pk].links);
+                    }
+                  }
+                });
+              });
+            }
+            if (rowData.drillLinks) {
+                rowData.drillLinks.forEach((lArr, i) => {
+                    if (lArr && lArr.length) {
+                        if (!existing.drillLinks[i]) existing.drillLinks[i] = [];
+                        existing.drillLinks[i].push(...lArr);
+                    }
+                });
+            }
+
+          } else {
+            dataMaps[dimIdx][clean] = {
+                ...rowData,
+                drillLinks: rowData.drillLinks ? rowData.drillLinks.map(l => [...l]) : [],
+                rawName: rawName
+            };
+          }
+        }
       });
-      return map;
     });
+    return dataMaps;
   },
 
   // --- RENDER ---
   _render: function (processed, config, queryResponse, details, loadedIcons) {
-    console.log(`[Viz V42 PDF] _render() called - Building layers...`);
-
-    const layers = [];
-    const iconUrlsDict = {};
-    let iconIdx = 0;
+    console.log(`[Viz V41 PDF] _render() called - Building layers...`);
+    const layerObjects = [];
+    let iconIndex = 0;
 
     for (let i = 1; i <= 4; i++) {
-      if (!config[`layer${i}_enabled`]) continue;
-      let iconOverride = null;
-      if (config[`layer${i}_type`] === 'icon') {
-        iconOverride = loadedIcons[iconIdx] || ICONS['marker'];
-        iconUrlsDict[i] = iconOverride;
-        iconIdx++;
-      }
-      const layer = this._buildSingleLayer(i, config, processed, iconOverride);
-      if (layer) {
-        console.log(`[Viz V42 PDF] Layer ${i} (${config[`layer${i}_type`]}) built successfully`);
-        layers.push(layer);
+      const enabled = config[`layer${i}_enabled`];
+      const type = config[`layer${i}_type`];
+
+      if (enabled) {
+        try {
+          let iconUrlOverride = null;
+          if (type === 'icon') {
+            iconUrlOverride = loadedIcons[iconIndex] || ICONS['marker'];
+            iconIndex++;
+          }
+          const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
+          if (layer) {
+            const z = Number(config[`layer${i}_z_index`]) || i;
+            layerObjects.push({ layer: layer, zIndex: z });
+            console.log(`[Viz V41 PDF] Layer ${i} (${type}) built successfully`);
+          }
+        } catch (e) {
+          console.error(`[Viz V41] Layer ${i} Error:`, e);
+        }
       }
     }
 
-    console.log(`[Viz V42 PDF] Total layers rendered: ${layers.length}`);
+    layerObjects.sort((a, b) => a.zIndex - b.zIndex);
+    const layers = layerObjects.map(obj => obj.layer);
+    console.log(`[Viz V41 PDF] Total layers rendered: ${layers.length}`);
 
-    // --- TOOLTIP ---
-    const getTooltip = ({ object }) => {
-      if (!object) return null;
+    // --- TOOLTIP (FIXED: Dimension-filtered total calculation) ---
+    const getTooltip = ({ object, layer }) => {
+      if (!object || config.tooltip_mode === 'none') return null;
 
-      let name = "Unknown";
-      let values = [];
-      let formattedValues = [];
-      let pivotData = null;
-      let showAllPivots = false;
-      let pivotIdx = 0;
-      let allowedMeasures = null;
-      let dimensionValues = [];
+      const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
+      const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
+      const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
+      const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
 
-      if (object.feature && object.feature.properties) {
-        const props = object.feature.properties;
-        name = props._name || props.name || "Region";
-        values = props._values || [];
-        pivotData = props._pivotData;
-        allowedMeasures = props._allowedMeasures;
-        dimensionValues = props._dimensionValues || [];
-      } else if (object.properties) {
-        const props = object.properties;
-        name = props._name || props.name || "Point";
-        values = props._values || [];
-        pivotData = props._pivotData;
-        allowedMeasures = props._allowedMeasures;
-        dimensionValues = props._dimensionValues || [];
-      } else if (object.values !== undefined) {
-        name = object.name || "Point";
+      let name, values, pivotData, allowedMeasures;
+
+      if (object.properties && object.properties._name) {
+        name = object.properties._name;
+        values = object.properties._values;
+        pivotData = object.properties._pivotData;
+        allowedMeasures = object.properties._allowedMeasures;
+      } else if (object.name && object.values) {
+        name = object.name;
         values = object.values;
-        formattedValues = object.formattedValues;
         pivotData = object.pivotData;
         allowedMeasures = object.allowedMeasures;
-        dimensionValues = object.dimensionValues || [];
       } else {
         return null;
       }
@@ -566,14 +768,12 @@ looker.plugins.visualizations.add({
             html += `<div class="pivot-section">`;
 
             if (showAllPivots) {
-              // ✅ FIXED: Aggregate dimension-filtered total
+              // FIXED: Recalculate dimension-filtered total
               let dimensionFilteredTotal = 0;
-
               this._pivotInfo.pivotKeys.forEach((pk, pIdx) => {
                 const pivotLabel = this._pivotInfo.pivotLabels[pIdx] || pk;
                 const pData = pivotData[m.name] && pivotData[m.name][pk];
                 let val = pData ? pData.formatted : '0';
-
                 if (pData) {
                   dimensionFilteredTotal += pData.value;
                   if (!pData.formatted) val = this._applyLookerFormat(pData.value, m.value_format);
@@ -634,7 +834,7 @@ looker.plugins.visualizations.add({
         transitionDuration: (details && details.print) ? 0 : 500
       };
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
-      console.log(`[Viz V42 PDF] ViewState initialized:`, this._viewState);
+      console.log(`[Viz V41 PDF] ViewState initialized:`, this._viewState);
     }
 
     const onViewStateChange = ({ viewState }) => {
@@ -643,7 +843,7 @@ looker.plugins.visualizations.add({
     };
 
     if (!this._deck) {
-      console.log(`[Viz V42 PDF] Creating new DeckGL instance...`);
+      console.log(`[Viz V41 PDF] Creating new DeckGL instance...`);
       this._deck = new deck.DeckGL({
         container: this._container,
         mapStyle: config.map_style,
@@ -654,12 +854,12 @@ looker.plugins.visualizations.add({
         layers: layers,
         getTooltip: getTooltip,
         glOptions: { preserveDrawingBuffer: true, willReadFrequently: true },
-        onError: (err) => console.warn("[Viz V42 DeckGL Error]:", err),
-        onLoad: () => console.log("[Viz V42 PDF] DeckGL loaded successfully")
+        onError: (err) => console.warn("[Viz V41 DeckGL Error]:", err),
+        onLoad: () => console.log("[Viz V41 PDF] DeckGL loaded successfully")
       });
-      console.log(`[Viz V42 PDF] DeckGL instance created`);
+      console.log(`[Viz V41 PDF] DeckGL instance created`);
     } else {
-      console.log(`[Viz V42 PDF] Updating existing DeckGL instance...`);
+      console.log(`[Viz V41 PDF] Updating existing DeckGL instance...`);
       this._deck.setProps({
         layers: layers,
         mapStyle: config.map_style,
@@ -669,7 +869,7 @@ looker.plugins.visualizations.add({
         controller: true,
         onViewStateChange: onViewStateChange
       });
-      console.log(`[Viz V42 PDF] DeckGL props updated`);
+      console.log(`[Viz V41 PDF] DeckGL props updated`);
     }
   },
 
@@ -750,46 +950,46 @@ looker.plugins.visualizations.add({
 
       if (!pivotInfo.hasPivot && drillLinks) {
         measureIndices.forEach(mIdx => {
-          if (drillLinks[mIdx]) finalLinks.push(...drillLinks[mIdx]);
+            if (drillLinks[mIdx]) finalLinks.push(...drillLinks[mIdx]);
         });
       }
       else if (pivotInfo.hasPivot && pivotData) {
         measureIndices.forEach(mIdx => {
-          const mName = measures[mIdx] ? measures[mIdx].name : null;
-          if (!mName || !pivotData[mName]) return;
+            const mName = measures[mIdx] ? measures[mIdx].name : null;
+            if (!mName || !pivotData[mName]) return;
 
-          if (showAllPivots) {
-            Object.values(pivotData[mName]).forEach(pVal => {
-              if (pVal.links) finalLinks.push(...pVal.links);
-            });
-          } else {
-            const pKey = pivotInfo.pivotKeys[pivotIdx];
-            if (pKey && pivotData[mName][pKey] && pivotData[mName][pKey].links) {
-              finalLinks.push(...pivotData[mName][pKey].links);
+            if (showAllPivots) {
+                Object.values(pivotData[mName]).forEach(pVal => {
+                    if (pVal.links) finalLinks.push(...pVal.links);
+                });
+            } else {
+                const pKey = pivotInfo.pivotKeys[pivotIdx];
+                if (pKey && pivotData[mName][pKey] && pivotData[mName][pKey].links) {
+                    finalLinks.push(...pivotData[mName][pKey].links);
+                }
             }
-          }
         });
       }
 
       finalLinks = finalLinks.map((link, linkIdx) => {
-        const measureIdx = measureIndices[Math.floor(linkIdx / (finalLinks.length / measureIndices.length))];
-        const measure = measures[measureIdx];
+          const measureIdx = measureIndices[Math.floor(linkIdx / (finalLinks.length / measureIndices.length))];
+          const measure = measures[measureIdx];
 
-        return {
-          ...link,
-          label: link.label || (measure ? measure.label_short || measure.label : "Show All")
-        };
+          return {
+              ...link,
+              label: link.label || (measure ? measure.label_short || measure.label : "Show All")
+          };
       });
 
       if (finalLinks.length > 0) {
         LookerCharts.Utils.openDrillMenu({
-          links: finalLinks,
-          event: {
-            pageX: info.x,
-            pageY: info.y,
-            clientX: info.x,
-            clientY: info.y
-          }
+            links: finalLinks,
+            event: {
+                pageX: info.x,
+                pageY: info.y,
+                clientX: info.x,
+                clientY: info.y
+            }
         });
       }
     };
@@ -800,17 +1000,53 @@ looker.plugins.visualizations.add({
         const dataMap = processed.dataMaps ? processed.dataMaps[dimIdx] : null;
         if (!dataMap) return;
 
-        processed.geojson.features.forEach(feature => {
-          const propName = feature.properties.name || feature.properties.NAME;
-          const normName = this._normalizeName(propName);
-          const entry = dataMap[normName];
+        if (processed.geojson && processed.geojson.features) {
+          processed.geojson.features.forEach(feature => {
+            const props = feature.properties;
+            let match = null;
+            for (let key in props) {
+              if (props[key]) {
+                const cleanProp = this._normalizeName(props[key]);
+                if (dataMap[cleanProp]) {
+                  match = dataMap[cleanProp];
+                  break;
+                }
+              }
+            }
+            if (match) {
+              pointData.push({
+                position: this._getCentroid(feature.geometry),
+                values: match.values,
+                pivotData: match.pivotData,
+                drillLinks: match.drillLinks,
+                name: match.rawName,
+                feature: feature,
+                allowedMeasures: measureIndices
+              });
+            }
+          });
+        }
 
-          if (entry) {
+        Object.keys(dataMap).forEach(key => {
+          const item = dataMap[key];
+          let pos = [0, 0];
+          if (Array.isArray(item.rawName) && item.rawName.length === 2) {
+            pos = [Number(item.rawName[1]), Number(item.rawName[0])];
+          } else if (typeof item.rawName === 'string' && item.rawName.includes(',')) {
+            const parts = item.rawName.split(',');
+            if (parts.length === 2) {
+              pos = [parseFloat(parts[1]), parseFloat(parts[0])];
+            }
+          }
+
+          if (pos[0] || pos[1]) {
             pointData.push({
-              position: this._getCentroid(feature.geometry),
-              ...entry,
-              name: entry.originalName || propName,
-              feature: feature,
+              position: pos,
+              values: item.values,
+              pivotData: item.pivotData,
+              drillLinks: item.drillLinks,
+              name: item.rawName.toString(),
+              feature: null,
               allowedMeasures: measureIndices
             });
           }
@@ -832,7 +1068,6 @@ looker.plugins.visualizations.add({
       d.feature.properties._drillLinks = d.drillLinks;
       d.feature.properties._name = d.name;
       d.feature.properties._allowedMeasures = d.allowedMeasures;
-      d.feature.properties._dimensionValues = d.dimensionValues;
       return d.feature;
     });
 
@@ -947,7 +1182,7 @@ looker.plugins.visualizations.add({
           getSize: d => radius / 100,
           sizeScale: 1,
           sizeMinPixels: 20,
-          billboard: true, // ✅ FIXED: Changed to true to prevent tilting
+          billboard: false,
           autoHighlight: false,
           onClick: onClickHandler
         });
