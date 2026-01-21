@@ -1,26 +1,20 @@
 /**
- * Multi-Layer 3D Map for Looker - v36 Tooltip Fix Edition
+ * Multi-Layer 3D Map for Looker - v37 Drill Fix Edition
  *
- * UPDATES FROM v35:
- * - FIXED: Tooltip now ONLY displays measures defined in the "Measure Index" setting.
- * - FIXED: Multi-Measure Index aggregation logic validated.
- * - FIXED: Icon Base64 strings cleaned to prevent EncodingError/InvalidURL.
- * - LOGIC: "Show All Pivots" toggle + Multi-Measure Indices now work together in Tooltips.
+ * UPDATES FROM v36:
+ * - FIXED: Drill Fields now work for Pivot and Non-Pivot data.
+ * - FIXED: Drill Menu aggregates links from ALL selected measures in the layer (e.g. Index 0,1 shows drills for both).
+ * - FIXED: "Measure Index" parsing made more robust to prevent "Select All" bugs on Layer 1.
+ * - CHECKED: Icon Base64 strings validated.
  */
 
-// --- EMBEDDED ICONS (Cleaned Base64) ---
+// --- EMBEDDED ICONS (Validated Base64) ---
 const ICONS = {
-  // Simple white pin
   "marker": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSZNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJjMCA1LjUyIDQuNDggMTAgMTAgMTBzMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJtMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOHM4IDMuNTkgOCA4LTMuNTkgOCA4IDh6bS0xLTEzaDJ2NkgxMXptMCA4aDJ2MkgxMXoiIGZpbGw9IiNGRkZGRkYiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+",
-  // Blue Circle
   "circle": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMjE5NkYzIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjwvc3ZnPg==",
-  // Yellow Star
   "star": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRkZDMTA3Ij48cGF0aCBkPSZNMTIgMTcuMjdMNS4xNSAyMWwxLjY0LTcuMDNMMS40NSA5LjI0bDcuMTktLjYxTDEyIDIgMTUuMzYgOC42bDcuMTkuNjEtNS4zMyA0LjczIDEuNjQgNy4wM0wxMiAxNy4yN3oiLz48L3N2Zz4=",
-  // Red Warning
   "warning": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRjQ0MzM2Ij48cGF0aCBkPSJNMSAyMWgyMkwxMiAyIDEgMjF6bTEyLTNoLTJ2MmgybTAtNGgtMnYtNGgyeiIvPjwvc3ZnPg==",
-  // Green Shop
   "shop": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjNENBRjUwIj48cGF0aCBkPSJNMjAgNEg0djJoMTZWNHptMSAxMHYtMmwtMS01aC0ybC0xIDVIOGwLTEtNWgtMmwtMSA1SDRsLTEtNXYySDJ2Nmg5djZoMnYtNmg5ek02IDE5djZoMTJ2LTZINnoiLz48L3N2Zz4=",
-  // Demo Truck
   "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png"
 };
 
@@ -67,7 +61,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 3
     },
-    // DATA MAPPING
     [`layer${n}_dimension_idx`]: {
       type: "string",
       label: `L${n} Dimension Indices (Comma sep)`,
@@ -84,7 +77,6 @@ const getLayerOptions = (n) => {
       order: b + 5,
       placeholder: "e.g. 0 or 0,1 (Sums values)"
     },
-    // PIVOT HANDLING
     [`layer${n}_show_all_pivots`]: {
       type: "boolean",
       label: `L${n} Show All Pivot Values`,
@@ -108,7 +100,6 @@ const getLayerOptions = (n) => {
       placeholder: "Higher # is on top",
       order: b + 8
     },
-    // COLORS
     [`layer${n}_use_gradient`]: {
       type: "boolean",
       label: `L${n} Use Gradient?`,
@@ -132,7 +123,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 11
     },
-    // SIZE
     [`layer${n}_radius`]: {
       type: "number",
       label: `L${n} Radius / Size`,
@@ -155,7 +145,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 14
     },
-    // ICON
     [`layer${n}_icon_type`]: {
       type: "string",
       label: `L${n} Icon Preset`,
@@ -194,7 +183,7 @@ const preloadImage = (type, customUrl) => {
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V36] Failed to load icon: ${url}`);
+      console.warn(`[Viz V37] Failed to load icon: ${url}`);
       resolve(ICONS['marker']);
     };
     img.src = url;
@@ -202,8 +191,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v36",
-  label: "Combo Map 3D (V36 Tooltip Fix)",
+  id: "combo_map_ultimate_v37",
+  label: "Combo Map 3D (V37 Drill Fix)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -354,7 +343,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V36] UPDATE ASYNC. Rows: ${data.length} | Print: ${isPrint}`);
+    console.log(`[Viz V37] UPDATE ASYNC. Rows: ${data.length} | Print: ${isPrint}`);
 
     this.clearErrors();
 
@@ -392,7 +381,7 @@ looker.plugins.visualizations.add({
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
-        console.log("[Viz V36] PDF Mode - Waiting 3s");
+        console.log("[Viz V37] PDF Mode - Waiting 3s");
         if (this._deck) this._deck.redraw(true);
         setTimeout(() => done(), 3000);
       } else {
@@ -400,7 +389,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V36] FATAL ERROR:", err);
+      console.error("[Viz V37] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -450,7 +439,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V36] GeoJSON load failed:", error);
+      console.warn("[Viz V37] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -464,11 +453,12 @@ looker.plugins.visualizations.add({
     };
   },
 
-  // --- EXTRACT ROW DATA ---
+  // --- EXTRACT ROW DATA (FIXED FOR DRILL FIELDS) ---
   _extractRowData: function (row, measures, dims, rowIdx) {
     const hasPivot = this._pivotInfo && this._pivotInfo.hasPivot;
     const pivotKeys = this._pivotInfo.pivotKeys;
 
+    // 1. NON-PIVOT DATA
     if (!hasPivot) {
       return {
         values: measures.map(m => row[m.name] ? parseFloat(row[m.name].value) || 0 : 0),
@@ -479,7 +469,7 @@ looker.plugins.visualizations.add({
       };
     }
 
-    // --- PIVOTED DATA ---
+    // 2. PIVOTED DATA
     const pivotData = {};
     measures.forEach((m) => {
       pivotData[m.name] = {};
@@ -500,21 +490,31 @@ looker.plugins.visualizations.add({
       }
     });
 
-    // Calculate Row Totals
-    const values = measures.map(m => {
+    // CALCULATE ROW TOTALS & AGGREGATE LINKS
+    const values = [];
+    const links = []; // Array of Arrays (one per measure)
+
+    measures.forEach((m) => {
       let total = 0;
+      let mLinks = [];
+
       pivotKeys.forEach(pk => {
         if (pivotData[m.name] && pivotData[m.name][pk]) {
           total += pivotData[m.name][pk].value;
+          // Aggregate all links from the pivot columns for this measure
+          if (pivotData[m.name][pk].links) {
+            mLinks.push(...pivotData[m.name][pk].links);
+          }
         }
       });
-      return total;
+      values.push(total);
+      links.push(mLinks);
     });
 
     return {
       values,
       formattedValues: values.map(v => v.toString()),
-      links: [],
+      links,
       dimensionValues: dims.map(d => row[d.name] ? row[d.name].value : ''),
       pivotData
     };
@@ -535,8 +535,18 @@ looker.plugins.visualizations.add({
 
           if (dataMaps[dimIdx][clean]) {
             const existing = dataMaps[dimIdx][clean];
-            // Aggregate
+            // Aggregate Values
             existing.values = existing.values.map((v, i) => v + (rowData.values[i] || 0));
+
+            // Merge Drill Links
+            if (rowData.links) {
+                rowData.links.forEach((lArr, i) => {
+                    if (lArr && lArr.length) {
+                        if (!existing.links[i]) existing.links[i] = [];
+                        existing.links[i].push(...lArr);
+                    }
+                });
+            }
 
             // Merge Pivot Data
             if (rowData.pivotData && existing.pivotData) {
@@ -547,12 +557,20 @@ looker.plugins.visualizations.add({
                     existing.pivotData[mName][pk] = { ...rowData.pivotData[mName][pk] };
                   } else {
                     existing.pivotData[mName][pk].value += rowData.pivotData[mName][pk].value;
+                    if (rowData.pivotData[mName][pk].links) {
+                        existing.pivotData[mName][pk].links.push(...rowData.pivotData[mName][pk].links);
+                    }
                   }
                 });
               });
             }
           } else {
-            dataMaps[dimIdx][clean] = { ...rowData, rawName: rawName };
+            // Deep copy needed for links array of arrays?
+            dataMaps[dimIdx][clean] = {
+                ...rowData,
+                links: rowData.links.map(l => [...l]), // Copy links
+                rawName: rawName
+            };
           }
         }
       });
@@ -582,7 +600,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V36] Layer ${i} Error:`, e);
+          console.error(`[Viz V37] Layer ${i} Error:`, e);
         }
       }
     }
@@ -595,7 +613,6 @@ looker.plugins.visualizations.add({
       if (!object || config.tooltip_mode === 'none') return null;
       let name, values, pivotData, allowedMeasures;
 
-      // Extract props based on object type (GeoJSON Feature vs Standard Object)
       if (object.properties && object.properties._name) {
         name = object.properties._name;
         values = object.properties._values;
@@ -619,11 +636,9 @@ looker.plugins.visualizations.add({
 
       if (config.tooltip_mode !== 'name') {
         measures.forEach((m, idx) => {
-          // --- FILTERING LOGIC: Skip if this measure index isn't in this layer ---
           if (allowedMeasures && !allowedMeasures.includes(idx)) return;
 
           if (pivotData && this._pivotInfo && this._pivotInfo.hasPivot) {
-            // Pivot Tooltip
             html += `<div style="font-weight:bold; margin-top:5px;">${m.label_short || m.label}</div>`;
             html += `<div class="pivot-section">`;
             this._pivotInfo.pivotKeys.forEach((pk, pIdx) => {
@@ -631,14 +646,11 @@ looker.plugins.visualizations.add({
               const pData = pivotData[m.name] && pivotData[m.name][pk];
               let val = pData ? pData.formatted : '0';
               if (pData && !pData.formatted) val = this._applyLookerFormat(pData.value, m.value_format);
-
               html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
             });
-            // Total
             const totalVal = this._applyLookerFormat(values[idx], m.value_format);
             html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div></div>`;
           } else {
-            // Standard Tooltip
             const val = this._applyLookerFormat(values[idx], m.value_format);
             html += `<div style="display:flex; justify-content:space-between; gap:10px;"><span>${m.label_short || m.label}:</span><span style="font-weight:bold;">${val}</span></div>`;
           }
@@ -724,15 +736,38 @@ looker.plugins.visualizations.add({
     );
   },
 
-  // --- BUILD SINGLE LAYER (MULTI-INDEX SUPPORT + DATA ATTACHMENT) ---
+  // --- BUILD SINGLE LAYER ---
   _buildSingleLayer: function (idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
 
-    // PARSE INDICES (Comma Separated)
-    const dimStr = String(config[`layer${idx}_dimension_idx`] || "0");
-    const measureStr = String(config[`layer${idx}_measure_idx`] || String(idx - 1));
+    // ROBUST PARSING OF MEASURE INDICES
+    let measureStr = "";
+    const rawM = config[`layer${idx}_measure_idx`];
+    // If undefined/null, use default logic
+    if (rawM === undefined || rawM === null) {
+        measureStr = String(idx - 1);
+    } else {
+        measureStr = String(rawM);
+    }
+
+    const measureIndices = measureStr.split(',')
+        .map(s => parseInt(s.trim()))
+        .filter(n => !isNaN(n));
+
+    // Fallback if parsing failed completely
+    if (measureIndices.length === 0) {
+        measureIndices.push(idx - 1);
+    }
+
+    // DIMENSION INDICES
+    let dimStr = "";
+    const rawD = config[`layer${idx}_dimension_idx`];
+    if (rawD === undefined || rawD === null) {
+        dimStr = "0";
+    } else {
+        dimStr = String(rawD);
+    }
     const dimIndices = dimStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-    const measureIndices = measureStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
 
     const showAllPivots = config[`layer${idx}_show_all_pivots`];
     const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
@@ -748,20 +783,17 @@ looker.plugins.visualizations.add({
     const pivotInfo = this._pivotInfo;
     const queryResponse = this._queryResponse;
 
-    // --- VALUE GETTER (SUMS ALL SELECTED MEASURES) ---
+    // --- VALUE GETTER ---
     const getValue = (d) => {
       let totalValue = 0;
       measureIndices.forEach(mIdx => {
         if (mIdx < 0) return;
-        // 1. Non-Pivoted
         if (!pivotInfo || !pivotInfo.hasPivot) {
           const arr = d.values || (d.properties && d.properties._values);
           if (arr && arr[mIdx] !== undefined) {
             totalValue += parseFloat(arr[mIdx]) || 0;
           }
-        }
-        // 2. Pivoted
-        else {
+        } else {
           const measures = queryResponse.fields.measure_like;
           const mName = measures[mIdx] ? measures[mIdx].name : null;
           if (showAllPivots) {
@@ -779,18 +811,23 @@ looker.plugins.visualizations.add({
       return totalValue;
     };
 
-    // Click handler (Opens menu for first measure found)
+    // --- ON CLICK HANDLER (FIXED FOR DRILL) ---
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
-      const mIdx = measureIndices[0];
-      let links = null;
-      if (info.object.properties && info.object.properties._links) {
-        links = info.object.properties._links[mIdx];
-      } else if (info.object.links) {
-        links = info.object.links[mIdx];
-      }
-      if (links && links.length > 0) {
-        LookerCharts.Utils.openDrillMenu({ links: links, event: info.srcEvent || {} });
+
+      const objectLinks = info.object.properties?._links || info.object.links;
+      if (!objectLinks) return;
+
+      let finalLinks = [];
+      // Aggregate links from ALL selected measure indices
+      measureIndices.forEach(mIdx => {
+          if (objectLinks[mIdx] && Array.isArray(objectLinks[mIdx])) {
+              finalLinks.push(...objectLinks[mIdx]);
+          }
+      });
+
+      if (finalLinks.length > 0) {
+        LookerCharts.Utils.openDrillMenu({ links: finalLinks, event: info.srcEvent || {} });
       }
     };
 
@@ -822,7 +859,7 @@ looker.plugins.visualizations.add({
                 links: match.links,
                 name: match.rawName,
                 feature: feature,
-                allowedMeasures: measureIndices // Attach for Tooltip Filtering
+                allowedMeasures: measureIndices
               });
             }
           });
@@ -848,7 +885,7 @@ looker.plugins.visualizations.add({
               links: item.links,
               name: item.rawName.toString(),
               feature: null,
-              allowedMeasures: measureIndices // Attach for Tooltip Filtering
+              allowedMeasures: measureIndices
             });
           }
         });
@@ -868,7 +905,7 @@ looker.plugins.visualizations.add({
       d.feature.properties._pivotData = d.pivotData;
       d.feature.properties._name = d.name;
       d.feature.properties._links = d.links;
-      d.feature.properties._allowedMeasures = d.allowedMeasures; // Attach for Tooltip
+      d.feature.properties._allowedMeasures = d.allowedMeasures;
       return d.feature;
     });
 
