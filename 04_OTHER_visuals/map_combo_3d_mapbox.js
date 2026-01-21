@@ -1,27 +1,23 @@
 /**
- * Multi-Layer 3D Map for Looker - v34 Pivot Fix Edition
+ * Multi-Layer 3D Map for Looker - v35 Ultimate Edition
  *
- * FIXES FROM v33:
- * - FIXED: "Show All Pivot Values" logic.
- * - PREVIOUSLY: Both checked and unchecked states returned the Total Sum.
- * - NOW: Unchecked returns the specific Pivot Column defined by the new Index setting.
- * - ADDED: "Pivot Column Index" option per layer to select specific columns (e.g., 0=Accessories, 1=Active).
- *
- * FEATURES:
- * - Icons: 100% Embedded (Base64).
- * - Logic: Handles pivoted and non-pivoted data seamlessly.
- * - UX: Enhanced tooltips showing breakdown + totals.
+ * UPDATES FROM v34:
+ * - ADDED: Multi-Index Support (Comma separated) for Dimensions & Measures.
+ * - REMOVED: "Region Dimension Name" field (Auto-detection enabled).
+ * - IMPROVED: Tooltips now respect LookML "value_format" string for totals.
+ * - FIXED: SVG Icon "natural dimensions" error.
+ * - CLEANUP: Reduced console noise, focused on PDF/Render lifecycle.
  */
 
-// --- EMBEDDED ICONS (Base64) - NO NETWORK REQUIRED ---
-
+// --- EMBEDDED ICONS (Base64) - FIXED WITH DIMENSIONS ---
+// Added width="24" height="24" to ensure createImageBitmap works
 const ICONS = {
-  "marker": "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyYzAgNS41MiA0LjQ4IDEwIDEwIDEwczEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAybTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LThzOCAzLjU5IDggOC0zLjU5IDggOCA4em0tMS0xM2gydjZIMTF6bTAgOGgydjJIMTF6IiBmaWxsPSIjRkZGRkZGIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==",
+  "marker": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSZNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJjMCA1LjUyIDQuNDggMTAgMTAgMTBzMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJtMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOHM4IDMuNTkgOCA4LTMuNTkgOCA4IDh6bS0xLTEzaDJ2NkgxMXptMCA4aDJ2MkgxMXoiIGZpbGw9IiNGRkZGRkYiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+",
   "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "star": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0ZGQzEwNyI+PHBhdGggZD0iTTEyIDE3LjI3TDUuMTUgMjFsMS42NC03LjAzTDEuNDUgOS4yNGw3LjE5LS42MUwxMiAyIDE1LjM2IDguNmw3LjE5LjYxLTUuMzMgNC43MyAxLjY0IDcuMDNMMTIgMTcuMjd6Ii8+PC9zdmc+",
-  "circle": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzIxOTZGMyI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48L3N2Zz4=",
-  "warning": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0Y0NDMzNiI+PHBhdGggZD0iTTEgMjFoMjJMMTIgMiAxIDIxem0xMi0zaC0ydjJoMm0wLTRoLTJ2LTRoMnoiLz48L3N2Zz4=",
-  "shop": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzRDQUY1MCI+PHBhdGggZD0iTTIwIDRINHYyaDE2VjR6bTEgMTB2LTJsLTEtNWgtMmwtMSA1SDhsLTEtNWgtMmwtMSA1SDRsLTEtNXYySDJ2Nmg5djZoMnYtNmg5ek02IDE5djZoMTJ2LTZINnoiLz48L3N2Zz4="
+  "star": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRkZDMTA3Ij48cGF0aCBkPSZNMTIgMTcuMjdMNS4xNSAyMWwxLjY0LTcuMDNMMS40NSA5LjI0bDcuMTktLjYxTDEyIDIgMTUuMzYgOC42bDcuMTkuNjEtNS4zMyA0LjczIDEuNjQgNy4wM0wxMiAxNy4yN3oiLz48L3N2Zz4=",
+  "circle": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMjE5NkYzIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjwvc3ZnPg==",
+  "warning": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRjQ0MzM2Ij48cGF0aCBkPSJNMSAyMWgyMkwxMiAyIDEgMjF6bTEyLTNoLTJ2MmgybTAtNGgtMnYtNGgyeiIvPjwvc3ZnPg==",
+  "shop": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjNENBRjUwIj48cGF0aCBkPSJNMjAgNEg0djJoMTZWNHptMSAxMHYtMmwtMS01aC0ybC0xIDVIOGwLTEtNWgtMmwtMSA1SDRsLTEtNXYySDJ2Nmg5djZoMnYtNmg5ek02IDE5djZoMTJ2LTZINnoiLz48L3N2Zz4="
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -69,19 +65,20 @@ const getLayerOptions = (n) => {
     },
     // DATA MAPPING
     [`layer${n}_dimension_idx`]: {
-      type: "number",
-      label: `L${n} Dimension Index`,
-      default: 0,
+      type: "string", // CHANGED TO STRING FOR CSV
+      label: `L${n} Dimension Indices (Comma sep)`,
+      default: "0",
       section: "Layers",
       order: b + 4,
-      placeholder: "0 = first dimension"
+      placeholder: "e.g. 0 or 0,1"
     },
     [`layer${n}_measure_idx`]: {
-      type: "number",
-      label: `L${n} Measure Index`,
-      default: n - 1,
+      type: "string", // CHANGED TO STRING FOR CSV
+      label: `L${n} Measure Indices (Comma sep)`,
+      default: `${n - 1}`,
       section: "Layers",
-      order: b + 5
+      order: b + 5,
+      placeholder: "e.g. 0 or 0,1 (Sums values)"
     },
     // PIVOT HANDLING
     [`layer${n}_show_all_pivots`]: {
@@ -107,7 +104,6 @@ const getLayerOptions = (n) => {
       placeholder: "Higher # is on top",
       order: b + 8
     },
-
     // COLORS
     [`layer${n}_use_gradient`]: {
       type: "boolean",
@@ -132,7 +128,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 11
     },
-
     // SIZE
     [`layer${n}_radius`]: {
       type: "number",
@@ -156,7 +151,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 14
     },
-
     // ICON
     [`layer${n}_icon_type`]: {
       type: "string",
@@ -186,22 +180,17 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER (Returns Base64 directly if preset) ---
+// --- HELPER: PRELOADER ---
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = ICONS[type] || customUrl;
-
-    if (url && url.startsWith("data:")) {
-      return resolve(url);
-    }
-
+    if (url && url.startsWith("data:")) return resolve(url);
     if (!url || url.length < 5) return resolve(ICONS['marker']);
-
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V34] Failed to load icon: ${url}. Using fallback.`);
+      console.warn(`[Viz V35] Failed to load icon: ${url}`);
       resolve(ICONS['marker']);
     };
     img.src = url;
@@ -209,8 +198,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v34",
-  label: "Combo Map 3D (V34 Fixed)",
+  id: "combo_map_ultimate_v35",
+  label: "Combo Map 3D (V35 Ultimate)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -252,13 +241,7 @@ looker.plugins.visualizations.add({
       placeholder: "https://...",
       order: 4
     },
-    region_dim_name: {
-      type: "string",
-      label: "Region Dimension Name (Default)",
-      section: "Plot",
-      placeholder: "e.g. state (Auto-detects if empty)",
-      order: 5
-    },
+    // REMOVED region_dim_name
 
     // --- BASE MAP ---
     map_header: { type: "string", label: "─── BASE MAP ───", display: "divider", section: "Plot", order: 10 },
@@ -323,8 +306,6 @@ looker.plugins.visualizations.add({
   },
 
   create: function (element, config) {
-    console.log("[Viz V34] CREATE called");
-
     if (!document.getElementById('mapbox-css-fix')) {
       const link = document.createElement('link');
       link.id = 'mapbox-css-fix';
@@ -361,7 +342,6 @@ looker.plugins.visualizations.add({
   },
 
   destroy: function () {
-    console.log("[Viz V34] DESTROY called");
     if (this._deck) {
       this._deck.finalize();
       this._deck = null;
@@ -372,18 +352,11 @@ looker.plugins.visualizations.add({
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
 
-    console.log("=".repeat(60));
-    console.log("[Viz V34] UPDATE ASYNC START");
-    console.log("[Viz V34] Rows:", data.length);
-    console.log("[Viz V34] PDF Mode:", isPrint);
-    console.log("=".repeat(60));
+    console.log(`[Viz V35] UPDATE ASYNC. Rows: ${data.length} | Print: ${isPrint}`);
 
     this.clearErrors();
 
-    // --- CHECK MAPBOX TOKEN ---
     if (!config.mapbox_token) {
-      console.error("[Viz V34] ERROR: Missing Mapbox Token");
-      if (this._deck) { this._deck.finalize(); this._deck = null; }
       this._tokenError.style.display = 'block';
       done();
       return;
@@ -391,21 +364,15 @@ looker.plugins.visualizations.add({
       this._tokenError.style.display = 'none';
     }
 
-    // --- CHECK DEPENDENCIES ---
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
-      console.error("[Viz V34] ERROR: Missing deck.gl or mapbox-gl");
       this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
       done();
       return;
     }
 
     this._queryResponse = queryResponse;
-
-    // --- DETECT PIVOTS ---
     this._pivotInfo = this._detectPivots(queryResponse);
-    console.log("[Viz V34] PIVOT INFO:", JSON.stringify(this._pivotInfo, null, 2));
 
-    // --- PRE-LOAD ICONS ---
     const iconPromises = [];
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
@@ -415,51 +382,45 @@ looker.plugins.visualizations.add({
       }
     }
 
-    // --- MAIN PROCESSING ---
     Promise.all([
       this._prepareData(data, config, queryResponse),
       ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
-      console.log("[Viz V34] DATA PREPARED. Rendering...");
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
+      // Force wait for PDF rendering
       if (isPrint) {
-        console.log("[Viz V34] PDF Mode - Waiting 4s");
+        console.log("[Viz V35] Print mode detected - Waiting 3s for tile load...");
         if (this._deck) this._deck.redraw(true);
-        setTimeout(() => done(), 4000);
+        setTimeout(() => {
+          console.log("[Viz V35] Print wait done.");
+          done();
+        }, 3000);
       } else {
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V34] FATAL ERROR:", err);
+      console.error("[Viz V35] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
   },
 
-  // --- DETECT PIVOT CONFIGURATION ---
+  // --- DETECT PIVOTS ---
   _detectPivots: function (queryResponse) {
     const pivotFields = queryResponse.fields.pivots || [];
-    const hasPivot = pivotFields.length > 0;
-
-    if (!hasPivot) {
+    if (pivotFields.length === 0) {
       return { hasPivot: false, pivotKeys: [], pivotField: null, pivotLabels: [] };
     }
-
     const pivotKeys = queryResponse.pivots ? queryResponse.pivots.map(p => p.key) : [];
     const pivotLabels = queryResponse.pivots ? queryResponse.pivots.map(p => {
       if (typeof p.data === 'object') return Object.values(p.data).join(' | ');
       return p.key;
     }) : pivotKeys;
 
-    return {
-      hasPivot: true,
-      pivotKeys: pivotKeys,
-      pivotField: pivotFields[0],
-      pivotLabels: pivotLabels
-    };
+    return { hasPivot: true, pivotKeys, pivotField: pivotFields[0], pivotLabels };
   },
 
   // --- PREPARE DATA ---
@@ -486,64 +447,50 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures, dims };
     }
 
-    // B. REGION MODE (Name Matching)
+    // B. REGION MODE
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
-
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V34] GeoJSON load failed:", error);
+      console.warn("[Viz V35] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
     const dataMaps = this._buildDataMaps(data, dims, measures);
-    const matchedFeatures = this._matchFeatures(geojson, dataMaps, config, dims);
+    // Note: We don't pre-match here anymore. We match in _buildSingleLayer based on config.
+    // However, we attach the GeoJSON to the response for layer processing.
 
     return {
       type: 'regions',
-      data: matchedFeatures,
-      dataMaps: dataMaps,
+      dataMaps: dataMaps, // Maps for each dimension index
       geojson: geojson,
       measures,
       dims
     };
   },
 
-  // --- EXTRACT ROW DATA (Calculates Totals correctly) ---
+  // --- EXTRACT ROW DATA ---
   _extractRowData: function (row, measures, dims, rowIdx) {
     const hasPivot = this._pivotInfo && this._pivotInfo.hasPivot;
+    const pivotKeys = this._pivotInfo.pivotKeys;
 
     if (!hasPivot) {
       return {
-        values: measures.map(m => {
-          const cell = row[m.name];
-          return cell ? parseFloat(cell.value) || 0 : 0;
-        }),
-        formattedValues: measures.map(m => {
-          const cell = row[m.name];
-          return cell ? (cell.rendered || cell.value) : '';
-        }),
-        links: measures.map(m => {
-          const cell = row[m.name];
-          return cell ? cell.links : [];
-        }),
-        dimensionValues: dims.map(d => {
-          const cell = row[d.name];
-          return cell ? cell.value : '';
-        }),
+        values: measures.map(m => row[m.name] ? parseFloat(row[m.name].value) || 0 : 0),
+        // Use rendered directly, or simple value
+        formattedValues: measures.map(m => row[m.name] ? (row[m.name].rendered || row[m.name].value) : ''),
+        links: measures.map(m => row[m.name] ? row[m.name].links : []),
+        dimensionValues: dims.map(d => row[d.name] ? row[d.name].value : ''),
         pivotData: null
       };
     }
 
     // --- PIVOTED DATA ---
     const pivotData = {};
-    const pivotKeys = this._pivotInfo.pivotKeys;
-
     measures.forEach((m) => {
       pivotData[m.name] = {};
       const measureCell = row[m.name];
-
       if (measureCell && typeof measureCell === 'object') {
         pivotKeys.forEach((pivotKey) => {
           const pivotCell = measureCell[pivotKey];
@@ -560,7 +507,7 @@ looker.plugins.visualizations.add({
       }
     });
 
-    // Calculate totals - THESE are used when ShowAllPivots = TRUE
+    // Calculate Row Totals
     const values = measures.map(m => {
       let total = 0;
       pivotKeys.forEach(pk => {
@@ -571,12 +518,11 @@ looker.plugins.visualizations.add({
       return total;
     });
 
-    const formattedValues = values.map(v => this._formatNumber(v));
-
+    // For totals, we re-format using LookML definition later
     return {
-      values, // Contains SUM of all pivots
-      formattedValues,
-      links: [], // Simplified for pivots
+      values,
+      formattedValues: values.map(v => v.toString()), // Placeholder
+      links: [],
       dimensionValues: dims.map(d => row[d.name] ? row[d.name].value : ''),
       pivotData
     };
@@ -597,11 +543,10 @@ looker.plugins.visualizations.add({
 
           if (dataMaps[dimIdx][clean]) {
             const existing = dataMaps[dimIdx][clean];
-            // Aggregate values (Summing totals)
+            // Aggregate
             existing.values = existing.values.map((v, i) => v + (rowData.values[i] || 0));
-            existing.formattedValues = existing.values.map(v => this._formatNumber(v));
 
-            // Merge pivot data
+            // Merge Pivot Data
             if (rowData.pivotData && existing.pivotData) {
               Object.keys(rowData.pivotData).forEach(mName => {
                 Object.keys(rowData.pivotData[mName]).forEach(pk => {
@@ -610,7 +555,7 @@ looker.plugins.visualizations.add({
                     existing.pivotData[mName][pk] = { ...rowData.pivotData[mName][pk] };
                   } else {
                     existing.pivotData[mName][pk].value += rowData.pivotData[mName][pk].value;
-                    existing.pivotData[mName][pk].formatted = this._formatNumber(existing.pivotData[mName][pk].value);
+                    // Note: We don't sum formatted strings here, we handle display later
                   }
                 });
               });
@@ -621,51 +566,7 @@ looker.plugins.visualizations.add({
         }
       });
     });
-
     return dataMaps;
-  },
-
-  // --- MATCH FEATURES TO GEOJSON ---
-  _matchFeatures: function (geojson, dataMaps, config, dims) {
-    const primaryDataMap = dataMaps[0] || {};
-    const matchedFeatures = [];
-
-    if (geojson && geojson.features) {
-      geojson.features.forEach((feature) => {
-        const props = feature.properties;
-        let match = null;
-
-        for (let key in props) {
-          if (props[key]) {
-            const cleanProp = this._normalizeName(props[key]);
-            if (primaryDataMap[cleanProp]) {
-              match = primaryDataMap[cleanProp];
-              break;
-            }
-          }
-        }
-
-        if (match) {
-          feature.properties._name = match.rawName;
-          feature.properties._values = match.values;
-          feature.properties._formatted = match.formattedValues;
-          feature.properties._pivotData = match.pivotData;
-
-          const centroid = this._getCentroid(feature.geometry);
-          matchedFeatures.push({
-            feature: feature,
-            centroid: centroid,
-            values: match.values,
-            formattedValues: match.formattedValues,
-            links: match.links,
-            name: match.rawName,
-            pivotData: match.pivotData,
-            dimensionValues: match.dimensionValues
-          });
-        }
-      });
-    }
-    return matchedFeatures;
   },
 
   // --- RENDER ---
@@ -684,14 +585,13 @@ looker.plugins.visualizations.add({
             iconUrlOverride = loadedIcons[iconIndex] || ICONS['marker'];
             iconIndex++;
           }
-
           const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V34] Layer ${i} build FAILED:`, e);
+          console.error(`[Viz V35] Layer ${i} Error:`, e);
         }
       }
     }
@@ -699,20 +599,18 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // Enhanced tooltip
+    // --- TOOLTIP ---
     const getTooltip = ({ object }) => {
       if (!object || config.tooltip_mode === 'none') return null;
-
-      let name, values, formatted, pivotData;
+      let name, values, pivotData;
+      // Handle both Region and Point objects
       if (object.properties && object.properties._name) {
         name = object.properties._name;
         values = object.properties._values;
-        formatted = object.properties._formatted;
         pivotData = object.properties._pivotData;
       } else if (object.name && object.values) {
         name = object.name;
         values = object.values;
-        formatted = object.formattedValues;
         pivotData = object.pivotData;
       } else {
         return null;
@@ -723,24 +621,32 @@ looker.plugins.visualizations.add({
         html += `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
       }
 
-      if (config.tooltip_mode !== 'name') {
-        const measures = queryResponse.fields.measure_like;
+      const measures = queryResponse.fields.measure_like;
 
+      if (config.tooltip_mode !== 'name') {
         if (pivotData && this._pivotInfo && this._pivotInfo.hasPivot) {
+          // Pivot Tooltip
           measures.forEach((m, idx) => {
             html += `<div style="font-weight:bold; margin-top:5px;">${m.label_short || m.label}</div>`;
             html += `<div class="pivot-section">`;
             this._pivotInfo.pivotKeys.forEach((pk, pIdx) => {
               const pivotLabel = this._pivotInfo.pivotLabels[pIdx] || pk;
               const pData = pivotData[m.name] && pivotData[m.name][pk];
-              const val = pData ? pData.formatted : '0';
+              // Use existing formatted value or format manually
+              let val = pData ? pData.formatted : '0';
+              if (pData && !pData.formatted) val = this._applyLookerFormat(pData.value, m.value_format);
+
               html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
             });
-            html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${formatted[idx]}</span></div></div>`;
+            // Total
+            const totalVal = this._applyLookerFormat(values[idx], m.value_format);
+            html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div></div>`;
           });
         } else {
+          // Standard Tooltip
           measures.forEach((m, idx) => {
-            html += `<div style="display:flex; justify-content:space-between; gap:10px;"><span>${m.label_short || m.label}:</span><span style="font-weight:bold;">${formatted[idx]}</span></div>`;
+            const val = this._applyLookerFormat(values[idx], m.value_format);
+            html += `<div style="display:flex; justify-content:space-between; gap:10px;"><span>${m.label_short || m.label}:</span><span style="font-weight:bold;">${val}</span></div>`;
           });
         }
       }
@@ -758,7 +664,7 @@ looker.plugins.visualizations.add({
       };
     };
 
-    // View state
+    // --- VIEW STATE ---
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
@@ -798,7 +704,7 @@ looker.plugins.visualizations.add({
         layers: layers,
         getTooltip: getTooltip,
         glOptions: { preserveDrawingBuffer: true, willReadFrequently: true },
-        onError: (err) => console.warn("[Viz V34] DeckGL Error:", err)
+        onError: (err) => console.warn("DeckGL Error:", err)
       });
     } else {
       this._deck.setProps({
@@ -824,149 +730,169 @@ looker.plugins.visualizations.add({
     );
   },
 
-  // --- BUILD SINGLE LAYER ---
+  // --- BUILD SINGLE LAYER (MULTI-INDEX SUPPORT) ---
   _buildSingleLayer: function (idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
-    const measureIdx = Number(config[`layer${idx}_measure_idx`]) || 0;
-    const dimensionIdx = Number(config[`layer${idx}_dimension_idx`]) || 0;
+
+    // PARSE INDICES (Comma Separated)
+    const dimStr = String(config[`layer${idx}_dimension_idx`] || "0");
+    const measureStr = String(config[`layer${idx}_measure_idx`] || String(idx - 1));
+    const dimIndices = dimStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    const measureIndices = measureStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+
     const showAllPivots = config[`layer${idx}_show_all_pivots`];
     const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
 
-    // Gradient Colors
+    // Visual Props
     const useGradient = config[`layer${idx}_use_gradient`];
     const startColorHex = config[`layer${idx}_color_main`];
     const endColorHex = config[`layer${idx}_gradient_end`];
     const startColor = this._hexToRgb(startColorHex);
-
     const radius = Number(config[`layer${idx}_radius`]) || 1000;
     const heightScale = Number(config[`layer${idx}_height`]) || 1000;
     const opacity = Number(config[`layer${idx}_opacity`]) || 0.7;
 
-    let iconUrl = iconUrlOverride;
-    if (!iconUrl) {
-      iconUrl = ICONS[config[`layer${idx}_icon_type`]] || ICONS['marker'];
-    }
-
     const pivotInfo = this._pivotInfo;
     const queryResponse = this._queryResponse;
 
-    // --- VALUE GETTER (FIXED FOR V34) ---
+    // --- VALUE GETTER (SUMS ALL SELECTED MEASURES) ---
     const getValue = (d) => {
-      // 1. Non-Pivoted Data
-      if (!pivotInfo || !pivotInfo.hasPivot) {
-        const arr = d.values || (d.properties && d.properties._values);
-        if (!arr) return 0;
-        return parseFloat(arr[measureIdx]) || 0;
-      }
+      let totalValue = 0;
 
-      // 2. Pivoted Data
-      const mName = queryResponse.fields.measure_like[measureIdx] ? queryResponse.fields.measure_like[measureIdx].name : null;
+      measureIndices.forEach(mIdx => {
+        // Safe check for bounds
+        if (mIdx < 0) return;
 
-      if (showAllPivots) {
-        // RETURN TOTAL (pre-calculated sum stored in d.values)
-        const arr = d.values || (d.properties && d.properties._values);
-        if (!arr) return 0;
-        return parseFloat(arr[measureIdx]) || 0;
-      } else {
-        // RETURN SPECIFIC PIVOT COLUMN
-        const pKey = pivotInfo.pivotKeys[pivotIdx]; // Use the user-selected pivot index
-        const pData = d.pivotData || (d.properties && d.properties._pivotData);
-
-        if (mName && pKey && pData && pData[mName] && pData[mName][pKey]) {
-          return pData[mName][pKey].value || 0;
+        // 1. Non-Pivoted
+        if (!pivotInfo || !pivotInfo.hasPivot) {
+          const arr = d.values || (d.properties && d.properties._values);
+          if (arr && arr[mIdx] !== undefined) {
+            totalValue += parseFloat(arr[mIdx]) || 0;
+          }
         }
-        return 0; // Fallback if specific pivot col is empty
-      }
+        // 2. Pivoted
+        else {
+          const measures = queryResponse.fields.measure_like;
+          const mName = measures[mIdx] ? measures[mIdx].name : null;
+
+          if (showAllPivots) {
+            // Use Row Total
+            const arr = d.values || (d.properties && d.properties._values);
+            if (arr && arr[mIdx] !== undefined) {
+              totalValue += parseFloat(arr[mIdx]) || 0;
+            }
+          } else {
+            // Use Specific Pivot Column
+            const pKey = pivotInfo.pivotKeys[pivotIdx];
+            const pData = d.pivotData || (d.properties && d.properties._pivotData);
+            if (mName && pKey && pData && pData[mName] && pData[mName][pKey]) {
+              totalValue += (pData[mName][pKey].value || 0);
+            }
+          }
+        }
+      });
+      return totalValue;
     };
 
-    // Click handler
+    // Click handler (Opens menu for first measure found)
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
+      // Just pick the first measure index for drill links to avoid UI clutter
+      const mIdx = measureIndices[0];
       let links = null;
       if (info.object.properties && info.object.properties._links) {
-        links = info.object.properties._links[measureIdx];
+        links = info.object.properties._links[mIdx];
       } else if (info.object.links) {
-        links = info.object.links[measureIdx];
+        links = info.object.links[mIdx];
       }
       if (links && links.length > 0) {
         LookerCharts.Utils.openDrillMenu({ links: links, event: info.srcEvent || {} });
       }
     };
 
-    // --- PREPARE DATA ---
+    // --- GATHER DATA FROM ALL DIMENSION INDICES ---
     let pointData = [];
+
     if (processed.type === 'regions') {
-      const dataMap = processed.dataMaps ? processed.dataMaps[dimensionIdx] : null;
-      if (dataMap) {
-        if (dimensionIdx === 0) {
-          if (processed.geojson && processed.geojson.features) {
-            processed.geojson.features.forEach(feature => {
-              const props = feature.properties;
-              let match = null;
-              for (let key in props) {
-                if (props[key]) {
-                  const cleanProp = this._normalizeName(props[key]);
-                  if (dataMap[cleanProp]) {
-                    match = dataMap[cleanProp];
-                    break;
-                  }
+      dimIndices.forEach(dimIdx => {
+        const dataMap = processed.dataMaps ? processed.dataMaps[dimIdx] : null;
+        if (!dataMap) return;
+
+        // Strategy: Match names if dimIdx matches a known region type logic?
+        // Actually, we just check if it matches GeoJSON or fallback to points
+        // NOTE: Standard behavior is usually Dim 0 = Regions. Others = Points.
+        // We will try to match against GeoJSON first.
+
+        if (processed.geojson && processed.geojson.features) {
+          // Find features matching this dimension map
+          processed.geojson.features.forEach(feature => {
+            const props = feature.properties;
+            let match = null;
+            for (let key in props) {
+              if (props[key]) {
+                const cleanProp = this._normalizeName(props[key]);
+                if (dataMap[cleanProp]) {
+                  match = dataMap[cleanProp];
+                  break;
                 }
               }
-              if (match) {
-                pointData.push({
-                  position: this._getCentroid(feature.geometry),
-                  values: match.values,
-                  formattedValues: match.formattedValues,
-                  links: match.links,
-                  name: match.rawName,
-                  pivotData: match.pivotData,
-                  dimensionValues: match.dimensionValues,
-                  feature: feature
-                });
-              }
-            });
-          }
-        } else {
-          Object.keys(dataMap).forEach(key => {
-            const item = dataMap[key];
-            let pos = [0, 0];
-            if (Array.isArray(item.rawName) && item.rawName.length === 2) {
-              pos = [Number(item.rawName[1]), Number(item.rawName[0])];
-            } else if (typeof item.rawName === 'string' && item.rawName.includes(',')) {
-              const parts = item.rawName.split(',');
-              if (parts.length === 2) {
-                pos = [parseFloat(parts[1]), parseFloat(parts[0])];
-              }
             }
-            if (pos[0] || pos[1]) {
+            if (match) {
               pointData.push({
-                position: pos,
-                values: item.values,
-                formattedValues: item.formattedValues,
-                links: item.links,
-                name: item.rawName.toString(),
-                pivotData: item.pivotData,
-                dimensionValues: item.dimensionValues,
-                feature: null
+                position: this._getCentroid(feature.geometry),
+                values: match.values,
+                pivotData: match.pivotData,
+                links: match.links,
+                name: match.rawName,
+                feature: feature // Save feature for GeoJsonLayer
               });
             }
           });
         }
-      }
+
+        // Also add non-matched (Lat/Lng) points from this dimension
+        Object.keys(dataMap).forEach(key => {
+          const item = dataMap[key];
+          let pos = [0, 0];
+          // Simple coord check
+          if (Array.isArray(item.rawName) && item.rawName.length === 2) {
+            pos = [Number(item.rawName[1]), Number(item.rawName[0])];
+          } else if (typeof item.rawName === 'string' && item.rawName.includes(',')) {
+            const parts = item.rawName.split(',');
+            if (parts.length === 2) {
+              pos = [parseFloat(parts[1]), parseFloat(parts[0])];
+            }
+          }
+
+          if (pos[0] || pos[1]) {
+            // Avoid duplicates if it was already matched as a region?
+            // For now, simpler to just add it. Points usually won't match Region names.
+            pointData.push({
+              position: pos,
+              values: item.values,
+              pivotData: item.pivotData,
+              links: item.links,
+              name: item.rawName.toString(),
+              feature: null
+            });
+          }
+        });
+      });
     } else {
+      // Points mode
       pointData = processed.data;
     }
 
     const safePointData = this._validateLayerData(pointData);
-    const id = `layer-${idx}-${type}-dim${dimensionIdx}`;
+    const id = `layer-${idx}-${type}`;
     const allVals = safePointData.map(d => getValue(d));
     const maxVal = Math.max(...allVals, 0.1);
+    const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx];
 
-    const updateTriggersBase = [measureIdx, useGradient, startColorHex, endColorHex, showAllPivots, dimensionIdx, pivotIdx];
-
+    // Filter for GeoJSON
     const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
+      // Inject calculated props into feature for tooltip
       d.feature.properties._values = d.values;
-      d.feature.properties._formatted = d.formattedValues;
       d.feature.properties._pivotData = d.pivotData;
       d.feature.properties._name = d.name;
       d.feature.properties._links = d.links;
@@ -1077,8 +1003,8 @@ looker.plugins.visualizations.add({
           data: safePointData,
           pickable: true,
           opacity: opacity,
-          iconAtlas: iconUrl,
-          iconMapping: { marker: { x: 0, y: 0, width: 512, height: 512, mask: false } },
+          iconAtlas: iconUrlOverride || ICONS['marker'],
+          iconMapping: { marker: { x: 0, y: 0, width: 24, height: 24, mask: false } }, // Match SVG Dims
           getIcon: d => 'marker',
           getPosition: d => d.position,
           getSize: d => radius,
@@ -1123,12 +1049,32 @@ looker.plugins.visualizations.add({
           }
         });
 
-      default:
-        return null;
+      default: return null;
     }
   },
 
   // --- UTILITIES ---
+
+  // Replaces basic patterns in Looker value_format strings
+  _applyLookerFormat: function (value, formatStr) {
+    if (value === undefined || value === null) return '0';
+    if (!formatStr) return this._formatNumber(value);
+
+    // Simple parser for standard Looker formats
+    let str = value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+    if (formatStr.includes('$')) str = '$' + str;
+    if (formatStr.includes('%')) str = (value * 100).toFixed(1) + '%';
+    if (formatStr.includes('€')) str = '€' + str;
+    if (formatStr.includes('£')) str = '£' + str;
+    // Handle '0.0 "k"' type custom formats loosely
+    if (formatStr.toLowerCase().includes('"k"')) {
+      str = (value / 1000).toFixed(1) + 'k';
+    }
+
+    return str;
+  },
+
   _formatNumber: function (num) {
     if (num === null || num === undefined) return '0';
     if (typeof num !== 'number') num = parseFloat(num) || 0;
