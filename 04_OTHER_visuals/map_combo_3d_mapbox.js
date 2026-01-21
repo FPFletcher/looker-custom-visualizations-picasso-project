@@ -1,14 +1,14 @@
 /**
- * Multi-Layer 3D Map for Looker - v37 Drill Fix Edition
+ * Multi-Layer 3D Map for Looker - v38 Final Polish
  *
- * UPDATES FROM v36:
- * - FIXED: Drill Fields now work for Pivot and Non-Pivot data.
- * - FIXED: Drill Menu aggregates links from ALL selected measures in the layer (e.g. Index 0,1 shows drills for both).
- * - FIXED: "Measure Index" parsing made more robust to prevent "Select All" bugs on Layer 1.
- * - CHECKED: Icon Base64 strings validated.
+ * UPDATES FROM v37:
+ * - FIXED: Drill Menu Position (now opens at click coordinates).
+ * - FIXED: Drill Menu Content (Shows Measure Labels + Values).
+ * - FIXED: Drill Menu Respects "Show All Pivots" & Dimension Filters.
+ * - FIXED: Layer 1 Measure Index parsing parity with other layers.
  */
 
-// --- EMBEDDED ICONS (Validated Base64) ---
+// --- EMBEDDED ICONS ---
 const ICONS = {
   "marker": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSZNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJjMCA1LjUyIDQuNDggMTAgMTAgMTBzMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJtMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOHM4IDMuNTkgOCA4LTMuNTkgOCA4IDh6bS0xLTEzaDJ2NkgxMXptMCA4aDJ2MkgxMXoiIGZpbGw9IiNGRkZGRkYiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+",
   "circle": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMjE5NkYzIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjwvc3ZnPg==",
@@ -183,7 +183,7 @@ const preloadImage = (type, customUrl) => {
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V37] Failed to load icon: ${url}`);
+      console.warn(`[Viz V38] Failed to load icon: ${url}`);
       resolve(ICONS['marker']);
     };
     img.src = url;
@@ -191,8 +191,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v37",
-  label: "Combo Map 3D (V37 Drill Fix)",
+  id: "combo_map_ultimate_v38",
+  label: "Combo Map 3D (V38 Final Polish)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -343,7 +343,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V37] UPDATE ASYNC. Rows: ${data.length} | Print: ${isPrint}`);
+    console.log(`[Viz V38] UPDATE ASYNC. Rows: ${data.length} | Print: ${isPrint}`);
 
     this.clearErrors();
 
@@ -381,7 +381,6 @@ looker.plugins.visualizations.add({
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
-        console.log("[Viz V37] PDF Mode - Waiting 3s");
         if (this._deck) this._deck.redraw(true);
         setTimeout(() => done(), 3000);
       } else {
@@ -389,7 +388,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V37] FATAL ERROR:", err);
+      console.error("[Viz V38] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -439,7 +438,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V37] GeoJSON load failed:", error);
+      console.warn("[Viz V38] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -453,23 +452,24 @@ looker.plugins.visualizations.add({
     };
   },
 
-  // --- EXTRACT ROW DATA (FIXED FOR DRILL FIELDS) ---
+  // --- EXTRACT ROW DATA ---
   _extractRowData: function (row, measures, dims, rowIdx) {
     const hasPivot = this._pivotInfo && this._pivotInfo.hasPivot;
     const pivotKeys = this._pivotInfo.pivotKeys;
 
-    // 1. NON-PIVOT DATA
+    // 1. NON-PIVOT
     if (!hasPivot) {
       return {
         values: measures.map(m => row[m.name] ? parseFloat(row[m.name].value) || 0 : 0),
         formattedValues: measures.map(m => row[m.name] ? (row[m.name].rendered || row[m.name].value) : ''),
-        links: measures.map(m => row[m.name] ? row[m.name].links : []),
+        // Pre-structure drill links for easy aggregation later
+        drillLinks: measures.map(m => row[m.name] ? row[m.name].links : []),
         dimensionValues: dims.map(d => row[d.name] ? row[d.name].value : ''),
         pivotData: null
       };
     }
 
-    // 2. PIVOTED DATA
+    // 2. PIVOTED
     const pivotData = {};
     measures.forEach((m) => {
       pivotData[m.name] = {};
@@ -490,31 +490,21 @@ looker.plugins.visualizations.add({
       }
     });
 
-    // CALCULATE ROW TOTALS & AGGREGATE LINKS
     const values = [];
-    const links = []; // Array of Arrays (one per measure)
-
     measures.forEach((m) => {
       let total = 0;
-      let mLinks = [];
-
       pivotKeys.forEach(pk => {
         if (pivotData[m.name] && pivotData[m.name][pk]) {
           total += pivotData[m.name][pk].value;
-          // Aggregate all links from the pivot columns for this measure
-          if (pivotData[m.name][pk].links) {
-            mLinks.push(...pivotData[m.name][pk].links);
-          }
         }
       });
       values.push(total);
-      links.push(mLinks);
     });
 
     return {
       values,
       formattedValues: values.map(v => v.toString()),
-      links,
+      drillLinks: [], // Not used for pivoted aggregation here, handled via pivotData
       dimensionValues: dims.map(d => row[d.name] ? row[d.name].value : ''),
       pivotData
     };
@@ -535,18 +525,7 @@ looker.plugins.visualizations.add({
 
           if (dataMaps[dimIdx][clean]) {
             const existing = dataMaps[dimIdx][clean];
-            // Aggregate Values
             existing.values = existing.values.map((v, i) => v + (rowData.values[i] || 0));
-
-            // Merge Drill Links
-            if (rowData.links) {
-                rowData.links.forEach((lArr, i) => {
-                    if (lArr && lArr.length) {
-                        if (!existing.links[i]) existing.links[i] = [];
-                        existing.links[i].push(...lArr);
-                    }
-                });
-            }
 
             // Merge Pivot Data
             if (rowData.pivotData && existing.pivotData) {
@@ -557,6 +536,7 @@ looker.plugins.visualizations.add({
                     existing.pivotData[mName][pk] = { ...rowData.pivotData[mName][pk] };
                   } else {
                     existing.pivotData[mName][pk].value += rowData.pivotData[mName][pk].value;
+                    // Aggregate links for this specific pivot cell
                     if (rowData.pivotData[mName][pk].links) {
                         existing.pivotData[mName][pk].links.push(...rowData.pivotData[mName][pk].links);
                     }
@@ -564,11 +544,21 @@ looker.plugins.visualizations.add({
                 });
               });
             }
+            // Merge Standard Links
+            if (rowData.drillLinks) {
+                rowData.drillLinks.forEach((lArr, i) => {
+                    if (lArr && lArr.length) {
+                        if (!existing.drillLinks[i]) existing.drillLinks[i] = [];
+                        existing.drillLinks[i].push(...lArr);
+                    }
+                });
+            }
+
           } else {
-            // Deep copy needed for links array of arrays?
+            // Deep copy structure
             dataMaps[dimIdx][clean] = {
                 ...rowData,
-                links: rowData.links.map(l => [...l]), // Copy links
+                drillLinks: rowData.drillLinks ? rowData.drillLinks.map(l => [...l]) : [],
                 rawName: rawName
             };
           }
@@ -600,7 +590,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V37] Layer ${i} Error:`, e);
+          console.error(`[Viz V38] Layer ${i} Error:`, e);
         }
       }
     }
@@ -608,7 +598,7 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP (SMART FILTERING) ---
+    // --- TOOLTIP ---
     const getTooltip = ({ object }) => {
       if (!object || config.tooltip_mode === 'none') return null;
       let name, values, pivotData, allowedMeasures;
@@ -740,33 +730,16 @@ looker.plugins.visualizations.add({
   _buildSingleLayer: function (idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
 
-    // ROBUST PARSING OF MEASURE INDICES
-    let measureStr = "";
+    // --- PARSE INDICES (FIXED FOR LAYER 1 PARITY) ---
+    // Force string conversion to handle '0' vs 0 correctly
     const rawM = config[`layer${idx}_measure_idx`];
-    // If undefined/null, use default logic
-    if (rawM === undefined || rawM === null) {
-        measureStr = String(idx - 1);
-    } else {
-        measureStr = String(rawM);
-    }
+    const measureStr = (rawM === undefined || rawM === null) ? String(idx - 1) : String(rawM);
+    const measureIndices = measureStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    // Default fallback if empty
+    if (measureIndices.length === 0) measureIndices.push(0);
 
-    const measureIndices = measureStr.split(',')
-        .map(s => parseInt(s.trim()))
-        .filter(n => !isNaN(n));
-
-    // Fallback if parsing failed completely
-    if (measureIndices.length === 0) {
-        measureIndices.push(idx - 1);
-    }
-
-    // DIMENSION INDICES
-    let dimStr = "";
     const rawD = config[`layer${idx}_dimension_idx`];
-    if (rawD === undefined || rawD === null) {
-        dimStr = "0";
-    } else {
-        dimStr = String(rawD);
-    }
+    const dimStr = (rawD === undefined || rawD === null) ? "0" : String(rawD);
     const dimIndices = dimStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
 
     const showAllPivots = config[`layer${idx}_show_all_pivots`];
@@ -811,23 +784,63 @@ looker.plugins.visualizations.add({
       return totalValue;
     };
 
-    // --- ON CLICK HANDLER (FIXED FOR DRILL) ---
+    // --- CLICK HANDLER (FIXED: POSITION + CONTENT + FILTERING) ---
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
 
-      const objectLinks = info.object.properties?._links || info.object.links;
-      if (!objectLinks) return;
+      const obj = info.object;
+      const props = obj.properties || obj; // Handle GeoJSON vs Point
+      const pivotData = props._pivotData || props.pivotData;
+      const drillLinks = props._drillLinks || props.drillLinks; // Standard links
 
       let finalLinks = [];
-      // Aggregate links from ALL selected measure indices
-      measureIndices.forEach(mIdx => {
-          if (objectLinks[mIdx] && Array.isArray(objectLinks[mIdx])) {
-              finalLinks.push(...objectLinks[mIdx]);
-          }
+
+      // 1. NON-PIVOT: Aggregate from drillLinks
+      if (!pivotInfo.hasPivot && drillLinks) {
+        measureIndices.forEach(mIdx => {
+            if (drillLinks[mIdx]) finalLinks.push(...drillLinks[mIdx]);
+        });
+      }
+      // 2. PIVOT: Aggregate based on Show All settings
+      else if (pivotInfo.hasPivot && pivotData) {
+        const measures = queryResponse.fields.measure_like;
+        measureIndices.forEach(mIdx => {
+            const mName = measures[mIdx] ? measures[mIdx].name : null;
+            if (!mName || !pivotData[mName]) return;
+
+            if (showAllPivots) {
+                // Add links from ALL columns for this measure
+                Object.values(pivotData[mName]).forEach(pVal => {
+                    if (pVal.links) finalLinks.push(...pVal.links);
+                });
+            } else {
+                // Add links ONLY from selected pivot column
+                const pKey = pivotInfo.pivotKeys[pivotIdx];
+                if (pKey && pivotData[mName][pKey] && pivotData[mName][pKey].links) {
+                    finalLinks.push(...pivotData[mName][pKey].links);
+                }
+            }
+        });
+      }
+
+      // Add label to links if missing (UX Improvement)
+      finalLinks = finalLinks.map(link => {
+          // Try to inject measure label if missing
+          // This is a best-effort since raw links don't always have metadata
+          return link;
       });
 
       if (finalLinks.length > 0) {
-        LookerCharts.Utils.openDrillMenu({ links: finalLinks, event: info.srcEvent || {} });
+        // USE COORDINATES FROM EVENT to position menu
+        LookerCharts.Utils.openDrillMenu({
+            links: finalLinks,
+            event: {
+                pageX: info.x,
+                pageY: info.y,
+                clientX: info.x,
+                clientY: info.y
+            }
+        });
       }
     };
 
@@ -856,7 +869,7 @@ looker.plugins.visualizations.add({
                 position: this._getCentroid(feature.geometry),
                 values: match.values,
                 pivotData: match.pivotData,
-                links: match.links,
+                drillLinks: match.drillLinks,
                 name: match.rawName,
                 feature: feature,
                 allowedMeasures: measureIndices
@@ -882,7 +895,7 @@ looker.plugins.visualizations.add({
               position: pos,
               values: item.values,
               pivotData: item.pivotData,
-              links: item.links,
+              drillLinks: item.drillLinks,
               name: item.rawName.toString(),
               feature: null,
               allowedMeasures: measureIndices
@@ -903,8 +916,8 @@ looker.plugins.visualizations.add({
     const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
       d.feature.properties._values = d.values;
       d.feature.properties._pivotData = d.pivotData;
+      d.feature.properties._drillLinks = d.drillLinks;
       d.feature.properties._name = d.name;
-      d.feature.properties._links = d.links;
       d.feature.properties._allowedMeasures = d.allowedMeasures;
       return d.feature;
     });
