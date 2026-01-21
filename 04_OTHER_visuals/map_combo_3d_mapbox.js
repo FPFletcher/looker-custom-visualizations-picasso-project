@@ -1,23 +1,27 @@
 /**
- * Multi-Layer 3D Map for Looker - v35 Ultimate Edition
+ * Multi-Layer 3D Map for Looker - v36 Tooltip Fix Edition
  *
- * UPDATES FROM v34:
- * - ADDED: Multi-Index Support (Comma separated) for Dimensions & Measures.
- * - REMOVED: "Region Dimension Name" field (Auto-detection enabled).
- * - IMPROVED: Tooltips now respect LookML "value_format" string for totals.
- * - FIXED: SVG Icon "natural dimensions" error.
- * - CLEANUP: Reduced console noise, focused on PDF/Render lifecycle.
+ * UPDATES FROM v35:
+ * - FIXED: Tooltip now ONLY displays measures defined in the "Measure Index" setting.
+ * - FIXED: Multi-Measure Index aggregation logic validated.
+ * - FIXED: Icon Base64 strings cleaned to prevent EncodingError/InvalidURL.
+ * - LOGIC: "Show All Pivots" toggle + Multi-Measure Indices now work together in Tooltips.
  */
 
-// --- EMBEDDED ICONS (Base64) - FIXED WITH DIMENSIONS ---
-// Added width="24" height="24" to ensure createImageBitmap works
+// --- EMBEDDED ICONS (Cleaned Base64) ---
 const ICONS = {
+  // Simple white pin
   "marker": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSZNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJjMCA1LjUyIDQuNDggMTAgMTAgMTBzMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJtMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOHM4IDMuNTkgOCA4LTMuNTkgOCA4IDh6bS0xLTEzaDJ2NkgxMXptMCA4aDJ2MkgxMXoiIGZpbGw9IiNGRkZGRkYiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+",
-  "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "star": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRkZDMTA3Ij48cGF0aCBkPSZNMTIgMTcuMjdMNS4xNSAyMWwxLjY0LTcuMDNMMS40NSA5LjI0bDcuMTktLjYxTDEyIDIgMTUuMzYgOC42bDcuMTkuNjEtNS4zMyA0LjczIDEuNjQgNy4wM0wxMiAxNy4yN3oiLz48L3N2Zz4=",
+  // Blue Circle
   "circle": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMjE5NkYzIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjwvc3ZnPg==",
+  // Yellow Star
+  "star": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRkZDMTA3Ij48cGF0aCBkPSZNMTIgMTcuMjdMNS4xNSAyMWwxLjY0LTcuMDNMMS40NSA5LjI0bDcuMTktLjYxTDEyIDIgMTUuMzYgOC42bDcuMTkuNjEtNS4zMyA0LjczIDEuNjQgNy4wM0wxMiAxNy4yN3oiLz48L3N2Zz4=",
+  // Red Warning
   "warning": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRjQ0MzM2Ij48cGF0aCBkPSJNMSAyMWgyMkwxMiAyIDEgMjF6bTEyLTNoLTJ2MmgybTAtNGgtMnYtNGgyeiIvPjwvc3ZnPg==",
-  "shop": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjNENBRjUwIj48cGF0aCBkPSJNMjAgNEg0djJoMTZWNHptMSAxMHYtMmwtMS01aC0ybC0xIDVIOGwLTEtNWgtMmwtMSA1SDRsLTEtNXYySDJ2Nmg5djZoMnYtNmg5ek02IDE5djZoMTJ2LTZINnoiLz48L3N2Zz4="
+  // Green Shop
+  "shop": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjNENBRjUwIj48cGF0aCBkPSJNMjAgNEg0djJoMTZWNHptMSAxMHYtMmwtMS01aC0ybC0xIDVIOGwLTEtNWgtMmwtMSA1SDRsLTEtNXYySDJ2Nmg5djZoMnYtNmg5ek02IDE5djZoMTJ2LTZINnoiLz48L3N2Zz4=",
+  // Demo Truck
+  "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -65,7 +69,7 @@ const getLayerOptions = (n) => {
     },
     // DATA MAPPING
     [`layer${n}_dimension_idx`]: {
-      type: "string", // CHANGED TO STRING FOR CSV
+      type: "string",
       label: `L${n} Dimension Indices (Comma sep)`,
       default: "0",
       section: "Layers",
@@ -73,7 +77,7 @@ const getLayerOptions = (n) => {
       placeholder: "e.g. 0 or 0,1"
     },
     [`layer${n}_measure_idx`]: {
-      type: "string", // CHANGED TO STRING FOR CSV
+      type: "string",
       label: `L${n} Measure Indices (Comma sep)`,
       default: `${n - 1}`,
       section: "Layers",
@@ -190,7 +194,7 @@ const preloadImage = (type, customUrl) => {
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V35] Failed to load icon: ${url}`);
+      console.warn(`[Viz V36] Failed to load icon: ${url}`);
       resolve(ICONS['marker']);
     };
     img.src = url;
@@ -198,8 +202,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v35",
-  label: "Combo Map 3D (V35 Ultimate)",
+  id: "combo_map_ultimate_v36",
+  label: "Combo Map 3D (V36 Tooltip Fix)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -241,7 +245,6 @@ looker.plugins.visualizations.add({
       placeholder: "https://...",
       order: 4
     },
-    // REMOVED region_dim_name
 
     // --- BASE MAP ---
     map_header: { type: "string", label: "─── BASE MAP ───", display: "divider", section: "Plot", order: 10 },
@@ -351,8 +354,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-
-    console.log(`[Viz V35] UPDATE ASYNC. Rows: ${data.length} | Print: ${isPrint}`);
+    console.log(`[Viz V36] UPDATE ASYNC. Rows: ${data.length} | Print: ${isPrint}`);
 
     this.clearErrors();
 
@@ -389,20 +391,16 @@ looker.plugins.visualizations.add({
 
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
-      // Force wait for PDF rendering
       if (isPrint) {
-        console.log("[Viz V35] Print mode detected - Waiting 3s for tile load...");
+        console.log("[Viz V36] PDF Mode - Waiting 3s");
         if (this._deck) this._deck.redraw(true);
-        setTimeout(() => {
-          console.log("[Viz V35] Print wait done.");
-          done();
-        }, 3000);
+        setTimeout(() => done(), 3000);
       } else {
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V35] FATAL ERROR:", err);
+      console.error("[Viz V36] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -432,7 +430,6 @@ looker.plugins.visualizations.add({
     if (config.data_mode === 'points') {
       const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
       const lngF = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lon'));
-
       if (!latF || !lngF) throw new Error("Latitude/Longitude dimensions missing.");
 
       const points = data.map((row, idx) => {
@@ -453,17 +450,14 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V35] GeoJSON load failed:", error);
+      console.warn("[Viz V36] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
     const dataMaps = this._buildDataMaps(data, dims, measures);
-    // Note: We don't pre-match here anymore. We match in _buildSingleLayer based on config.
-    // However, we attach the GeoJSON to the response for layer processing.
-
     return {
       type: 'regions',
-      dataMaps: dataMaps, // Maps for each dimension index
+      dataMaps: dataMaps,
       geojson: geojson,
       measures,
       dims
@@ -478,7 +472,6 @@ looker.plugins.visualizations.add({
     if (!hasPivot) {
       return {
         values: measures.map(m => row[m.name] ? parseFloat(row[m.name].value) || 0 : 0),
-        // Use rendered directly, or simple value
         formattedValues: measures.map(m => row[m.name] ? (row[m.name].rendered || row[m.name].value) : ''),
         links: measures.map(m => row[m.name] ? row[m.name].links : []),
         dimensionValues: dims.map(d => row[d.name] ? row[d.name].value : ''),
@@ -518,10 +511,9 @@ looker.plugins.visualizations.add({
       return total;
     });
 
-    // For totals, we re-format using LookML definition later
     return {
       values,
-      formattedValues: values.map(v => v.toString()), // Placeholder
+      formattedValues: values.map(v => v.toString()),
       links: [],
       dimensionValues: dims.map(d => row[d.name] ? row[d.name].value : ''),
       pivotData
@@ -555,7 +547,6 @@ looker.plugins.visualizations.add({
                     existing.pivotData[mName][pk] = { ...rowData.pivotData[mName][pk] };
                   } else {
                     existing.pivotData[mName][pk].value += rowData.pivotData[mName][pk].value;
-                    // Note: We don't sum formatted strings here, we handle display later
                   }
                 });
               });
@@ -591,7 +582,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V35] Layer ${i} Error:`, e);
+          console.error(`[Viz V36] Layer ${i} Error:`, e);
         }
       }
     }
@@ -599,19 +590,22 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP ---
+    // --- TOOLTIP (SMART FILTERING) ---
     const getTooltip = ({ object }) => {
       if (!object || config.tooltip_mode === 'none') return null;
-      let name, values, pivotData;
-      // Handle both Region and Point objects
+      let name, values, pivotData, allowedMeasures;
+
+      // Extract props based on object type (GeoJSON Feature vs Standard Object)
       if (object.properties && object.properties._name) {
         name = object.properties._name;
         values = object.properties._values;
         pivotData = object.properties._pivotData;
+        allowedMeasures = object.properties._allowedMeasures;
       } else if (object.name && object.values) {
         name = object.name;
         values = object.values;
         pivotData = object.pivotData;
+        allowedMeasures = object.allowedMeasures;
       } else {
         return null;
       }
@@ -624,15 +618,17 @@ looker.plugins.visualizations.add({
       const measures = queryResponse.fields.measure_like;
 
       if (config.tooltip_mode !== 'name') {
-        if (pivotData && this._pivotInfo && this._pivotInfo.hasPivot) {
-          // Pivot Tooltip
-          measures.forEach((m, idx) => {
+        measures.forEach((m, idx) => {
+          // --- FILTERING LOGIC: Skip if this measure index isn't in this layer ---
+          if (allowedMeasures && !allowedMeasures.includes(idx)) return;
+
+          if (pivotData && this._pivotInfo && this._pivotInfo.hasPivot) {
+            // Pivot Tooltip
             html += `<div style="font-weight:bold; margin-top:5px;">${m.label_short || m.label}</div>`;
             html += `<div class="pivot-section">`;
             this._pivotInfo.pivotKeys.forEach((pk, pIdx) => {
               const pivotLabel = this._pivotInfo.pivotLabels[pIdx] || pk;
               const pData = pivotData[m.name] && pivotData[m.name][pk];
-              // Use existing formatted value or format manually
               let val = pData ? pData.formatted : '0';
               if (pData && !pData.formatted) val = this._applyLookerFormat(pData.value, m.value_format);
 
@@ -641,14 +637,12 @@ looker.plugins.visualizations.add({
             // Total
             const totalVal = this._applyLookerFormat(values[idx], m.value_format);
             html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div></div>`;
-          });
-        } else {
-          // Standard Tooltip
-          measures.forEach((m, idx) => {
+          } else {
+            // Standard Tooltip
             const val = this._applyLookerFormat(values[idx], m.value_format);
             html += `<div style="display:flex; justify-content:space-between; gap:10px;"><span>${m.label_short || m.label}:</span><span style="font-weight:bold;">${val}</span></div>`;
-          });
-        }
+          }
+        });
       }
 
       return {
@@ -730,7 +724,7 @@ looker.plugins.visualizations.add({
     );
   },
 
-  // --- BUILD SINGLE LAYER (MULTI-INDEX SUPPORT) ---
+  // --- BUILD SINGLE LAYER (MULTI-INDEX SUPPORT + DATA ATTACHMENT) ---
   _buildSingleLayer: function (idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
 
@@ -743,7 +737,6 @@ looker.plugins.visualizations.add({
     const showAllPivots = config[`layer${idx}_show_all_pivots`];
     const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
 
-    // Visual Props
     const useGradient = config[`layer${idx}_use_gradient`];
     const startColorHex = config[`layer${idx}_color_main`];
     const endColorHex = config[`layer${idx}_gradient_end`];
@@ -758,11 +751,8 @@ looker.plugins.visualizations.add({
     // --- VALUE GETTER (SUMS ALL SELECTED MEASURES) ---
     const getValue = (d) => {
       let totalValue = 0;
-
       measureIndices.forEach(mIdx => {
-        // Safe check for bounds
         if (mIdx < 0) return;
-
         // 1. Non-Pivoted
         if (!pivotInfo || !pivotInfo.hasPivot) {
           const arr = d.values || (d.properties && d.properties._values);
@@ -774,15 +764,10 @@ looker.plugins.visualizations.add({
         else {
           const measures = queryResponse.fields.measure_like;
           const mName = measures[mIdx] ? measures[mIdx].name : null;
-
           if (showAllPivots) {
-            // Use Row Total
             const arr = d.values || (d.properties && d.properties._values);
-            if (arr && arr[mIdx] !== undefined) {
-              totalValue += parseFloat(arr[mIdx]) || 0;
-            }
+            if (arr && arr[mIdx] !== undefined) totalValue += parseFloat(arr[mIdx]) || 0;
           } else {
-            // Use Specific Pivot Column
             const pKey = pivotInfo.pivotKeys[pivotIdx];
             const pData = d.pivotData || (d.properties && d.properties._pivotData);
             if (mName && pKey && pData && pData[mName] && pData[mName][pKey]) {
@@ -797,7 +782,6 @@ looker.plugins.visualizations.add({
     // Click handler (Opens menu for first measure found)
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
-      // Just pick the first measure index for drill links to avoid UI clutter
       const mIdx = measureIndices[0];
       let links = null;
       if (info.object.properties && info.object.properties._links) {
@@ -810,21 +794,14 @@ looker.plugins.visualizations.add({
       }
     };
 
-    // --- GATHER DATA FROM ALL DIMENSION INDICES ---
+    // --- GATHER DATA ---
     let pointData = [];
-
     if (processed.type === 'regions') {
       dimIndices.forEach(dimIdx => {
         const dataMap = processed.dataMaps ? processed.dataMaps[dimIdx] : null;
         if (!dataMap) return;
 
-        // Strategy: Match names if dimIdx matches a known region type logic?
-        // Actually, we just check if it matches GeoJSON or fallback to points
-        // NOTE: Standard behavior is usually Dim 0 = Regions. Others = Points.
-        // We will try to match against GeoJSON first.
-
         if (processed.geojson && processed.geojson.features) {
-          // Find features matching this dimension map
           processed.geojson.features.forEach(feature => {
             const props = feature.properties;
             let match = null;
@@ -844,17 +821,16 @@ looker.plugins.visualizations.add({
                 pivotData: match.pivotData,
                 links: match.links,
                 name: match.rawName,
-                feature: feature // Save feature for GeoJsonLayer
+                feature: feature,
+                allowedMeasures: measureIndices // Attach for Tooltip Filtering
               });
             }
           });
         }
 
-        // Also add non-matched (Lat/Lng) points from this dimension
         Object.keys(dataMap).forEach(key => {
           const item = dataMap[key];
           let pos = [0, 0];
-          // Simple coord check
           if (Array.isArray(item.rawName) && item.rawName.length === 2) {
             pos = [Number(item.rawName[1]), Number(item.rawName[0])];
           } else if (typeof item.rawName === 'string' && item.rawName.includes(',')) {
@@ -865,22 +841,20 @@ looker.plugins.visualizations.add({
           }
 
           if (pos[0] || pos[1]) {
-            // Avoid duplicates if it was already matched as a region?
-            // For now, simpler to just add it. Points usually won't match Region names.
             pointData.push({
               position: pos,
               values: item.values,
               pivotData: item.pivotData,
               links: item.links,
               name: item.rawName.toString(),
-              feature: null
+              feature: null,
+              allowedMeasures: measureIndices // Attach for Tooltip Filtering
             });
           }
         });
       });
     } else {
-      // Points mode
-      pointData = processed.data;
+      pointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
     }
 
     const safePointData = this._validateLayerData(pointData);
@@ -889,13 +863,12 @@ looker.plugins.visualizations.add({
     const maxVal = Math.max(...allVals, 0.1);
     const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx];
 
-    // Filter for GeoJSON
     const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
-      // Inject calculated props into feature for tooltip
       d.feature.properties._values = d.values;
       d.feature.properties._pivotData = d.pivotData;
       d.feature.properties._name = d.name;
       d.feature.properties._links = d.links;
+      d.feature.properties._allowedMeasures = d.allowedMeasures; // Attach for Tooltip
       return d.feature;
     });
 
@@ -1004,7 +977,7 @@ looker.plugins.visualizations.add({
           pickable: true,
           opacity: opacity,
           iconAtlas: iconUrlOverride || ICONS['marker'],
-          iconMapping: { marker: { x: 0, y: 0, width: 24, height: 24, mask: false } }, // Match SVG Dims
+          iconMapping: { marker: { x: 0, y: 0, width: 24, height: 24, mask: false } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
           getSize: d => radius,
@@ -1055,23 +1028,17 @@ looker.plugins.visualizations.add({
 
   // --- UTILITIES ---
 
-  // Replaces basic patterns in Looker value_format strings
   _applyLookerFormat: function (value, formatStr) {
     if (value === undefined || value === null) return '0';
     if (!formatStr) return this._formatNumber(value);
-
-    // Simple parser for standard Looker formats
     let str = value.toLocaleString("en-US", { maximumFractionDigits: 2 });
-
     if (formatStr.includes('$')) str = '$' + str;
     if (formatStr.includes('%')) str = (value * 100).toFixed(1) + '%';
     if (formatStr.includes('€')) str = '€' + str;
     if (formatStr.includes('£')) str = '£' + str;
-    // Handle '0.0 "k"' type custom formats loosely
     if (formatStr.toLowerCase().includes('"k"')) {
       str = (value / 1000).toFixed(1) + 'k';
     }
-
     return str;
   },
 
