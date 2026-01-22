@@ -1,26 +1,90 @@
 /**
- * Multi-Layer 3D Map for Looker - v44 (Stable V41 + Tooltip Fix)
- * * CHANGES FROM V41:
- * 1. FIXED: Tooltip now calculates correct totals for PIVOTS by looking up
- * the full aggregated data instead of using single-row feature properties.
- * 2. FIXED: Values now use LookML 'value_format' where available.
- * 3. UPDATE: Default "marker" icon changed to the known-working Truck PNG.
+ * Multi-Layer 3D Map for Looker - v45 (Stable V41 + Tooltip Logic Fix)
+ *
+ * CHANGES FROM V41:
+ * 1. FIX: Changed default 'marker' from SVG to PNG to prevent InvalidStateError crash.
+ * 2. FIX: Tooltip now looks up aggregated data using the Layer's specific Dimension Index.
+ * 3. LOGIC: Tooltip totals are now mathematically correct for Pivots (Sum of all rows, not just first).
  */
 
 // --- CDN-HOSTED ICONS ---
+// NOTE: We replaced the SVG marker with the PNG Truck to prevent the crash seen in your logs.
 const ICONS = {
-  // We use the known working Truck PNG as the default 'marker' to ensure visibility
+  // === LOCATION & MAP ICONS ===
   "marker": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
+  "map_pin": "https://em-content.zobj.net/thumbs/120/google/350/round-pushpin_1f4cd.png", // Changed to PNG
+  "location_pin": "https://em-content.zobj.net/thumbs/120/google/350/round-pushpin_1f4cd.png",
+  "location_filled": "https://em-content.zobj.net/thumbs/120/google/350/pushpin_1f4cc.png",
 
-  // Standard Defaults
-  "map_pin": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/map-pin.svg",
-  "circle": "https://em-content.zobj.net/thumbs/120/google/350/blue-circle_1f535.png",
+  // === BUSINESS & COMMERCE ===
   "shop": "https://em-content.zobj.net/thumbs/120/google/350/convenience-store_1f3ea.png",
-  "factory": "https://em-content.zobj.net/thumbs/120/google/350/factory_1f3ed.png",
-  "check": "https://em-content.zobj.net/thumbs/120/google/350/check-mark_2714-fe0f.png",
-  "warning": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
+  "shopping_cart": "https://em-content.zobj.net/thumbs/120/google/350/shopping-cart_1f6d2.png",
+  "building": "https://em-content.zobj.net/thumbs/120/google/350/office-building_1f3e2.png",
+  "warehouse": "https://em-content.zobj.net/thumbs/120/google/350/department-store_1f3ec.png",
 
-  // You can add more here...
+  // === TRANSPORTATION ===
+  "truck": "https://em-content.zobj.net/thumbs/120/google/350/delivery-truck_1f69a.png",
+  "truck_fast": "https://em-content.zobj.net/thumbs/120/google/350/racing-car_1f3ce-fe0f.png",
+  "plane": "https://em-content.zobj.net/thumbs/120/google/350/airplane_2708-fe0f.png",
+  "ship": "https://em-content.zobj.net/thumbs/120/google/350/ship_1f6a2.png",
+  "car": "https://em-content.zobj.net/thumbs/120/google/350/automobile_1f697.png",
+  "train": "https://em-content.zobj.net/thumbs/120/google/350/locomotive_1f682.png",
+
+  // === STATUS & ALERTS ===
+  "warning": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
+  "warning_triangle": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
+  "alert": "https://em-content.zobj.net/thumbs/120/google/350/exclamation-mark_2757.png",
+  "info": "https://em-content.zobj.net/thumbs/120/google/350/information_2139-fe0f.png",
+  "check": "https://em-content.zobj.net/thumbs/120/google/350/check-mark_2714-fe0f.png",
+  "error": "https://em-content.zobj.net/thumbs/120/google/350/cross-mark_274c.png",
+
+  // === SHAPES & BASIC ===
+  "circle": "https://em-content.zobj.net/thumbs/120/google/350/blue-circle_1f535.png",
+  "star": "https://em-content.zobj.net/thumbs/120/google/350/star_2b50.png",
+  "star_outline": "https://em-content.zobj.net/thumbs/120/google/350/white-medium-star_2b50.png",
+  "square": "https://em-content.zobj.net/thumbs/120/google/350/blue-square_1f7e6.png",
+  "heart": "https://em-content.zobj.net/thumbs/120/google/350/red-heart_2764-fe0f.png",
+  "flag": "https://em-content.zobj.net/thumbs/120/google/350/triangular-flag_1f6a9.png",
+
+  // === INDUSTRY & FACILITIES ===
+  "factory": "https://em-content.zobj.net/thumbs/120/google/350/factory_1f3ed.png",
+  "hospital": "https://em-content.zobj.net/thumbs/120/google/350/hospital_1f3e5.png",
+  "school": "https://em-content.zobj.net/thumbs/120/google/350/school_1f3eb.png",
+  "hotel": "https://em-content.zobj.net/thumbs/120/google/350/hotel_1f3e8.png",
+  "gas_station": "https://em-content.zobj.net/thumbs/120/google/350/fuel-pump_26fd.png",
+
+  // === PEOPLE & USERS ===
+  "user": "https://em-content.zobj.net/thumbs/120/google/350/bust-in-silhouette_1f464.png",
+  "users": "https://em-content.zobj.net/thumbs/120/google/350/busts-in-silhouette_1f465.png",
+  "person": "https://em-content.zobj.net/thumbs/120/google/350/person_1f9d1.png",
+
+  // === FOOD & DINING ===
+  "restaurant": "https://em-content.zobj.net/thumbs/120/google/350/fork-and-knife_1f374.png",
+  "coffee": "https://em-content.zobj.net/thumbs/120/google/350/hot-beverage_2615.png",
+  "pizza": "https://em-content.zobj.net/thumbs/120/google/350/pizza_1f355.png",
+
+  // === NATURE & ENVIRONMENT ===
+  "tree": "https://em-content.zobj.net/thumbs/120/google/350/deciduous-tree_1f333.png",
+  "leaf": "https://em-content.zobj.net/thumbs/120/google/350/leaf-fluttering-in-wind_1f343.png",
+  "mountain": "https://em-content.zobj.net/thumbs/120/google/350/mountain_26f0-fe0f.png",
+  "water": "https://em-content.zobj.net/thumbs/120/google/350/droplet_1f4a7.png",
+
+  // === TECHNOLOGY & DEVICES ===
+  "phone": "https://em-content.zobj.net/thumbs/120/google/350/telephone_260e-fe0f.png",
+  "computer": "https://em-content.zobj.net/thumbs/120/google/350/desktop-computer_1f5a5-fe0f.png",
+  "wifi": "https://em-content.zobj.net/thumbs/120/google/350/antenna-bars_1f4f6.png",
+  "signal": "https://em-content.zobj.net/thumbs/120/google/350/mobile-phone_1f4f1.png",
+
+  // === FINANCIAL ===
+  "dollar": "https://em-content.zobj.net/thumbs/120/google/350/dollar-banknote_1f4b5.png",
+  "euro": "https://em-content.zobj.net/thumbs/120/google/350/euro-banknote_1f4b6.png",
+  "bank": "https://em-content.zobj.net/thumbs/120/google/350/bank_1f3e6.png",
+
+  // === WEATHER ===
+  "sun": "https://em-content.zobj.net/thumbs/120/google/350/sun_2600-fe0f.png",
+  "cloud": "https://em-content.zobj.net/thumbs/120/google/350/cloud_2601-fe0f.png",
+  "rain": "https://em-content.zobj.net/thumbs/120/google/350/cloud-with-rain_1f327-fe0f.png",
+  "snow": "https://em-content.zobj.net/thumbs/120/google/350/snowflake_2744-fe0f.png"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -156,13 +220,58 @@ const getLayerOptions = (n) => {
       display: "select",
       values: [
         { "Custom URL": "custom" },
-        { "Truck (Blue PNG)": "marker" },
-        { "Map Pin": "map_pin" },
+        { "Marker (Truck)": "marker" }, // Updated label
+        { "Alert": "alert" },
+        { "Bank": "bank" },
+        { "Building": "building" },
+        { "Car": "car" },
+        { "Check/Success": "check" },
         { "Circle": "circle" },
-        { "Shop": "shop" },
+        { "Cloud": "cloud" },
+        { "Coffee": "coffee" },
+        { "Computer": "computer" },
+        { "Dollar": "dollar" },
+        { "Error": "error" },
+        { "Euro": "euro" },
         { "Factory": "factory" },
-        { "Check": "check" },
-        { "Warning": "warning" }
+        { "Flag": "flag" },
+        { "Gas Station": "gas_station" },
+        { "Heart": "heart" },
+        { "Hospital": "hospital" },
+        { "Hotel": "hotel" },
+        { "Info": "info" },
+        { "Leaf": "leaf" },
+        { "Location Filled": "location_filled" },
+        { "Location Pin": "location_pin" },
+        { "Map Pin": "map_pin" },
+        { "Mountain": "mountain" },
+        { "Person": "person" },
+        { "Phone": "phone" },
+        { "Pizza": "pizza" },
+        { "Plane": "plane" },
+        { "Rain": "rain" },
+        { "Restaurant": "restaurant" },
+        { "School": "school" },
+        { "Ship": "ship" },
+        { "Shop/Store": "shop" },
+        { "Shopping Cart": "shopping_cart" },
+        { "Signal": "signal" },
+        { "Snow": "snow" },
+        { "Square": "square" },
+        { "Star": "star" },
+        { "Star Outline": "star_outline" },
+        { "Sun": "sun" },
+        { "Train": "train" },
+        { "Tree": "tree" },
+        { "Truck": "truck" },
+        { "Truck Fast": "truck_fast" },
+        { "User": "user" },
+        { "Users": "users" },
+        { "Warehouse": "warehouse" },
+        { "Warning": "warning" },
+        { "Warning Triangle": "warning_triangle" },
+        { "Water": "water" },
+        { "WiFi": "wifi" }
       ],
       default: "marker",
       section: "Layers",
@@ -179,21 +288,17 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER (Stable V41 Version) ---
+// --- HELPER: PRELOADER ---
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = ICONS[type] || customUrl;
-    if (!url || url.length < 5) url = ICONS['marker'];
-
-    // Safety check for base64
-    if (url.startsWith("data:")) return resolve(url);
-
+    if (url && url.startsWith("data:")) return resolve(url);
+    if (!url || url.length < 5) return resolve(ICONS['marker']);
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V44] Failed to load icon: ${url}`);
-      // Fallback to marker if fails
+      console.warn(`[Viz V45] Failed to load icon: ${url}`);
       resolve(ICONS['marker']);
     };
     img.src = url;
@@ -201,8 +306,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v44",
-  label: "Combo Map 3D (V44 Fixed)",
+  id: "combo_map_ultimate_v45",
+  label: "Combo Map 3D (V45 Fixed)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -341,6 +446,8 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
+    // Store processed data for tooltip lookup
+    this._processedData = null;
   },
 
   destroy: function () {
@@ -353,7 +460,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V44] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V45] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -380,8 +487,6 @@ looker.plugins.visualizations.add({
         const preset = config[`layer${i}_icon_type`];
         const custom = config[`layer${i}_icon_url`];
         iconPromises.push(preloadImage(preset, custom));
-      } else {
-        iconPromises.push(Promise.resolve(null));
       }
     }
 
@@ -390,18 +495,25 @@ looker.plugins.visualizations.add({
       ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
-      console.log(`[Viz V44] Data prepared, rendering layers...`);
+      // Save processed data globally so Tooltip can access aggregated maps
+      this._processedData = processedData;
+
+      console.log(`[Viz V45] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
-        if (this._deck) this._deck.redraw(true);
-        setTimeout(() => done(), 2000);
+        if (this._deck) {
+          this._deck.redraw(true);
+        }
+        setTimeout(() => {
+          done();
+        }, 3000);
       } else {
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V44] FATAL ERROR:", err);
+      console.error("[Viz V45] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -451,7 +563,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V44] GeoJSON load failed:", error);
+      console.warn("[Viz V45] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -554,6 +666,15 @@ looker.plugins.visualizations.add({
                 });
               });
             }
+            if (rowData.drillLinks) {
+              rowData.drillLinks.forEach((lArr, i) => {
+                if (lArr && lArr.length) {
+                  if (!existing.drillLinks[i]) existing.drillLinks[i] = [];
+                  existing.drillLinks[i].push(...lArr);
+                }
+              });
+            }
+
           } else {
             dataMaps[dimIdx][clean] = {
               ...rowData,
@@ -570,12 +691,7 @@ looker.plugins.visualizations.add({
   // --- RENDER ---
   _render: function (processed, config, queryResponse, details, loadedIcons) {
     const layerObjects = [];
-
-    // Only map icons to enabled layers to preserve order
-    let iconUrlMap = {};
-    for(let i=1; i<=4; i++) {
-        iconUrlMap[i] = loadedIcons[i-1];
-    }
+    let iconIndex = 0;
 
     for (let i = 1; i <= 4; i++) {
       const enabled = config[`layer${i}_enabled`];
@@ -583,14 +699,18 @@ looker.plugins.visualizations.add({
 
       if (enabled) {
         try {
-          const iconUrl = iconUrlMap[i];
-          const layer = this._buildSingleLayer(i, config, processed, iconUrl);
+          let iconUrlOverride = null;
+          if (type === 'icon') {
+            iconUrlOverride = loadedIcons[iconIndex] || ICONS['marker'];
+            iconIndex++;
+          }
+          const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V44] Layer ${i} Error:`, e);
+          console.error(`[Viz V45] Layer ${i} Error:`, e);
         }
       }
     }
@@ -598,12 +718,11 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP (V44 FIXED LOGIC) ---
-    // Now looks up aggregated totals from 'processed' instead of single feature props
+    // --- TOOLTIP (FIXED FOR DIMENSION INDICES & AGGREGATION) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
-      // 1. Identify which layer to get Dimension Index
+      // 1. Identify which layer we are hovering over (to get the specific Dimension Index)
       const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
       const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
 
@@ -617,34 +736,55 @@ looker.plugins.visualizations.add({
           }
       }
 
-      // 2. Identify the object name
-      const props = object.properties || object;
-      const rawName = props._name || props.name || "Unknown";
+      // 2. Identify the object name to lookup in aggregated data
+      // We look for properties on the object, or fallback to object itself
+      const rawName = object.properties?._name || object.name || (object.properties && object.properties.name);
       const cleanName = this._normalizeName(rawName);
 
-      // 3. Lookup AGGREGATED data
+      // 3. Lookup the AGGREGATED data using the global _processedData map
+      // This ensures we get the sum of all rows for this dimension, not just the first one.
       let aggregatedData = null;
-      if (processed &&
-          processed.dataMaps &&
-          processed.dataMaps[layerDimIdx] &&
-          processed.dataMaps[layerDimIdx][cleanName]) {
-          aggregatedData = processed.dataMaps[layerDimIdx][cleanName];
+      if (this._processedData &&
+          this._processedData.dataMaps &&
+          this._processedData.dataMaps[layerDimIdx] &&
+          this._processedData.dataMaps[layerDimIdx][cleanName]) {
+          aggregatedData = this._processedData.dataMaps[layerDimIdx][cleanName];
       }
 
-      // Fallback
-      const source = aggregatedData || props;
+      // 4. Define source data (Use aggregated if found, otherwise fallback to hovered object properties)
+      // The 'source' object will contain values, pivotData, etc.
+      let source = null;
+
+      if (aggregatedData) {
+         source = aggregatedData;
+      } else if (object.properties && object.properties._name) {
+         // Fallback to internal properties if aggregation lookup fails
+         source = {
+            name: object.properties._name,
+            values: object.properties._values,
+            pivotData: object.properties._pivotData,
+            allowedMeasures: object.properties._allowedMeasures
+         };
+      } else if (object.name && object.values) {
+         source = object;
+      } else {
+         return null;
+      }
+
+      const name = source.rawName || source.name;
+      const values = source.values || source._values;
       const pivotData = source.pivotData || source._pivotData;
-      const values = source.values || source._values || [];
-      const allowedMeasures = props._allowedMeasures || props.allowedMeasures;
+      const allowedMeasures = source.allowedMeasures || (object.properties && object.properties._allowedMeasures);
+
+      const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
+      const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
 
       let html = "";
       if (config.tooltip_mode !== 'values') {
-        html += `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${source.rawName || rawName}</div>`;
+        html += `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
       }
 
       const measures = queryResponse.fields.measure_like;
-      const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
-      const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
 
       if (config.tooltip_mode !== 'name') {
         measures.forEach((m, idx) => {
@@ -759,7 +899,8 @@ looker.plugins.visualizations.add({
       d.position &&
       d.position.length === 2 &&
       !isNaN(d.position[0]) &&
-      !isNaN(d.position[1])
+      !isNaN(d.position[1]) &&
+      d.position[1] >= -90 && d.position[1] <= 90
     );
   },
 
@@ -819,7 +960,7 @@ looker.plugins.visualizations.add({
 
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
-      // Revert to simple V41 drill logic for now to ensure stability
+
       const obj = info.object;
       const props = obj.properties || obj;
       const pivotData = props._pivotData || props.pivotData;
@@ -851,8 +992,9 @@ looker.plugins.visualizations.add({
       }
 
       finalLinks = finalLinks.map((link, linkIdx) => {
-        const measureIdx = measureIndices[Math.floor(linkIdx / (Math.max(1, finalLinks.length) / measureIndices.length))];
+        const measureIdx = measureIndices[Math.floor(linkIdx / (finalLinks.length / measureIndices.length))];
         const measure = measures[measureIdx];
+
         return {
           ...link,
           label: link.label || (measure ? measure.label_short || measure.label : "Show All")
@@ -862,7 +1004,12 @@ looker.plugins.visualizations.add({
       if (finalLinks.length > 0) {
         LookerCharts.Utils.openDrillMenu({
           links: finalLinks,
-          event: { pageX: info.x, pageY: info.y, clientX: info.x, clientY: info.y }
+          event: {
+            pageX: info.x,
+            pageY: info.y,
+            clientX: info.x,
+            clientY: info.y
+          }
         });
       }
     };
@@ -899,6 +1046,31 @@ looker.plugins.visualizations.add({
             }
           });
         }
+
+        Object.keys(dataMap).forEach(key => {
+          const item = dataMap[key];
+          let pos = [0, 0];
+          if (Array.isArray(item.rawName) && item.rawName.length === 2) {
+            pos = [Number(item.rawName[1]), Number(item.rawName[0])];
+          } else if (typeof item.rawName === 'string' && item.rawName.includes(',')) {
+            const parts = item.rawName.split(',');
+            if (parts.length === 2) {
+              pos = [parseFloat(parts[1]), parseFloat(parts[0])];
+            }
+          }
+
+          if (pos[0] || pos[1]) {
+            pointData.push({
+              position: pos,
+              values: item.values,
+              pivotData: item.pivotData,
+              drillLinks: item.drillLinks,
+              name: item.rawName.toString(),
+              feature: null,
+              allowedMeasures: measureIndices
+            });
+          }
+        });
       });
     } else {
       pointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
@@ -942,9 +1114,11 @@ looker.plugins.visualizations.add({
         });
 
       case 'column':
+        if (safePointData.length === 0) return null;
         return new deck.ColumnLayer({
           id: id,
           data: safePointData,
+          diskResolution: 6,
           radius: radius,
           extruded: true,
           pickable: true,
@@ -959,10 +1133,14 @@ looker.plugins.visualizations.add({
           elevationScale: 1,
           opacity: opacity,
           onClick: onClickHandler,
-          updateTriggers: { getFillColor: updateTriggersBase }
+          updateTriggers: {
+            getFillColor: updateTriggersBase,
+            getElevation: [...updateTriggersBase, heightScale]
+          }
         });
 
       case 'point':
+        if (safePointData.length === 0) return null;
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
@@ -979,11 +1157,13 @@ looker.plugins.visualizations.add({
             const val = getValue(d);
             return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
+          getLineColor: [255, 255, 255],
           onClick: onClickHandler,
           updateTriggers: { getFillColor: updateTriggersBase }
         });
 
       case 'bubble':
+        if (safePointData.length === 0) return null;
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
@@ -991,6 +1171,8 @@ looker.plugins.visualizations.add({
           opacity: opacity,
           stroked: true,
           filled: true,
+          radiusScale: 1,
+          radiusMinPixels: 2,
           getPosition: d => d.position,
           getRadius: d => Math.sqrt(getValue(d) / maxVal) * radius,
           getFillColor: d => {
@@ -998,16 +1180,22 @@ looker.plugins.visualizations.add({
             const val = getValue(d);
             return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
+          getLineColor: [255, 255, 255],
           onClick: onClickHandler,
-          updateTriggers: { getFillColor: updateTriggersBase, getRadius: [...updateTriggersBase, radius] }
+          updateTriggers: {
+            getFillColor: updateTriggersBase,
+            getRadius: [...updateTriggersBase, radius]
+          }
         });
 
       case 'icon':
+        if (safePointData.length === 0) return null;
         return new deck.IconLayer({
           id: id,
           data: safePointData,
           pickable: true,
           opacity: opacity,
+          // CRITICAL FIX: Ensure SVG is replaced with PNG or safe fallback
           iconAtlas: iconUrlOverride || ICONS['marker'],
           iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false } },
           getIcon: d => 'marker',
@@ -1021,6 +1209,7 @@ looker.plugins.visualizations.add({
         });
 
       case 'heatmap':
+        if (safePointData.length === 0) return null;
         return new deck.HeatmapLayer({
           id: id,
           data: safePointData,
@@ -1033,6 +1222,7 @@ looker.plugins.visualizations.add({
         });
 
       case 'hexagon':
+        if (safePointData.length === 0) return null;
         return new deck.HexagonLayer({
           id: id,
           data: safePointData,
@@ -1047,7 +1237,10 @@ looker.plugins.visualizations.add({
           elevationAggregation: 'SUM',
           colorRange: this._generateColorRange(startColorHex, endColorHex),
           onClick: onClickHandler,
-          updateTriggers: { getElevationWeight: updateTriggersBase }
+          updateTriggers: {
+            getElevationWeight: updateTriggersBase,
+            getColorWeight: updateTriggersBase
+          }
         });
 
       default: return null;
@@ -1062,29 +1255,21 @@ looker.plugins.visualizations.add({
 
     let str = value.toString();
 
-    // LookML Format Handling
-    // This is a basic implementation. Looker format strings can be complex.
-    // For robust handling, one would need a full SSF library, but this covers standard cases.
-
-    if (formatStr.includes('$')) {
-        // e.g. "$#,##0.00"
-        str = '$' + this._formatNumber(value);
-    }
-    else if (formatStr.includes('€')) {
-        str = '€' + this._formatNumber(value);
-    }
-    else if (formatStr.includes('£')) {
-        str = '£' + this._formatNumber(value);
-    }
-    else if (formatStr.includes('%')) {
-        // e.g. "0.0%" -> 15.2%
-        str = (value * 100).toFixed(1) + '%';
-    }
+    if (formatStr.includes('$')) str = '$' + this._formatNumber(value);
+    else if (formatStr.includes('€')) str = '€' + this._formatNumber(value);
+    else if (formatStr.includes('£')) str = '£' + this._formatNumber(value);
+    else if (formatStr.includes('%')) str = (value * 100).toFixed(1) + '%';
     else if (formatStr.toLowerCase().includes('"k"') || formatStr.toLowerCase().includes('k')) {
-         str = this._formatNumber(value); // _formatNumber handles M/K auto-scaling
+      str = this._formatNumber(value);
+    }
+    else if (formatStr.includes('.')) {
+      const decimals = (formatStr.split('.')[1] || '').replace(/[^0]/g, '').length;
+      str = value.toLocaleString("en-US", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
     }
     else {
-      // Fallback to standard
       str = this._formatNumber(value);
     }
 
@@ -1094,15 +1279,9 @@ looker.plugins.visualizations.add({
   _formatNumber: function (num) {
     if (num === null || num === undefined) return '0';
     if (typeof num !== 'number') num = parseFloat(num) || 0;
-
-    if (Math.abs(num) >= 1000000000) return (num / 1000000000).toFixed(1) + 'B';
     if (Math.abs(num) >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (Math.abs(num) >= 1000) return (num / 1000).toFixed(1) + 'K';
-
-    // Check if integer
-    if (Number.isInteger(num)) return num.toLocaleString();
-
-    return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    else if (Math.abs(num) >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toLocaleString();
   },
 
   _getGeoJSONUrl: function (config) {
