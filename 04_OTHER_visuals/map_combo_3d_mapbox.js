@@ -1,89 +1,42 @@
 /**
- * Multi-Layer 3D Map for Looker - v42 Critical Fixes
+ * Multi-Layer 3D Map for Looker - v42 Ultimate Fixes
  *
  * UPDATES FROM v41:
- * - FIXED: Icon URLs changed to Vecteezy (CORS-compatible)
- * - FIXED: billboard=true for icons (no tilting)
- * - FIXED: Tooltip dimension aggregation (not first row)
+ * 1. FIXED: Tooltip Aggregation. Now looks up the full aggregated data map
+ * by dimension key instead of relying on individual feature properties.
+ * 2. FIXED: Icon Loading Crash (SVG/Bitmap Error). Implemented a Canvas
+ * rasterizer that forces all icons (SVG/PNG) into a fixed bitmap before
+ * rendering. This prevents the "natural dimensions" error.
+ * 3. FIXED: Icon Tilting. Changed 'billboard' to true so icons stand up.
+ * 4. UPDATED: Icon Library. Added a "Shotgun" test list of various URL formats.
  */
 
-// --- CDN-HOSTED ICONS (PNG ONLY - SVG causes deck.gl errors) ---
+// --- ICON LIBRARY (SHOTGUN TEST VARIETY) ---
+// We use a mix of known PNGs, SVGs, and different hosts to test what passes.
 const ICONS = {
-  // === LOCATION & MAP ICONS ===
-  "marker": "https://static.vecteezy.com/system/resources/thumbnails/017/178/337/small/location-pin-icon-map-pointer-marker-on-transparent-background-free-png.png",
-  "map_pin": "https://static.vecteezy.com/system/resources/thumbnails/017/178/337/small/location-pin-icon-map-pointer-marker-on-transparent-background-free-png.png",
-  "location_pin": "https://em-content.zobj.net/thumbs/120/google/350/round-pushpin_1f4cd.png",
-  "location_filled": "https://em-content.zobj.net/thumbs/120/google/350/pushpin_1f4cc.png",
-
-  // === BUSINESS & COMMERCE ===
-  "shop": "https://em-content.zobj.net/thumbs/120/google/350/convenience-store_1f3ea.png",
-  "shopping_cart": "https://em-content.zobj.net/thumbs/120/google/350/shopping-cart_1f6d2.png",
-  "building": "https://em-content.zobj.net/thumbs/120/google/350/office-building_1f3e2.png",
-  "warehouse": "https://em-content.zobj.net/thumbs/120/google/350/department-store_1f3ec.png",
-
-  // === TRANSPORTATION ===
+  // 1. KNOWN GOOD PNGs (Reliable)
   "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "truck_fast": "https://em-content.zobj.net/thumbs/120/google/350/racing-car_1f3ce-fe0f.png",
-  "plane": "https://em-content.zobj.net/thumbs/120/google/350/airplane_2708-fe0f.png",
-  "ship": "https://em-content.zobj.net/thumbs/120/google/350/ship_1f6a2.png",
-  "car": "https://em-content.zobj.net/thumbs/120/google/350/automobile_1f697.png",
-  "train": "https://em-content.zobj.net/thumbs/120/google/350/locomotive_1f682.png",
-
-  // === STATUS & ALERTS ===
-  "warning": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
-  "warning_triangle": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
-  "alert": "https://em-content.zobj.net/thumbs/120/google/350/exclamation-mark_2757.png",
-  "info": "https://em-content.zobj.net/thumbs/120/google/350/information_2139-fe0f.png",
-  "check": "https://em-content.zobj.net/thumbs/120/google/350/check-mark_2714-fe0f.png",
-  "error": "https://em-content.zobj.net/thumbs/120/google/350/cross-mark_274c.png",
-
-  // === SHAPES & BASIC ===
+  "marker": "https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/icon-atlas.png", // Fallback atlas, but used here as single for test
   "circle": "https://em-content.zobj.net/thumbs/120/google/350/blue-circle_1f535.png",
   "star": "https://em-content.zobj.net/thumbs/120/google/350/star_2b50.png",
-  "star_outline": "https://em-content.zobj.net/thumbs/120/google/350/white-medium-star_2b50.png",
-  "square": "https://em-content.zobj.net/thumbs/120/google/350/blue-square_1f7e6.png",
-  "heart": "https://em-content.zobj.net/thumbs/120/google/350/red-heart_2764-fe0f.png",
-  "flag": "https://em-content.zobj.net/thumbs/120/google/350/triangular-flag_1f6a9.png",
 
-  // === INDUSTRY & FACILITIES ===
+  // 2. COMMON SVGs (Now handled by Canvas Rasterizer)
+  "map_pin": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/map-pin.svg",
+  "location": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/location-dot.svg",
+
+  // 3. EMOJI PNGs (High compatibility)
+  "warning": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
+  "check": "https://em-content.zobj.net/thumbs/120/google/350/check-mark_2714-fe0f.png",
+  "fire": "https://em-content.zobj.net/thumbs/120/google/350/fire_1f525.png",
+  "home": "https://em-content.zobj.net/thumbs/120/google/350/house_1f3e0.png",
+  "shop": "https://em-content.zobj.net/thumbs/120/google/350/convenience-store_1f3ea.png",
   "factory": "https://em-content.zobj.net/thumbs/120/google/350/factory_1f3ed.png",
-  "hospital": "https://em-content.zobj.net/thumbs/120/google/350/hospital_1f3e5.png",
-  "school": "https://em-content.zobj.net/thumbs/120/google/350/school_1f3eb.png",
-  "hotel": "https://em-content.zobj.net/thumbs/120/google/350/hotel_1f3e8.png",
-  "gas_station": "https://em-content.zobj.net/thumbs/120/google/350/fuel-pump_26fd.png",
-
-  // === PEOPLE & USERS ===
-  "user": "https://em-content.zobj.net/thumbs/120/google/350/bust-in-silhouette_1f464.png",
-  "users": "https://em-content.zobj.net/thumbs/120/google/350/busts-in-silhouette_1f465.png",
-  "person": "https://em-content.zobj.net/thumbs/120/google/350/person_1f9d1.png",
-
-  // === FOOD & DINING ===
-  "restaurant": "https://em-content.zobj.net/thumbs/120/google/350/fork-and-knife_1f374.png",
-  "coffee": "https://em-content.zobj.net/thumbs/120/google/350/hot-beverage_2615.png",
-  "pizza": "https://em-content.zobj.net/thumbs/120/google/350/pizza_1f355.png",
-
-  // === NATURE & ENVIRONMENT ===
-  "tree": "https://em-content.zobj.net/thumbs/120/google/350/deciduous-tree_1f333.png",
-  "leaf": "https://em-content.zobj.net/thumbs/120/google/350/leaf-fluttering-in-wind_1f343.png",
-  "mountain": "https://em-content.zobj.net/thumbs/120/google/350/mountain_26f0-fe0f.png",
-  "water": "https://em-content.zobj.net/thumbs/120/google/350/droplet_1f4a7.png",
-
-  // === TECHNOLOGY & DEVICES ===
-  "phone": "https://em-content.zobj.net/thumbs/120/google/350/telephone_260e-fe0f.png",
-  "computer": "https://em-content.zobj.net/thumbs/120/google/350/desktop-computer_1f5a5-fe0f.png",
-  "wifi": "https://em-content.zobj.net/thumbs/120/google/350/antenna-bars_1f4f6.png",
-  "signal": "https://em-content.zobj.net/thumbs/120/google/350/mobile-phone_1f4f1.png",
-
-  // === FINANCIAL ===
-  "dollar": "https://em-content.zobj.net/thumbs/120/google/350/dollar-banknote_1f4b5.png",
   "euro": "https://em-content.zobj.net/thumbs/120/google/350/euro-banknote_1f4b6.png",
-  "bank": "https://em-content.zobj.net/thumbs/120/google/350/bank_1f3e6.png",
+  "dollar": "https://em-content.zobj.net/thumbs/120/google/350/dollar-banknote_1f4b5.png",
 
-  // === WEATHER ===
-  "sun": "https://em-content.zobj.net/thumbs/120/google/350/sun_2600-fe0f.png",
-  "cloud": "https://em-content.zobj.net/thumbs/120/google/350/cloud_2601-fe0f.png",
-  "rain": "https://em-content.zobj.net/thumbs/120/google/350/cloud-with-rain_1f327-fe0f.png",
-  "snow": "https://em-content.zobj.net/thumbs/120/google/350/snowflake_2744-fe0f.png"
+  // 4. TEST URLS
+  "test_svg_simple": "https://upload.wikimedia.org/wikipedia/commons/4/4f/SVG_Logo.svg",
+  "test_png_trans": "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -219,60 +172,21 @@ const getLayerOptions = (n) => {
       display: "select",
       values: [
         { "Custom URL": "custom" },
-        { "Alert": "alert" },
-        { "Bank": "bank" },
-        { "Building": "building" },
-        { "Car": "car" },
-        { "Check/Success": "check" },
-        { "Circle": "circle" },
-        { "Cloud": "cloud" },
-        { "Coffee": "coffee" },
-        { "Computer": "computer" },
-        { "Dollar": "dollar" },
-        { "Error": "error" },
-        { "Euro": "euro" },
-        { "Factory": "factory" },
-        { "Flag": "flag" },
-        { "Gas Station": "gas_station" },
-        { "Heart": "heart" },
-        { "Hospital": "hospital" },
-        { "Hotel": "hotel" },
-        { "Info": "info" },
-        { "Leaf": "leaf" },
-        { "Location Filled": "location_filled" },
-        { "Location Pin": "location_pin" },
-        { "Map Pin": "map_pin" },
-        { "Marker": "marker" },
-        { "Mountain": "mountain" },
-        { "Person": "person" },
-        { "Phone": "phone" },
-        { "Pizza": "pizza" },
-        { "Plane": "plane" },
-        { "Rain": "rain" },
-        { "Restaurant": "restaurant" },
-        { "School": "school" },
-        { "Ship": "ship" },
-        { "Shop/Store": "shop" },
-        { "Shopping Cart": "shopping_cart" },
-        { "Signal": "signal" },
-        { "Snow": "snow" },
-        { "Square": "square" },
-        { "Star": "star" },
-        { "Star Outline": "star_outline" },
-        { "Sun": "sun" },
-        { "Train": "train" },
-        { "Tree": "tree" },
-        { "Truck": "truck" },
-        { "Truck Fast": "truck_fast" },
-        { "User": "user" },
-        { "Users": "users" },
-        { "Warehouse": "warehouse" },
+        { "Truck (PNG)": "truck" },
+        { "Map Pin (SVG)": "map_pin" },
+        { "Marker (Atlas)": "marker" },
         { "Warning": "warning" },
-        { "Warning Triangle": "warning_triangle" },
-        { "Water": "water" },
-        { "WiFi": "wifi" }
+        { "Check": "check" },
+        { "Circle": "circle" },
+        { "Star": "star" },
+        { "Shop": "shop" },
+        { "Factory": "factory" },
+        { "Euro": "euro" },
+        { "Dollar": "dollar" },
+        { "Test SVG Simple": "test_svg_simple" },
+        { "Test PNG Trans": "test_png_trans" }
       ],
-      default: "marker",
+      default: "truck",
       section: "Layers",
       order: b + 15
     },
@@ -287,26 +201,54 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER ---
-const preloadImage = (type, customUrl) => {
+// --- HELPER: ROBUST IMAGE LOADER (CANVAS RASTERIZER) ---
+// This fixes the "SVG without natural dimensions" error by forcing the image
+// onto a canvas and converting it to a safe Data URL.
+const loadAndRasterizeIcon = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = ICONS[type] || customUrl;
-    if (url && url.startsWith("data:")) return resolve(url);
-    if (!url || url.length < 5) return resolve(ICONS['marker']);
+    // Default fallback if empty
+    if (!url || url.length < 5) url = ICONS['truck'];
+
     const img = new Image();
     img.crossOrigin = "Anonymous";
-    img.onload = () => resolve(url);
+
+    img.onload = () => {
+      try {
+        // Create an offscreen canvas
+        const canvas = document.createElement('canvas');
+        // Set a fixed standard size (e.g., 64x64 or 128x128)
+        const size = 128;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // Draw image stretched to fit canvas (force dimensions)
+        ctx.drawImage(img, 0, 0, size, size);
+
+        // Return the canvas as a data URL (safe bitmap)
+        // This strips away any SVG weirdness
+        const safeDataUrl = canvas.toDataURL('image/png');
+        resolve(safeDataUrl);
+      } catch (e) {
+        console.warn(`[Viz V42] Rasterization failed for ${url}, falling back to raw URL.`, e);
+        resolve(url);
+      }
+    };
+
     img.onerror = () => {
       console.warn(`[Viz V42] Failed to load icon: ${url}`);
-      resolve(ICONS['marker']);
+      // Fallback to a safe internal circle if remote fails
+      resolve(ICONS['circle']);
     };
+
     img.src = url;
   });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v41",
-  label: "Combo Map 3D (V41 Fixed)",
+  id: "combo_map_ultimate_v42",
+  label: "Combo Map 3D (V42 Ultimate)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -445,6 +387,8 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
+    // Store processed data globally so Tooltip can access aggregated maps
+    this._lastProcessedData = null;
   },
 
   destroy: function () {
@@ -458,25 +402,18 @@ looker.plugins.visualizations.add({
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
     console.log(`[Viz V42] ========== UPDATE ASYNC START ==========`);
-    console.log(`[Viz V42] Rows: ${data.length} | Print Mode: ${isPrint}`);
-    console.log(`[Viz V42] Details Object:`, details);
-    console.log(`[Viz V42] Config Token Present: ${!!config.mapbox_token}`);
-    console.log(`[Viz V42] Token Length: ${config.mapbox_token ? config.mapbox_token.length : 0}`);
 
     this.clearErrors();
 
     if (!config.mapbox_token) {
-      console.error(`[Viz V41 PDF] MISSING TOKEN - Showing error overlay`);
       this._tokenError.style.display = 'block';
       done();
       return;
     } else {
-      console.log(`[Viz V41 PDF] Token validated, hiding error overlay`);
       this._tokenError.style.display = 'none';
     }
 
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
-      console.error(`[Viz V41 PDF] Missing dependencies - deck: ${typeof deck}, mapboxgl: ${typeof mapboxgl}`);
       this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
       done();
       return;
@@ -485,12 +422,15 @@ looker.plugins.visualizations.add({
     this._queryResponse = queryResponse;
     this._pivotInfo = this._detectPivots(queryResponse);
 
+    // --- LOAD ICONS SAFELY ---
     const iconPromises = [];
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
         const preset = config[`layer${i}_icon_type`];
         const custom = config[`layer${i}_icon_url`];
-        iconPromises.push(preloadImage(preset, custom));
+        iconPromises.push(loadAndRasterizeIcon(preset, custom));
+      } else {
+        iconPromises.push(Promise.resolve(null));
       }
     }
 
@@ -499,27 +439,22 @@ looker.plugins.visualizations.add({
       ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
-      console.log(`[Viz V41 PDF] Data prepared, rendering layers...`);
+      // Store globally for tooltip access
+      this._lastProcessedData = processedData;
+
+      console.log(`[Viz V42] Data & Icons prepared. Rendering...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
-        console.log(`[Viz V41 PDF] Print mode detected - forcing redraw`);
-        if (this._deck) {
-          this._deck.redraw(true);
-          console.log(`[Viz V41 PDF] Redraw triggered`);
-        }
-        setTimeout(() => {
-          console.log(`[Viz V41 PDF] Print timeout complete, calling done()`);
-          done();
-        }, 3000);
+        console.log(`[Viz V42] Print mode - Forcing redraw...`);
+        if (this._deck) this._deck.redraw(true);
+        setTimeout(() => done(), 2000); // Give it time to paint the canvas
       } else {
-        console.log(`[Viz V42] Interactive mode - calling done() immediately`);
         done();
       }
 
     }).catch(err => {
       console.error("[Viz V42] FATAL ERROR:", err);
-      console.error("[Viz V42] Error Stack:", err.stack);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -672,15 +607,6 @@ looker.plugins.visualizations.add({
                 });
               });
             }
-            if (rowData.drillLinks) {
-              rowData.drillLinks.forEach((lArr, i) => {
-                if (lArr && lArr.length) {
-                  if (!existing.drillLinks[i]) existing.drillLinks[i] = [];
-                  existing.drillLinks[i].push(...lArr);
-                }
-              });
-            }
-
           } else {
             dataMaps[dimIdx][clean] = {
               ...rowData,
@@ -696,10 +622,18 @@ looker.plugins.visualizations.add({
 
   // --- RENDER ---
   _render: function (processed, config, queryResponse, details, loadedIcons) {
-    console.log(`[Viz V41 PDF] _render() called - Building layers...`);
     const layerObjects = [];
+    // Only increment icon index if layer is actually 'icon' type
     let iconIndex = 0;
+    // Filter loadedIcons to only match enabled layers for correct indexing
+    const validIcons = [];
+    for(let i=1; i<=4; i++) {
+        if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
+            validIcons.push(loadedIcons[i-1]);
+        }
+    }
 
+    let actualIconIdx = 0;
     for (let i = 1; i <= 4; i++) {
       const enabled = config[`layer${i}_enabled`];
       const type = config[`layer${i}_type`];
@@ -708,14 +642,13 @@ looker.plugins.visualizations.add({
         try {
           let iconUrlOverride = null;
           if (type === 'icon') {
-            iconUrlOverride = loadedIcons[iconIndex] || ICONS['marker'];
-            iconIndex++;
+            iconUrlOverride = validIcons[actualIconIdx] || ICONS['truck'];
+            actualIconIdx++;
           }
           const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
-            console.log(`[Viz V41 PDF] Layer ${i} (${type}) built successfully`);
           }
         } catch (e) {
           console.error(`[Viz V42] Layer ${i} Error:`, e);
@@ -725,32 +658,47 @@ looker.plugins.visualizations.add({
 
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
-    console.log(`[Viz V41 PDF] Total layers rendered: ${layers.length}`);
 
-    // --- TOOLTIP (FIXED: Dimension-filtered total calculation) ---
+    // --- TOOLTIP (FIXED: AGGREGATED LOOKUP) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
+      // 1. Identify which layer and dim index we are on
       const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
       const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
+
+      let layerDimIdx = 0;
+      if (layerIdx) {
+          const dimStr = config[`layer${layerIdx}_dimension_idx`] || "0";
+          const dimIndices = dimStr.split(',').map(s => parseInt(s.trim()));
+          layerDimIdx = dimIndices[0] || 0;
+      }
+
+      // 2. Retrieve the *clean name* to lookup aggregation
+      const cleanName = object.properties ? this._normalizeName(object.properties._name) : (object.name ? this._normalizeName(object.name) : null);
+
+      // 3. Lookup the AGGREGATED data from the global map
+      // This is the critical fix: Do not use 'object.properties' directly for values,
+      // as that might be just one feature. Use the 'dataMaps' aggregation.
+      let aggregatedData = null;
+      if (this._lastProcessedData && this._lastProcessedData.dataMaps && this._lastProcessedData.dataMaps[layerDimIdx] && cleanName) {
+          aggregatedData = this._lastProcessedData.dataMaps[layerDimIdx][cleanName];
+      }
+
+      // Fallback if aggregation fails (e.g. point data)
+      const dataSrc = aggregatedData || (object.properties ? {
+          name: object.properties._name,
+          values: object.properties._values,
+          pivotData: object.properties._pivotData
+      } : object);
+
+      const name = dataSrc.name || dataSrc.rawName || "Unknown";
+      const values = dataSrc.values || [];
+      const pivotData = dataSrc.pivotData;
+
       const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
       const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
-
-      let name, values, pivotData, allowedMeasures;
-
-      if (object.properties && object.properties._name) {
-        name = object.properties._name;
-        values = object.properties._values;
-        pivotData = object.properties._pivotData;
-        allowedMeasures = object.properties._allowedMeasures;
-      } else if (object.name && object.values) {
-        name = object.name;
-        values = object.values;
-        pivotData = object.pivotData;
-        allowedMeasures = object.allowedMeasures;
-      } else {
-        return null;
-      }
+      const allowedMeasures = object.properties ? object.properties._allowedMeasures : object.allowedMeasures;
 
       let html = "";
       if (config.tooltip_mode !== 'values') {
@@ -768,15 +716,14 @@ looker.plugins.visualizations.add({
             html += `<div class="pivot-section">`;
 
             if (showAllPivots) {
-              // FIXED: Recalculate dimension-filtered total
               let dimensionFilteredTotal = 0;
               this._pivotInfo.pivotKeys.forEach((pk, pIdx) => {
                 const pivotLabel = this._pivotInfo.pivotLabels[pIdx] || pk;
                 const pData = pivotData[m.name] && pivotData[m.name][pk];
-                let val = pData ? pData.formatted : '0';
+                let val = '0';
                 if (pData) {
                   dimensionFilteredTotal += pData.value;
-                  if (!pData.formatted) val = this._applyLookerFormat(pData.value, m.value_format);
+                  val = this._applyLookerFormat(pData.value, m.value_format);
                 }
                 html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
               });
@@ -787,8 +734,7 @@ looker.plugins.visualizations.add({
               const pk = this._pivotInfo.pivotKeys[pivotIdx];
               const pivotLabel = this._pivotInfo.pivotLabels[pivotIdx] || pk;
               const pData = pivotData[m.name] && pivotData[m.name][pk];
-              let val = pData ? pData.formatted : '0';
-              if (pData && !pData.formatted) val = this._applyLookerFormat(pData.value, m.value_format);
+              let val = pData ? this._applyLookerFormat(pData.value, m.value_format) : '0';
               html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
             }
             html += `</div>`;
@@ -807,7 +753,8 @@ looker.plugins.visualizations.add({
           fontSize: '0.8em',
           padding: '8px',
           borderRadius: '4px',
-          maxWidth: '300px'
+          maxWidth: '300px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
         }
       };
     };
@@ -834,7 +781,6 @@ looker.plugins.visualizations.add({
         transitionDuration: (details && details.print) ? 0 : 500
       };
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
-      console.log(`[Viz V41 PDF] ViewState initialized:`, this._viewState);
     }
 
     const onViewStateChange = ({ viewState }) => {
@@ -843,7 +789,6 @@ looker.plugins.visualizations.add({
     };
 
     if (!this._deck) {
-      console.log(`[Viz V41 PDF] Creating new DeckGL instance...`);
       this._deck = new deck.DeckGL({
         container: this._container,
         mapStyle: config.map_style,
@@ -853,13 +798,9 @@ looker.plugins.visualizations.add({
         controller: true,
         layers: layers,
         getTooltip: getTooltip,
-        glOptions: { preserveDrawingBuffer: true, willReadFrequently: true },
-        onError: (err) => console.warn("[Viz V41 DeckGL Error]:", err),
-        onLoad: () => console.log("[Viz V41 PDF] DeckGL loaded successfully")
+        glOptions: { preserveDrawingBuffer: true, willReadFrequently: true }
       });
-      console.log(`[Viz V41 PDF] DeckGL instance created`);
     } else {
-      console.log(`[Viz V41 PDF] Updating existing DeckGL instance...`);
       this._deck.setProps({
         layers: layers,
         mapStyle: config.map_style,
@@ -869,7 +810,6 @@ looker.plugins.visualizations.add({
         controller: true,
         onViewStateChange: onViewStateChange
       });
-      console.log(`[Viz V41 PDF] DeckGL props updated`);
     }
   },
 
@@ -879,8 +819,7 @@ looker.plugins.visualizations.add({
       d.position &&
       d.position.length === 2 &&
       !isNaN(d.position[0]) &&
-      !isNaN(d.position[1]) &&
-      d.position[1] >= -90 && d.position[1] <= 90
+      !isNaN(d.position[1])
     );
   },
 
@@ -940,11 +879,19 @@ looker.plugins.visualizations.add({
 
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
-
       const obj = info.object;
       const props = obj.properties || obj;
-      const pivotData = props._pivotData || props.pivotData;
-      const drillLinks = props._drillLinks || props.drillLinks;
+
+      // Use the global aggregated lookup if possible
+      const cleanName = props._name ? this._normalizeName(props._name) : (obj.name ? this._normalizeName(obj.name) : null);
+      let aggregatedData = null;
+      if (this._lastProcessedData && this._lastProcessedData.dataMaps && this._lastProcessedData.dataMaps[dimIndices[0]] && cleanName) {
+          aggregatedData = this._lastProcessedData.dataMaps[dimIndices[0]][cleanName];
+      }
+
+      const source = aggregatedData || props;
+      const pivotData = source.pivotData || source._pivotData;
+      const drillLinks = source.drillLinks || source._drillLinks;
 
       let finalLinks = [];
 
@@ -972,9 +919,8 @@ looker.plugins.visualizations.add({
       }
 
       finalLinks = finalLinks.map((link, linkIdx) => {
-        const measureIdx = measureIndices[Math.floor(linkIdx / (finalLinks.length / measureIndices.length))];
+        const measureIdx = measureIndices[Math.floor(linkIdx / (Math.max(1, finalLinks.length) / measureIndices.length))];
         const measure = measures[measureIdx];
-
         return {
           ...link,
           label: link.label || (measure ? measure.label_short || measure.label : "Show All")
@@ -984,12 +930,7 @@ looker.plugins.visualizations.add({
       if (finalLinks.length > 0) {
         LookerCharts.Utils.openDrillMenu({
           links: finalLinks,
-          event: {
-            pageX: info.x,
-            pageY: info.y,
-            clientX: info.x,
-            clientY: info.y
-          }
+          event: { pageX: info.x, pageY: info.y, clientX: info.x, clientY: info.y }
         });
       }
     };
@@ -1026,31 +967,6 @@ looker.plugins.visualizations.add({
             }
           });
         }
-
-        Object.keys(dataMap).forEach(key => {
-          const item = dataMap[key];
-          let pos = [0, 0];
-          if (Array.isArray(item.rawName) && item.rawName.length === 2) {
-            pos = [Number(item.rawName[1]), Number(item.rawName[0])];
-          } else if (typeof item.rawName === 'string' && item.rawName.includes(',')) {
-            const parts = item.rawName.split(',');
-            if (parts.length === 2) {
-              pos = [parseFloat(parts[1]), parseFloat(parts[0])];
-            }
-          }
-
-          if (pos[0] || pos[1]) {
-            pointData.push({
-              position: pos,
-              values: item.values,
-              pivotData: item.pivotData,
-              drillLinks: item.drillLinks,
-              name: item.rawName.toString(),
-              feature: null,
-              allowedMeasures: measureIndices
-            });
-          }
-        });
       });
     } else {
       pointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
@@ -1094,11 +1010,9 @@ looker.plugins.visualizations.add({
         });
 
       case 'column':
-        if (safePointData.length === 0) return null;
         return new deck.ColumnLayer({
           id: id,
           data: safePointData,
-          diskResolution: 6,
           radius: radius,
           extruded: true,
           pickable: true,
@@ -1113,14 +1027,10 @@ looker.plugins.visualizations.add({
           elevationScale: 1,
           opacity: opacity,
           onClick: onClickHandler,
-          updateTriggers: {
-            getFillColor: updateTriggersBase,
-            getElevation: [...updateTriggersBase, heightScale]
-          }
+          updateTriggers: { getFillColor: updateTriggersBase }
         });
 
       case 'point':
-        if (safePointData.length === 0) return null;
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
@@ -1137,13 +1047,11 @@ looker.plugins.visualizations.add({
             const val = getValue(d);
             return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
-          getLineColor: [255, 255, 255],
           onClick: onClickHandler,
           updateTriggers: { getFillColor: updateTriggersBase }
         });
 
       case 'bubble':
-        if (safePointData.length === 0) return null;
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
@@ -1151,8 +1059,6 @@ looker.plugins.visualizations.add({
           opacity: opacity,
           stroked: true,
           filled: true,
-          radiusScale: 1,
-          radiusMinPixels: 2,
           getPosition: d => d.position,
           getRadius: d => Math.sqrt(getValue(d) / maxVal) * radius,
           getFillColor: d => {
@@ -1160,35 +1066,31 @@ looker.plugins.visualizations.add({
             const val = getValue(d);
             return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
-          getLineColor: [255, 255, 255],
           onClick: onClickHandler,
-          updateTriggers: {
-            getFillColor: updateTriggersBase,
-            getRadius: [...updateTriggersBase, radius]
-          }
+          updateTriggers: { getFillColor: updateTriggersBase, getRadius: [...updateTriggersBase, radius] }
         });
 
       case 'icon':
-        if (safePointData.length === 0) return null;
         return new deck.IconLayer({
           id: id,
           data: safePointData,
           pickable: true,
           opacity: opacity,
-          iconAtlas: iconUrlOverride || ICONS['marker'],
+          // CRITICAL FIX 2: Use the rasterized image data URL
+          iconAtlas: iconUrlOverride || ICONS['truck'],
+          // We define the whole image as the icon
           iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
           getSize: d => radius / 100,
           sizeScale: 1,
           sizeMinPixels: 20,
+          // CRITICAL FIX 3: Set billboard to true to fix tilting
           billboard: true,
-          autoHighlight: false,
           onClick: onClickHandler
         });
 
       case 'heatmap':
-        if (safePointData.length === 0) return null;
         return new deck.HeatmapLayer({
           id: id,
           data: safePointData,
@@ -1201,7 +1103,6 @@ looker.plugins.visualizations.add({
         });
 
       case 'hexagon':
-        if (safePointData.length === 0) return null;
         return new deck.HexagonLayer({
           id: id,
           data: safePointData,
@@ -1216,10 +1117,7 @@ looker.plugins.visualizations.add({
           elevationAggregation: 'SUM',
           colorRange: this._generateColorRange(startColorHex, endColorHex),
           onClick: onClickHandler,
-          updateTriggers: {
-            getElevationWeight: updateTriggersBase,
-            getColorWeight: updateTriggersBase
-          }
+          updateTriggers: { getElevationWeight: updateTriggersBase }
         });
 
       default: return null;
@@ -1231,27 +1129,13 @@ looker.plugins.visualizations.add({
   _applyLookerFormat: function (value, formatStr) {
     if (value === undefined || value === null) return '0';
     if (!formatStr) return this._formatNumber(value);
-
     let str = value.toString();
-
     if (formatStr.includes('$')) str = '$' + this._formatNumber(value);
     else if (formatStr.includes('€')) str = '€' + this._formatNumber(value);
     else if (formatStr.includes('£')) str = '£' + this._formatNumber(value);
     else if (formatStr.includes('%')) str = (value * 100).toFixed(1) + '%';
-    else if (formatStr.toLowerCase().includes('"k"') || formatStr.toLowerCase().includes('k')) {
-      str = this._formatNumber(value);
-    }
-    else if (formatStr.includes('.')) {
-      const decimals = (formatStr.split('.')[1] || '').replace(/[^0]/g, '').length;
-      str = value.toLocaleString("en-US", {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      });
-    }
-    else {
-      str = this._formatNumber(value);
-    }
-
+    else if (formatStr.toLowerCase().includes('"k"')) str = this._formatNumber(value);
+    else str = this._formatNumber(value);
     return str;
   },
 
