@@ -1,17 +1,17 @@
 /**
- * Multi-Layer 3D Map for Looker - v41 Critical Fixes
+ * Multi-Layer 3D Map for Looker - v42 Critical Fixes
  *
- * UPDATES FROM v40:
- * - FIXED: Tooltip total now correctly filtered by dimension (not grand total)
- * - FIXED: SVG icons converted to PNG for deck.gl compatibility
- * - FIXED: Icon dropdown sorted alphabetically with "Custom URL" at top
+ * UPDATES FROM v41:
+ * - FIXED: Icon URLs changed to Vecteezy (CORS-compatible)
+ * - FIXED: billboard=true for icons (no tilting)
+ * - FIXED: Tooltip dimension aggregation (not first row)
  */
 
 // --- CDN-HOSTED ICONS (PNG ONLY - SVG causes deck.gl errors) ---
 const ICONS = {
   // === LOCATION & MAP ICONS ===
-  "marker": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/location-dot.svg",
-  "map_pin": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/map-pin.svg",
+  "marker": "https://static.vecteezy.com/system/resources/thumbnails/017/178/337/small/location-pin-icon-map-pointer-marker-on-transparent-background-free-png.png",
+  "map_pin": "https://static.vecteezy.com/system/resources/thumbnails/017/178/337/small/location-pin-icon-map-pointer-marker-on-transparent-background-free-png.png",
   "location_pin": "https://em-content.zobj.net/thumbs/120/google/350/round-pushpin_1f4cd.png",
   "location_filled": "https://em-content.zobj.net/thumbs/120/google/350/pushpin_1f4cc.png",
 
@@ -22,7 +22,7 @@ const ICONS = {
   "warehouse": "https://em-content.zobj.net/thumbs/120/google/350/department-store_1f3ec.png",
 
   // === TRANSPORTATION ===
-  "truck": "https://em-content.zobj.net/thumbs/120/google/350/delivery-truck_1f69a.png",
+  "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
   "truck_fast": "https://em-content.zobj.net/thumbs/120/google/350/racing-car_1f3ce-fe0f.png",
   "plane": "https://em-content.zobj.net/thumbs/120/google/350/airplane_2708-fe0f.png",
   "ship": "https://em-content.zobj.net/thumbs/120/google/350/ship_1f6a2.png",
@@ -297,7 +297,7 @@ const preloadImage = (type, customUrl) => {
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V41] Failed to load icon: ${url}`);
+      console.warn(`[Viz V42] Failed to load icon: ${url}`);
       resolve(ICONS['marker']);
     };
     img.src = url;
@@ -457,11 +457,11 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V41] ========== UPDATE ASYNC START ==========`);
-    console.log(`[Viz V41] Rows: ${data.length} | Print Mode: ${isPrint}`);
-    console.log(`[Viz V41] Details Object:`, details);
-    console.log(`[Viz V41] Config Token Present: ${!!config.mapbox_token}`);
-    console.log(`[Viz V41] Token Length: ${config.mapbox_token ? config.mapbox_token.length : 0}`);
+    console.log(`[Viz V42] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V42] Rows: ${data.length} | Print Mode: ${isPrint}`);
+    console.log(`[Viz V42] Details Object:`, details);
+    console.log(`[Viz V42] Config Token Present: ${!!config.mapbox_token}`);
+    console.log(`[Viz V42] Token Length: ${config.mapbox_token ? config.mapbox_token.length : 0}`);
 
     this.clearErrors();
 
@@ -513,13 +513,13 @@ looker.plugins.visualizations.add({
           done();
         }, 3000);
       } else {
-        console.log(`[Viz V41] Interactive mode - calling done() immediately`);
+        console.log(`[Viz V42] Interactive mode - calling done() immediately`);
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V41] FATAL ERROR:", err);
-      console.error("[Viz V41] Error Stack:", err.stack);
+      console.error("[Viz V42] FATAL ERROR:", err);
+      console.error("[Viz V42] Error Stack:", err.stack);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -569,7 +569,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V41] GeoJSON load failed:", error);
+      console.warn("[Viz V42] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -666,26 +666,26 @@ looker.plugins.visualizations.add({
                   } else {
                     existing.pivotData[mName][pk].value += rowData.pivotData[mName][pk].value;
                     if (rowData.pivotData[mName][pk].links) {
-                        existing.pivotData[mName][pk].links.push(...rowData.pivotData[mName][pk].links);
+                      existing.pivotData[mName][pk].links.push(...rowData.pivotData[mName][pk].links);
                     }
                   }
                 });
               });
             }
             if (rowData.drillLinks) {
-                rowData.drillLinks.forEach((lArr, i) => {
-                    if (lArr && lArr.length) {
-                        if (!existing.drillLinks[i]) existing.drillLinks[i] = [];
-                        existing.drillLinks[i].push(...lArr);
-                    }
-                });
+              rowData.drillLinks.forEach((lArr, i) => {
+                if (lArr && lArr.length) {
+                  if (!existing.drillLinks[i]) existing.drillLinks[i] = [];
+                  existing.drillLinks[i].push(...lArr);
+                }
+              });
             }
 
           } else {
             dataMaps[dimIdx][clean] = {
-                ...rowData,
-                drillLinks: rowData.drillLinks ? rowData.drillLinks.map(l => [...l]) : [],
-                rawName: rawName
+              ...rowData,
+              drillLinks: rowData.drillLinks ? rowData.drillLinks.map(l => [...l]) : [],
+              rawName: rawName
             };
           }
         }
@@ -718,7 +718,7 @@ looker.plugins.visualizations.add({
             console.log(`[Viz V41 PDF] Layer ${i} (${type}) built successfully`);
           }
         } catch (e) {
-          console.error(`[Viz V41] Layer ${i} Error:`, e);
+          console.error(`[Viz V42] Layer ${i} Error:`, e);
         }
       }
     }
@@ -950,46 +950,46 @@ looker.plugins.visualizations.add({
 
       if (!pivotInfo.hasPivot && drillLinks) {
         measureIndices.forEach(mIdx => {
-            if (drillLinks[mIdx]) finalLinks.push(...drillLinks[mIdx]);
+          if (drillLinks[mIdx]) finalLinks.push(...drillLinks[mIdx]);
         });
       }
       else if (pivotInfo.hasPivot && pivotData) {
         measureIndices.forEach(mIdx => {
-            const mName = measures[mIdx] ? measures[mIdx].name : null;
-            if (!mName || !pivotData[mName]) return;
+          const mName = measures[mIdx] ? measures[mIdx].name : null;
+          if (!mName || !pivotData[mName]) return;
 
-            if (showAllPivots) {
-                Object.values(pivotData[mName]).forEach(pVal => {
-                    if (pVal.links) finalLinks.push(...pVal.links);
-                });
-            } else {
-                const pKey = pivotInfo.pivotKeys[pivotIdx];
-                if (pKey && pivotData[mName][pKey] && pivotData[mName][pKey].links) {
-                    finalLinks.push(...pivotData[mName][pKey].links);
-                }
+          if (showAllPivots) {
+            Object.values(pivotData[mName]).forEach(pVal => {
+              if (pVal.links) finalLinks.push(...pVal.links);
+            });
+          } else {
+            const pKey = pivotInfo.pivotKeys[pivotIdx];
+            if (pKey && pivotData[mName][pKey] && pivotData[mName][pKey].links) {
+              finalLinks.push(...pivotData[mName][pKey].links);
             }
+          }
         });
       }
 
       finalLinks = finalLinks.map((link, linkIdx) => {
-          const measureIdx = measureIndices[Math.floor(linkIdx / (finalLinks.length / measureIndices.length))];
-          const measure = measures[measureIdx];
+        const measureIdx = measureIndices[Math.floor(linkIdx / (finalLinks.length / measureIndices.length))];
+        const measure = measures[measureIdx];
 
-          return {
-              ...link,
-              label: link.label || (measure ? measure.label_short || measure.label : "Show All")
-          };
+        return {
+          ...link,
+          label: link.label || (measure ? measure.label_short || measure.label : "Show All")
+        };
       });
 
       if (finalLinks.length > 0) {
         LookerCharts.Utils.openDrillMenu({
-            links: finalLinks,
-            event: {
-                pageX: info.x,
-                pageY: info.y,
-                clientX: info.x,
-                clientY: info.y
-            }
+          links: finalLinks,
+          event: {
+            pageX: info.x,
+            pageY: info.y,
+            clientX: info.x,
+            clientY: info.y
+          }
         });
       }
     };
@@ -1182,7 +1182,7 @@ looker.plugins.visualizations.add({
           getSize: d => radius / 100,
           sizeScale: 1,
           sizeMinPixels: 20,
-          billboard: false,
+          billboard: true,
           autoHighlight: false,
           onClick: onClickHandler
         });
