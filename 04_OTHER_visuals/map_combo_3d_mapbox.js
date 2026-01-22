@@ -1,90 +1,50 @@
 /**
- * Multi-Layer 3D Map for Looker - v45 (Stable V41 + Tooltip Logic Fix)
+ * Multi-Layer 3D Map for Looker - v46 (Stable V45 + Icon Source Testing)
  *
- * CHANGES FROM V41:
- * 1. FIX: Changed default 'marker' from SVG to PNG to prevent InvalidStateError crash.
- * 2. FIX: Tooltip now looks up aggregated data using the Layer's specific Dimension Index.
- * 3. LOGIC: Tooltip totals are now mathematically correct for Pivots (Sum of all rows, not just first).
+ * CHANGES FROM V45:
+ * 1. UPDATED: Icon Library now contains 12 different hosting sources to test CORS.
+ * 2. UPDATED: Dropdown menu explicitly lists the Source (Vecteezy, GitHub, Base64, etc.)
+ * 3. STABLE: Retains the V45 Tooltip Fix and Data Aggregation logic.
  */
 
-// --- CDN-HOSTED ICONS ---
-// NOTE: We replaced the SVG marker with the PNG Truck to prevent the crash seen in your logs.
+// --- DIVERSE ICON SOURCES (The "Shotgun" Test) ---
 const ICONS = {
-  // === LOCATION & MAP ICONS ===
-  "marker": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "map_pin": "https://em-content.zobj.net/thumbs/120/google/350/round-pushpin_1f4cd.png", // Changed to PNG
-  "location_pin": "https://em-content.zobj.net/thumbs/120/google/350/round-pushpin_1f4cd.png",
-  "location_filled": "https://em-content.zobj.net/thumbs/120/google/350/pushpin_1f4cc.png",
+  // 1. VECTEEZY (Known working from your Single Value viz)
+  "truck_vecteezy": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
 
-  // === BUSINESS & COMMERCE ===
-  "shop": "https://em-content.zobj.net/thumbs/120/google/350/convenience-store_1f3ea.png",
-  "shopping_cart": "https://em-content.zobj.net/thumbs/120/google/350/shopping-cart_1f6d2.png",
-  "building": "https://em-content.zobj.net/thumbs/120/google/350/office-building_1f3e2.png",
-  "warehouse": "https://em-content.zobj.net/thumbs/120/google/350/department-store_1f3ec.png",
+  // 2. BASE64 (No Network - 100% Reliability Control)
+  // A simple blue dot encoded directly in text. If this fails, it's a code/browser issue, not network.
+  "dot_base64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6E52E6C5C0C5611E29623861C39169726\" xmpMM:DocumentID=\"xmp.did:E52E6C5C0C5611E29623861C39169726\"> <xmpMM:DerivedFrom stRef:instanceID=\"xmp.iid:E52E6C5B0C5611E29623861C39169726\" stRef:documentID=\"xmp.did:E52E6C5C0C5611E29623861C39169726\"/> </rdf:Description> </rdf:RDF> </x:xmpmeta> <?xpacket end=\"r\"?>H031AAAAMklEQVR42uzZoQ0AAAjDMPZ/0f0O3QlkM4Kqqvqa6+4BAAAAAPBVdwAAAADgOwAAAADDALxMAS0l2s5gAAAAAElFTkSuQmCC",
 
-  // === TRANSPORTATION ===
-  "truck": "https://em-content.zobj.net/thumbs/120/google/350/delivery-truck_1f69a.png",
-  "truck_fast": "https://em-content.zobj.net/thumbs/120/google/350/racing-car_1f3ce-fe0f.png",
-  "plane": "https://em-content.zobj.net/thumbs/120/google/350/airplane_2708-fe0f.png",
-  "ship": "https://em-content.zobj.net/thumbs/120/google/350/ship_1f6a2.png",
-  "car": "https://em-content.zobj.net/thumbs/120/google/350/automobile_1f697.png",
-  "train": "https://em-content.zobj.net/thumbs/120/google/350/locomotive_1f682.png",
+  // 3. UNPKG (Very reliable CDN for JS libraries)
+  "pin_unpkg": "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
 
-  // === STATUS & ALERTS ===
-  "warning": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
-  "warning_triangle": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
-  "alert": "https://em-content.zobj.net/thumbs/120/google/350/exclamation-mark_2757.png",
-  "info": "https://em-content.zobj.net/thumbs/120/google/350/information_2139-fe0f.png",
-  "check": "https://em-content.zobj.net/thumbs/120/google/350/check-mark_2714-fe0f.png",
-  "error": "https://em-content.zobj.net/thumbs/120/google/350/cross-mark_274c.png",
+  // 4. WIKIMEDIA COMMONS (Usually very CORS friendly)
+  "circle_wikimedia": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png",
 
-  // === SHAPES & BASIC ===
-  "circle": "https://em-content.zobj.net/thumbs/120/google/350/blue-circle_1f535.png",
-  "star": "https://em-content.zobj.net/thumbs/120/google/350/star_2b50.png",
-  "star_outline": "https://em-content.zobj.net/thumbs/120/google/350/white-medium-star_2b50.png",
-  "square": "https://em-content.zobj.net/thumbs/120/google/350/blue-square_1f7e6.png",
-  "heart": "https://em-content.zobj.net/thumbs/120/google/350/red-heart_2764-fe0f.png",
-  "flag": "https://em-content.zobj.net/thumbs/120/google/350/triangular-flag_1f6a9.png",
+  // 5. GITHUB RAW (Often blocked by strict policies, but standard for devs)
+  "star_github": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-gold.png",
 
-  // === INDUSTRY & FACILITIES ===
-  "factory": "https://em-content.zobj.net/thumbs/120/google/350/factory_1f3ed.png",
-  "hospital": "https://em-content.zobj.net/thumbs/120/google/350/hospital_1f3e5.png",
-  "school": "https://em-content.zobj.net/thumbs/120/google/350/school_1f3eb.png",
-  "hotel": "https://em-content.zobj.net/thumbs/120/google/350/hotel_1f3e8.png",
-  "gas_station": "https://em-content.zobj.net/thumbs/120/google/350/fuel-pump_26fd.png",
+  // 6. CLOUDINARY (Dedicated Image CDN)
+  "shop_cloudinary": "https://res.cloudinary.com/demo/image/upload/w_64/shopping_cart.png",
 
-  // === PEOPLE & USERS ===
-  "user": "https://em-content.zobj.net/thumbs/120/google/350/bust-in-silhouette_1f464.png",
-  "users": "https://em-content.zobj.net/thumbs/120/google/350/busts-in-silhouette_1f465.png",
-  "person": "https://em-content.zobj.net/thumbs/120/google/350/person_1f9d1.png",
+  // 7. ICONARCHIVE (Standard Icon Host)
+  "car_iconarchive": "https://icons.iconarchive.com/icons/icons8/windows-8/64/Transport-Car-icon.png",
 
-  // === FOOD & DINING ===
-  "restaurant": "https://em-content.zobj.net/thumbs/120/google/350/fork-and-knife_1f374.png",
-  "coffee": "https://em-content.zobj.net/thumbs/120/google/350/hot-beverage_2615.png",
-  "pizza": "https://em-content.zobj.net/thumbs/120/google/350/pizza_1f355.png",
+  // 8. GOOGLE STATIC (Maps API assets)
+  "check_google": "https://maps.gstatic.com/mapfiles/api-3/images/spotlight-poi2.png",
 
-  // === NATURE & ENVIRONMENT ===
-  "tree": "https://em-content.zobj.net/thumbs/120/google/350/deciduous-tree_1f333.png",
-  "leaf": "https://em-content.zobj.net/thumbs/120/google/350/leaf-fluttering-in-wind_1f343.png",
-  "mountain": "https://em-content.zobj.net/thumbs/120/google/350/mountain_26f0-fe0f.png",
-  "water": "https://em-content.zobj.net/thumbs/120/google/350/droplet_1f4a7.png",
+  // 9. ICONS8 (Direct Link)
+  "factory_icons8": "https://img.icons8.com/color/96/factory.png",
 
-  // === TECHNOLOGY & DEVICES ===
-  "phone": "https://em-content.zobj.net/thumbs/120/google/350/telephone_260e-fe0f.png",
-  "computer": "https://em-content.zobj.net/thumbs/120/google/350/desktop-computer_1f5a5-fe0f.png",
-  "wifi": "https://em-content.zobj.net/thumbs/120/google/350/antenna-bars_1f4f6.png",
-  "signal": "https://em-content.zobj.net/thumbs/120/google/350/mobile-phone_1f4f1.png",
+  // 10. FLATICON (Direct CDN link - expires often but good for test)
+  "warning_flaticon": "https://cdn-icons-png.flaticon.com/128/179/179386.png",
 
-  // === FINANCIAL ===
-  "dollar": "https://em-content.zobj.net/thumbs/120/google/350/dollar-banknote_1f4b5.png",
-  "euro": "https://em-content.zobj.net/thumbs/120/google/350/euro-banknote_1f4b6.png",
-  "bank": "https://em-content.zobj.net/thumbs/120/google/350/bank_1f3e6.png",
+  // 11. IMGUR (Image Host)
+  "heart_imgur": "https://i.imgur.com/gL8mUaR.png",
 
-  // === WEATHER ===
-  "sun": "https://em-content.zobj.net/thumbs/120/google/350/sun_2600-fe0f.png",
-  "cloud": "https://em-content.zobj.net/thumbs/120/google/350/cloud_2601-fe0f.png",
-  "rain": "https://em-content.zobj.net/thumbs/120/google/350/cloud-with-rain_1f327-fe0f.png",
-  "snow": "https://em-content.zobj.net/thumbs/120/google/350/snowflake_2744-fe0f.png"
+  // 12. DUMMYIMAGE (Placeholder Generator)
+  "box_placeholder": "https://dummyimage.com/64x64/000/fff&text=X"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -216,64 +176,24 @@ const getLayerOptions = (n) => {
     },
     [`layer${n}_icon_type`]: {
       type: "string",
-      label: `L${n} Icon Preset`,
+      label: `L${n} Icon Source (Shotgun Test)`,
       display: "select",
       values: [
         { "Custom URL": "custom" },
-        { "Marker (Truck)": "marker" }, // Updated label
-        { "Alert": "alert" },
-        { "Bank": "bank" },
-        { "Building": "building" },
-        { "Car": "car" },
-        { "Check/Success": "check" },
-        { "Circle": "circle" },
-        { "Cloud": "cloud" },
-        { "Coffee": "coffee" },
-        { "Computer": "computer" },
-        { "Dollar": "dollar" },
-        { "Error": "error" },
-        { "Euro": "euro" },
-        { "Factory": "factory" },
-        { "Flag": "flag" },
-        { "Gas Station": "gas_station" },
-        { "Heart": "heart" },
-        { "Hospital": "hospital" },
-        { "Hotel": "hotel" },
-        { "Info": "info" },
-        { "Leaf": "leaf" },
-        { "Location Filled": "location_filled" },
-        { "Location Pin": "location_pin" },
-        { "Map Pin": "map_pin" },
-        { "Mountain": "mountain" },
-        { "Person": "person" },
-        { "Phone": "phone" },
-        { "Pizza": "pizza" },
-        { "Plane": "plane" },
-        { "Rain": "rain" },
-        { "Restaurant": "restaurant" },
-        { "School": "school" },
-        { "Ship": "ship" },
-        { "Shop/Store": "shop" },
-        { "Shopping Cart": "shopping_cart" },
-        { "Signal": "signal" },
-        { "Snow": "snow" },
-        { "Square": "square" },
-        { "Star": "star" },
-        { "Star Outline": "star_outline" },
-        { "Sun": "sun" },
-        { "Train": "train" },
-        { "Tree": "tree" },
-        { "Truck": "truck" },
-        { "Truck Fast": "truck_fast" },
-        { "User": "user" },
-        { "Users": "users" },
-        { "Warehouse": "warehouse" },
-        { "Warning": "warning" },
-        { "Warning Triangle": "warning_triangle" },
-        { "Water": "water" },
-        { "WiFi": "wifi" }
+        { "1. Truck (Vecteezy - Known Good)": "truck_vecteezy" },
+        { "2. Dot (Base64 - No Network)": "dot_base64" },
+        { "3. Pin (Unpkg CDN)": "pin_unpkg" },
+        { "4. Circle (Wikimedia)": "circle_wikimedia" },
+        { "5. Star (GitHub Raw)": "star_github" },
+        { "6. Shop (Cloudinary)": "shop_cloudinary" },
+        { "7. Car (IconArchive)": "car_iconarchive" },
+        { "8. Check (Google Static)": "check_google" },
+        { "9. Factory (Icons8)": "factory_icons8" },
+        { "10. Warning (Flaticon)": "warning_flaticon" },
+        { "11. Heart (Imgur)": "heart_imgur" },
+        { "12. Box (DummyImage)": "box_placeholder" }
       ],
-      default: "marker",
+      default: "truck_vecteezy",
       section: "Layers",
       order: b + 15
     },
@@ -288,26 +208,33 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER ---
+// --- HELPER: PRELOADER (Stable) ---
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = ICONS[type] || customUrl;
-    if (url && url.startsWith("data:")) return resolve(url);
-    if (!url || url.length < 5) return resolve(ICONS['marker']);
+
+    // Fallback to Vecteezy truck if default fails
+    const fallback = ICONS['truck_vecteezy'];
+
+    if (!url || url.length < 5) return resolve(fallback);
+
+    // Base64 is always safe (no network/CORS)
+    if (url.startsWith("data:")) return resolve(url);
+
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V45] Failed to load icon: ${url}`);
-      resolve(ICONS['marker']);
+      console.warn(`[Viz V46] Failed to load icon: ${url}`);
+      resolve(fallback);
     };
     img.src = url;
   });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v45",
-  label: "Combo Map 3D (V45 Fixed)",
+  id: "combo_map_ultimate_v46",
+  label: "Combo Map 3D (V46 Shotgun)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -460,7 +387,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V45] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V46] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -498,7 +425,7 @@ looker.plugins.visualizations.add({
       // Save processed data globally so Tooltip can access aggregated maps
       this._processedData = processedData;
 
-      console.log(`[Viz V45] Data prepared, rendering layers...`);
+      console.log(`[Viz V46] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -513,7 +440,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V45] FATAL ERROR:", err);
+      console.error("[Viz V46] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -563,7 +490,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V45] GeoJSON load failed:", error);
+      console.warn("[Viz V46] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -701,7 +628,7 @@ looker.plugins.visualizations.add({
         try {
           let iconUrlOverride = null;
           if (type === 'icon') {
-            iconUrlOverride = loadedIcons[iconIndex] || ICONS['marker'];
+            iconUrlOverride = loadedIcons[iconIndex] || ICONS['truck_vecteezy'];
             iconIndex++;
           }
           const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
@@ -710,7 +637,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V45] Layer ${i} Error:`, e);
+          console.error(`[Viz V46] Layer ${i} Error:`, e);
         }
       }
     }
@@ -718,11 +645,11 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP (FIXED FOR DIMENSION INDICES & AGGREGATION) ---
+    // --- TOOLTIP (V45 FIXED LOGIC) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
-      // 1. Identify which layer we are hovering over (to get the specific Dimension Index)
+      // 1. Identify layer to get Dimension Index
       const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
       const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
 
@@ -736,13 +663,11 @@ looker.plugins.visualizations.add({
           }
       }
 
-      // 2. Identify the object name to lookup in aggregated data
-      // We look for properties on the object, or fallback to object itself
+      // 2. Identify object name
       const rawName = object.properties?._name || object.name || (object.properties && object.properties.name);
       const cleanName = this._normalizeName(rawName);
 
-      // 3. Lookup the AGGREGATED data using the global _processedData map
-      // This ensures we get the sum of all rows for this dimension, not just the first one.
+      // 3. Lookup AGGREGATED data (Sum of all rows for this dimension)
       let aggregatedData = null;
       if (this._processedData &&
           this._processedData.dataMaps &&
@@ -751,14 +676,11 @@ looker.plugins.visualizations.add({
           aggregatedData = this._processedData.dataMaps[layerDimIdx][cleanName];
       }
 
-      // 4. Define source data (Use aggregated if found, otherwise fallback to hovered object properties)
-      // The 'source' object will contain values, pivotData, etc.
+      // 4. Define source
       let source = null;
-
       if (aggregatedData) {
          source = aggregatedData;
       } else if (object.properties && object.properties._name) {
-         // Fallback to internal properties if aggregation lookup fails
          source = {
             name: object.properties._name,
             values: object.properties._values,
@@ -802,13 +724,11 @@ looker.plugins.visualizations.add({
                 let val = '0';
                 if (pData) {
                   dimensionFilteredTotal += pData.value;
-                  // LookML Format logic
                   val = this._applyLookerFormat(pData.value, m.value_format);
                 }
                 html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
               });
 
-              // LookML Format logic for total
               const totalVal = this._applyLookerFormat(dimensionFilteredTotal, m.value_format);
               html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div>`;
             } else {
@@ -1196,7 +1116,7 @@ looker.plugins.visualizations.add({
           pickable: true,
           opacity: opacity,
           // CRITICAL FIX: Ensure SVG is replaced with PNG or safe fallback
-          iconAtlas: iconUrlOverride || ICONS['marker'],
+          iconAtlas: iconUrlOverride || ICONS['truck_vecteezy'],
           iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false } },
           getIcon: d => 'marker',
           getPosition: d => d.position,

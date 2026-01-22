@@ -193,7 +193,6 @@ looker.plugins.visualizations.add({
       iframe.setAttribute('allow', config.allow_features);
     }
 
-    // FIX: Ajout de allow-same-origin pour résoudre les erreurs SecurityError
     if (config.use_sandbox) {
       var sandboxPerms = config.sandbox_permissions || 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox';
       iframe.setAttribute('sandbox', sandboxPerms);
@@ -235,7 +234,6 @@ looker.plugins.visualizations.add({
 
     this.content.appendChild(iframe);
 
-    // FIX: Timeout amélioré
     loadTimeout = setTimeout(function() {
       if (self.content.querySelector('.url-embed-loading')) {
         self.content.innerHTML = '';
@@ -244,7 +242,6 @@ looker.plugins.visualizations.add({
       }
     }, 5000);
 
-    // FIX: Refresh interval amélioré
     if (config.refresh_interval && config.refresh_interval > 0) {
       this.refreshInterval = setInterval(function() {
         if (iframe && iframe.src) {
