@@ -1,42 +1,59 @@
 /**
- * Multi-Layer 3D Map for Looker - v42 Ultimate Fixes
- *
- * UPDATES FROM v41:
- * 1. FIXED: Tooltip Aggregation. Now looks up the full aggregated data map
- * by dimension key instead of relying on individual feature properties.
- * 2. FIXED: Icon Loading Crash (SVG/Bitmap Error). Implemented a Canvas
- * rasterizer that forces all icons (SVG/PNG) into a fixed bitmap before
- * rendering. This prevents the "natural dimensions" error.
- * 3. FIXED: Icon Tilting. Changed 'billboard' to true so icons stand up.
- * 4. UPDATED: Icon Library. Added a "Shotgun" test list of various URL formats.
+ * Multi-Layer 3D Map for Looker - v43 (Shotgun Test)
+ * * FIXES:
+ * 1. Tooltip Pivot Totals: Uses Dimension Aggregation (V42 logic).
+ * 2. Icons: "Shotgun" approach. 15 different URL sources to test CORS.
+ * 3. Icon Tilt: Fixed with 'billboard: true'.
+ * 4. Dimension Indices: Fixed lookup logic in tooltip.
  */
 
-// --- ICON LIBRARY (SHOTGUN TEST VARIETY) ---
-// We use a mix of known PNGs, SVGs, and different hosts to test what passes.
+// --- ICONS: SHOTGUN TEST SUITE ---
+// We test different CDNs and Formats to see what passes your specific CORS rules.
 const ICONS = {
-  // 1. KNOWN GOOD PNGs (Reliable)
+  // 1. KNOWN WORKING (User Provided)
   "truck": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "marker": "https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/icon-atlas.png", // Fallback atlas, but used here as single for test
-  "circle": "https://em-content.zobj.net/thumbs/120/google/350/blue-circle_1f535.png",
-  "star": "https://em-content.zobj.net/thumbs/120/google/350/star_2b50.png",
 
-  // 2. COMMON SVGs (Now handled by Canvas Rasterizer)
+  // 2. WIKIMEDIA (Usually CORS Friendly)
+  "marker": "https://upload.wikimedia.org/wikipedia/commons/8/88/Map_marker.svg",
+
+  // 3. GITHUB RAW (Usually CORS Friendly)
   "map_pin": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/map-pin.svg",
-  "location": "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/location-dot.svg",
 
-  // 3. EMOJI PNGs (High compatibility)
-  "warning": "https://em-content.zobj.net/thumbs/120/google/350/warning_26a0-fe0f.png",
-  "check": "https://em-content.zobj.net/thumbs/120/google/350/check-mark_2714-fe0f.png",
-  "fire": "https://em-content.zobj.net/thumbs/120/google/350/fire_1f525.png",
-  "home": "https://em-content.zobj.net/thumbs/120/google/350/house_1f3e0.png",
-  "shop": "https://em-content.zobj.net/thumbs/120/google/350/convenience-store_1f3ea.png",
-  "factory": "https://em-content.zobj.net/thumbs/120/google/350/factory_1f3ed.png",
-  "euro": "https://em-content.zobj.net/thumbs/120/google/350/euro-banknote_1f4b6.png",
-  "dollar": "https://em-content.zobj.net/thumbs/120/google/350/dollar-banknote_1f4b5.png",
+  // 4. CLOUDINARY (Optimized CDN)
+  "shop": "https://res.cloudinary.com/demo/image/upload/w_64/shopping_cart.png",
 
-  // 4. TEST URLS
-  "test_svg_simple": "https://upload.wikimedia.org/wikipedia/commons/4/4f/SVG_Logo.svg",
-  "test_png_trans": "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+  // 5. ICONS8 (Direct PNG)
+  "factory": "https://img.icons8.com/color/96/factory.png",
+
+  // 6. FLATICON (Direct via CDN)
+  "warning": "https://cdn-icons-png.flaticon.com/128/179/179386.png",
+
+  // 7. GOOGLE FONTS (Material Symbols SVG)
+  "circle": "https://fonts.gstatic.com/s/i/materialicons/circle/v4/24px.svg",
+
+  // 8. PLACEHOLDER (Test Service)
+  "star": "https://via.placeholder.com/64/FFFF00/000000?text=*",
+
+  // 9. DATA URI (Base64 - 100% Safe, no Network)
+  "check": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAACXBIWXMAAAsTAAALEwEAmpwYAAADG0lEQVR4nO2bT0gUURzHP2921z+rW0tE2E1CBMMgOewWQRAZdIogCLoE0S136RYdnTq0Q5cIOrgEdQ+dQzqE0CKCiIikJSp2t01/dnbG9+08nZ11d2Z3Vkd94PDezLw37/P9/b6/35sZ7FCHOnScYJqmV0pNKaUmlFJD/6kYyWTuw798wphS6rFS6iVwHzjTqgCmaQ4qpW4rpc45fN0FvAMeK6Xu2badb6Vv1zJASuY6cNOh833AVeC+bds5P336CiCl1KBSasHhcwH4aNt21i9/vgJIyVwFrjl87QLe2rad8dOfZwAppc4Ajxy+FgEfbNvO+u3Tk/ewwSjQrwzD6A0EAn2RSGQwEomMhcPha4FAQE3TFCADZJRSGWAzGo0+T6VSL9Lp9FvbtnPe+rMCuAPM2bY9V8/3XQFIL0g3mFzP990AGaXUDDDTy/ddAewHbgF36v2+K4A5YCbwL5h6AewHrgP3gJv1ft8VwF3gGvAImK33+64A8gN/n3T7y+f7rgDsB64A94GZej9wBWBKqTFgxvXzXQHsB64A94Hper/vCsB0g/R+388A0g3S+30/A0g3SO/3XQFM0xzmD3nXd/0MIL0gvd/3M4D0gvR+388A0g3S+30/A0g3SO/3/QwgvSC93/czgPSC9H7fz74PMAyjNxAI9EUikcFIJDIWDof7A4GANU1T1Nn/AeR/gWw0Gn2eSqVepNPpt7Zt5+r8wN8l0zQHgVEHwfPAoG3b2Vb6di0DAH0Ogv3ANdu2c6306yuAlMwl4JpD51vAB9u2M3769BVASqmjSqmHwBWHr7vAe+Chbdu5Vvr2FcA0TS+wopQ6p5QadPiaB94pZV6zLLvQqtB/36b8t2maXkopTyk1opQadBA4C7wDHjHLyrQywI/x36ZpDvo0/t1/3f8H/wP+B/wP+B/wP+B/wP+A/wH/A/4H/A/4H/A/4H/A/4H/AfqeYJqm10GgG9jP/z5gC8gAy8Cybdv5Vv5/q0L/A4N5y/55Fq+6AAAAAElFTkSuQmCC",
+
+  // 10. WIKIMEDIA PNG
+  "euro": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Euro_Symbol.svg/64px-Euro_Symbol.svg.png",
+
+  // 11. WORLD BANK (Test)
+  "dollar": "https://data.worldbank.org/assets/images/logo-wb-header-en.svg",
+
+  // 12. CLOUDFRONT (AWS CDN)
+  "info": "https://d1.awsstatic.com/serverless/Lambda/lambda_logo.png",
+
+  // 13. IMGUR (Often blocked, but worth a shot)
+  "heart": "https://i.imgur.com/gL8mUaR.png",
+
+  // 14. SIMPLE SVG
+  "square": "https://upload.wikimedia.org/wikipedia/commons/1/18/Blue_Square.svg",
+
+  // 15. DEFAULT FALLBACK
+  "default": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -168,23 +185,24 @@ const getLayerOptions = (n) => {
     },
     [`layer${n}_icon_type`]: {
       type: "string",
-      label: `L${n} Icon Preset`,
+      label: `L${n} Icon Preset (CORS Test)`,
       display: "select",
       values: [
         { "Custom URL": "custom" },
-        { "Truck (PNG)": "truck" },
-        { "Map Pin (SVG)": "map_pin" },
-        { "Marker (Atlas)": "marker" },
-        { "Warning": "warning" },
-        { "Check": "check" },
-        { "Circle": "circle" },
-        { "Star": "star" },
-        { "Shop": "shop" },
-        { "Factory": "factory" },
-        { "Euro": "euro" },
-        { "Dollar": "dollar" },
-        { "Test SVG Simple": "test_svg_simple" },
-        { "Test PNG Trans": "test_png_trans" }
+        { "1. Truck (Vecteezy)": "truck" },
+        { "2. Marker (Wiki - SVG)": "marker" },
+        { "3. Map Pin (GitHub Raw)": "map_pin" },
+        { "4. Shop (Cloudinary)": "shop" },
+        { "5. Factory (Icons8)": "factory" },
+        { "6. Warning (Flaticon)": "warning" },
+        { "7. Circle (Google Fonts)": "circle" },
+        { "8. Star (Placeholder)": "star" },
+        { "9. Check (Base64 DataURI)": "check" },
+        { "10. Euro (Wiki PNG)": "euro" },
+        { "11. Dollar (World Bank)": "dollar" },
+        { "12. Info (Cloudfront)": "info" },
+        { "13. Heart (Imgur)": "heart" },
+        { "14. Square (Wiki SVG)": "square" }
       ],
       default: "truck",
       section: "Layers",
@@ -201,54 +219,35 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: ROBUST IMAGE LOADER (CANVAS RASTERIZER) ---
-// This fixes the "SVG without natural dimensions" error by forcing the image
-// onto a canvas and converting it to a safe Data URL.
-const loadAndRasterizeIcon = (type, customUrl) => {
+// --- HELPER: SIMPLE PRELOADER (With CrossOrigin) ---
+// Reverted to simple loader to avoid InvalidStateError,
+// but keeps crossOrigin set to anonymous.
+const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = ICONS[type] || customUrl;
-    // Default fallback if empty
+    // Fallback to truck if undefined
     if (!url || url.length < 5) url = ICONS['truck'];
 
+    // Base64 is always safe
+    if (url.startsWith("data:")) return resolve(url);
+
     const img = new Image();
+    // This is required for WebGL textures
     img.crossOrigin = "Anonymous";
 
-    img.onload = () => {
-      try {
-        // Create an offscreen canvas
-        const canvas = document.createElement('canvas');
-        // Set a fixed standard size (e.g., 64x64 or 128x128)
-        const size = 128;
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-
-        // Draw image stretched to fit canvas (force dimensions)
-        ctx.drawImage(img, 0, 0, size, size);
-
-        // Return the canvas as a data URL (safe bitmap)
-        // This strips away any SVG weirdness
-        const safeDataUrl = canvas.toDataURL('image/png');
-        resolve(safeDataUrl);
-      } catch (e) {
-        console.warn(`[Viz V42] Rasterization failed for ${url}, falling back to raw URL.`, e);
-        resolve(url);
-      }
-    };
-
+    img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V42] Failed to load icon: ${url}`);
-      // Fallback to a safe internal circle if remote fails
-      resolve(ICONS['circle']);
+      console.warn(`[Viz V43] CORS/Load Error for: ${url}`);
+      // Fallback to Base64 checkmark if fetch fails
+      resolve(ICONS['check']);
     };
-
     img.src = url;
   });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v42",
-  label: "Combo Map 3D (V42 Ultimate)",
+  id: "combo_map_ultimate_v43",
+  label: "Combo Map 3D (V43 Shotgun)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -371,10 +370,46 @@ looker.plugins.visualizations.add({
             color: #FF5252; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 8px;
             font-family: sans-serif; font-weight: bold; text-align: center; display: none; z-index: 999;
         }
-        .deck-tooltip { font-family: sans-serif; font-size: 12px; pointer-events: none; }
-        .pivot-section { margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc; }
-        .pivot-value { display: flex; justify-content: space-between; gap: 10px; }
-        .pivot-label { color: #666; font-size: 0.9em; }
+        .deck-tooltip {
+            font-family: "Open Sans", "Helvetica", sans-serif;
+            font-size: 12px;
+            pointer-events: none;
+            line-height: 1.4;
+        }
+        .tooltip-header {
+            font-size: 13px;
+            font-weight: 600;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+            color: #333;
+        }
+        .pivot-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+        }
+        .pivot-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .pivot-key {
+            color: #666;
+            text-align: left;
+        }
+        .pivot-val {
+            font-weight: 600;
+            text-align: right;
+            color: #111;
+        }
+        .total-row {
+            border-top: 1px solid #eee;
+            margin-top: 4px;
+            padding-top: 4px;
+            font-weight: 600;
+            color: #333;
+        }
       </style>
 
       <div id="map-wrapper">
@@ -387,8 +422,7 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
-    // Store processed data globally so Tooltip can access aggregated maps
-    this._lastProcessedData = null;
+    this._processedData = null; // Store for tooltip lookup
   },
 
   destroy: function () {
@@ -401,7 +435,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V42] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V43] Update Start. Rows: ${data.length}`);
 
     this.clearErrors();
 
@@ -422,15 +456,15 @@ looker.plugins.visualizations.add({
     this._queryResponse = queryResponse;
     this._pivotInfo = this._detectPivots(queryResponse);
 
-    // --- LOAD ICONS SAFELY ---
+    // --- PRELOAD ICONS (Standard Loader) ---
     const iconPromises = [];
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
         const preset = config[`layer${i}_icon_type`];
         const custom = config[`layer${i}_icon_url`];
-        iconPromises.push(loadAndRasterizeIcon(preset, custom));
+        iconPromises.push(preloadImage(preset, custom));
       } else {
-        iconPromises.push(Promise.resolve(null));
+        iconPromises.push(Promise.resolve(null)); // Placeholder to keep index alignment
       }
     }
 
@@ -439,22 +473,21 @@ looker.plugins.visualizations.add({
       ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
-      // Store globally for tooltip access
-      this._lastProcessedData = processedData;
+      // Save for Tooltip Lookup (V42 Logic)
+      this._processedData = processedData;
 
-      console.log(`[Viz V42] Data & Icons prepared. Rendering...`);
+      console.log(`[Viz V43] Rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
-        console.log(`[Viz V42] Print mode - Forcing redraw...`);
         if (this._deck) this._deck.redraw(true);
-        setTimeout(() => done(), 2000); // Give it time to paint the canvas
+        setTimeout(() => done(), 2000);
       } else {
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V42] FATAL ERROR:", err);
+      console.error("[Viz V43] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -504,7 +537,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V42] GeoJSON load failed:", error);
+      console.warn("[Viz V43] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -623,35 +656,29 @@ looker.plugins.visualizations.add({
   // --- RENDER ---
   _render: function (processed, config, queryResponse, details, loadedIcons) {
     const layerObjects = [];
-    // Only increment icon index if layer is actually 'icon' type
-    let iconIndex = 0;
-    // Filter loadedIcons to only match enabled layers for correct indexing
-    const validIcons = [];
+
+    // Only map icons to enabled layers to preserve order
+    let iconUrlMap = {};
+    let iconLoadIdx = 0;
     for(let i=1; i<=4; i++) {
-        if (config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
-            validIcons.push(loadedIcons[i-1]);
-        }
+        // loadedIcons array maps 1:1 to layers 1-4 (null if disabled)
+        iconUrlMap[i] = loadedIcons[i-1];
     }
 
-    let actualIconIdx = 0;
     for (let i = 1; i <= 4; i++) {
       const enabled = config[`layer${i}_enabled`];
       const type = config[`layer${i}_type`];
 
       if (enabled) {
         try {
-          let iconUrlOverride = null;
-          if (type === 'icon') {
-            iconUrlOverride = validIcons[actualIconIdx] || ICONS['truck'];
-            actualIconIdx++;
-          }
-          const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
+          const iconUrl = iconUrlMap[i];
+          const layer = this._buildSingleLayer(i, config, processed, iconUrl);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V42] Layer ${i} Error:`, e);
+          console.error(`[Viz V43] Layer ${i} Error:`, e);
         }
       }
     }
@@ -659,61 +686,63 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP (FIXED: AGGREGATED LOOKUP) ---
+    // --- TOOLTIP (V42 Logic + LookML Formatting) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
-      // 1. Identify which layer and dim index we are on
+      // 1. Identify which layer we are on to get specific Dimension Index
       const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
       const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
 
+      // Fix: Correctly parse the dimension index for this specific layer
       let layerDimIdx = 0;
       if (layerIdx) {
-          const dimStr = config[`layer${layerIdx}_dimension_idx`] || "0";
-          const dimIndices = dimStr.split(',').map(s => parseInt(s.trim()));
-          layerDimIdx = dimIndices[0] || 0;
+          const dimStr = config[`layer${layerIdx}_dimension_idx`];
+          // Handle '0', '0,1', etc.
+          if (dimStr !== undefined && dimStr !== null) {
+              const parts = String(dimStr).split(',');
+              const firstVal = parseInt(parts[0].trim());
+              if (!isNaN(firstVal)) layerDimIdx = firstVal;
+          }
       }
 
-      // 2. Retrieve the *clean name* to lookup aggregation
-      const cleanName = object.properties ? this._normalizeName(object.properties._name) : (object.name ? this._normalizeName(object.name) : null);
+      // 2. Identify the object name to lookup
+      const props = object.properties || object;
+      const rawName = props._name || props.name || "Unknown";
+      const cleanName = this._normalizeName(rawName);
 
-      // 3. Lookup the AGGREGATED data from the global map
-      // This is the critical fix: Do not use 'object.properties' directly for values,
-      // as that might be just one feature. Use the 'dataMaps' aggregation.
+      // 3. Lookup AGGREGATED pivot totals (The V42 Fix)
+      // Use the global map instead of the single feature
       let aggregatedData = null;
-      if (this._lastProcessedData && this._lastProcessedData.dataMaps && this._lastProcessedData.dataMaps[layerDimIdx] && cleanName) {
-          aggregatedData = this._lastProcessedData.dataMaps[layerDimIdx][cleanName];
+      if (this._processedData &&
+          this._processedData.dataMaps &&
+          this._processedData.dataMaps[layerDimIdx] &&
+          this._processedData.dataMaps[layerDimIdx][cleanName]) {
+          aggregatedData = this._processedData.dataMaps[layerDimIdx][cleanName];
       }
 
-      // Fallback if aggregation fails (e.g. point data)
-      const dataSrc = aggregatedData || (object.properties ? {
-          name: object.properties._name,
-          values: object.properties._values,
-          pivotData: object.properties._pivotData
-      } : object);
-
-      const name = dataSrc.name || dataSrc.rawName || "Unknown";
-      const values = dataSrc.values || [];
-      const pivotData = dataSrc.pivotData;
-
-      const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
-      const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
-      const allowedMeasures = object.properties ? object.properties._allowedMeasures : object.allowedMeasures;
+      // Fallback if aggregation fails
+      const source = aggregatedData || props;
+      const pivotData = source.pivotData || source._pivotData;
+      const values = source.values || source._values || [];
+      const allowedMeasures = props._allowedMeasures || props.allowedMeasures;
 
       let html = "";
       if (config.tooltip_mode !== 'values') {
-        html += `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
+        html += `<div class="tooltip-header">${source.rawName || rawName}</div>`;
       }
 
       const measures = queryResponse.fields.measure_like;
+      const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
+      const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
 
       if (config.tooltip_mode !== 'name') {
         measures.forEach((m, idx) => {
           if (allowedMeasures && !allowedMeasures.includes(idx)) return;
 
           if (pivotData && this._pivotInfo && this._pivotInfo.hasPivot) {
-            html += `<div style="font-weight:bold; margin-top:5px;">${m.label_short || m.label}</div>`;
-            html += `<div class="pivot-section">`;
+            html += `<div style="font-size:11px; color:#666; margin-top:6px;">${m.label_short || m.label}</div>`;
+            html += `<div class="pivot-table">`;
 
             if (showAllPivots) {
               let dimensionFilteredTotal = 0;
@@ -725,22 +754,22 @@ looker.plugins.visualizations.add({
                   dimensionFilteredTotal += pData.value;
                   val = this._applyLookerFormat(pData.value, m.value_format);
                 }
-                html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
+                html += `<div class="pivot-row"><span class="pivot-key">${pivotLabel}</span><span class="pivot-val">${val}</span></div>`;
               });
 
               const totalVal = this._applyLookerFormat(dimensionFilteredTotal, m.value_format);
-              html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div>`;
+              html += `<div class="pivot-row total-row"><span class="pivot-key">Total</span><span class="pivot-val">${totalVal}</span></div>`;
             } else {
               const pk = this._pivotInfo.pivotKeys[pivotIdx];
               const pivotLabel = this._pivotInfo.pivotLabels[pivotIdx] || pk;
               const pData = pivotData[m.name] && pivotData[m.name][pk];
               let val = pData ? this._applyLookerFormat(pData.value, m.value_format) : '0';
-              html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
+              html += `<div class="pivot-row"><span class="pivot-key">${pivotLabel}</span><span class="pivot-val">${val}</span></div>`;
             }
             html += `</div>`;
           } else {
             const val = this._applyLookerFormat(values[idx], m.value_format);
-            html += `<div style="display:flex; justify-content:space-between; gap:10px;"><span>${m.label_short || m.label}:</span><span style="font-weight:bold;">${val}</span></div>`;
+            html += `<div class="pivot-row" style="margin-top:2px;"><span class="pivot-key">${m.label_short || m.label}</span><span class="pivot-val">${val}</span></div>`;
           }
         });
       }
@@ -749,12 +778,11 @@ looker.plugins.visualizations.add({
         html,
         style: {
           backgroundColor: config.tooltip_bg_color || '#fff',
-          color: '#000',
-          fontSize: '0.8em',
-          padding: '8px',
+          color: '#333',
+          padding: '10px',
           borderRadius: '4px',
-          maxWidth: '300px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+          boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+          minWidth: '150px'
         }
       };
     };
@@ -798,7 +826,7 @@ looker.plugins.visualizations.add({
         controller: true,
         layers: layers,
         getTooltip: getTooltip,
-        glOptions: { preserveDrawingBuffer: true, willReadFrequently: true }
+        glOptions: { preserveDrawingBuffer: true }
       });
     } else {
       this._deck.setProps({
@@ -879,14 +907,17 @@ looker.plugins.visualizations.add({
 
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
-      const obj = info.object;
-      const props = obj.properties || obj;
 
-      // Use the global aggregated lookup if possible
-      const cleanName = props._name ? this._normalizeName(props._name) : (obj.name ? this._normalizeName(obj.name) : null);
+      // Use the global map lookup again for drilling to get aggregated links
+      const props = info.object.properties || info.object;
+      const cleanName = this._normalizeName(props._name || props.name);
+
       let aggregatedData = null;
-      if (this._lastProcessedData && this._lastProcessedData.dataMaps && this._lastProcessedData.dataMaps[dimIndices[0]] && cleanName) {
-          aggregatedData = this._lastProcessedData.dataMaps[dimIndices[0]][cleanName];
+      if (this._processedData &&
+          this._processedData.dataMaps &&
+          this._processedData.dataMaps[dimIndices[0]] &&
+          this._processedData.dataMaps[dimIndices[0]][cleanName]) {
+          aggregatedData = this._processedData.dataMaps[dimIndices[0]][cleanName];
       }
 
       const source = aggregatedData || props;
@@ -1076,16 +1107,14 @@ looker.plugins.visualizations.add({
           data: safePointData,
           pickable: true,
           opacity: opacity,
-          // CRITICAL FIX 2: Use the rasterized image data URL
           iconAtlas: iconUrlOverride || ICONS['truck'],
-          // We define the whole image as the icon
           iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
           getSize: d => radius / 100,
           sizeScale: 1,
           sizeMinPixels: 20,
-          // CRITICAL FIX 3: Set billboard to true to fix tilting
+          // FIX: Billboard true keeps icons facing camera (no tilting)
           billboard: true,
           onClick: onClickHandler
         });
