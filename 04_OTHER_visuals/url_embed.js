@@ -90,98 +90,37 @@ looker.plugins.visualizations.add({
   },
 
   create: function(element, config) {
-    element.innerHTML = `
-      <style>
-        .url-embed-container {
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-          width: 100%;
-          font-family: "Open Sans", "Helvetica", sans-serif;
-        }
+    var container = document.createElement('div');
+    container.className = 'url-embed-container';
 
-        .url-embed-header {
-          padding: 12px 16px;
-          background-color: #f8f9fa;
-          border-bottom: 1px solid #dee2e6;
-          font-size: 16px;
-          font-weight: 600;
-          color: #212529;
-        }
+    var style = document.createElement('style');
+    style.textContent = '.url-embed-container { display: flex; flex-direction: column; height: 100%; width: 100%; font-family: "Open Sans", "Helvetica", sans-serif; }' +
+      '.url-embed-header { padding: 12px 16px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; font-size: 16px; font-weight: 600; color: #212529; }' +
+      '.url-embed-content { flex: 1; position: relative; overflow: hidden; }' +
+      '.url-embed-iframe { border: none; display: block; }' +
+      '.url-embed-loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #6c757d; }' +
+      '.url-embed-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 12px; }' +
+      '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }' +
+      '.url-embed-error { padding: 20px; text-align: center; color: #dc3545; }' +
+      '.url-embed-error-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }' +
+      '.url-embed-error-details { font-size: 14px; color: #6c757d; margin-top: 8px; padding: 12px; background-color: #f8f9fa; border-radius: 4px; text-align: left; }' +
+      '.url-embed-info { padding: 16px; text-align: center; color: #6c757d; font-size: 14px; }';
 
-        .url-embed-content {
-          flex: 1;
-          position: relative;
-          overflow: hidden;
-        }
+    var header = document.createElement('div');
+    header.className = 'url-embed-header';
+    header.style.display = 'none';
 
-        .url-embed-iframe {
-          border: none;
-          display: block;
-        }
+    var content = document.createElement('div');
+    content.className = 'url-embed-content';
 
-        .url-embed-loading {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          text-align: center;
-          color: #6c757d;
-        }
+    container.appendChild(header);
+    container.appendChild(content);
+    element.appendChild(style);
+    element.appendChild(container);
 
-        .url-embed-spinner {
-          border: 3px solid #f3f3f3;
-          border-top: 3px solid #3498db;
-          border-radius: 50%;
-          width: 40px;
-          height: 40px;
-          animation: spin 1s linear infinite;
-          margin: 0 auto 12px;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        .url-embed-error {
-          padding: 20px;
-          text-align: center;
-          color: #dc3545;
-        }
-
-        .url-embed-error-title {
-          font-size: 18px;
-          font-weight: 600;
-          margin-bottom: 8px;
-        }
-
-        .url-embed-error-details {
-          font-size: 14px;
-          color: #6c757d;
-          margin-top: 8px;
-          padding: 12px;
-          background-color: #f8f9fa;
-          border-radius: 4px;
-          text-align: left;
-        }
-
-        .url-embed-info {
-          padding: 16px;
-          text-align: center;
-          color: #6c757d;
-          font-size: 14px;
-        }
-      </style>
-      <div class="url-embed-container">
-        <div class="url-embed-header" style="display: none;"></div>
-        <div class="url-embed-content"></div>
-      </div>
-    `;
-
-    this.container = element.querySelector('.url-embed-container');
-    this.header = element.querySelector('.url-embed-header');
-    this.content = element.querySelector('.url-embed-content');
+    this.container = container;
+    this.header = header;
+    this.content = content;
     this.refreshInterval = null;
   },
 
@@ -201,13 +140,11 @@ looker.plugins.visualizations.add({
     }
 
     if (!config.embed_url) {
-      this.content.innerHTML = `
-        <div class="url-embed-info">
-          <p><strong>Configuration Required</strong></p>
-          <p>Please enter an Embed URL in the visualization settings.</p>
-          <p style="margin-top: 12px; font-size: 12px;">Example: https://www.youtube.com/embed/VIDEO_ID</p>
-        </div>
-      `;
+      this.content.innerHTML = '<div class="url-embed-info">' +
+        '<p><strong>Configuration Required</strong></p>' +
+        '<p>Please enter an Embed URL in the visualization settings.</p>' +
+        '<p style="margin-top: 12px; font-size: 12px;">Example: https://www.youtube.com/embed/VIDEO_ID</p>' +
+        '</div>';
       done();
       return;
     }
@@ -215,30 +152,29 @@ looker.plugins.visualizations.add({
     try {
       new URL(config.embed_url);
     } catch (e) {
-      this.content.innerHTML = `
-        <div class="url-embed-error">
-          <div class="url-embed-error-title">Invalid URL</div>
-          <p>The provided URL is not valid.</p>
-          ${config.show_error_details ? `
-            <div class="url-embed-error-details">
-              <strong>URL:</strong> ${config.embed_url}<br>
-              <strong>Error:</strong> ${e.message}
-            </div>
-          ` : ''}
-        </div>
-      `;
+      var errorHtml = '<div class="url-embed-error">' +
+        '<div class="url-embed-error-title">Invalid URL</div>' +
+        '<p>The provided URL is not valid.</p>';
+
+      if (config.show_error_details) {
+        errorHtml += '<div class="url-embed-error-details">' +
+          '<strong>URL:</strong> ' + config.embed_url + '<br>' +
+          '<strong>Error:</strong> ' + e.message +
+          '</div>';
+      }
+
+      errorHtml += '</div>';
+      this.content.innerHTML = errorHtml;
       done();
       return;
     }
 
-    this.content.innerHTML = `
-      <div class="url-embed-loading">
-        <div class="url-embed-spinner"></div>
-        <div>${config.loading_message || 'Loading content...'}</div>
-      </div>
-    `;
+    this.content.innerHTML = '<div class="url-embed-loading">' +
+      '<div class="url-embed-spinner"></div>' +
+      '<div>' + (config.loading_message || 'Loading content...') + '</div>' +
+      '</div>';
 
-    const iframe = document.createElement('iframe');
+    var iframe = document.createElement('iframe');
     iframe.className = 'url-embed-iframe';
     iframe.src = config.embed_url;
     iframe.style.width = config.iframe_width || '100%';
@@ -248,12 +184,11 @@ looker.plugins.visualizations.add({
       iframe.setAttribute('allow', config.allow_features);
     }
 
-    // CRITICAL FIX: Only use sandbox if explicitly enabled
     if (config.use_sandbox) {
       iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
     }
 
-    const self = this;
+    var self = this;
 
     iframe.onload = function() {
       self.content.innerHTML = '';
@@ -262,24 +197,25 @@ looker.plugins.visualizations.add({
     };
 
     iframe.onerror = function(error) {
-      self.content.innerHTML = `
-        <div class="url-embed-error">
-          <div class="url-embed-error-title">Failed to Load Content</div>
-          <p>The embedded content could not be loaded. This may be due to:</p>
-          <ul style="text-align: left; display: inline-block; margin-top: 12px;">
-            <li>X-Frame-Options preventing embedding</li>
-            <li>Content Security Policy restrictions</li>
-            <li>Network connectivity issues</li>
-            <li>Invalid or inaccessible URL</li>
-          </ul>
-          ${config.show_error_details ? `
-            <div class="url-embed-error-details">
-              <strong>URL:</strong> ${config.embed_url}<br>
-              <strong>Tip:</strong> Try using the embed version of the URL (e.g., youtube.com/embed/VIDEO_ID)
-            </div>
-          ` : ''}
-        </div>
-      `;
+      var errorHtml = '<div class="url-embed-error">' +
+        '<div class="url-embed-error-title">Failed to Load Content</div>' +
+        '<p>The embedded content could not be loaded. This may be due to:</p>' +
+        '<ul style="text-align: left; display: inline-block; margin-top: 12px;">' +
+        '<li>X-Frame-Options preventing embedding</li>' +
+        '<li>Content Security Policy restrictions</li>' +
+        '<li>Network connectivity issues</li>' +
+        '<li>Invalid or inaccessible URL</li>' +
+        '</ul>';
+
+      if (config.show_error_details) {
+        errorHtml += '<div class="url-embed-error-details">' +
+          '<strong>URL:</strong> ' + config.embed_url + '<br>' +
+          '<strong>Tip:</strong> Try using the embed version of the URL (e.g., youtube.com/embed/VIDEO_ID)' +
+          '</div>';
+      }
+
+      errorHtml += '</div>';
+      self.content.innerHTML = errorHtml;
       done();
     };
 
@@ -302,25 +238,3 @@ looker.plugins.visualizations.add({
     }, 5000);
   }
 });
-```
-
-## Key Fix
-
-**Removed default sandbox attribute** - This was causing the cookie/serviceWorker errors. Sandbox is now:
-- **Disabled by default** (most permissive)
-- Optional via "Enable Sandbox" toggle in settings
-- When enabled, uses minimum required permissions
-
-## Test These Working URLs
-```
-# YouTube (WILL WORK)
-https://www.youtube.com/embed/dQw4w9WgXcQ
-
-# Google Maps (WILL WORK)
-https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2624.9914!2d2.292292!3d48.858370!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47e66e2964e34e2d%3A0x8ddca9ee380ef7e0!2sEiffel%20Tower!5e0!3m2!1sen!2sfr
-
-# CodePen (WILL WORK)
-https://codepen.io/team/css-tricks/embed/preview/oNBrBZP
-
-# JSFiddle (WILL WORK)
-https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/line-basic/embedded/result/
