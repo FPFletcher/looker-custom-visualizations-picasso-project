@@ -91,9 +91,7 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // Create the visualization
   create: function(element, config) {
-    // Create container
     element.innerHTML = `
       <style>
         .url-embed-container {
@@ -183,34 +181,29 @@ looker.plugins.visualizations.add({
       </div>
     `;
 
-    this._container = element.querySelector('.url-embed-container');
-    this._header = element.querySelector('.url-embed-header');
-    this._content = element.querySelector('.url-embed-content');
-    this._refreshInterval = null;
+    this.container = element.querySelector('.url-embed-container');
+    this.header = element.querySelector('.url-embed-header');
+    this.content = element.querySelector('.url-embed-content');
+    this.refreshInterval = null;
   },
 
-  // Update the visualization
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    // Clear any existing refresh interval
-    if (this._refreshInterval) {
-      clearInterval(this._refreshInterval);
-      this._refreshInterval = null;
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
     }
 
-    // Clear content
-    this._content.innerHTML = '';
+    this.content.innerHTML = '';
 
-    // Update title
     if (config.show_title && config.url_title) {
-      this._header.textContent = config.url_title;
-      this._header.style.display = 'block';
+      this.header.textContent = config.url_title;
+      this.header.style.display = 'block';
     } else {
-      this._header.style.display = 'none';
+      this.header.style.display = 'none';
     }
 
-    // Validate URL
     if (!config.embed_url) {
-      this._content.innerHTML = `
+      this.content.innerHTML = `
         <div class="url-embed-info">
           <p><strong>Configuration Required</strong></p>
           <p>Please enter an Embed URL in the visualization settings.</p>
@@ -220,11 +213,10 @@ looker.plugins.visualizations.add({
       return;
     }
 
-    // Validate URL format
     try {
       new URL(config.embed_url);
     } catch (e) {
-      this._content.innerHTML = `
+      this.content.innerHTML = `
         <div class="url-embed-error">
           <div class="url-embed-error-title">Invalid URL</div>
           <p>The provided URL is not valid.</p>
@@ -240,41 +232,37 @@ looker.plugins.visualizations.add({
       return;
     }
 
-    // Show loading indicator
-    this._content.innerHTML = `
+    this.content.innerHTML = `
       <div class="url-embed-loading">
         <div class="url-embed-spinner"></div>
         <div>${config.loading_message || 'Loading content...'}</div>
       </div>
     `;
 
-    // Create iframe
     const iframe = document.createElement('iframe');
     iframe.className = 'url-embed-iframe';
     iframe.src = config.embed_url;
     iframe.style.width = config.iframe_width || '100%';
     iframe.style.height = config.iframe_height || '600px';
 
-    // Set allow attribute
     if (config.allow_features) {
       iframe.setAttribute('allow', config.allow_features);
     }
 
-    // Set sandbox attribute
     if (config.sandbox_permissions) {
       iframe.setAttribute('sandbox', config.sandbox_permissions);
     }
 
-    // Handle iframe load
-    iframe.onload = () => {
-      this._content.innerHTML = '';
-      this._content.appendChild(iframe);
+    const self = this;
+
+    iframe.onload = function() {
+      self.content.innerHTML = '';
+      self.content.appendChild(iframe);
       done();
     };
 
-    // Handle iframe error
-    iframe.onerror = (error) => {
-      this._content.innerHTML = `
+    iframe.onerror = function(error) {
+      self.content.innerHTML = `
         <div class="url-embed-error">
           <div class="url-embed-error-title">Failed to Load Content</div>
           <p>The embedded content could not be loaded. This may be due to:</p>
@@ -294,55 +282,22 @@ looker.plugins.visualizations.add({
       done();
     };
 
-    // Append iframe (this triggers the load/error events)
-    this._content.appendChild(iframe);
+    this.content.appendChild(iframe);
 
-    // Set up auto-refresh if configured
     if (config.refresh_interval && config.refresh_interval > 0) {
-      this._refreshInterval = setInterval(() => {
+      this.refreshInterval = setInterval(function() {
         if (iframe && iframe.contentWindow) {
-          iframe.src = iframe.src; // Reload iframe
+          iframe.src = iframe.src;
         }
       }, config.refresh_interval * 1000);
     }
 
-    // Fallback timeout in case onload never fires
-    setTimeout(() => {
-      if (this._content.querySelector('.url-embed-loading')) {
-        this._content.innerHTML = '';
-        this._content.appendChild(iframe);
+    setTimeout(function() {
+      if (self.content.querySelector('.url-embed-loading')) {
+        self.content.innerHTML = '';
+        self.content.appendChild(iframe);
         done();
       }
     }, 5000);
-  },
-
-  // Cleanup on destroy
-  destroy: function() {
-    if (this._refreshInterval) {
-      clearInterval(this._refreshInterval);
-      this._refreshInterval = null;
-    }
   }
 });
-```
-
-## Testing Instructions
-
-1. **Save the file** as `url_embed.js`
-
-2. **Upload to Looker:**
-   - Go to Admin → Platform → Visualizations
-   - Add new visualization
-   - Upload the JS file
-
-3. **Test URLs to try:**
-```
-   # Safe embeddable sites:
-   https://www.youtube.com/embed/dQw4w9WgXcQ
-   https://docs.google.com/presentation/d/e/YOUR_ID/embed
-   https://codepen.io/pen/YOUR_PEN
-   https://www.google.com/maps/embed?...
-
-   # Will likely fail (X-Frame-Options):
-   https://www.google.com
-   https://www.facebook.com
