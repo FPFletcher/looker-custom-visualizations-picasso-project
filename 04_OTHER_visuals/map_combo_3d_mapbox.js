@@ -1,38 +1,41 @@
 /**
- * Multi-Layer 3D Map for Looker - v47 (Content Expansion & UI Polish)
+ * Multi-Layer 3D Map for Looker - v48 (Final Polish & Logic Fixes)
  *
- * CHANGES FROM V46:
- * 1. EXPANDED: Added Car, Truck, Oil, Dam, etc. using the working "Icons8" CDN.
- * 2. UI FIX: Icons now anchor at the BOTTOM (not center) to "stick" to the map better.
- * 3. UI FIX: Forced Elevation to 0 for Icons to prevent "floating in space" effect.
- * 4. LOGIC: Enhanced Tooltip Formatting to strictly respect LookML currency/decimal patterns.
+ * CHANGES FROM V47:
+ * 1. FIXED: Floating Icons forced to Z=0 coordinate.
+ * 2. NEW: "Hide Rows with 0/Null" toggle in Plot tab (Defaults to True).
+ * 3. FIXED: Tooltip now respects the "Measure Indices" setting (hides unselected measures).
+ * 4. FIXED: Drill Menu now aggregates links from ALL selected measures.
+ * 5. REMOVED: Clustered Hexagon Layer.
+ * 6. UI: Icons sorted alphabetically, Custom first. Oil Barrel removed.
  */
 
-// --- ICONS8 CDN (Proven to work based on your feedback) ---
+// --- ICONS8 CDN & OTHERS ---
 const ICONS = {
-  // === NEW REQUESTED ICONS ===
-  "factory": "https://img.icons8.com/color/96/factory.png", // The one that worked
-  "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
-  "oil_barrel": "https://img.icons8.com/color/96/oil-barrel.png",
-  "water_dam": "https://img.icons8.com/color/96/dam.png",
+  // Custom is handled by logic, these are the presets
+  "box": "https://img.icons8.com/color/96/box.png",
+  "building": "https://img.icons8.com/color/96/office-building.png",
   "car": "https://img.icons8.com/color/96/car--v1.png",
-  "truck": "https://img.icons8.com/color/96/truck.png",
-  "semi_truck": "https://img.icons8.com/color/96/semi-truck-side-view.png",
-
-  // === STANDARD TYPES (Migrated to Icons8 for consistency) ===
-  "shop": "https://img.icons8.com/color/96/shop.png",
-  "warning": "https://img.icons8.com/color/96/box-important--v1.png", // Warning sign
   "check": "https://img.icons8.com/color/96/checked--v1.png",
-  "pin": "https://img.icons8.com/color/96/marker.png",
-  "home": "https://img.icons8.com/color/96/home.png",
-  "user": "https://img.icons8.com/color/96/user.png",
+  "circle": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png",
   "dollar": "https://img.icons8.com/color/96/us-dollar-circled--v1.png",
   "euro": "https://img.icons8.com/color/96/euro-pound-exchange.png",
-  "box": "https://img.icons8.com/color/96/box.png",
-
-  // === FALLBACKS ===
+  "factory": "https://img.icons8.com/color/96/factory.png",
+  "home": "https://img.icons8.com/color/96/home.png",
+  "hospital": "https://img.icons8.com/color/96/hospital-3.png",
+  "info": "https://img.icons8.com/color/96/info--v1.png",
   "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "circle": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png"
+  "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
+  "pin": "https://img.icons8.com/color/96/marker.png",
+  "plane": "https://img.icons8.com/color/96/airport.png",
+  "semi_truck": "https://img.icons8.com/color/96/semi-truck-side-view.png",
+  "ship": "https://img.icons8.com/color/96/water-transportation.png",
+  "shop": "https://img.icons8.com/color/96/shop.png",
+  "train": "https://img.icons8.com/color/96/train.png",
+  "truck": "https://img.icons8.com/color/96/truck.png",
+  "user": "https://img.icons8.com/color/96/user.png",
+  "warning": "https://img.icons8.com/color/96/box-important--v1.png",
+  "water_dam": "https://img.icons8.com/color/96/dam.png"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -71,8 +74,7 @@ const getLayerOptions = (n) => {
         { "Points (Fixed Size)": "point" },
         { "Bubbles (Value Size)": "bubble" },
         { "Icon (Image)": "icon" },
-        { "Clustered Hexagons (Sum Density)": "hexagon" },
-        { "Heatmap (Sum Density)": "heatmap" }
+        { "Heatmap (Sum Density)": "heatmap" } // Removed Hexagon
       ],
       default: def.type,
       section: "Layers",
@@ -168,22 +170,29 @@ const getLayerOptions = (n) => {
       display: "select",
       values: [
         { "Custom URL": "custom" },
-        { "Factory": "factory" },
-        { "Warning / Alert": "warning" },
+        { "Box / Package": "box" },
+        { "Building": "building" },
         { "Car": "car" },
-        { "Truck": "truck" },
-        { "Semi Truck": "semi_truck" },
-        { "Oil Rig": "oil_rig" },
-        { "Oil Barrel": "oil_barrel" },
-        { "Water Dam": "water_dam" },
-        { "Shop / Store": "shop" },
         { "Checkmark": "check" },
-        { "Map Pin": "pin" },
-        { "Home": "home" },
-        { "User": "user" },
+        { "Circle": "circle" },
         { "Dollar": "dollar" },
         { "Euro": "euro" },
-        { "Box / Package": "box" }
+        { "Factory": "factory" },
+        { "Home": "home" },
+        { "Hospital": "hospital" },
+        { "Info": "info" },
+        { "Map Pin": "pin" },
+        { "Marker (Truck Blue)": "marker_blue" },
+        { "Oil Rig": "oil_rig" },
+        { "Plane": "plane" },
+        { "Semi Truck": "semi_truck" },
+        { "Ship": "ship" },
+        { "Shop / Store": "shop" },
+        { "Train": "train" },
+        { "Truck": "truck" },
+        { "User": "user" },
+        { "Warning / Alert": "warning" },
+        { "Water Dam": "water_dam" }
       ],
       default: "factory",
       section: "Layers",
@@ -204,23 +213,22 @@ const getLayerOptions = (n) => {
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = ICONS[type] || customUrl;
-    // Fallback if empty
     if (!url || url.length < 5) return resolve(ICONS['factory']);
 
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V47] Failed to load icon: ${url}`);
-      resolve(ICONS['warning']); // Fallback to warning if fail
+      console.warn(`[Viz V48] Failed to load icon: ${url}`);
+      resolve(ICONS['warning']);
     };
     img.src = url;
   });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v47",
-  label: "Combo Map 3D (V47 Icons8)",
+  id: "combo_map_ultimate_v48",
+  label: "Combo Map 3D (V48 Final)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -234,6 +242,13 @@ looker.plugins.visualizations.add({
         { "Point Data (Lat/Lng)": "points" }
       ],
       default: "regions",
+      section: "Plot",
+      order: 2
+    },
+    hide_no_data: {
+      type: "boolean",
+      label: "Hide Rows with 0/Null",
+      default: true,
       section: "Plot",
       order: 2
     },
@@ -372,7 +387,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V47] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V48] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -409,7 +424,7 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V47] Data prepared, rendering layers...`);
+      console.log(`[Viz V48] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -424,13 +439,12 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V47] FATAL ERROR:", err);
+      console.error("[Viz V48] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
   },
 
-  // --- DETECT PIVOTS ---
   _detectPivots: function (queryResponse) {
     const pivotFields = queryResponse.fields.pivots || [];
     if (pivotFields.length === 0) {
@@ -445,7 +459,6 @@ looker.plugins.visualizations.add({
     return { hasPivot: true, pivotKeys, pivotField: pivotFields[0], pivotLabels };
   },
 
-  // --- PREPARE DATA ---
   _prepareData: async function (data, config, queryResponse) {
     const measures = queryResponse.fields.measure_like;
     const dims = queryResponse.fields.dimension_like;
@@ -472,7 +485,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V47] GeoJSON load failed:", error);
+      console.warn("[Viz V48] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -486,7 +499,6 @@ looker.plugins.visualizations.add({
     };
   },
 
-  // --- EXTRACT ROW DATA ---
   _extractRowData: function (row, measures, dims, rowIdx) {
     const hasPivot = this._pivotInfo && this._pivotInfo.hasPivot;
     const pivotKeys = this._pivotInfo.pivotKeys;
@@ -541,7 +553,6 @@ looker.plugins.visualizations.add({
     };
   },
 
-  // --- BUILD DATA MAPS ---
   _buildDataMaps: function (data, dims, measures) {
     const dataMaps = {};
 
@@ -595,7 +606,6 @@ looker.plugins.visualizations.add({
     return dataMaps;
   },
 
-  // --- RENDER ---
   _render: function (processed, config, queryResponse, details, loadedIcons) {
     const layerObjects = [];
     let iconIndex = 0;
@@ -617,7 +627,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V47] Layer ${i} Error:`, e);
+          console.error(`[Viz V48] Layer ${i} Error:`, e);
         }
       }
     }
@@ -625,7 +635,7 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP (V47 ENHANCED LOOKML FORMATTING) ---
+    // --- TOOLTIP (V48 FIXED LOGIC: Respects Measure Indices) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
@@ -633,6 +643,8 @@ looker.plugins.visualizations.add({
       const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
 
       let layerDimIdx = 0;
+      // Get Measure Indices for this layer to filter the tooltip
+      let activeMeasureIndices = [];
       if (layerIdx) {
           const dimStr = config[`layer${layerIdx}_dimension_idx`];
           if (dimStr !== undefined && dimStr !== null) {
@@ -640,6 +652,15 @@ looker.plugins.visualizations.add({
               const firstVal = parseInt(parts[0].trim());
               if (!isNaN(firstVal)) layerDimIdx = firstVal;
           }
+          const measStr = config[`layer${layerIdx}_measure_idx`];
+          if (measStr !== undefined && measStr !== null) {
+              activeMeasureIndices = String(measStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+          } else {
+              activeMeasureIndices = [layerIdx - 1]; // Default fallback
+          }
+      } else {
+          // Heatmap or generic fallback
+          activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
       }
 
       const rawName = object.properties?._name || object.name || (object.properties && object.properties.name);
@@ -664,7 +685,6 @@ looker.plugins.visualizations.add({
       const name = source.rawName || source.name;
       const values = source.values || source._values;
       const pivotData = source.pivotData || source._pivotData;
-      const allowedMeasures = source.allowedMeasures || (object.properties && object.properties._allowedMeasures);
 
       const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
       const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
@@ -678,7 +698,8 @@ looker.plugins.visualizations.add({
 
       if (config.tooltip_mode !== 'name') {
         measures.forEach((m, idx) => {
-          if (allowedMeasures && !allowedMeasures.includes(idx)) return;
+          // FIX: Only show measures selected for this layer
+          if (!activeMeasureIndices.includes(idx)) return;
 
           if (pivotData && this._pivotInfo && this._pivotInfo.hasPivot) {
             html += `<div style="font-weight:bold; margin-top:5px;">${m.label_short || m.label}</div>`;
@@ -697,7 +718,6 @@ looker.plugins.visualizations.add({
                 html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
               });
 
-              // Apply LookML format to the calculated total
               const totalVal = this._applyLookerFormat(dimensionFilteredTotal, m.value_format);
               html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div>`;
             } else {
@@ -782,18 +802,31 @@ looker.plugins.visualizations.add({
     }
   },
 
-  _validateLayerData: function (data) {
+  _validateLayerData: function (data, config) {
     if (!data || !Array.isArray(data) || data.length === 0) return [];
-    return data.filter(d =>
+
+    // Default validation
+    let validData = data.filter(d =>
       d.position &&
       d.position.length === 2 &&
       !isNaN(d.position[0]) &&
       !isNaN(d.position[1]) &&
       d.position[1] >= -90 && d.position[1] <= 90
     );
+
+    // FIX: Hide 0/Null Data logic
+    if (config.hide_no_data) {
+        validData = validData.filter(d => {
+            const vals = d.values || (d.properties && d.properties._values);
+            if (!vals) return false;
+            // Check if ANY measure in the row has a value > 0
+            return vals.some(v => parseFloat(v) > 0);
+        });
+    }
+
+    return validData;
   },
 
-  // --- BUILD SINGLE LAYER ---
   _buildSingleLayer: function (idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
 
@@ -857,9 +890,17 @@ looker.plugins.visualizations.add({
 
       let finalLinks = [];
 
+      // FIX: Aggregated Drill Logic
       if (!pivotInfo.hasPivot && drillLinks) {
+        // Collect links for ALL selected measures in this layer
         measureIndices.forEach(mIdx => {
-          if (drillLinks[mIdx]) finalLinks.push(...drillLinks[mIdx]);
+          if (drillLinks[mIdx] && drillLinks[mIdx].length > 0) {
+             const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
+             // Label the drill links by their measure name
+             drillLinks[mIdx].forEach(link => {
+                 finalLinks.push({ ...link, label: `${mName}: ${link.label}` });
+             });
+          }
         });
       }
       else if (pivotInfo.hasPivot && pivotData) {
@@ -879,16 +920,6 @@ looker.plugins.visualizations.add({
           }
         });
       }
-
-      finalLinks = finalLinks.map((link, linkIdx) => {
-        const measureIdx = measureIndices[Math.floor(linkIdx / (finalLinks.length / measureIndices.length))];
-        const measure = measures[measureIdx];
-
-        return {
-          ...link,
-          label: link.label || (measure ? measure.label_short || measure.label : "Show All")
-        };
-      });
 
       if (finalLinks.length > 0) {
         LookerCharts.Utils.openDrillMenu({
@@ -965,7 +996,7 @@ looker.plugins.visualizations.add({
       pointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
     }
 
-    const safePointData = this._validateLayerData(pointData);
+    const safePointData = this._validateLayerData(pointData, config);
     const id = `layer-${idx}-${type}`;
     const allVals = safePointData.map(d => getValue(d));
     const maxVal = Math.max(...allVals, 0.1);
@@ -1079,7 +1110,7 @@ looker.plugins.visualizations.add({
 
       case 'icon':
         if (safePointData.length === 0) return null;
-        // FIX: Force Z coordinate to 0 to prevent floating icons
+        // FIX: Force Z coordinate to 0 to prevent floating
         const groundedData = safePointData.map(d => ({
             ...d,
             position: [d.position[0], d.position[1], 0]
@@ -1091,7 +1122,7 @@ looker.plugins.visualizations.add({
           pickable: true,
           opacity: opacity,
           iconAtlas: iconUrlOverride || ICONS['factory'],
-          // FIX: Anchor Y at 128 (bottom) assuming 128x128 max atlas mapping
+          // Anchor Y at 128 (bottom) assuming 128x128 max atlas mapping
           iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false, anchorY: 128 } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
@@ -1108,41 +1139,21 @@ looker.plugins.visualizations.add({
         return new deck.HeatmapLayer({
           id: id,
           data: safePointData,
-          pickable: false,
+          // FIX: Enabled pickable so drill actions might trigger if deck.gl allows it
+          pickable: true,
           getPosition: d => d.position,
           getWeight: d => getValue(d),
           radiusPixels: radius / 500,
           colorRange: this._generateColorRange(startColorHex, endColorHex),
+          onClick: onClickHandler, // Mapped drill handler
           updateTriggers: { getWeight: updateTriggersBase }
-        });
-
-      case 'hexagon':
-        if (safePointData.length === 0) return null;
-        return new deck.HexagonLayer({
-          id: id,
-          data: safePointData,
-          pickable: true,
-          extruded: true,
-          radius: radius,
-          elevationScale: heightScale,
-          getPosition: d => d.position,
-          getElevationWeight: d => getValue(d),
-          getColorWeight: d => getValue(d),
-          colorAggregation: 'SUM',
-          elevationAggregation: 'SUM',
-          colorRange: this._generateColorRange(startColorHex, endColorHex),
-          onClick: onClickHandler,
-          updateTriggers: {
-            getElevationWeight: updateTriggersBase,
-            getColorWeight: updateTriggersBase
-          }
         });
 
       default: return null;
     }
   },
 
-  // --- UTILITIES (ENHANCED) ---
+  // --- UTILITIES ---
 
   _applyLookerFormat: function (value, formatStr) {
     if (value === undefined || value === null) return '0';
