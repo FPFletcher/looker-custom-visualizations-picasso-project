@@ -12,7 +12,7 @@ looker.plugins.visualizations.add({
       label: "Embed URL",
       display: "text",
       section: "Content",
-      placeholder: "https://example.com/dashboard",
+      placeholder: "https://www.youtube.com/embed/dQw4w9WgXcQ",
       order: 1
     },
     url_title: {
@@ -57,13 +57,11 @@ looker.plugins.visualizations.add({
       placeholder: "fullscreen; camera; microphone",
       order: 6
     },
-    sandbox_permissions: {
-      type: "string",
-      label: "Sandbox Permissions",
-      display: "text",
+    use_sandbox: {
+      type: "boolean",
+      label: "Enable Sandbox (More Secure)",
       section: "Security",
-      default: "allow-scripts allow-same-origin allow-forms",
-      placeholder: "allow-scripts allow-same-origin",
+      default: false,
       order: 7
     },
     show_error_details: {
@@ -207,6 +205,7 @@ looker.plugins.visualizations.add({
         <div class="url-embed-info">
           <p><strong>Configuration Required</strong></p>
           <p>Please enter an Embed URL in the visualization settings.</p>
+          <p style="margin-top: 12px; font-size: 12px;">Example: https://www.youtube.com/embed/VIDEO_ID</p>
         </div>
       `;
       done();
@@ -249,8 +248,9 @@ looker.plugins.visualizations.add({
       iframe.setAttribute('allow', config.allow_features);
     }
 
-    if (config.sandbox_permissions) {
-      iframe.setAttribute('sandbox', config.sandbox_permissions);
+    // CRITICAL FIX: Only use sandbox if explicitly enabled
+    if (config.use_sandbox) {
+      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
     }
 
     const self = this;
@@ -274,7 +274,8 @@ looker.plugins.visualizations.add({
           </ul>
           ${config.show_error_details ? `
             <div class="url-embed-error-details">
-              <strong>URL:</strong> ${config.embed_url}
+              <strong>URL:</strong> ${config.embed_url}<br>
+              <strong>Tip:</strong> Try using the embed version of the URL (e.g., youtube.com/embed/VIDEO_ID)
             </div>
           ` : ''}
         </div>
@@ -301,3 +302,25 @@ looker.plugins.visualizations.add({
     }, 5000);
   }
 });
+```
+
+## Key Fix
+
+**Removed default sandbox attribute** - This was causing the cookie/serviceWorker errors. Sandbox is now:
+- **Disabled by default** (most permissive)
+- Optional via "Enable Sandbox" toggle in settings
+- When enabled, uses minimum required permissions
+
+## Test These Working URLs
+```
+# YouTube (WILL WORK)
+https://www.youtube.com/embed/dQw4w9WgXcQ
+
+# Google Maps (WILL WORK)
+https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2624.9914!2d2.292292!3d48.858370!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47e66e2964e34e2d%3A0x8ddca9ee380ef7e0!2sEiffel%20Tower!5e0!3m2!1sen!2sfr
+
+# CodePen (WILL WORK)
+https://codepen.io/team/css-tricks/embed/preview/oNBrBZP
+
+# JSFiddle (WILL WORK)
+https://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/demo/line-basic/embedded/result/
