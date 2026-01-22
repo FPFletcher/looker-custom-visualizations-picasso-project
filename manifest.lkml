@@ -57,6 +57,11 @@ visualization: {
 }
 #"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
 
+visualization: {
+  id: "url-embed-visual"
+  label: "URL embed"
+  file: "04_OTHER_visuals/url_embed.js"
+}
 
 visualization: {
   id: "custom-advanced-cross-filter"
