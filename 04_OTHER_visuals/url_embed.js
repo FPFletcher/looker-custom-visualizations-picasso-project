@@ -1,5 +1,5 @@
 /**
- * Looker URL Embed Visualization
+ * Looker URL Embed Visualization with Proxy Support
  * Embeds external URLs via iframe within Looker dashboards
  */
 
@@ -48,13 +48,11 @@ looker.plugins.visualizations.add({
       placeholder: "100% or 800px",
       order: 5
     },
-    allow_features: {
-      type: "string",
-      label: "iframe Allow Attribute",
-      display: "text",
-      section: "Security",
-      default: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
-      placeholder: "fullscreen; camera; microphone",
+    use_link_button: {
+      type: "boolean",
+      label: "Use Link Button Instead (if embedding fails)",
+      section: "Fallback",
+      default: false,
       order: 6
     },
     show_error_details: {
@@ -63,30 +61,6 @@ looker.plugins.visualizations.add({
       section: "Advanced",
       default: true,
       order: 7
-    },
-    loading_message: {
-      type: "string",
-      label: "Loading Message",
-      display: "text",
-      section: "Advanced",
-      default: "Loading content...",
-      order: 8
-    },
-    refresh_interval: {
-      type: "number",
-      label: "Auto-refresh (seconds, 0=disabled)",
-      display: "number",
-      section: "Advanced",
-      default: 0,
-      order: 9
-    },
-    csp_timeout: {
-      type: "number",
-      label: "CSP Detection Timeout (ms)",
-      display: "number",
-      section: "Advanced",
-      default: 2000,
-      order: 10
     }
   },
 
@@ -110,21 +84,9 @@ looker.plugins.visualizations.add({
     this.container = container;
     this.header = header;
     this.content = content;
-    this.refreshInterval = null;
-    this.cspCheckInterval = null;
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-      this.refreshInterval = null;
-    }
-
-    if (this.cspCheckInterval) {
-      clearInterval(this.cspCheckInterval);
-      this.cspCheckInterval = null;
-    }
-
     this.content.innerHTML = '';
 
     if (config.show_title && config.url_title) {
@@ -140,7 +102,7 @@ looker.plugins.visualizations.add({
         '<p>Please enter an Embed URL in the visualization settings.</p>' +
         '<p style="margin-top: 12px; font-size: 12px;">Examples:</p>' +
         '<p style="font-size: 12px;">• YouTube: https://www.youtube.com/embed/VIDEO_ID</p>' +
-        '<p style="font-size: 12px;">• Looker: https://your-instance.looker.com/embed/dashboards/ID</p>' +
+        '<p style="font-size: 12px;">• Notion: https://your-workspace.notion.site/PAGE_ID</p>' +
         '</div>';
       done();
       return;
@@ -150,189 +112,123 @@ looker.plugins.visualizations.add({
     try {
       parsedUrl = new URL(config.embed_url);
     } catch (e) {
-      var errorHtml = '<div style="padding: 20px; text-align: center; color: #dc3545;">' +
+      this.content.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc3545;">' +
         '<div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Invalid URL</div>' +
-        '<p>The provided URL is not valid.</p>';
-
-      if (config.show_error_details) {
-        errorHtml += '<div style="font-size: 14px; color: #6c757d; margin-top: 8px; padding: 12px; background-color: #f8f9fa; border-radius: 4px; text-align: left;">' +
-          '<strong>URL:</strong> ' + config.embed_url + '<br>' +
-          '<strong>Error:</strong> ' + e.message +
-          '</div>';
-      }
-
-      errorHtml += '</div>';
-      this.content.innerHTML = errorHtml;
+        '<p>The provided URL is not valid.</p></div>';
       done();
       return;
     }
 
+    var isYouTube = parsedUrl.hostname.includes('youtube.com');
+    var isNotion = parsedUrl.hostname.includes('notion.site') || parsedUrl.hostname.includes('notion.so');
+    var domain = parsedUrl.hostname;
+
+    // If user wants link button mode or known problematic sites
+    if (config.use_link_button || isYouTube || isNotion) {
+      var buttonHtml = '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px; text-align: center;">' +
+        '<div style="font-size: 48px; margin-bottom: 20px;">🔗</div>' +
+        '<h3 style="margin: 0 0 12px 0; color: #212529; font-size: 20px; font-weight: 600;">';
+
+      if (config.url_title) {
+        buttonHtml += config.url_title;
+      } else if (isYouTube) {
+        buttonHtml += 'YouTube Video';
+      } else if (isNotion) {
+        buttonHtml += 'Notion Page';
+      } else {
+        buttonHtml += 'External Content';
+      }
+
+      buttonHtml += '</h3>' +
+        '<p style="color: #6c757d; margin-bottom: 24px; max-width: 500px;">Due to security restrictions, this content cannot be embedded directly in Looker. Click the button below to open it in a new tab.</p>' +
+        '<a href="' + config.embed_url + '" target="_blank" rel="noopener noreferrer" ' +
+        'style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background-color: #1a73e8; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 14px; transition: background-color 0.2s;"' +
+        'onmouseover="this.style.backgroundColor=\'#1557b0\'" onmouseout="this.style.backgroundColor=\'#1a73e8\'">' +
+        '<span>Open ' + (isYouTube ? 'Video' : isNotion ? 'Page' : 'Content') + '</span>' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+        '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>' +
+        '<polyline points="15 3 21 3 21 9"></polyline>' +
+        '<line x1="10" y1="14" x2="21" y2="3"></line>' +
+        '</svg>' +
+        '</a>';
+
+      if (config.show_error_details) {
+        buttonHtml += '<div style="margin-top: 24px; padding: 16px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; text-align: left; max-width: 600px; font-size: 13px; color: #856404;">' +
+          '<strong>⚠️ Why can\'t this be embedded?</strong><ul style="margin: 8px 0; padding-left: 20px;">';
+
+        if (isYouTube) {
+          buttonHtml += '<li>YouTube blocks embedding in nested iframes (Looker limitation)</li>' +
+            '<li>Cache storage restrictions prevent the YouTube player from loading</li>';
+        } else if (isNotion) {
+          buttonHtml += '<li>Notion\'s CSP only allows: notion.so, mail.notion.so</li>' +
+            '<li>Even public pages cannot be embedded in third-party sites</li>';
+        } else {
+          buttonHtml += '<li>The site has X-Frame-Options or CSP restrictions</li>' +
+            '<li>Looker\'s sandboxed iframe environment blocks this content</li>';
+        }
+
+        buttonHtml += '</ul><div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ffc107;">' +
+          '<code style="background: #fff; padding: 2px 6px; border-radius: 3px; font-size: 11px; word-break: break-all;">' +
+          config.embed_url + '</code></div></div>';
+      }
+
+      buttonHtml += '</div>';
+
+      this.content.innerHTML = buttonHtml;
+      done();
+      return;
+    }
+
+    // Try standard iframe for other sites
     var loadingHtml = '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #6c757d;">' +
       '<div style="border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 12px;"></div>' +
       '<style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>' +
-      '<div>' + (config.loading_message || 'Loading content...') + '</div>' +
-      '</div>';
+      '<div>Loading content...</div></div>';
 
     this.content.innerHTML = loadingHtml;
 
     var iframe = document.createElement('iframe');
-    iframe.className = 'url-embed-iframe';
     iframe.src = config.embed_url;
     iframe.style.cssText = 'border: none; display: block; width: ' + (config.iframe_width || '100%') + '; height: ' + (config.iframe_height || '600px') + ';';
-
     iframe.setAttribute('frameborder', '0');
-    iframe.setAttribute('loading', 'lazy');
-
-    if (config.allow_features) {
-      iframe.setAttribute('allow', config.allow_features);
-    }
+    iframe.setAttribute('allowfullscreen', 'true');
+    iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
 
     var self = this;
-    var loadTimeout;
-    var cspCheckTimeout;
     var hasLoaded = false;
-    var hasFailed = false;
-
-    function showCspError(detectedIssue) {
-      if (hasFailed) return;
-      hasFailed = true;
-
-      clearTimeout(loadTimeout);
-      clearTimeout(cspCheckTimeout);
-      if (self.cspCheckInterval) {
-        clearInterval(self.cspCheckInterval);
-        self.cspCheckInterval = null;
-      }
-
-      var domain = parsedUrl.hostname;
-      var isYouTube = domain.includes('youtube.com');
-      var isGoogleDocs = domain.includes('docs.google.com');
-      var isLooker = domain.includes('looker.com');
-
-      var errorTitle = 'Content Security Policy (CSP) Blocked';
-      var errorMessage = 'The website "' + domain + '" has blocked embedding in this context.';
-      var suggestions = [];
-
-      if (isYouTube) {
-        errorTitle = 'YouTube Embedding Issue';
-        errorMessage = 'YouTube videos cannot be embedded in this context due to security restrictions.';
-        suggestions = [
-          'Use the embed URL format: https://www.youtube.com/embed/VIDEO_ID',
-          'Make sure the video is not age-restricted or private',
-          'YouTube may block embedding in nested iframes (Looker limitation)',
-          'Consider using a direct link instead of embedding'
-        ];
-      } else if (isGoogleDocs) {
-        errorTitle = 'Google Docs Embedding Issue';
-        errorMessage = 'Google Docs content has strict frame-ancestors policy.';
-        suggestions = [
-          'Google Docs typically only allows embedding on specific domains',
-          'Try using Google Drive preview links instead',
-          'Consider exporting as PDF and hosting elsewhere'
-        ];
-      } else if (isLooker) {
-        errorTitle = 'Looker Dashboard Embedding Issue';
-        errorMessage = 'Looker dashboards may have CSP restrictions when nested.';
-        suggestions = [
-          'Ensure the embed URL is from the same Looker instance',
-          'Check if SSO/authentication is required',
-          'Nested Looker embeds may not work due to frame-ancestors policy'
-        ];
-      } else {
-        suggestions = [
-          'The website has X-Frame-Options or frame-ancestors CSP set',
-          'Contact the website owner to allow embedding',
-          'Try using an embed-specific URL if available',
-          'Some sites only allow embedding on whitelisted domains'
-        ];
-      }
-
-      var errorHtml = '<div style="padding: 20px; text-align: center; color: #dc3545;">' +
-        '<div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">🚫 ' + errorTitle + '</div>' +
-        '<p style="color: #212529; margin-bottom: 16px;">' + errorMessage + '</p>';
-
-      if (config.show_error_details) {
-        errorHtml += '<div style="font-size: 14px; color: #6c757d; margin-top: 8px; padding: 16px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; text-align: left;">' +
-          '<strong style="color: #856404;">🔍 Troubleshooting Tips:</strong><ul style="margin: 8px 0; padding-left: 20px; text-align: left;">';
-
-        suggestions.forEach(function(suggestion) {
-          errorHtml += '<li style="margin: 4px 0;">' + suggestion + '</li>';
-        });
-
-        errorHtml += '</ul>' +
-          '<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #ffc107;">' +
-          '<strong style="color: #856404;">Technical Details:</strong><br>' +
-          '<code style="background: #fff; padding: 4px 8px; border-radius: 3px; font-size: 12px;">' + config.embed_url + '</code><br>' +
-          '<span style="font-size: 12px; margin-top: 4px; display: block;">Issue: ' + (detectedIssue || 'CSP frame-ancestors violation') + '</span>' +
-          '</div>' +
-          '</div>';
-      }
-
-      errorHtml += '<div style="margin-top: 16px; padding: 12px; background-color: #e7f3ff; border-radius: 4px; font-size: 13px; color: #004085;">' +
-        '<strong>💡 Alternative:</strong> Consider opening the content in a new tab instead of embedding.' +
-        '</div></div>';
-
-      self.content.innerHTML = errorHtml;
-      done();
-    }
+    var loadTimeout;
 
     iframe.onload = function() {
-      if (hasLoaded || hasFailed) return;
+      if (hasLoaded) return;
       hasLoaded = true;
       clearTimeout(loadTimeout);
-      clearTimeout(cspCheckTimeout);
-      if (self.cspCheckInterval) {
-        clearInterval(self.cspCheckInterval);
-        self.cspCheckInterval = null;
-      }
       self.content.innerHTML = '';
       self.content.appendChild(iframe);
       done();
     };
 
     iframe.onerror = function() {
-      showCspError('iframe.onerror triggered');
+      if (hasLoaded) return;
+      hasLoaded = true;
+      clearTimeout(loadTimeout);
+
+      self.content.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc3545;">' +
+        '<div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Failed to Load Content</div>' +
+        '<p>The content could not be embedded due to security restrictions.</p>' +
+        '<p style="margin-top: 16px;"><a href="' + config.embed_url + '" target="_blank" style="color: #1a73e8; text-decoration: none; font-weight: 500;">Open in New Tab →</a></p>' +
+        '</div>';
+      done();
     };
 
     this.content.appendChild(iframe);
 
-    cspCheckTimeout = setTimeout(function() {
-      if (!hasLoaded && !hasFailed) {
-        try {
-          var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-          if (!iframeDoc || iframeDoc.body.innerHTML === '') {
-            showCspError('Empty iframe content detected (likely CSP block)');
-          }
-        } catch (e) {
-          // Cross-origin, but that's expected and okay
-          hasLoaded = true;
-          clearTimeout(loadTimeout);
-          self.content.innerHTML = '';
-          self.content.appendChild(iframe);
-          done();
-        }
-      }
-    }, config.csp_timeout || 2000);
-
     loadTimeout = setTimeout(function() {
-      if (!hasLoaded && !hasFailed) {
+      if (!hasLoaded) {
         hasLoaded = true;
         self.content.innerHTML = '';
         self.content.appendChild(iframe);
         done();
       }
-    }, 5000);
-
-    if (config.refresh_interval && config.refresh_interval > 0) {
-      this.refreshInterval = setInterval(function() {
-        if (iframe && iframe.parentNode && !hasFailed) {
-          var currentSrc = iframe.src;
-          iframe.src = 'about:blank';
-          setTimeout(function() {
-            iframe.src = currentSrc;
-          }, 50);
-        }
-      }, config.refresh_interval * 1000);
-    }
+    }, 3000);
   }
 });
