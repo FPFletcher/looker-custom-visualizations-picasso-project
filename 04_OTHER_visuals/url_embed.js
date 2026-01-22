@@ -64,12 +64,21 @@ looker.plugins.visualizations.add({
       default: false,
       order: 7
     },
+    sandbox_permissions: {
+      type: "string",
+      label: "Sandbox Permissions",
+      display: "text",
+      section: "Security",
+      default: "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox",
+      placeholder: "allow-scripts allow-same-origin",
+      order: 8
+    },
     show_error_details: {
       type: "boolean",
       label: "Show Error Details",
       section: "Advanced",
       default: true,
-      order: 8
+      order: 9
     },
     loading_message: {
       type: "string",
@@ -77,7 +86,7 @@ looker.plugins.visualizations.add({
       display: "text",
       section: "Advanced",
       default: "Loading content...",
-      order: 9
+      order: 10
     },
     refresh_interval: {
       type: "number",
@@ -85,7 +94,7 @@ looker.plugins.visualizations.add({
       display: "number",
       section: "Advanced",
       default: 0,
-      order: 10
+      order: 11
     }
   },
 
@@ -184,19 +193,24 @@ looker.plugins.visualizations.add({
       iframe.setAttribute('allow', config.allow_features);
     }
 
+    // FIX: Ajout de allow-same-origin pour résoudre les erreurs SecurityError
     if (config.use_sandbox) {
-      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+      var sandboxPerms = config.sandbox_permissions || 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox';
+      iframe.setAttribute('sandbox', sandboxPerms);
     }
 
     var self = this;
+    var loadTimeout;
 
     iframe.onload = function() {
+      clearTimeout(loadTimeout);
       self.content.innerHTML = '';
       self.content.appendChild(iframe);
       done();
     };
 
     iframe.onerror = function(error) {
+      clearTimeout(loadTimeout);
       var errorHtml = '<div class="url-embed-error">' +
         '<div class="url-embed-error-title">Failed to Load Content</div>' +
         '<p>The embedded content could not be loaded. This may be due to:</p>' +
@@ -221,20 +235,26 @@ looker.plugins.visualizations.add({
 
     this.content.appendChild(iframe);
 
-    if (config.refresh_interval && config.refresh_interval > 0) {
-      this.refreshInterval = setInterval(function() {
-        if (iframe && iframe.contentWindow) {
-          iframe.src = iframe.src;
-        }
-      }, config.refresh_interval * 1000);
-    }
-
-    setTimeout(function() {
+    // FIX: Timeout amélioré
+    loadTimeout = setTimeout(function() {
       if (self.content.querySelector('.url-embed-loading')) {
         self.content.innerHTML = '';
         self.content.appendChild(iframe);
         done();
       }
     }, 5000);
+
+    // FIX: Refresh interval amélioré
+    if (config.refresh_interval && config.refresh_interval > 0) {
+      this.refreshInterval = setInterval(function() {
+        if (iframe && iframe.src) {
+          var currentSrc = iframe.src;
+          iframe.src = '';
+          setTimeout(function() {
+            iframe.src = currentSrc;
+          }, 100);
+        }
+      }, config.refresh_interval * 1000);
+    }
   }
 });
