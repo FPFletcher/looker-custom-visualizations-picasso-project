@@ -1,50 +1,38 @@
 /**
- * Multi-Layer 3D Map for Looker - v46 (Stable V45 + Icon Source Testing)
+ * Multi-Layer 3D Map for Looker - v47 (Content Expansion & UI Polish)
  *
- * CHANGES FROM V45:
- * 1. UPDATED: Icon Library now contains 12 different hosting sources to test CORS.
- * 2. UPDATED: Dropdown menu explicitly lists the Source (Vecteezy, GitHub, Base64, etc.)
- * 3. STABLE: Retains the V45 Tooltip Fix and Data Aggregation logic.
+ * CHANGES FROM V46:
+ * 1. EXPANDED: Added Car, Truck, Oil, Dam, etc. using the working "Icons8" CDN.
+ * 2. UI FIX: Icons now anchor at the BOTTOM (not center) to "stick" to the map better.
+ * 3. UI FIX: Forced Elevation to 0 for Icons to prevent "floating in space" effect.
+ * 4. LOGIC: Enhanced Tooltip Formatting to strictly respect LookML currency/decimal patterns.
  */
 
-// --- DIVERSE ICON SOURCES (The "Shotgun" Test) ---
+// --- ICONS8 CDN (Proven to work based on your feedback) ---
 const ICONS = {
-  // 1. VECTEEZY (Known working from your Single Value viz)
-  "truck_vecteezy": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
+  // === NEW REQUESTED ICONS ===
+  "factory": "https://img.icons8.com/color/96/factory.png", // The one that worked
+  "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
+  "oil_barrel": "https://img.icons8.com/color/96/oil-barrel.png",
+  "water_dam": "https://img.icons8.com/color/96/dam.png",
+  "car": "https://img.icons8.com/color/96/car--v1.png",
+  "truck": "https://img.icons8.com/color/96/truck.png",
+  "semi_truck": "https://img.icons8.com/color/96/semi-truck-side-view.png",
 
-  // 2. BASE64 (No Network - 100% Reliability Control)
-  // A simple blue dot encoded directly in text. If this fails, it's a code/browser issue, not network.
-  "dot_base64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6E52E6C5C0C5611E29623861C39169726\" xmpMM:DocumentID=\"xmp.did:E52E6C5C0C5611E29623861C39169726\"> <xmpMM:DerivedFrom stRef:instanceID=\"xmp.iid:E52E6C5B0C5611E29623861C39169726\" stRef:documentID=\"xmp.did:E52E6C5C0C5611E29623861C39169726\"/> </rdf:Description> </rdf:RDF> </x:xmpmeta> <?xpacket end=\"r\"?>H031AAAAMklEQVR42uzZoQ0AAAjDMPZ/0f0O3QlkM4Kqqvqa6+4BAAAAAPBVdwAAAADgOwAAAADDALxMAS0l2s5gAAAAAElFTkSuQmCC",
+  // === STANDARD TYPES (Migrated to Icons8 for consistency) ===
+  "shop": "https://img.icons8.com/color/96/shop.png",
+  "warning": "https://img.icons8.com/color/96/box-important--v1.png", // Warning sign
+  "check": "https://img.icons8.com/color/96/checked--v1.png",
+  "pin": "https://img.icons8.com/color/96/marker.png",
+  "home": "https://img.icons8.com/color/96/home.png",
+  "user": "https://img.icons8.com/color/96/user.png",
+  "dollar": "https://img.icons8.com/color/96/us-dollar-circled--v1.png",
+  "euro": "https://img.icons8.com/color/96/euro-pound-exchange.png",
+  "box": "https://img.icons8.com/color/96/box.png",
 
-  // 3. UNPKG (Very reliable CDN for JS libraries)
-  "pin_unpkg": "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-
-  // 4. WIKIMEDIA COMMONS (Usually very CORS friendly)
-  "circle_wikimedia": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png",
-
-  // 5. GITHUB RAW (Often blocked by strict policies, but standard for devs)
-  "star_github": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-gold.png",
-
-  // 6. CLOUDINARY (Dedicated Image CDN)
-  "shop_cloudinary": "https://res.cloudinary.com/demo/image/upload/w_64/shopping_cart.png",
-
-  // 7. ICONARCHIVE (Standard Icon Host)
-  "car_iconarchive": "https://icons.iconarchive.com/icons/icons8/windows-8/64/Transport-Car-icon.png",
-
-  // 8. GOOGLE STATIC (Maps API assets)
-  "check_google": "https://maps.gstatic.com/mapfiles/api-3/images/spotlight-poi2.png",
-
-  // 9. ICONS8 (Direct Link)
-  "factory_icons8": "https://img.icons8.com/color/96/factory.png",
-
-  // 10. FLATICON (Direct CDN link - expires often but good for test)
-  "warning_flaticon": "https://cdn-icons-png.flaticon.com/128/179/179386.png",
-
-  // 11. IMGUR (Image Host)
-  "heart_imgur": "https://i.imgur.com/gL8mUaR.png",
-
-  // 12. DUMMYIMAGE (Placeholder Generator)
-  "box_placeholder": "https://dummyimage.com/64x64/000/fff&text=X"
+  // === FALLBACKS ===
+  "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
+  "circle": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -176,24 +164,28 @@ const getLayerOptions = (n) => {
     },
     [`layer${n}_icon_type`]: {
       type: "string",
-      label: `L${n} Icon Source (Shotgun Test)`,
+      label: `L${n} Icon Preset`,
       display: "select",
       values: [
         { "Custom URL": "custom" },
-        { "1. Truck (Vecteezy - Known Good)": "truck_vecteezy" },
-        { "2. Dot (Base64 - No Network)": "dot_base64" },
-        { "3. Pin (Unpkg CDN)": "pin_unpkg" },
-        { "4. Circle (Wikimedia)": "circle_wikimedia" },
-        { "5. Star (GitHub Raw)": "star_github" },
-        { "6. Shop (Cloudinary)": "shop_cloudinary" },
-        { "7. Car (IconArchive)": "car_iconarchive" },
-        { "8. Check (Google Static)": "check_google" },
-        { "9. Factory (Icons8)": "factory_icons8" },
-        { "10. Warning (Flaticon)": "warning_flaticon" },
-        { "11. Heart (Imgur)": "heart_imgur" },
-        { "12. Box (DummyImage)": "box_placeholder" }
+        { "Factory": "factory" },
+        { "Warning / Alert": "warning" },
+        { "Car": "car" },
+        { "Truck": "truck" },
+        { "Semi Truck": "semi_truck" },
+        { "Oil Rig": "oil_rig" },
+        { "Oil Barrel": "oil_barrel" },
+        { "Water Dam": "water_dam" },
+        { "Shop / Store": "shop" },
+        { "Checkmark": "check" },
+        { "Map Pin": "pin" },
+        { "Home": "home" },
+        { "User": "user" },
+        { "Dollar": "dollar" },
+        { "Euro": "euro" },
+        { "Box / Package": "box" }
       ],
-      default: "truck_vecteezy",
+      default: "factory",
       section: "Layers",
       order: b + 15
     },
@@ -208,33 +200,27 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER (Stable) ---
+// --- HELPER: PRELOADER ---
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = ICONS[type] || customUrl;
-
-    // Fallback to Vecteezy truck if default fails
-    const fallback = ICONS['truck_vecteezy'];
-
-    if (!url || url.length < 5) return resolve(fallback);
-
-    // Base64 is always safe (no network/CORS)
-    if (url.startsWith("data:")) return resolve(url);
+    // Fallback if empty
+    if (!url || url.length < 5) return resolve(ICONS['factory']);
 
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V46] Failed to load icon: ${url}`);
-      resolve(fallback);
+      console.warn(`[Viz V47] Failed to load icon: ${url}`);
+      resolve(ICONS['warning']); // Fallback to warning if fail
     };
     img.src = url;
   });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v46",
-  label: "Combo Map 3D (V46 Shotgun)",
+  id: "combo_map_ultimate_v47",
+  label: "Combo Map 3D (V47 Icons8)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -373,7 +359,6 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
-    // Store processed data for tooltip lookup
     this._processedData = null;
   },
 
@@ -387,7 +372,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V46] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V47] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -422,10 +407,9 @@ looker.plugins.visualizations.add({
       ...iconPromises
     ]).then(([processedData, ...loadedIcons]) => {
 
-      // Save processed data globally so Tooltip can access aggregated maps
       this._processedData = processedData;
 
-      console.log(`[Viz V46] Data prepared, rendering layers...`);
+      console.log(`[Viz V47] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -440,7 +424,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V46] FATAL ERROR:", err);
+      console.error("[Viz V47] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -466,7 +450,6 @@ looker.plugins.visualizations.add({
     const measures = queryResponse.fields.measure_like;
     const dims = queryResponse.fields.dimension_like;
 
-    // A. POINT MODE (Lat/Lng)
     if (config.data_mode === 'points') {
       const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
       const lngF = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lon'));
@@ -484,13 +467,12 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures, dims };
     }
 
-    // B. REGION MODE
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V46] GeoJSON load failed:", error);
+      console.warn("[Viz V47] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -509,7 +491,6 @@ looker.plugins.visualizations.add({
     const hasPivot = this._pivotInfo && this._pivotInfo.hasPivot;
     const pivotKeys = this._pivotInfo.pivotKeys;
 
-    // 1. NON-PIVOT
     if (!hasPivot) {
       return {
         values: measures.map(m => row[m.name] ? parseFloat(row[m.name].value) || 0 : 0),
@@ -520,7 +501,6 @@ looker.plugins.visualizations.add({
       };
     }
 
-    // 2. PIVOTED
     const pivotData = {};
     measures.forEach((m) => {
       pivotData[m.name] = {};
@@ -628,7 +608,7 @@ looker.plugins.visualizations.add({
         try {
           let iconUrlOverride = null;
           if (type === 'icon') {
-            iconUrlOverride = loadedIcons[iconIndex] || ICONS['truck_vecteezy'];
+            iconUrlOverride = loadedIcons[iconIndex] || ICONS['factory'];
             iconIndex++;
           }
           const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
@@ -637,7 +617,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V46] Layer ${i} Error:`, e);
+          console.error(`[Viz V47] Layer ${i} Error:`, e);
         }
       }
     }
@@ -645,11 +625,10 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP (V45 FIXED LOGIC) ---
+    // --- TOOLTIP (V47 ENHANCED LOOKML FORMATTING) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
-      // 1. Identify layer to get Dimension Index
       const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
       const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
 
@@ -663,11 +642,10 @@ looker.plugins.visualizations.add({
           }
       }
 
-      // 2. Identify object name
       const rawName = object.properties?._name || object.name || (object.properties && object.properties.name);
       const cleanName = this._normalizeName(rawName);
 
-      // 3. Lookup AGGREGATED data (Sum of all rows for this dimension)
+      // Aggregated Lookup
       let aggregatedData = null;
       if (this._processedData &&
           this._processedData.dataMaps &&
@@ -676,22 +654,12 @@ looker.plugins.visualizations.add({
           aggregatedData = this._processedData.dataMaps[layerDimIdx][cleanName];
       }
 
-      // 4. Define source
-      let source = null;
-      if (aggregatedData) {
-         source = aggregatedData;
-      } else if (object.properties && object.properties._name) {
-         source = {
+      let source = aggregatedData || (object.properties && object.properties._name ? {
             name: object.properties._name,
             values: object.properties._values,
             pivotData: object.properties._pivotData,
             allowedMeasures: object.properties._allowedMeasures
-         };
-      } else if (object.name && object.values) {
-         source = object;
-      } else {
-         return null;
-      }
+         } : object);
 
       const name = source.rawName || source.name;
       const values = source.values || source._values;
@@ -729,6 +697,7 @@ looker.plugins.visualizations.add({
                 html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
               });
 
+              // Apply LookML format to the calculated total
               const totalVal = this._applyLookerFormat(dimensionFilteredTotal, m.value_format);
               html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div>`;
             } else {
@@ -1110,20 +1079,26 @@ looker.plugins.visualizations.add({
 
       case 'icon':
         if (safePointData.length === 0) return null;
+        // FIX: Force Z coordinate to 0 to prevent floating icons
+        const groundedData = safePointData.map(d => ({
+            ...d,
+            position: [d.position[0], d.position[1], 0]
+        }));
+
         return new deck.IconLayer({
           id: id,
-          data: safePointData,
+          data: groundedData,
           pickable: true,
           opacity: opacity,
-          // CRITICAL FIX: Ensure SVG is replaced with PNG or safe fallback
-          iconAtlas: iconUrlOverride || ICONS['truck_vecteezy'],
-          iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false } },
+          iconAtlas: iconUrlOverride || ICONS['factory'],
+          // FIX: Anchor Y at 128 (bottom) assuming 128x128 max atlas mapping
+          iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false, anchorY: 128 } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
           getSize: d => radius / 100,
           sizeScale: 1,
           sizeMinPixels: 20,
-          billboard: false,
+          billboard: true,
           autoHighlight: false,
           onClick: onClickHandler
         });
@@ -1167,33 +1142,55 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // --- UTILITIES ---
+  // --- UTILITIES (ENHANCED) ---
 
   _applyLookerFormat: function (value, formatStr) {
     if (value === undefined || value === null) return '0';
-    if (!formatStr) return this._formatNumber(value);
+    if (typeof value !== 'number') return value;
 
-    let str = value.toString();
+    // Default formatting if no LookML format provided
+    if (!formatStr) return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-    if (formatStr.includes('$')) str = '$' + this._formatNumber(value);
-    else if (formatStr.includes('€')) str = '€' + this._formatNumber(value);
-    else if (formatStr.includes('£')) str = '£' + this._formatNumber(value);
-    else if (formatStr.includes('%')) str = (value * 100).toFixed(1) + '%';
-    else if (formatStr.toLowerCase().includes('"k"') || formatStr.toLowerCase().includes('k')) {
-      str = this._formatNumber(value);
-    }
-    else if (formatStr.includes('.')) {
-      const decimals = (formatStr.split('.')[1] || '').replace(/[^0]/g, '').length;
-      str = value.toLocaleString("en-US", {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      });
-    }
-    else {
-      str = this._formatNumber(value);
+    // Detect Currency
+    let style = 'decimal';
+    let currency = undefined;
+
+    if (formatStr.includes('$')) { style = 'currency'; currency = 'USD'; }
+    else if (formatStr.includes('€')) { style = 'currency'; currency = 'EUR'; }
+    else if (formatStr.includes('£')) { style = 'currency'; currency = 'GBP'; }
+    else if (formatStr.includes('¥')) { style = 'currency'; currency = 'JPY'; }
+    else if (formatStr.includes('%')) { style = 'percent'; }
+
+    // Detect Decimals (0.00 -> 2 digits)
+    let decimals = 0;
+    if (formatStr.includes('.')) {
+        const afterDot = formatStr.split('.')[1];
+        if (afterDot) decimals = afterDot.replace(/[^0#]/g, '').length;
+    } else if (style === 'currency') {
+        decimals = 2; // Default for currency
     }
 
-    return str;
+    try {
+        const options = {
+            style: style,
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        };
+        if (currency) options.currency = currency;
+
+        // Handle "K" or "M" shorthand in LookML (basic support)
+        if (formatStr.toLowerCase().includes('"k"')) {
+             return (value / 1000).toLocaleString(undefined, options) + 'k';
+        }
+        if (formatStr.toLowerCase().includes('"m"')) {
+             return (value / 1000000).toLocaleString(undefined, options) + 'm';
+        }
+
+        return value.toLocaleString('en-US', options);
+    } catch (e) {
+        console.warn("Formatting error", e);
+        return value.toFixed(decimals);
+    }
   },
 
   _formatNumber: function (num) {
