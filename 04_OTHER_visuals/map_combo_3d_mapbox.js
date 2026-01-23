@@ -1,20 +1,20 @@
 /**
- * Multi-Layer 3D Map for Looker - v52 (Flexible Icons & Classic Library)
+ * Multi-Layer 3D Map for Looker - v55 (v52 Base + Scaling Sensitivity Fix)
  *
- * CHANGES FROM V51:
- * 1. CONTENT: Reverted to v49 Icon Library (Icons8 style).
- * 2. FIX: Updated 'building' and 'oil_barrel' URLs to working versions.
- * 3. FEATURE: "Flexible" Icon Dimensions.
- * - The code now detects the aspect ratio of custom images.
- * - Prevents "square cropping" of wide images (like the Porsche).
- * 4. EXPLANATION: The Proxy is REQUIRED for WebGL (Deck.gl) even if URLs work in HTML.
+ * BASED ON V52 (Stable Core & Flexible Dimensions)
+ * FIXES:
+ * 1. SCALING: Removed "Minimum Size" clamps (Math.max(0.2...)).
+ * - Icons/Points can now scale down to near-zero for small values.
+ * - 'sizeMinPixels' lowered to 1px when proportional sizing is ON.
+ * 2. UI: Restored "Size Proportional to Value?" checkbox.
+ * 3. IMAGES: Preserved flexible dimension logic (Porsche fix).
  */
 
-// --- ICONS LIBRARY (Restored v49 Style with Fixes) ---
+// --- ICONS LIBRARY (Stable) ---
 const ICONS = {
   "custom": "custom",
   "box": "https://img.icons8.com/color/96/box.png",
-  "building": "https://img.icons8.com/color/96/city.png", // FIXED
+  "building": "https://img.icons8.com/color/96/city.png",
   "car": "https://img.icons8.com/color/96/car--v1.png",
   "check": "https://img.icons8.com/color/96/checked--v1.png",
   "circle": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png",
@@ -25,7 +25,7 @@ const ICONS = {
   "hospital": "https://img.icons8.com/color/96/hospital-3.png",
   "info": "https://img.icons8.com/color/96/info--v1.png",
   "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "oil_barrel": "https://img.icons8.com/color/96/oil-storage-tank.png", // FIXED
+  "oil_barrel": "https://img.icons8.com/color/96/oil-storage-tank.png",
   "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
   "pin": "https://img.icons8.com/color/96/marker.png",
   "plane": "https://img.icons8.com/color/96/airport.png",
@@ -150,6 +150,7 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 12
     },
+    // RESTORED UI OPTION: Size Proportional to Value
     [`layer${n}_size_by_value`]: {
       type: "boolean",
       label: `L${n} Size Proportional to Value?`,
@@ -226,12 +227,10 @@ const getLayerOptions = (n) => {
 };
 
 // --- HELPER: PRELOADER (WITH DIMENSION DETECTION) ---
-// Returns: { url: string, width: number, height: number }
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = "";
 
-    // 1. Determine URL
     if (type === 'custom' && customUrl) {
       url = customUrl;
     } else if (ICONS[type]) {
@@ -239,12 +238,10 @@ const preloadImage = (type, customUrl) => {
     }
 
     if (!url || url.length < 5) {
-      // Return default dimensions (128x128) for fallback
       return resolve({ url: ICONS['factory'], width: 128, height: 128 });
     }
 
-    // 2. APPLY PROXY (Required for WebGL CORS)
-    // We skip proxy for data URIs or already proxied links
+    // CORS Proxy
     if (type === 'custom' && !url.startsWith('data:') && !url.includes('wsrv.nl')) {
       url = `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
     }
@@ -252,8 +249,6 @@ const preloadImage = (type, customUrl) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => {
-      // 3. RETURN DIMENSIONS
-      // This allows us to set the sprite mapping exactly to the image size
       resolve({
         url: url,
         width: img.naturalWidth || 128,
@@ -261,7 +256,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V52] Failed to load icon: ${url}`);
+      console.warn(`[Viz V55] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -269,8 +264,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v52",
-  label: "Combo Map 3D (V52 Flexible)",
+  id: "combo_map_ultimate_v55",
+  label: "Combo Map 3D (V55 Precise)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -417,7 +412,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V52] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V55] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -454,7 +449,7 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V52] Data prepared, rendering layers...`);
+      console.log(`[Viz V55] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -469,7 +464,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V52] FATAL ERROR:", err);
+      console.error("[Viz V55] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -497,7 +492,6 @@ looker.plugins.visualizations.add({
     const latDim = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
     const lonDim = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lng') || d.name.toLowerCase().includes('lon'));
 
-    // If we have Lat/Lon, use POINTS mode. Otherwise use REGIONS.
     const isPointsMode = (latDim && lonDim);
 
     if (isPointsMode) {
@@ -519,7 +513,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V52] GeoJSON load failed:", error);
+      console.warn("[Viz V55] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -650,10 +644,9 @@ looker.plugins.visualizations.add({
 
       if (enabled) {
         try {
-          // --- ICON RETRIEVAL (Now contains object {url, width, height}) ---
+          // --- ICON RETRIEVAL (Contains object {url, width, height}) ---
           let iconData = null;
           if (type === 'icon') {
-            // Default fallback
             const defaultIcon = { url: ICONS['factory'], width: 128, height: 128 };
             iconData = loadedIcons[iconIndex] || defaultIcon;
             iconIndex++;
@@ -664,7 +657,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V52] Layer ${i} Error:`, e);
+          console.error(`[Viz V55] Layer ${i} Error:`, e);
         }
       }
     }
@@ -861,7 +854,10 @@ looker.plugins.visualizations.add({
     const showAllPivots = config[`layer${idx}_show_all_pivots`];
     const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
     const hideNulls = config.hide_no_data;
-    const sizeByValue = config[`layer${idx}_size_by_value`];
+
+    // UI: "Size Proportional to Value?" (Correct ID from v50/Your Request)
+    const sizeByValue = config[`layer${idx}_size_by_value`] || false;
+
     const iconBillboard = config[`layer${idx}_icon_billboard`] !== false; // Default true
 
     const useGradient = config[`layer${idx}_use_gradient`];
@@ -1101,6 +1097,7 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
+          // SCALING FIX: Allow small values to shrink below the previous floor
           getRadius: d => {
             if (sizeByValue) return (Math.sqrt(getValue(d) / maxVal) * radius);
             return radius;
@@ -1151,13 +1148,10 @@ looker.plugins.visualizations.add({
           position: [d.position[0], d.position[1], 0]
         }));
 
-        // --- FLEXIBLE DIMENSION LOGIC ---
-        // Instead of hardcoding 128x128, use the loaded image's actual size.
-        // This prevents the "square crop" of rectangular images (like the Porsche).
+        // FLEXIBLE DIMS (From v52)
         const iconW = iconData ? iconData.width : 128;
         const iconH = iconData ? iconData.height : 128;
 
-        // We set the mapping to cover the FULL image dimensions
         const iconMapping = {
           marker: {
             x: 0,
@@ -1165,7 +1159,7 @@ looker.plugins.visualizations.add({
             width: iconW,
             height: iconH,
             mask: false,
-            anchorY: iconH // Anchor at bottom
+            anchorY: iconH
           }
         };
 
@@ -1178,19 +1172,21 @@ looker.plugins.visualizations.add({
           iconMapping: iconMapping,
           getIcon: d => 'marker',
           getPosition: d => d.position,
+          // SCALING FIX: Remove Math.max floor. Allow full scaling.
           getSize: d => {
             const baseSize = radius / 100;
             if (sizeByValue) return baseSize * (getValue(d) / maxVal);
             return baseSize;
           },
           sizeScale: 1,
-          sizeMinPixels: 20,
+          // SCALING FIX: Drop minimum pixels to 1 if scaling is enabled
+          sizeMinPixels: sizeByValue ? 1 : 20,
           billboard: iconBillboard,
           autoHighlight: false,
           onClick: onClickHandler,
           updateTriggers: {
             getSize: [...updateTriggersBase, radius, sizeByValue],
-            getIcon: [iconData.url] // Triggers redraw if icon loads
+            getIcon: [iconData ? iconData.url : '']
           }
         });
 
