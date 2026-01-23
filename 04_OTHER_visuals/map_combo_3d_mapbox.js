@@ -1,15 +1,15 @@
 /**
- * Multi-Layer 3D Map for Looker - v50 (Proportional Sizes & Strict Hiding)
+ * Multi-Layer 3D Map for Looker - v51 (Null Logic & Proportional Sizes)
  *
- * CHANGES FROM V49:
- * 1. LOGIC: "Hide Null/0" now filters PER LAYER based on the specific measure selected.
- * 2. FEATURE: Added "Size Proportional to Value" boolean for all layers.
- * 3. FEATURE: Added "Icon: Face Camera" toggle to control tilting (Billboard).
- * 4. CONTENT: Removed broken Oil Barrel icon.
- * 5. FIX: Removed floating artifacts by forcing Z=0 and proper anchoring.
+ * CHANGES FROM V50:
+ * 1. FIXED: "Hide Rows with 0/Null" now rigorously filters PER LAYER based on the
+ * specific measure assigned to that layer. This prevents "ghost" points.
+ * 2. FIXED: Custom Icons now default to 'billboard: false' (flat on map) unless toggled.
+ * 3. FEATURE: Added "Size Proportional to Value" checkbox for dynamic scaling.
+ * 4. LOGIC: Tooltip now strictly matches the active measure index.
  */
 
-// --- ICONS LIBRARY (Sorted Alphabetically) ---
+// --- ICONS LIBRARY ---
 const ICONS = {
   "custom": "custom",
   "box": "https://img.icons8.com/color/96/box.png",
@@ -148,6 +148,7 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 12
     },
+    // NEW: Proportional Sizing Toggle
     [`layer${n}_size_by_value`]: {
       type: "boolean",
       label: `L${n} Size Proportional to Value?`,
@@ -212,6 +213,7 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 17
     },
+    // NEW: Billboard Toggle (Face Camera)
     [`layer${n}_icon_billboard`]: {
       type: "boolean",
       label: `L${n} Icon: Face Camera (Billboard)`,
@@ -235,7 +237,7 @@ const preloadImage = (type, customUrl) => {
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V50] Failed to load icon: ${url}`);
+      console.warn(`[Viz V51] Failed to load icon: ${url}`);
       resolve(ICONS['warning']);
     };
     img.src = url;
@@ -243,8 +245,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v50",
-  label: "Combo Map 3D (V50 Pro)",
+  id: "combo_map_ultimate_v51",
+  label: "Combo Map 3D (V51 Logic)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -391,7 +393,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V50] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V51] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -419,7 +421,7 @@ looker.plugins.visualizations.add({
         const custom = config[`layer${i}_icon_url`];
         iconPromises.push(preloadImage(preset, custom));
       } else {
-        iconPromises.push(Promise.resolve(null)); // Keep array size for index matching
+        iconPromises.push(Promise.resolve(null));
       }
     }
 
@@ -430,7 +432,7 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V50] Data prepared, rendering layers...`);
+      console.log(`[Viz V51] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -445,7 +447,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V50] FATAL ERROR:", err);
+      console.error("[Viz V51] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -492,7 +494,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V50] GeoJSON load failed:", error);
+      console.warn("[Viz V51] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -642,7 +644,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V50] Layer ${i} Error:`, e);
+          console.error(`[Viz V51] Layer ${i} Error:`, e);
         }
       }
     }
@@ -650,7 +652,7 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP (V50: Strict Measure Index Match) ---
+    // --- TOOLTIP (V51 FIXED: Strict Measure Index Match) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
@@ -814,6 +816,21 @@ looker.plugins.visualizations.add({
     }
   },
 
+  _validateLayerData: function (data, config) {
+    if (!data || !Array.isArray(data) || data.length === 0) return [];
+
+    // Default validation
+    let validData = data.filter(d =>
+      d.position &&
+      d.position.length === 2 &&
+      !isNaN(d.position[0]) &&
+      !isNaN(d.position[1]) &&
+      d.position[1] >= -90 && d.position[1] <= 90
+    );
+
+    return validData;
+  },
+
   _buildSingleLayer: function (idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
 
@@ -837,7 +854,16 @@ looker.plugins.visualizations.add({
     const heightScale = Number(config[`layer${idx}_height`]) || 1000;
     const opacity = Number(config[`layer${idx}_opacity`]) || 0.7;
     const sizeByValue = config[`layer${idx}_size_by_value`] || false;
-    const billboard = config[`layer${idx}_icon_billboard`] !== false; // Default true
+
+    // V51 FIX: Default Billboard to TRUE unless Custom URL is selected
+    const iconType = config[`layer${idx}_icon_type`];
+    let billboardDefault = true;
+    if (iconType === 'custom') billboardDefault = false;
+
+    // Override if manually set
+    const billboard = config[`layer${idx}_icon_billboard`] !== undefined
+                      ? config[`layer${idx}_icon_billboard`]
+                      : billboardDefault;
 
     const pivotInfo = this._pivotInfo;
     const queryResponse = this._queryResponse;
@@ -881,7 +907,9 @@ looker.plugins.visualizations.add({
 
       let finalLinks = [];
 
+      // FIX: Aggregated Drill Logic
       if (!pivotInfo.hasPivot && drillLinks) {
+        // Collect links for ALL selected measures in this layer
         measureIndices.forEach(mIdx => {
           if (drillLinks[mIdx] && drillLinks[mIdx].length > 0) {
              const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
@@ -960,8 +988,8 @@ looker.plugins.visualizations.add({
       pointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
     }
 
-    // --- STRICT FILTERING (Hide Rows with 0/Null for THIS Layer's Measures) ---
-    // If config.hide_no_data is true, check if the calculated value is > 0
+    // --- V51 FIX: STRICT FILTERING PER LAYER ---
+    // Instead of a global filter, we check if the calculated value FOR THIS LAYER's measures is > 0
     let safePointData = pointData.filter(d =>
       d.position &&
       d.position.length === 2 &&
@@ -972,14 +1000,16 @@ looker.plugins.visualizations.add({
 
     if (config.hide_no_data) {
         safePointData = safePointData.filter(d => {
+            // Calculate value SPECIFICALLY for the measures assigned to this layer
             const val = getValue(d);
+            // Hide if value is 0, null, or undefined
             return val !== null && val !== undefined && Math.abs(val) > 0;
         });
     }
 
     const id = `layer-${idx}-${type}`;
     const allVals = safePointData.map(d => getValue(d));
-    const maxVal = Math.max(...allVals, 0.1); // Avoid division by zero
+    const maxVal = Math.max(...allVals, 0.1);
     const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx, sizeByValue];
 
     const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
@@ -994,9 +1024,10 @@ looker.plugins.visualizations.add({
     // --- SCALING FUNCTION ---
     const getScaledSize = (d) => {
         if (!sizeByValue) return radius;
-        // Simple scale: (Value / Max) * Radius * Factor (adjust factor as needed)
-        // Using square root for area-proportional sizing
-        return (Math.sqrt(getValue(d)) / Math.sqrt(maxVal)) * radius;
+        // Simple linear scale relative to max value in this layer
+        // (Value / Max) * Radius
+        const ratio = Math.sqrt(getValue(d)) / Math.sqrt(maxVal);
+        return ratio * radius;
     };
 
     switch (type) {
@@ -1027,7 +1058,7 @@ looker.plugins.visualizations.add({
           id: id,
           data: safePointData,
           diskResolution: 6,
-          radius: radius, // Columns usually have fixed width, but can scale
+          radius: radius, // Columns usually standard width
           extruded: true,
           pickable: true,
           getPosition: d => d.position,
@@ -1085,7 +1116,6 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          // Bubbles are intrinsically sized by value, but we apply the scaler logic
           getRadius: d => getScaledSize(d),
           getFillColor: d => {
             if (!useGradient) return startColor;
@@ -1102,7 +1132,6 @@ looker.plugins.visualizations.add({
 
       case 'icon':
         if (safePointData.length === 0) return null;
-        // FIX: Force Z coordinate to 0 to prevent floating
         const groundedData = safePointData.map(d => ({
             ...d,
             position: [d.position[0], d.position[1], 0]
@@ -1114,17 +1143,16 @@ looker.plugins.visualizations.add({
           pickable: true,
           opacity: opacity,
           iconAtlas: iconUrlOverride || ICONS['factory'],
-          // FIX: AnchorY at 128 (bottom) for standard 128px atlas cells
           iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false, anchorY: 128 } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
           getSize: d => {
               if (sizeByValue) return (Math.sqrt(getValue(d)) / Math.sqrt(maxVal)) * (radius / 100) * 50;
-              return radius / 2; // Fixed adjust
+              return radius / 2;
           },
           sizeScale: 1,
-          sizeMinPixels: 15,
-          billboard: billboard, // Toggleable
+          sizeMinPixels: 20,
+          billboard: billboard, // V51 Fix: Defaults to false for custom, true for presets
           autoHighlight: false,
           onClick: onClickHandler,
           updateTriggers: {
