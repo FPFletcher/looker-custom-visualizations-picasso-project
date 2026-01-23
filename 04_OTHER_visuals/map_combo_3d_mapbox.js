@@ -1,17 +1,22 @@
 /**
- * Multi-Layer 3D Map for Looker - v51 (Null Logic & Proportional Sizes)
+ * Multi-Layer 3D Map for Looker - v49 (Auto-Detect & Icon Expansion)
  *
- * CHANGES FROM V50:
- * 1. FIXED: "Hide Rows with 0/Null" now rigorously filters PER LAYER based on the
- * specific measure assigned to that layer. This prevents "ghost" points.
- * 2. FIXED: Custom Icons now default to 'billboard: false' (flat on map) unless toggled.
- * 3. FEATURE: Added "Size Proportional to Value" checkbox for dynamic scaling.
- * 4. LOGIC: Tooltip now strictly matches the active measure index.
+ * CHANGES FROM V48:
+ * 1. UI: Removed "Data Mode". Logic now Auto-Detects Lat/Lon dimensions.
+ * 2. FIX: "Hide Null/0" logic improved to handle Pivots correctly.
+ * 3. CONTENT: Added Oil Rig, Dam, Car, Truck icons.
+ * 4. UI: Icons sorted Alphabetically. Custom URL is at the top.
+ * 5. FIX: Drill menu aggregates links from ALL selected measures.
+ *
+ * UPDATES IN THIS VERSION (User Request):
+ * - Fixed "Hide Null/0" to work at the Layer Level (filters based on the calculated value).
+ * - Added "Size by Value" boolean for Points and Icons.
+ * - Added "Icon Faces Camera" (Billboard) boolean to control tilting.
  */
 
-// --- ICONS LIBRARY ---
+// --- ICONS LIBRARY (Sorted Alphabetically) ---
 const ICONS = {
-  "custom": "custom",
+  "custom": "custom", // Placeholder for logic
   "box": "https://img.icons8.com/color/96/box.png",
   "building": "https://img.icons8.com/color/96/office-building.png",
   "car": "https://img.icons8.com/color/96/car--v1.png",
@@ -24,6 +29,7 @@ const ICONS = {
   "hospital": "https://img.icons8.com/color/96/hospital-3.png",
   "info": "https://img.icons8.com/color/96/info--v1.png",
   "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
+  "oil_barrel": "https://img.icons8.com/color/96/oil-barrel.png",
   "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
   "pin": "https://img.icons8.com/color/96/marker.png",
   "plane": "https://img.icons8.com/color/96/airport.png",
@@ -70,10 +76,10 @@ const getLayerOptions = (n) => {
       values: [
         { "Choropleth (Region Only)": "geojson" },
         { "3D Columns": "column" },
-        { "Points": "point" },
-        { "Bubbles": "bubble" },
+        { "Points (Fixed Size)": "point" },
+        { "Bubbles (Value Size)": "bubble" },
         { "Icon (Image)": "icon" },
-        { "Heatmap": "heatmap" }
+        { "Heatmap (Sum Density)": "heatmap" }
       ],
       default: def.type,
       section: "Layers",
@@ -143,25 +149,25 @@ const getLayerOptions = (n) => {
     },
     [`layer${n}_radius`]: {
       type: "number",
-      label: `L${n} Radius / Size (Base)`,
+      label: `L${n} Radius / Size`,
       default: def.radius,
       section: "Layers",
       order: b + 12
     },
-    // NEW: Proportional Sizing Toggle
+    // NEW OPTION: Size by Value
     [`layer${n}_size_by_value`]: {
       type: "boolean",
       label: `L${n} Size Proportional to Value?`,
       default: false,
       section: "Layers",
-      order: b + 13
+      order: b + 12.5
     },
     [`layer${n}_height`]: {
       type: "number",
       label: `L${n} Height (3D)`,
       default: def.height,
       section: "Layers",
-      order: b + 14
+      order: b + 13
     },
     [`layer${n}_opacity`]: {
       type: "number",
@@ -169,7 +175,7 @@ const getLayerOptions = (n) => {
       default: 0.7,
       min: 0, max: 1, step: 0.1,
       section: "Layers",
-      order: b + 15
+      order: b + 14
     },
     [`layer${n}_icon_type`]: {
       type: "string",
@@ -190,6 +196,7 @@ const getLayerOptions = (n) => {
         { "Info": "info" },
         { "Map Pin": "pin" },
         { "Marker (Truck Blue)": "marker_blue" },
+        { "Oil Barrel": "oil_barrel" },
         { "Oil Rig": "oil_rig" },
         { "Plane": "plane" },
         { "Semi Truck": "semi_truck" },
@@ -203,7 +210,7 @@ const getLayerOptions = (n) => {
       ],
       default: "factory",
       section: "Layers",
-      order: b + 16
+      order: b + 15
     },
     [`layer${n}_icon_url`]: {
       type: "string",
@@ -211,15 +218,15 @@ const getLayerOptions = (n) => {
       default: "",
       placeholder: "https://...",
       section: "Layers",
-      order: b + 17
+      order: b + 16
     },
-    // NEW: Billboard Toggle (Face Camera)
+    // NEW OPTION: Billboard Toggle
     [`layer${n}_icon_billboard`]: {
       type: "boolean",
-      label: `L${n} Icon: Face Camera (Billboard)`,
+      label: `L${n} Icons Face Camera? (Billboard)`,
       default: true,
       section: "Layers",
-      order: b + 18
+      order: b + 17
     }
   };
 };
@@ -237,7 +244,7 @@ const preloadImage = (type, customUrl) => {
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V51] Failed to load icon: ${url}`);
+      console.warn(`[Viz V49] Failed to load icon: ${url}`);
       resolve(ICONS['warning']);
     };
     img.src = url;
@@ -245,11 +252,13 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v51",
-  label: "Combo Map 3D (V51 Logic)",
+  id: "combo_map_ultimate_v49",
+  label: "Combo Map 3D (V49 Auto)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
+
+    // REMOVED DATA MODE - Now Auto-Detected
 
     hide_no_data: {
       type: "boolean",
@@ -393,7 +402,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V51] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V49] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -420,8 +429,6 @@ looker.plugins.visualizations.add({
         const preset = config[`layer${i}_icon_type`];
         const custom = config[`layer${i}_icon_url`];
         iconPromises.push(preloadImage(preset, custom));
-      } else {
-        iconPromises.push(Promise.resolve(null));
       }
     }
 
@@ -432,7 +439,7 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V51] Data prepared, rendering layers...`);
+      console.log(`[Viz V49] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -447,7 +454,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V51] FATAL ERROR:", err);
+      console.error("[Viz V49] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -474,6 +481,8 @@ looker.plugins.visualizations.add({
     // AUTO-DETECT DATA MODE
     const latDim = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
     const lonDim = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lng') || d.name.toLowerCase().includes('lon'));
+
+    // If we have Lat/Lon, use POINTS mode. Otherwise use REGIONS.
     const isPointsMode = (latDim && lonDim);
 
     if (isPointsMode) {
@@ -489,12 +498,13 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures, dims };
     }
 
+    // REGIONS MODE (Default if no Lat/Lon found)
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V51] GeoJSON load failed:", error);
+      console.warn("[Viz V49] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -617,16 +627,7 @@ looker.plugins.visualizations.add({
 
   _render: function (processed, config, queryResponse, details, loadedIcons) {
     const layerObjects = [];
-
-    // Only increment for enabled layers
-    let validIconMap = {};
-    let iconLoadIndex = 0;
-    for (let i = 1; i <= 4; i++) {
-        if(config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
-            validIconMap[i] = loadedIcons[iconLoadIndex];
-            iconLoadIndex++;
-        }
-    }
+    let iconIndex = 0;
 
     for (let i = 1; i <= 4; i++) {
       const enabled = config[`layer${i}_enabled`];
@@ -636,7 +637,8 @@ looker.plugins.visualizations.add({
         try {
           let iconUrlOverride = null;
           if (type === 'icon') {
-            iconUrlOverride = validIconMap[i] || ICONS['factory'];
+            iconUrlOverride = loadedIcons[iconIndex] || ICONS['factory'];
+            iconIndex++;
           }
           const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
           if (layer) {
@@ -644,7 +646,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V51] Layer ${i} Error:`, e);
+          console.error(`[Viz V49] Layer ${i} Error:`, e);
         }
       }
     }
@@ -652,7 +654,7 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP (V51 FIXED: Strict Measure Index Match) ---
+    // --- TOOLTIP ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
@@ -662,40 +664,39 @@ looker.plugins.visualizations.add({
       let layerDimIdx = 0;
       let activeMeasureIndices = [];
       if (layerIdx) {
-          const dimStr = config[`layer${layerIdx}_dimension_idx`];
-          if (dimStr !== undefined && dimStr !== null) {
-              const parts = String(dimStr).split(',');
-              const firstVal = parseInt(parts[0].trim());
-              if (!isNaN(firstVal)) layerDimIdx = firstVal;
-          }
-          const measStr = config[`layer${layerIdx}_measure_idx`];
-          if (measStr !== undefined && measStr !== null) {
-              activeMeasureIndices = String(measStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-          } else {
-              activeMeasureIndices = [layerIdx - 1];
-          }
+        const dimStr = config[`layer${layerIdx}_dimension_idx`];
+        if (dimStr !== undefined && dimStr !== null) {
+          const parts = String(dimStr).split(',');
+          const firstVal = parseInt(parts[0].trim());
+          if (!isNaN(firstVal)) layerDimIdx = firstVal;
+        }
+        const measStr = config[`layer${layerIdx}_measure_idx`];
+        if (measStr !== undefined && measStr !== null) {
+          activeMeasureIndices = String(measStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        } else {
+          activeMeasureIndices = [layerIdx - 1]; // Default fallback
+        }
       } else {
-          activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
+        activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
       }
 
       const rawName = object.properties?._name || object.name || (object.properties && object.properties.name);
       const cleanName = this._normalizeName(rawName);
 
-      // Aggregated Lookup
       let aggregatedData = null;
       if (this._processedData &&
-          this._processedData.dataMaps &&
-          this._processedData.dataMaps[layerDimIdx] &&
-          this._processedData.dataMaps[layerDimIdx][cleanName]) {
-          aggregatedData = this._processedData.dataMaps[layerDimIdx][cleanName];
+        this._processedData.dataMaps &&
+        this._processedData.dataMaps[layerDimIdx] &&
+        this._processedData.dataMaps[layerDimIdx][cleanName]) {
+        aggregatedData = this._processedData.dataMaps[layerDimIdx][cleanName];
       }
 
       let source = aggregatedData || (object.properties && object.properties._name ? {
-            name: object.properties._name,
-            values: object.properties._values,
-            pivotData: object.properties._pivotData,
-            allowedMeasures: object.properties._allowedMeasures
-         } : object);
+        name: object.properties._name,
+        values: object.properties._values,
+        pivotData: object.properties._pivotData,
+        allowedMeasures: object.properties._allowedMeasures
+      } : object);
 
       const name = source.rawName || source.name;
       const values = source.values || source._values;
@@ -818,17 +819,14 @@ looker.plugins.visualizations.add({
 
   _validateLayerData: function (data, config) {
     if (!data || !Array.isArray(data) || data.length === 0) return [];
-
-    // Default validation
-    let validData = data.filter(d =>
+    // Basic coordinate validation
+    return data.filter(d =>
       d.position &&
       d.position.length === 2 &&
       !isNaN(d.position[0]) &&
       !isNaN(d.position[1]) &&
       d.position[1] >= -90 && d.position[1] <= 90
     );
-
-    return validData;
   },
 
   _buildSingleLayer: function (idx, config, processed, iconUrlOverride) {
@@ -845,6 +843,9 @@ looker.plugins.visualizations.add({
 
     const showAllPivots = config[`layer${idx}_show_all_pivots`];
     const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
+    const hideNulls = config.hide_no_data;
+    const sizeByValue = config[`layer${idx}_size_by_value`];
+    const iconBillboard = config[`layer${idx}_icon_billboard`] !== false; // Default true
 
     const useGradient = config[`layer${idx}_use_gradient`];
     const startColorHex = config[`layer${idx}_color_main`];
@@ -853,23 +854,12 @@ looker.plugins.visualizations.add({
     const radius = Number(config[`layer${idx}_radius`]) || 1000;
     const heightScale = Number(config[`layer${idx}_height`]) || 1000;
     const opacity = Number(config[`layer${idx}_opacity`]) || 0.7;
-    const sizeByValue = config[`layer${idx}_size_by_value`] || false;
-
-    // V51 FIX: Default Billboard to TRUE unless Custom URL is selected
-    const iconType = config[`layer${idx}_icon_type`];
-    let billboardDefault = true;
-    if (iconType === 'custom') billboardDefault = false;
-
-    // Override if manually set
-    const billboard = config[`layer${idx}_icon_billboard`] !== undefined
-                      ? config[`layer${idx}_icon_billboard`]
-                      : billboardDefault;
 
     const pivotInfo = this._pivotInfo;
     const queryResponse = this._queryResponse;
     const measures = queryResponse.fields.measure_like;
 
-    // --- GET VALUE HELPER (Sum of Selected Measures) ---
+    // --- HELPER: Get Value for specific layer config ---
     const getValue = (d) => {
       let totalValue = 0;
       measureIndices.forEach(mIdx => {
@@ -896,10 +886,94 @@ looker.plugins.visualizations.add({
       return totalValue || 0;
     };
 
-    // --- CLICK HANDLER (Aggregates All Links) ---
+    // --- PREPARE DATA ---
+    let rawPointData = [];
+    if (processed.type === 'regions') {
+      dimIndices.forEach(dimIdx => {
+        const dataMap = processed.dataMaps ? processed.dataMaps[dimIdx] : null;
+        if (!dataMap) return;
+
+        // GeoJSON Matches
+        if (processed.geojson && processed.geojson.features) {
+          processed.geojson.features.forEach(feature => {
+            const props = feature.properties;
+            let match = null;
+            for (let key in props) {
+              if (props[key]) {
+                const cleanProp = this._normalizeName(props[key]);
+                if (dataMap[cleanProp]) {
+                  match = dataMap[cleanProp];
+                  break;
+                }
+              }
+            }
+            if (match) {
+              rawPointData.push({
+                position: this._getCentroid(feature.geometry),
+                values: match.values,
+                pivotData: match.pivotData,
+                drillLinks: match.drillLinks,
+                name: match.rawName,
+                feature: feature,
+                allowedMeasures: measureIndices
+              });
+            }
+          });
+        }
+
+        // Lat/Lon fallback within regions mode
+        Object.keys(dataMap).forEach(key => {
+          const item = dataMap[key];
+          let pos = [0, 0];
+          if (Array.isArray(item.rawName) && item.rawName.length === 2) {
+            pos = [Number(item.rawName[1]), Number(item.rawName[0])];
+          } else if (typeof item.rawName === 'string' && item.rawName.includes(',')) {
+            const parts = item.rawName.split(',');
+            if (parts.length === 2) {
+              pos = [parseFloat(parts[1]), parseFloat(parts[0])];
+            }
+          }
+
+          if (pos[0] || pos[1]) {
+            rawPointData.push({
+              position: pos,
+              values: item.values,
+              pivotData: item.pivotData,
+              drillLinks: item.drillLinks,
+              name: item.rawName.toString(),
+              feature: null,
+              allowedMeasures: measureIndices
+            });
+          }
+        });
+      });
+    } else {
+      rawPointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
+    }
+
+    // --- FILTER: Validate and Hide Nulls (Layer Logic) ---
+    // 1. Basic coordinate validation
+    let safePointData = this._validateLayerData(rawPointData, config);
+
+    // 2. Hide Nulls/Zero Logic (Calculated per layer)
+    // If 'Hide Rows with 0/Null' is ON, we remove points where the calculated value is 0.
+    if (hideNulls) {
+      safePointData = safePointData.filter(d => {
+        const val = getValue(d);
+        // Keep if value is non-zero
+        return val !== 0 && val !== null && !isNaN(val);
+      });
+    }
+
+    // --- CALCULATE MAX VALUE (For sizing/gradients) ---
+    const allVals = safePointData.map(d => getValue(d));
+    const maxVal = Math.max(...allVals, 0.1); // Avoid div by zero
+
+    const id = `layer-${idx}-${type}`;
+    const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx, hideNulls, sizeByValue];
+
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
-
       const obj = info.object;
       const props = obj.properties || obj;
       const pivotData = props._pivotData || props.pivotData;
@@ -907,15 +981,13 @@ looker.plugins.visualizations.add({
 
       let finalLinks = [];
 
-      // FIX: Aggregated Drill Logic
       if (!pivotInfo.hasPivot && drillLinks) {
-        // Collect links for ALL selected measures in this layer
         measureIndices.forEach(mIdx => {
           if (drillLinks[mIdx] && drillLinks[mIdx].length > 0) {
-             const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
-             drillLinks[mIdx].forEach(link => {
-                 finalLinks.push({ ...link, label: `${mName}: ${link.label}` });
-             });
+            const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
+            drillLinks[mIdx].forEach(link => {
+              finalLinks.push({ ...link, label: `${mName}: ${link.label}` });
+            });
           }
         });
       }
@@ -950,68 +1022,6 @@ looker.plugins.visualizations.add({
       }
     };
 
-    // --- DATA PREPARATION ---
-    let pointData = [];
-    if (processed.type === 'regions') {
-      dimIndices.forEach(dimIdx => {
-        const dataMap = processed.dataMaps ? processed.dataMaps[dimIdx] : null;
-        if (!dataMap) return;
-
-        if (processed.geojson && processed.geojson.features) {
-          processed.geojson.features.forEach(feature => {
-            const props = feature.properties;
-            let match = null;
-            for (let key in props) {
-              if (props[key]) {
-                const cleanProp = this._normalizeName(props[key]);
-                if (dataMap[cleanProp]) {
-                  match = dataMap[cleanProp];
-                  break;
-                }
-              }
-            }
-            if (match) {
-              pointData.push({
-                position: this._getCentroid(feature.geometry),
-                values: match.values,
-                pivotData: match.pivotData,
-                drillLinks: match.drillLinks,
-                name: match.rawName,
-                feature: feature,
-                allowedMeasures: measureIndices
-              });
-            }
-          });
-        }
-      });
-    } else {
-      pointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
-    }
-
-    // --- V51 FIX: STRICT FILTERING PER LAYER ---
-    // Instead of a global filter, we check if the calculated value FOR THIS LAYER's measures is > 0
-    let safePointData = pointData.filter(d =>
-      d.position &&
-      d.position.length === 2 &&
-      !isNaN(d.position[0]) &&
-      !isNaN(d.position[1]) &&
-      d.position[1] >= -90 && d.position[1] <= 90
-    );
-
-    if (config.hide_no_data) {
-        safePointData = safePointData.filter(d => {
-            // Calculate value SPECIFICALLY for the measures assigned to this layer
-            const val = getValue(d);
-            // Hide if value is 0, null, or undefined
-            return val !== null && val !== undefined && Math.abs(val) > 0;
-        });
-    }
-
-    const id = `layer-${idx}-${type}`;
-    const allVals = safePointData.map(d => getValue(d));
-    const maxVal = Math.max(...allVals, 0.1);
-    const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx, sizeByValue];
-
     const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
       d.feature.properties._values = d.values;
       d.feature.properties._pivotData = d.pivotData;
@@ -1020,15 +1030,6 @@ looker.plugins.visualizations.add({
       d.feature.properties._allowedMeasures = d.allowedMeasures;
       return d.feature;
     });
-
-    // --- SCALING FUNCTION ---
-    const getScaledSize = (d) => {
-        if (!sizeByValue) return radius;
-        // Simple linear scale relative to max value in this layer
-        // (Value / Max) * Radius
-        const ratio = Math.sqrt(getValue(d)) / Math.sqrt(maxVal);
-        return ratio * radius;
-    };
 
     switch (type) {
       case 'geojson':
@@ -1058,7 +1059,7 @@ looker.plugins.visualizations.add({
           id: id,
           data: safePointData,
           diskResolution: 6,
-          radius: radius, // Columns usually standard width
+          radius: radius,
           extruded: true,
           pickable: true,
           getPosition: d => d.position,
@@ -1090,7 +1091,11 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          getRadius: d => getScaledSize(d),
+          // FIX: Added Size Proportional Logic
+          getRadius: d => {
+            if (sizeByValue) return (Math.sqrt(getValue(d) / maxVal) * radius);
+            return radius;
+          },
           getFillColor: d => {
             if (!useGradient) return startColor;
             const val = getValue(d);
@@ -1099,8 +1104,8 @@ looker.plugins.visualizations.add({
           getLineColor: [255, 255, 255],
           onClick: onClickHandler,
           updateTriggers: {
-              getFillColor: updateTriggersBase,
-              getRadius: updateTriggersBase
+            getFillColor: updateTriggersBase,
+            getRadius: [...updateTriggersBase, radius, sizeByValue]
           }
         });
 
@@ -1116,7 +1121,7 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          getRadius: d => getScaledSize(d),
+          getRadius: d => Math.sqrt(getValue(d) / maxVal) * radius,
           getFillColor: d => {
             if (!useGradient) return startColor;
             const val = getValue(d);
@@ -1126,15 +1131,15 @@ looker.plugins.visualizations.add({
           onClick: onClickHandler,
           updateTriggers: {
             getFillColor: updateTriggersBase,
-            getRadius: updateTriggersBase
+            getRadius: [...updateTriggersBase, radius]
           }
         });
 
       case 'icon':
         if (safePointData.length === 0) return null;
         const groundedData = safePointData.map(d => ({
-            ...d,
-            position: [d.position[0], d.position[1], 0]
+          ...d,
+          position: [d.position[0], d.position[1], 0]
         }));
 
         return new deck.IconLayer({
@@ -1146,17 +1151,21 @@ looker.plugins.visualizations.add({
           iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false, anchorY: 128 } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
+          // FIX: Added Size Proportional Logic
           getSize: d => {
-              if (sizeByValue) return (Math.sqrt(getValue(d)) / Math.sqrt(maxVal)) * (radius / 100) * 50;
-              return radius / 2;
+            const baseSize = radius / 100; // normalize
+            if (sizeByValue) return baseSize * (getValue(d) / maxVal);
+            return baseSize;
           },
           sizeScale: 1,
           sizeMinPixels: 20,
-          billboard: billboard, // V51 Fix: Defaults to false for custom, true for presets
+          // FIX: Added Billboard Toggle (Controls tilting/rotation towards camera)
+          billboard: iconBillboard,
           autoHighlight: false,
           onClick: onClickHandler,
           updateTriggers: {
-              getSize: updateTriggersBase
+            getSize: [...updateTriggersBase, radius, sizeByValue],
+            getIcon: [iconUrlOverride]
           }
         });
 
@@ -1182,43 +1191,49 @@ looker.plugins.visualizations.add({
   _applyLookerFormat: function (value, formatStr) {
     if (value === undefined || value === null) return '0';
     if (typeof value !== 'number') return value;
+
+    // Default formatting if no LookML format provided
     if (!formatStr) return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
+    // Detect Currency
     let style = 'decimal';
     let currency = undefined;
+
     if (formatStr.includes('$')) { style = 'currency'; currency = 'USD'; }
     else if (formatStr.includes('€')) { style = 'currency'; currency = 'EUR'; }
     else if (formatStr.includes('£')) { style = 'currency'; currency = 'GBP'; }
     else if (formatStr.includes('¥')) { style = 'currency'; currency = 'JPY'; }
     else if (formatStr.includes('%')) { style = 'percent'; }
 
+    // Detect Decimals (0.00 -> 2 digits)
     let decimals = 0;
     if (formatStr.includes('.')) {
-        const afterDot = formatStr.split('.')[1];
-        if (afterDot) decimals = afterDot.replace(/[^0#]/g, '').length;
+      const afterDot = formatStr.split('.')[1];
+      if (afterDot) decimals = afterDot.replace(/[^0#]/g, '').length;
     } else if (style === 'currency') {
-        decimals = 2;
+      decimals = 2; // Default for currency
     }
 
     try {
-        const options = {
-            style: style,
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals
-        };
-        if (currency) options.currency = currency;
+      const options = {
+        style: style,
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      };
+      if (currency) options.currency = currency;
 
-        if (formatStr.toLowerCase().includes('"k"')) {
-             return (value / 1000).toLocaleString(undefined, options) + 'k';
-        }
-        if (formatStr.toLowerCase().includes('"m"')) {
-             return (value / 1000000).toLocaleString(undefined, options) + 'm';
-        }
+      // Handle "K" or "M" shorthand in LookML (basic support)
+      if (formatStr.toLowerCase().includes('"k"')) {
+        return (value / 1000).toLocaleString(undefined, options) + 'k';
+      }
+      if (formatStr.toLowerCase().includes('"m"')) {
+        return (value / 1000000).toLocaleString(undefined, options) + 'm';
+      }
 
-        return value.toLocaleString('en-US', options);
+      return value.toLocaleString('en-US', options);
     } catch (e) {
-        console.warn("Formatting error", e);
-        return value.toFixed(decimals);
+      console.warn("Formatting error", e);
+      return value.toFixed(decimals);
     }
   },
 
