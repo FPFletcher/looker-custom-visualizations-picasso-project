@@ -1,13 +1,12 @@
 /**
- * Multi-Layer 3D Map for Looker - v55 (v52 Base + Scaling Sensitivity Fix)
+ * Multi-Layer 3D Map for Looker - v56 (Series Tab, Legend & PDF Fixes)
  *
- * BASED ON V52 (Stable Core & Flexible Dimensions)
- * FIXES:
- * 1. SCALING: Removed "Minimum Size" clamps (Math.max(0.2...)).
- * - Icons/Points can now scale down to near-zero for small values.
- * - 'sizeMinPixels' lowered to 1px when proportional sizing is ON.
- * 2. UI: Restored "Size Proportional to Value?" checkbox.
- * 3. IMAGES: Preserved flexible dimension logic (Porsche fix).
+ * BASED ON V55 (Stable Core, Flexible Dims, Prop Sizing)
+ *
+ * NEW FEATURES:
+ * 1. SERIES TAB: Added specific tab for Legend configuration.
+ * 2. LEGEND: Dynamic legend showing Icons (custom), Colors, and Labels.
+ * 3. PRINT FIX: Enhanced logic to ensure Mapbox/Deck.gl renders before PDF capture.
  */
 
 // --- ICONS LIBRARY (Stable) ---
@@ -150,7 +149,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 12
     },
-    // RESTORED UI OPTION: Size Proportional to Value
     [`layer${n}_size_by_value`]: {
       type: "boolean",
       label: `L${n} Size Proportional to Value?`,
@@ -222,6 +220,14 @@ const getLayerOptions = (n) => {
       default: true,
       section: "Layers",
       order: b + 17
+    },
+    // NEW SERIES OPTION: Legend Label
+    [`layer${n}_legend_label`]: {
+      type: "string",
+      label: `Layer ${n} Legend Label`,
+      default: `Layer ${n}`,
+      section: "Series",
+      order: n * 10
     }
   };
 };
@@ -256,7 +262,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V55] Failed to load icon: ${url}`);
+      console.warn(`[Viz V56] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -264,8 +270,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v55",
-  label: "Combo Map 3D (V55 Precise)",
+  id: "combo_map_ultimate_v56",
+  label: "Combo Map 3D (V56 Series/Legend)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -358,6 +364,30 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
+    // --- SERIES TAB (New) ---
+    legend_header: { type: "string", label: "─── LEGEND SETTINGS ───", display: "divider", section: "Series", order: 1 },
+    show_legend: {
+      type: "boolean",
+      label: "Show Legend",
+      default: true,
+      section: "Series",
+      order: 2
+    },
+    legend_position: {
+      type: "string",
+      label: "Legend Position",
+      display: "select",
+      values: [
+        { "Top Right": "top-right" },
+        { "Bottom Right": "bottom-right" },
+        { "Top Left": "top-left" },
+        { "Bottom Left": "bottom-left" }
+      ],
+      default: "bottom-right",
+      section: "Series",
+      order: 3
+    },
+
     // --- 2. LAYERS TAB ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
@@ -366,6 +396,7 @@ looker.plugins.visualizations.add({
   },
 
   create: function (element, config) {
+    // Inject CSS for Mapbox and Legend
     if (!document.getElementById('mapbox-css-fix')) {
       const link = document.createElement('link');
       link.id = 'mapbox-css-fix';
@@ -387,15 +418,42 @@ looker.plugins.visualizations.add({
         .pivot-section { margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc; }
         .pivot-value { display: flex; justify-content: space-between; gap: 10px; }
         .pivot-label { color: #666; font-size: 0.9em; }
+
+        /* LEGEND STYLES */
+        .map-legend {
+          position: absolute;
+          background: rgba(255, 255, 255, 0.9);
+          padding: 10px;
+          border-radius: 4px;
+          font-family: sans-serif;
+          font-size: 12px;
+          color: #333;
+          box-shadow: 0 0 4px rgba(0,0,0,0.3);
+          z-index: 10;
+          pointer-events: none; /* Let clicks pass through if needed */
+          max-width: 200px;
+        }
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
+        .legend-symbol { width: 16px; height: 16px; margin-right: 8px; display: inline-block; background-size: contain; background-repeat: no-repeat; background-position: center; }
+        .legend-circle { border-radius: 50%; }
+        .legend-rect { border-radius: 2px; }
+
+        /* POSITIONS */
+        .top-right { top: 10px; right: 10px; }
+        .bottom-right { bottom: 30px; right: 10px; }
+        .top-left { top: 10px; left: 10px; }
+        .bottom-left { bottom: 30px; left: 10px; }
       </style>
 
       <div id="map-wrapper">
         <div id="map"></div>
+        <div id="map-legend" class="map-legend bottom-right" style="display:none;"></div>
         <div id="token-error">MISSING MAPBOX TOKEN<br><span style="font-size:0.8em; font-weight:normal">Please enter your token in the "Plot" settings.</span></div>
       </div>`;
 
     this._container = element.querySelector('#map');
     this._tokenError = element.querySelector('#token-error');
+    this._legend = element.querySelector('#map-legend');
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
@@ -412,7 +470,8 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V55] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V56] ========== UPDATE ASYNC START ==========`);
+    if (isPrint) console.log(`[Viz V56 Print] Print Mode Detected. Token: ${config.mapbox_token ? 'Present' : 'MISSING'}`);
 
     this.clearErrors();
 
@@ -449,13 +508,17 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V55] Data prepared, rendering layers...`);
+      console.log(`[Viz V56] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
+      this._updateLegend(config, loadedIcons);
 
       if (isPrint) {
+        // PDF FIX: Force redraw immediately to populate buffer
         if (this._deck) {
+          console.log("[Viz V56 Print] Forcing redraw for PDF...");
           this._deck.redraw(true);
         }
+        // Longer timeout for PDF to ensure map tiles load
         setTimeout(() => {
           done();
         }, 3000);
@@ -464,10 +527,50 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V55] FATAL ERROR:", err);
+      console.error("[Viz V56] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
+  },
+
+  _updateLegend: function(config, loadedIcons) {
+    if (!config.show_legend) {
+      this._legend.style.display = 'none';
+      return;
+    }
+
+    this._legend.style.display = 'block';
+    this._legend.className = `map-legend ${config.legend_position || 'bottom-right'}`;
+
+    let html = '';
+    let iconIndex = 0;
+
+    for (let i = 1; i <= 4; i++) {
+      if (config[`layer${i}_enabled`]) {
+        const label = config[`layer${i}_legend_label`] || `Layer ${i}`;
+        const color = config[`layer${i}_color_main`] || '#ccc';
+        const type = config[`layer${i}_type`];
+
+        let symbolHtml = '';
+
+        if (type === 'icon') {
+          // Use loaded icon URL
+          const iconData = loadedIcons[iconIndex];
+          const url = iconData ? iconData.url : ICONS['factory'];
+          symbolHtml = `<div class="legend-symbol" style="background-image: url('${url}');"></div>`;
+          iconIndex++;
+        } else if (type === 'point' || type === 'bubble') {
+          symbolHtml = `<div class="legend-symbol legend-circle" style="background-color: ${color};"></div>`;
+        } else {
+          // Geojson / Column / Heatmap
+          symbolHtml = `<div class="legend-symbol legend-rect" style="background-color: ${color};"></div>`;
+        }
+
+        html += `<div class="legend-item">${symbolHtml}<span>${label}</span></div>`;
+      }
+    }
+
+    this._legend.innerHTML = html;
   },
 
   _detectPivots: function (queryResponse) {
@@ -513,7 +616,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V55] GeoJSON load failed:", error);
+      console.warn("[Viz V56] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -635,6 +738,7 @@ looker.plugins.visualizations.add({
   },
 
   _render: function (processed, config, queryResponse, details, loadedIcons) {
+    const isPrint = details && details.print;
     const layerObjects = [];
     let iconIndex = 0;
 
@@ -644,20 +748,22 @@ looker.plugins.visualizations.add({
 
       if (enabled) {
         try {
-          // --- ICON RETRIEVAL (Contains object {url, width, height}) ---
           let iconData = null;
+          let isCustomIcon = false;
           if (type === 'icon') {
+            const preset = config[`layer${i}_icon_type`];
+            isCustomIcon = (preset === 'custom');
             const defaultIcon = { url: ICONS['factory'], width: 128, height: 128 };
             iconData = loadedIcons[iconIndex] || defaultIcon;
             iconIndex++;
           }
-          const layer = this._buildSingleLayer(i, config, processed, iconData);
+          const layer = this._buildSingleLayer(i, config, processed, iconData, isCustomIcon);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V55] Layer ${i} Error:`, e);
+          console.error(`[Viz V56] Layer ${i} Error:`, e);
         }
       }
     }
@@ -793,7 +899,7 @@ looker.plugins.visualizations.add({
         zoom: cfgZoom,
         pitch: cfgPitch,
         bearing: 0,
-        transitionDuration: (details && details.print) ? 0 : 500
+        transitionDuration: isPrint ? 0 : 500 // PDF FIX: No transition for print
       };
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
     }
@@ -828,18 +934,28 @@ looker.plugins.visualizations.add({
     }
   },
 
-  _validateLayerData: function (data, config) {
+  _validateLayerData: function (data, config, getValueFn) {
     if (!data || !Array.isArray(data) || data.length === 0) return [];
-    return data.filter(d =>
+
+    let validData = data.filter(d =>
       d.position &&
       d.position.length === 2 &&
       !isNaN(d.position[0]) &&
       !isNaN(d.position[1]) &&
       d.position[1] >= -90 && d.position[1] <= 90
     );
+
+    if (config.hide_no_data && getValueFn) {
+      validData = validData.filter(d => {
+        const val = getValueFn(d);
+        return val !== null && val !== undefined && !isNaN(val) && Math.abs(val) > 0;
+      });
+    }
+
+    return validData;
   },
 
-  _buildSingleLayer: function (idx, config, processed, iconData) {
+  _buildSingleLayer: function (idx, config, processed, iconData, isCustomIcon) {
     const type = config[`layer${idx}_type`];
 
     const rawM = config[`layer${idx}_measure_idx`];
@@ -855,10 +971,9 @@ looker.plugins.visualizations.add({
     const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
     const hideNulls = config.hide_no_data;
 
-    // UI: "Size Proportional to Value?" (Correct ID from v50/Your Request)
     const sizeByValue = config[`layer${idx}_size_by_value`] || false;
 
-    const iconBillboard = config[`layer${idx}_icon_billboard`] !== false; // Default true
+    const iconBillboard = config[`layer${idx}_icon_billboard`] !== false;
 
     const useGradient = config[`layer${idx}_use_gradient`];
     const startColorHex = config[`layer${idx}_color_main`];
@@ -872,7 +987,6 @@ looker.plugins.visualizations.add({
     const queryResponse = this._queryResponse;
     const measures = queryResponse.fields.measure_like;
 
-    // --- HELPER: Get Value for specific layer config ---
     const getValue = (d) => {
       let totalValue = 0;
       measureIndices.forEach(mIdx => {
@@ -899,7 +1013,6 @@ looker.plugins.visualizations.add({
       return totalValue || 0;
     };
 
-    // --- PREPARE DATA ---
     let rawPointData = [];
     if (processed.type === 'regions') {
       dimIndices.forEach(dimIdx => {
@@ -962,21 +1075,20 @@ looker.plugins.visualizations.add({
       rawPointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
     }
 
-    // --- FILTER: Validate and Hide Nulls (Layer Logic) ---
-    let safePointData = this._validateLayerData(rawPointData, config);
-
-    if (hideNulls) {
-      safePointData = safePointData.filter(d => {
-        const val = getValue(d);
-        return val !== 0 && val !== null && !isNaN(val);
-      });
-    }
-
+    const safePointData = this._validateLayerData(rawPointData, config, getValue);
+    const id = `layer-${idx}-${type}`;
     const allVals = safePointData.map(d => getValue(d));
     const maxVal = Math.max(...allVals, 0.1);
-
-    const id = `layer-${idx}-${type}`;
     const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx, hideNulls, sizeByValue];
+
+    const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
+      d.feature.properties._values = d.values;
+      d.feature.properties._pivotData = d.pivotData;
+      d.feature.properties._drillLinks = d.drillLinks;
+      d.feature.properties._name = d.name;
+      d.feature.properties._allowedMeasures = d.allowedMeasures;
+      return d.feature;
+    });
 
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
@@ -984,7 +1096,6 @@ looker.plugins.visualizations.add({
       const props = obj.properties || obj;
       const pivotData = props._pivotData || props.pivotData;
       const drillLinks = props._drillLinks || props.drillLinks;
-
       let finalLinks = [];
 
       if (!pivotInfo.hasPivot && drillLinks) {
@@ -1001,7 +1112,6 @@ looker.plugins.visualizations.add({
         measureIndices.forEach(mIdx => {
           const mName = measures[mIdx] ? measures[mIdx].name : null;
           if (!mName || !pivotData[mName]) return;
-
           if (showAllPivots) {
             Object.values(pivotData[mName]).forEach(pVal => {
               if (pVal.links) finalLinks.push(...pVal.links);
@@ -1027,15 +1137,6 @@ looker.plugins.visualizations.add({
         });
       }
     };
-
-    const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
-      d.feature.properties._values = d.values;
-      d.feature.properties._pivotData = d.pivotData;
-      d.feature.properties._drillLinks = d.drillLinks;
-      d.feature.properties._name = d.name;
-      d.feature.properties._allowedMeasures = d.allowedMeasures;
-      return d.feature;
-    });
 
     switch (type) {
       case 'geojson':
@@ -1097,7 +1198,6 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          // SCALING FIX: Allow small values to shrink below the previous floor
           getRadius: d => {
             if (sizeByValue) return (Math.sqrt(getValue(d) / maxVal) * radius);
             return radius;
@@ -1148,7 +1248,6 @@ looker.plugins.visualizations.add({
           position: [d.position[0], d.position[1], 0]
         }));
 
-        // FLEXIBLE DIMS (From v52)
         const iconW = iconData ? iconData.width : 128;
         const iconH = iconData ? iconData.height : 128;
 
@@ -1172,14 +1271,12 @@ looker.plugins.visualizations.add({
           iconMapping: iconMapping,
           getIcon: d => 'marker',
           getPosition: d => d.position,
-          // SCALING FIX: Remove Math.max floor. Allow full scaling.
           getSize: d => {
             const baseSize = radius / 100;
             if (sizeByValue) return baseSize * (getValue(d) / maxVal);
             return baseSize;
           },
           sizeScale: 1,
-          // SCALING FIX: Drop minimum pixels to 1 if scaling is enabled
           sizeMinPixels: sizeByValue ? 1 : 20,
           billboard: iconBillboard,
           autoHighlight: false,
