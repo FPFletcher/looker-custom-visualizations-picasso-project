@@ -1,17 +1,20 @@
 /**
- * Multi-Layer 3D Map for Looker - v54 (Flexible Dims + Fixed Proportional Sizing)
+ * Multi-Layer 3D Map for Looker - v52 (Flexible Icons & Classic Library)
  *
- * MERGED FEATURES:
- * 1. UI: "Size Proportional to Value?" setting is strictly linked (Restored v50 logic).
- * 2. VISUAL: Flexible Icons (v52) prevents cropping of rectangular images.
- * 3. STABILITY: Uses reliable Wikimedia URLs and CORS Proxy.
+ * CHANGES FROM V51:
+ * 1. CONTENT: Reverted to v49 Icon Library (Icons8 style).
+ * 2. FIX: Updated 'building' and 'oil_barrel' URLs to working versions.
+ * 3. FEATURE: "Flexible" Icon Dimensions.
+ * - The code now detects the aspect ratio of custom images.
+ * - Prevents "square cropping" of wide images (like the Porsche).
+ * 4. EXPLANATION: The Proxy is REQUIRED for WebGL (Deck.gl) even if URLs work in HTML.
  */
 
-// --- ICONS LIBRARY (Stable Wikimedia/Icons8 Style) ---
+// --- ICONS LIBRARY (Restored v49 Style with Fixes) ---
 const ICONS = {
   "custom": "custom",
   "box": "https://img.icons8.com/color/96/box.png",
-  "building": "https://img.icons8.com/color/96/city.png",
+  "building": "https://img.icons8.com/color/96/city.png", // FIXED
   "car": "https://img.icons8.com/color/96/car--v1.png",
   "check": "https://img.icons8.com/color/96/checked--v1.png",
   "circle": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png",
@@ -22,7 +25,7 @@ const ICONS = {
   "hospital": "https://img.icons8.com/color/96/hospital-3.png",
   "info": "https://img.icons8.com/color/96/info--v1.png",
   "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "oil_barrel": "https://img.icons8.com/color/96/oil-storage-tank.png",
+  "oil_barrel": "https://img.icons8.com/color/96/oil-storage-tank.png", // FIXED
   "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
   "pin": "https://img.icons8.com/color/96/marker.png",
   "plane": "https://img.icons8.com/color/96/airport.png",
@@ -147,7 +150,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 12
     },
-    // RESTORED OPTION: Size by Value
     [`layer${n}_size_by_value`]: {
       type: "boolean",
       label: `L${n} Size Proportional to Value?`,
@@ -223,11 +225,13 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER (WITH DIMENSION DETECTION & PROXY) ---
+// --- HELPER: PRELOADER (WITH DIMENSION DETECTION) ---
+// Returns: { url: string, width: number, height: number }
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = "";
 
+    // 1. Determine URL
     if (type === 'custom' && customUrl) {
       url = customUrl;
     } else if (ICONS[type]) {
@@ -235,10 +239,12 @@ const preloadImage = (type, customUrl) => {
     }
 
     if (!url || url.length < 5) {
+      // Return default dimensions (128x128) for fallback
       return resolve({ url: ICONS['factory'], width: 128, height: 128 });
     }
 
-    // CORS Proxy for Custom URLs
+    // 2. APPLY PROXY (Required for WebGL CORS)
+    // We skip proxy for data URIs or already proxied links
     if (type === 'custom' && !url.startsWith('data:') && !url.includes('wsrv.nl')) {
       url = `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
     }
@@ -246,6 +252,8 @@ const preloadImage = (type, customUrl) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => {
+      // 3. RETURN DIMENSIONS
+      // This allows us to set the sprite mapping exactly to the image size
       resolve({
         url: url,
         width: img.naturalWidth || 128,
@@ -253,7 +261,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V54] Failed to load icon: ${url}`);
+      console.warn(`[Viz V52] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -261,8 +269,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v54",
-  label: "Combo Map 3D (V54 Final)",
+  id: "combo_map_ultimate_v52",
+  label: "Combo Map 3D (V52 Flexible)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -409,7 +417,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V54] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V52] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -446,7 +454,7 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V54] Data prepared, rendering layers...`);
+      console.log(`[Viz V52] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -461,7 +469,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V54] FATAL ERROR:", err);
+      console.error("[Viz V52] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -489,6 +497,7 @@ looker.plugins.visualizations.add({
     const latDim = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
     const lonDim = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lng') || d.name.toLowerCase().includes('lon'));
 
+    // If we have Lat/Lon, use POINTS mode. Otherwise use REGIONS.
     const isPointsMode = (latDim && lonDim);
 
     if (isPointsMode) {
@@ -510,7 +519,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V54] GeoJSON load failed:", error);
+      console.warn("[Viz V52] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -641,23 +650,21 @@ looker.plugins.visualizations.add({
 
       if (enabled) {
         try {
-          // --- ICON RETRIEVAL ---
+          // --- ICON RETRIEVAL (Now contains object {url, width, height}) ---
           let iconData = null;
-          let isCustomIcon = false;
           if (type === 'icon') {
-            const preset = config[`layer${i}_icon_type`];
-            isCustomIcon = (preset === 'custom');
+            // Default fallback
             const defaultIcon = { url: ICONS['factory'], width: 128, height: 128 };
             iconData = loadedIcons[iconIndex] || defaultIcon;
             iconIndex++;
           }
-          const layer = this._buildSingleLayer(i, config, processed, iconData, isCustomIcon);
+          const layer = this._buildSingleLayer(i, config, processed, iconData);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V54] Layer ${i} Error:`, e);
+          console.error(`[Viz V52] Layer ${i} Error:`, e);
         }
       }
     }
@@ -828,30 +835,18 @@ looker.plugins.visualizations.add({
     }
   },
 
-  _validateLayerData: function (data, config, getValueFn) {
+  _validateLayerData: function (data, config) {
     if (!data || !Array.isArray(data) || data.length === 0) return [];
-
-    // Default validation (Location validity)
-    let validData = data.filter(d =>
+    return data.filter(d =>
       d.position &&
       d.position.length === 2 &&
       !isNaN(d.position[0]) &&
       !isNaN(d.position[1]) &&
       d.position[1] >= -90 && d.position[1] <= 90
     );
-
-    // FIX: Hide 0/Null using specific layer logic
-    if (config.hide_no_data && getValueFn) {
-      validData = validData.filter(d => {
-        const val = getValueFn(d);
-        return val !== null && val !== undefined && !isNaN(val) && Math.abs(val) > 0;
-      });
-    }
-
-    return validData;
   },
 
-  _buildSingleLayer: function (idx, config, processed, iconData, isCustomIcon) {
+  _buildSingleLayer: function (idx, config, processed, iconData) {
     const type = config[`layer${idx}_type`];
 
     const rawM = config[`layer${idx}_measure_idx`];
@@ -866,10 +861,7 @@ looker.plugins.visualizations.add({
     const showAllPivots = config[`layer${idx}_show_all_pivots`];
     const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
     const hideNulls = config.hide_no_data;
-
-    // RESTORED LINK: Using 'size_by_value' as the flag
-    const sizeByValue = config[`layer${idx}_size_by_value`] || false;
-
+    const sizeByValue = config[`layer${idx}_size_by_value`];
     const iconBillboard = config[`layer${idx}_icon_billboard`] !== false; // Default true
 
     const useGradient = config[`layer${idx}_use_gradient`];
@@ -974,12 +966,71 @@ looker.plugins.visualizations.add({
       rawPointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
     }
 
-    // --- FILTER & NORMALIZE ---
-    const safePointData = this._validateLayerData(rawPointData, config, getValue);
-    const id = `layer-${idx}-${type}`;
+    // --- FILTER: Validate and Hide Nulls (Layer Logic) ---
+    let safePointData = this._validateLayerData(rawPointData, config);
+
+    if (hideNulls) {
+      safePointData = safePointData.filter(d => {
+        const val = getValue(d);
+        return val !== 0 && val !== null && !isNaN(val);
+      });
+    }
+
     const allVals = safePointData.map(d => getValue(d));
     const maxVal = Math.max(...allVals, 0.1);
+
+    const id = `layer-${idx}-${type}`;
     const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx, hideNulls, sizeByValue];
+
+    const onClickHandler = (info) => {
+      if (!info || !info.object) return;
+      const obj = info.object;
+      const props = obj.properties || obj;
+      const pivotData = props._pivotData || props.pivotData;
+      const drillLinks = props._drillLinks || props.drillLinks;
+
+      let finalLinks = [];
+
+      if (!pivotInfo.hasPivot && drillLinks) {
+        measureIndices.forEach(mIdx => {
+          if (drillLinks[mIdx] && drillLinks[mIdx].length > 0) {
+            const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
+            drillLinks[mIdx].forEach(link => {
+              finalLinks.push({ ...link, label: `${mName}: ${link.label}` });
+            });
+          }
+        });
+      }
+      else if (pivotInfo.hasPivot && pivotData) {
+        measureIndices.forEach(mIdx => {
+          const mName = measures[mIdx] ? measures[mIdx].name : null;
+          if (!mName || !pivotData[mName]) return;
+
+          if (showAllPivots) {
+            Object.values(pivotData[mName]).forEach(pVal => {
+              if (pVal.links) finalLinks.push(...pVal.links);
+            });
+          } else {
+            const pKey = pivotInfo.pivotKeys[pivotIdx];
+            if (pKey && pivotData[mName][pKey] && pivotData[mName][pKey].links) {
+              finalLinks.push(...pivotData[mName][pKey].links);
+            }
+          }
+        });
+      }
+
+      if (finalLinks.length > 0) {
+        LookerCharts.Utils.openDrillMenu({
+          links: finalLinks,
+          event: {
+            pageX: info.x,
+            pageY: info.y,
+            clientX: info.x,
+            clientY: info.y
+          }
+        });
+      }
+    };
 
     const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
       d.feature.properties._values = d.values;
@@ -1063,7 +1114,7 @@ looker.plugins.visualizations.add({
           onClick: onClickHandler,
           updateTriggers: {
             getFillColor: updateTriggersBase,
-            getRadius: [...updateTriggersBase, radius]
+            getRadius: [...updateTriggersBase, radius, sizeByValue]
           }
         });
 
@@ -1101,9 +1152,12 @@ looker.plugins.visualizations.add({
         }));
 
         // --- FLEXIBLE DIMENSION LOGIC ---
+        // Instead of hardcoding 128x128, use the loaded image's actual size.
+        // This prevents the "square crop" of rectangular images (like the Porsche).
         const iconW = iconData ? iconData.width : 128;
         const iconH = iconData ? iconData.height : 128;
 
+        // We set the mapping to cover the FULL image dimensions
         const iconMapping = {
           marker: {
             x: 0,
@@ -1111,14 +1165,9 @@ looker.plugins.visualizations.add({
             width: iconW,
             height: iconH,
             mask: false,
-            anchorY: iconH
+            anchorY: iconH // Anchor at bottom
           }
         };
-
-        // Determine billboard mode (User setting has priority)
-        // If Custom Icon -> Default to False (Draped) unless user forces True
-        // If Preset Icon -> Default to True (Standing)
-        // But for simplicity, we respect the user UI toggle completely.
 
         return new deck.IconLayer({
           id: id,
@@ -1129,20 +1178,19 @@ looker.plugins.visualizations.add({
           iconMapping: iconMapping,
           getIcon: d => 'marker',
           getPosition: d => d.position,
-          // RESTORED SIZING LOGIC LINKED TO 'sizeByValue'
           getSize: d => {
             const baseSize = radius / 100;
-            if (sizeByValue) return baseSize * Math.max(0.2, Math.sqrt(getValue(d) / maxVal));
+            if (sizeByValue) return baseSize * (getValue(d) / maxVal);
             return baseSize;
           },
           sizeScale: 1,
-          sizeMinPixels: sizeByValue ? 10 : 20,
+          sizeMinPixels: 20,
           billboard: iconBillboard,
           autoHighlight: false,
           onClick: onClickHandler,
           updateTriggers: {
-            getSize: [...updateTriggersBase, radius],
-            getIcon: [iconData ? iconData.url : '']
+            getSize: [...updateTriggersBase, radius, sizeByValue],
+            getIcon: [iconData.url] // Triggers redraw if icon loads
           }
         });
 
