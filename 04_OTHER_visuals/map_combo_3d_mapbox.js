@@ -1,46 +1,42 @@
 /**
- * Multi-Layer 3D Map for Looker - v51 (Ultimate Fixes)
+ * Multi-Layer 3D Map for Looker - v52 (Flexible Icons & Classic Library)
  *
- * CHANGES FROM V50:
- * 1. LIBRARY FIX: Replaced broken "Icons8" links with stable Wikimedia/CDN links.
- * (Solves the 404 errors in your logs).
- * 2. PROXY LOGIC: Added error handling for the Proxy.
- * NOTE: The Proxy CANNOT fetch private images (like Google Chat attachments).
- * You must use PUBLIC image URLs.
- *
- * PREVIOUS FEATURES:
- * - Automatic CORS Proxy for Custom URLs.
- * - "Size by Value" & "Billboard" Toggles.
- * - Auto-Detect Lat/Lon.
+ * CHANGES FROM V51:
+ * 1. CONTENT: Reverted to v49 Icon Library (Icons8 style).
+ * 2. FIX: Updated 'building' and 'oil_barrel' URLs to working versions.
+ * 3. FEATURE: "Flexible" Icon Dimensions.
+ * - The code now detects the aspect ratio of custom images.
+ * - Prevents "square cropping" of wide images (like the Porsche).
+ * 4. EXPLANATION: The Proxy is REQUIRED for WebGL (Deck.gl) even if URLs work in HTML.
  */
 
-// --- ICONS LIBRARY (Updated with Stable Public URLs) ---
+// --- ICONS LIBRARY (Restored v49 Style with Fixes) ---
 const ICONS = {
   "custom": "custom",
-  // Standard shapes/symbols (Reliable Public URLs)
-  "box": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Nuvola_apps_package_toys.svg/128px-Nuvola_apps_package_toys.svg.png",
-  "building": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Nuvola_apps_kcmprocessor.png/128px-Nuvola_apps_kcmprocessor.png",
-  "car": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/Nuvola_apps_kdmconfig.png/128px-Nuvola_apps_kdmconfig.png",
-  "check": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Yes_check.svg/128px-Yes_check.svg.png",
+  "box": "https://img.icons8.com/color/96/box.png",
+  "building": "https://img.icons8.com/color/96/city.png", // FIXED
+  "car": "https://img.icons8.com/color/96/car--v1.png",
+  "check": "https://img.icons8.com/color/96/checked--v1.png",
   "circle": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png",
-  "dollar": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Dollar_Sign.svg/96px-Dollar_Sign.svg.png",
-  "euro": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Euro_Sign.svg/96px-Euro_Sign.svg.png",
-  "factory": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Factory_1.svg/128px-Factory_1.svg.png",
-  "home": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Home-icon.svg/128px-Home-icon.svg.png",
-  "hospital": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Map_marker_icon_%E2%80%93_Nicolas_Mollet_%E2%80%93_Hospital_%E2%80%93_Industry_%E2%80%93_White_%E2%80%93_Dark_red.svg/128px-Map_marker_icon.svg.png",
-  "info": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Infostand_anchor_icon.svg/128px-Infostand_anchor_icon.svg.png",
-  "marker_blue": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Map_marker.svg/128px-Map_marker.svg.png",
-  "oil_barrel": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Oil_barrel_icon.svg/128px-Oil_barrel_icon.svg.png",
-  "oil_rig": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Oil_Rig_Icon.svg/128px-Oil_Rig_Icon.svg.png",
-  "pin": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Google_Maps_pin.svg/100px-Google_Maps_pin.svg.png",
-  "plane": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Air_plane_airport.svg/128px-Air_plane_airport.svg.png",
-  "ship": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Nuvola_apps_mouse.png/128px-Nuvola_apps_mouse.png", // Placeholder for ship
-  "shop": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Mall_icon.svg/128px-Mall_icon.svg.png",
-  "train": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Aiga_railtransportation_inv.svg/128px-Aiga_railtransportation_inv.svg.png",
-  "truck": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Truck_icon.svg/128px-Truck_icon.svg.png",
-  "user": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Google_Contacts_icon.svg/128px-Google_Contacts_icon.svg.png",
-  "warning": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Ostraha_icon.svg/128px-Ostraha_icon.svg.png",
-  "water_dam": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/Hydroelectric_dam_icon.svg/128px-Hydroelectric_dam_icon.svg.png"
+  "dollar": "https://img.icons8.com/color/96/us-dollar-circled--v1.png",
+  "euro": "https://img.icons8.com/color/96/euro-pound-exchange.png",
+  "factory": "https://img.icons8.com/color/96/factory.png",
+  "home": "https://img.icons8.com/color/96/home.png",
+  "hospital": "https://img.icons8.com/color/96/hospital-3.png",
+  "info": "https://img.icons8.com/color/96/info--v1.png",
+  "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
+  "oil_barrel": "https://img.icons8.com/color/96/oil-storage-tank.png", // FIXED
+  "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
+  "pin": "https://img.icons8.com/color/96/marker.png",
+  "plane": "https://img.icons8.com/color/96/airport.png",
+  "semi_truck": "https://img.icons8.com/color/96/semi-truck-side-view.png",
+  "ship": "https://img.icons8.com/color/96/water-transportation.png",
+  "shop": "https://img.icons8.com/color/96/shop.png",
+  "train": "https://img.icons8.com/color/96/train.png",
+  "truck": "https://img.icons8.com/color/96/truck.png",
+  "user": "https://img.icons8.com/color/96/user.png",
+  "warning": "https://img.icons8.com/color/96/box-important--v1.png",
+  "water_dam": "https://img.icons8.com/color/96/dam.png"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -194,10 +190,11 @@ const getLayerOptions = (n) => {
         { "Hospital": "hospital" },
         { "Info": "info" },
         { "Map Pin": "pin" },
-        { "Marker (Blue)": "marker_blue" },
+        { "Marker (Truck Blue)": "marker_blue" },
         { "Oil Barrel": "oil_barrel" },
         { "Oil Rig": "oil_rig" },
         { "Plane": "plane" },
+        { "Semi Truck": "semi_truck" },
         { "Ship": "ship" },
         { "Shop / Store": "shop" },
         { "Train": "train" },
@@ -228,41 +225,52 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER (WITH CORS PROXY) ---
+// --- HELPER: PRELOADER (WITH DIMENSION DETECTION) ---
+// Returns: { url: string, width: number, height: number }
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = "";
 
-    // 1. Determine the raw URL
+    // 1. Determine URL
     if (type === 'custom' && customUrl) {
       url = customUrl;
     } else if (ICONS[type]) {
       url = ICONS[type];
     }
 
-    if (!url || url.length < 5) return resolve(ICONS['factory']);
+    if (!url || url.length < 5) {
+      // Return default dimensions (128x128) for fallback
+      return resolve({ url: ICONS['factory'], width: 128, height: 128 });
+    }
 
-    // 2. APPLY CORS PROXY if it's a Custom URL
-    // NOTE: This will NOT work for private links (e.g. Google Chat, Private S3)
+    // 2. APPLY PROXY (Required for WebGL CORS)
+    // We skip proxy for data URIs or already proxied links
     if (type === 'custom' && !url.startsWith('data:') && !url.includes('wsrv.nl')) {
       url = `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
     }
 
     const img = new Image();
     img.crossOrigin = "Anonymous";
-    img.onload = () => resolve(url);
+    img.onload = () => {
+      // 3. RETURN DIMENSIONS
+      // This allows us to set the sprite mapping exactly to the image size
+      resolve({
+        url: url,
+        width: img.naturalWidth || 128,
+        height: img.naturalHeight || 128
+      });
+    };
     img.onerror = () => {
-      console.warn(`[Viz V51] Failed to load icon: ${url}`);
-      // Fallback to warning icon if proxy fails
-      resolve(ICONS['warning']);
+      console.warn(`[Viz V52] Failed to load icon: ${url}`);
+      resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
   });
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v51",
-  label: "Combo Map 3D (V51 Stable)",
+  id: "combo_map_ultimate_v52",
+  label: "Combo Map 3D (V52 Flexible)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -409,7 +417,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V51] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V52] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -446,7 +454,7 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V51] Data prepared, rendering layers...`);
+      console.log(`[Viz V52] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -461,7 +469,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V51] FATAL ERROR:", err);
+      console.error("[Viz V52] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -505,13 +513,13 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures, dims };
     }
 
-    // REGIONS MODE (Default if no Lat/Lon found)
+    // REGIONS MODE
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V51] GeoJSON load failed:", error);
+      console.warn("[Viz V52] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -642,18 +650,21 @@ looker.plugins.visualizations.add({
 
       if (enabled) {
         try {
-          let iconUrlOverride = null;
+          // --- ICON RETRIEVAL (Now contains object {url, width, height}) ---
+          let iconData = null;
           if (type === 'icon') {
-            iconUrlOverride = loadedIcons[iconIndex] || ICONS['factory'];
+            // Default fallback
+            const defaultIcon = { url: ICONS['factory'], width: 128, height: 128 };
+            iconData = loadedIcons[iconIndex] || defaultIcon;
             iconIndex++;
           }
-          const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
+          const layer = this._buildSingleLayer(i, config, processed, iconData);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V51] Layer ${i} Error:`, e);
+          console.error(`[Viz V52] Layer ${i} Error:`, e);
         }
       }
     }
@@ -835,7 +846,7 @@ looker.plugins.visualizations.add({
     );
   },
 
-  _buildSingleLayer: function (idx, config, processed, iconUrlOverride) {
+  _buildSingleLayer: function (idx, config, processed, iconData) {
     const type = config[`layer${idx}_type`];
 
     const rawM = config[`layer${idx}_measure_idx`];
@@ -1140,13 +1151,31 @@ looker.plugins.visualizations.add({
           position: [d.position[0], d.position[1], 0]
         }));
 
+        // --- FLEXIBLE DIMENSION LOGIC ---
+        // Instead of hardcoding 128x128, use the loaded image's actual size.
+        // This prevents the "square crop" of rectangular images (like the Porsche).
+        const iconW = iconData ? iconData.width : 128;
+        const iconH = iconData ? iconData.height : 128;
+
+        // We set the mapping to cover the FULL image dimensions
+        const iconMapping = {
+          marker: {
+            x: 0,
+            y: 0,
+            width: iconW,
+            height: iconH,
+            mask: false,
+            anchorY: iconH // Anchor at bottom
+          }
+        };
+
         return new deck.IconLayer({
           id: id,
           data: groundedData,
           pickable: true,
           opacity: opacity,
-          iconAtlas: iconUrlOverride || ICONS['factory'],
-          iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false, anchorY: 128 } },
+          iconAtlas: iconData ? iconData.url : ICONS['factory'],
+          iconMapping: iconMapping,
           getIcon: d => 'marker',
           getPosition: d => d.position,
           getSize: d => {
@@ -1161,7 +1190,7 @@ looker.plugins.visualizations.add({
           onClick: onClickHandler,
           updateTriggers: {
             getSize: [...updateTriggersBase, radius, sizeByValue],
-            getIcon: [iconUrlOverride]
+            getIcon: [iconData.url] // Triggers redraw if icon loads
           }
         });
 
