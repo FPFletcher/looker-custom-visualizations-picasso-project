@@ -1,12 +1,11 @@
 /**
- * Multi-Layer 3D Map for Looker - v57 (Legend Auto-Labels & Gradient + PDF Debug)
+ * Multi-Layer 3D Map for Looker - v58 (Safety Guard Fix)
  *
- * BASED ON V56 (Stable Core, Flexible Dims, Prop Sizing)
+ * BASED ON V57
  *
- * NEW FEATURES:
- * 1. LEGEND LABELS: Defaults to Measure Label(s) instead of "Layer X".
- * 2. LEGEND GRADIENTS: Displays gradient swatch if layer uses gradient.
- * 3. PDF DEBUG: Enhanced logging and forced static rendering for print mode.
+ * FIX: "Safety Guard" added. The visualization now completely ignores
+ * any update cycle where the Mapbox Token is missing. This prevents
+ * the "Black Map" crash that happens during the initial loading phase.
  */
 
 // --- ICONS LIBRARY (Stable) ---
@@ -221,7 +220,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 17
     },
-    // NEW SERIES OPTION: Legend Label (Blank = Auto)
     [`layer${n}_legend_label`]: {
       type: "string",
       label: `Layer ${n} Legend Label`,
@@ -248,7 +246,6 @@ const preloadImage = (type, customUrl) => {
       return resolve({ url: ICONS['factory'], width: 128, height: 128 });
     }
 
-    // CORS Proxy
     if (type === 'custom' && !url.startsWith('data:') && !url.includes('wsrv.nl')) {
       url = `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
     }
@@ -263,7 +260,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V57] Failed to load icon: ${url}`);
+      console.warn(`[Viz V58] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -271,8 +268,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v57",
-  label: "Combo Map 3D (V57 Gradient Legend)",
+  id: "combo_map_ultimate_v58",
+  label: "Combo Map 3D (V58 Print Safety)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -365,7 +362,7 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
-    // --- SERIES TAB (New) ---
+    // --- SERIES TAB ---
     legend_header: { type: "string", label: "─── LEGEND SETTINGS ───", display: "divider", section: "Series", order: 1 },
     show_legend: {
       type: "boolean",
@@ -419,7 +416,6 @@ looker.plugins.visualizations.add({
         .pivot-value { display: flex; justify-content: space-between; gap: 10px; }
         .pivot-label { color: #666; font-size: 0.9em; }
 
-        /* LEGEND STYLES */
         .map-legend {
           position: absolute;
           background: rgba(255, 255, 255, 0.9);
@@ -468,22 +464,18 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
-    //const isPrint = details && details.print;
-    const isPrint = true;
-    console.log(`[Viz V57] ========== UPDATE ASYNC START ==========`);
-
-    // DEBUG: Log specific Print details
-    if (isPrint) {
-        console.log(`[Viz V57 Print] Mode: PRINT DETECTED.`);
-        console.log(`[Viz V57 Print] Mapbox Token Present? ${!!config.mapbox_token}`);
-        console.log(`[Viz V57 Print] Map Style: ${config.map_style}`);
-    }
+    const isPrint = details && details.print;
+    console.log(`[Viz V58] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
+    // SAFETY GUARD: If token is missing, stop immediately.
+    // This prevents the map from initializing in a broken state during the first "False" cycle.
     if (!config.mapbox_token) {
+      console.warn("[Viz V58] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
-      done();
+      // Do NOT call done() here if you want it to keep waiting, but typically Looker needs done().
+      // However, initializing Mapbox without a token is fatal.
       return;
     } else {
       this._tokenError.style.display = 'none';
@@ -514,29 +506,23 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V57] Data prepared, rendering layers...`);
+      console.log(`[Viz V58] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
       this._updateLegend(config, loadedIcons, queryResponse);
 
       if (isPrint) {
-        // PDF FIX: Force redraw and wait longer
         if (this._deck) {
-          console.log("[Viz V57 Print] Forcing redraw loop...");
+          console.log("[Viz V58 Print] Forcing redraw loop...");
           this._deck.redraw(true);
-          // Double redraw to catch tile load
-          setTimeout(() => {
-             if(this._deck) this._deck.redraw(true);
-          }, 1000);
+          setTimeout(() => { if(this._deck) this._deck.redraw(true); }, 1000);
         }
-        setTimeout(() => {
-          done();
-        }, 4000); // Extended wait for PDF
+        setTimeout(() => { done(); }, 4000);
       } else {
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V57] FATAL ERROR:", err);
+      console.error("[Viz V58] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -557,19 +543,14 @@ looker.plugins.visualizations.add({
 
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`]) {
-        // AUTO-LABEL LOGIC
         let label = config[`layer${i}_legend_label`];
         if (!label || label.trim() === '') {
-            // Determine measure indices
             const measStr = config[`layer${i}_measure_idx`];
             const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
-
-            // Build label from measure names
             const names = mIndices.map(idx => {
                 const m = measures[idx];
                 return m ? (m.label_short || m.label) : '';
             }).filter(s => s !== '');
-
             label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
         }
 
@@ -586,13 +567,11 @@ looker.plugins.visualizations.add({
           symbolHtml = `<div class="legend-symbol" style="background-image: url('${url}');"></div>`;
           iconIndex++;
         } else if (type === 'point' || type === 'bubble') {
-          // GRADIENT LOGIC
           const style = useGradient
             ? `background: linear-gradient(135deg, ${color}, ${endColor});`
             : `background-color: ${color};`;
           symbolHtml = `<div class="legend-symbol legend-circle" style="${style}"></div>`;
         } else {
-          // Geojson / Column / Heatmap
           const style = useGradient
             ? `background: linear-gradient(to right, ${color}, ${endColor});`
             : `background-color: ${color};`;
@@ -624,7 +603,6 @@ looker.plugins.visualizations.add({
     const measures = queryResponse.fields.measure_like;
     const dims = queryResponse.fields.dimension_like;
 
-    // AUTO-DETECT DATA MODE
     const latDim = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
     const lonDim = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lng') || d.name.toLowerCase().includes('lon'));
 
@@ -643,13 +621,12 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures, dims };
     }
 
-    // REGIONS MODE
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V57] GeoJSON load failed:", error);
+      console.warn("[Viz V58] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -796,7 +773,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V57] Layer ${i} Error:`, e);
+          console.error(`[Viz V58] Layer ${i} Error:`, e);
         }
       }
     }
@@ -932,7 +909,7 @@ looker.plugins.visualizations.add({
         zoom: cfgZoom,
         pitch: cfgPitch,
         bearing: 0,
-        transitionDuration: isPrint ? 0 : 500 // PDF FIX: No transition for print
+        transitionDuration: isPrint ? 0 : 500
       };
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
     }
