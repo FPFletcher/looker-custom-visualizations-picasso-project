@@ -468,7 +468,8 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
-    const isPrint = details && details.print;
+    //const isPrint = details && details.print;
+    const isPrint = true;
     console.log(`[Viz V57] ========== UPDATE ASYNC START ==========`);
 
     // DEBUG: Log specific Print details
