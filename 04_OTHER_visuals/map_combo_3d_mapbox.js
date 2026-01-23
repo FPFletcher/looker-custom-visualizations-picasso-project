@@ -1,12 +1,12 @@
 /**
- * Multi-Layer 3D Map for Looker - v56 (Series Tab, Legend & PDF Fixes)
+ * Multi-Layer 3D Map for Looker - v57 (Legend Auto-Labels & Gradient + PDF Debug)
  *
- * BASED ON V55 (Stable Core, Flexible Dims, Prop Sizing)
+ * BASED ON V56 (Stable Core, Flexible Dims, Prop Sizing)
  *
  * NEW FEATURES:
- * 1. SERIES TAB: Added specific tab for Legend configuration.
- * 2. LEGEND: Dynamic legend showing Icons (custom), Colors, and Labels.
- * 3. PRINT FIX: Enhanced logic to ensure Mapbox/Deck.gl renders before PDF capture.
+ * 1. LEGEND LABELS: Defaults to Measure Label(s) instead of "Layer X".
+ * 2. LEGEND GRADIENTS: Displays gradient swatch if layer uses gradient.
+ * 3. PDF DEBUG: Enhanced logging and forced static rendering for print mode.
  */
 
 // --- ICONS LIBRARY (Stable) ---
@@ -221,11 +221,12 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 17
     },
-    // NEW SERIES OPTION: Legend Label
+    // NEW SERIES OPTION: Legend Label (Blank = Auto)
     [`layer${n}_legend_label`]: {
       type: "string",
       label: `Layer ${n} Legend Label`,
-      default: `Layer ${n}`,
+      default: "",
+      placeholder: "Leave empty to use Measure Name",
       section: "Series",
       order: n * 10
     }
@@ -262,7 +263,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V56] Failed to load icon: ${url}`);
+      console.warn(`[Viz V57] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -270,8 +271,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v56",
-  label: "Combo Map 3D (V56 Series/Legend)",
+  id: "combo_map_ultimate_v57",
+  label: "Combo Map 3D (V57 Gradient Legend)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -396,7 +397,6 @@ looker.plugins.visualizations.add({
   },
 
   create: function (element, config) {
-    // Inject CSS for Mapbox and Legend
     if (!document.getElementById('mapbox-css-fix')) {
       const link = document.createElement('link');
       link.id = 'mapbox-css-fix';
@@ -430,15 +430,14 @@ looker.plugins.visualizations.add({
           color: #333;
           box-shadow: 0 0 4px rgba(0,0,0,0.3);
           z-index: 10;
-          pointer-events: none; /* Let clicks pass through if needed */
-          max-width: 200px;
+          pointer-events: none;
+          max-width: 250px;
         }
         .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
-        .legend-symbol { width: 16px; height: 16px; margin-right: 8px; display: inline-block; background-size: contain; background-repeat: no-repeat; background-position: center; }
+        .legend-symbol { width: 16px; height: 16px; margin-right: 8px; display: inline-block; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid rgba(0,0,0,0.1); }
         .legend-circle { border-radius: 50%; }
         .legend-rect { border-radius: 2px; }
 
-        /* POSITIONS */
         .top-right { top: 10px; right: 10px; }
         .bottom-right { bottom: 30px; right: 10px; }
         .top-left { top: 10px; left: 10px; }
@@ -470,8 +469,14 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V56] ========== UPDATE ASYNC START ==========`);
-    if (isPrint) console.log(`[Viz V56 Print] Print Mode Detected. Token: ${config.mapbox_token ? 'Present' : 'MISSING'}`);
+    console.log(`[Viz V57] ========== UPDATE ASYNC START ==========`);
+
+    // DEBUG: Log specific Print details
+    if (isPrint) {
+        console.log(`[Viz V57 Print] Mode: PRINT DETECTED.`);
+        console.log(`[Viz V57 Print] Mapbox Token Present? ${!!config.mapbox_token}`);
+        console.log(`[Viz V57 Print] Map Style: ${config.map_style}`);
+    }
 
     this.clearErrors();
 
@@ -508,32 +513,35 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V56] Data prepared, rendering layers...`);
+      console.log(`[Viz V57] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
-      this._updateLegend(config, loadedIcons);
+      this._updateLegend(config, loadedIcons, queryResponse);
 
       if (isPrint) {
-        // PDF FIX: Force redraw immediately to populate buffer
+        // PDF FIX: Force redraw and wait longer
         if (this._deck) {
-          console.log("[Viz V56 Print] Forcing redraw for PDF...");
+          console.log("[Viz V57 Print] Forcing redraw loop...");
           this._deck.redraw(true);
+          // Double redraw to catch tile load
+          setTimeout(() => {
+             if(this._deck) this._deck.redraw(true);
+          }, 1000);
         }
-        // Longer timeout for PDF to ensure map tiles load
         setTimeout(() => {
           done();
-        }, 3000);
+        }, 4000); // Extended wait for PDF
       } else {
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V56] FATAL ERROR:", err);
+      console.error("[Viz V57] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
   },
 
-  _updateLegend: function(config, loadedIcons) {
+  _updateLegend: function(config, loadedIcons, queryResponse) {
     if (!config.show_legend) {
       this._legend.style.display = 'none';
       return;
@@ -544,26 +552,50 @@ looker.plugins.visualizations.add({
 
     let html = '';
     let iconIndex = 0;
+    const measures = queryResponse.fields.measure_like;
 
     for (let i = 1; i <= 4; i++) {
       if (config[`layer${i}_enabled`]) {
-        const label = config[`layer${i}_legend_label`] || `Layer ${i}`;
+        // AUTO-LABEL LOGIC
+        let label = config[`layer${i}_legend_label`];
+        if (!label || label.trim() === '') {
+            // Determine measure indices
+            const measStr = config[`layer${i}_measure_idx`];
+            const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
+
+            // Build label from measure names
+            const names = mIndices.map(idx => {
+                const m = measures[idx];
+                return m ? (m.label_short || m.label) : '';
+            }).filter(s => s !== '');
+
+            label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
+        }
+
         const color = config[`layer${i}_color_main`] || '#ccc';
         const type = config[`layer${i}_type`];
+        const useGradient = config[`layer${i}_use_gradient`];
+        const endColor = config[`layer${i}_gradient_end`] || color;
 
         let symbolHtml = '';
 
         if (type === 'icon') {
-          // Use loaded icon URL
           const iconData = loadedIcons[iconIndex];
           const url = iconData ? iconData.url : ICONS['factory'];
           symbolHtml = `<div class="legend-symbol" style="background-image: url('${url}');"></div>`;
           iconIndex++;
         } else if (type === 'point' || type === 'bubble') {
-          symbolHtml = `<div class="legend-symbol legend-circle" style="background-color: ${color};"></div>`;
+          // GRADIENT LOGIC
+          const style = useGradient
+            ? `background: linear-gradient(135deg, ${color}, ${endColor});`
+            : `background-color: ${color};`;
+          symbolHtml = `<div class="legend-symbol legend-circle" style="${style}"></div>`;
         } else {
           // Geojson / Column / Heatmap
-          symbolHtml = `<div class="legend-symbol legend-rect" style="background-color: ${color};"></div>`;
+          const style = useGradient
+            ? `background: linear-gradient(to right, ${color}, ${endColor});`
+            : `background-color: ${color};`;
+          symbolHtml = `<div class="legend-symbol legend-rect" style="${style}"></div>`;
         }
 
         html += `<div class="legend-item">${symbolHtml}<span>${label}</span></div>`;
@@ -616,7 +648,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V56] GeoJSON load failed:", error);
+      console.warn("[Viz V57] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -763,7 +795,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V56] Layer ${i} Error:`, e);
+          console.error(`[Viz V57] Layer ${i} Error:`, e);
         }
       }
     }
