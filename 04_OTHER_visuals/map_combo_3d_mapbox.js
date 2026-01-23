@@ -1,17 +1,16 @@
 /**
- * Multi-Layer 3D Map for Looker - v49 (Auto-Detect & Icon Expansion)
+ * Multi-Layer 3D Map for Looker - v50 (CORS Fix & Auto-Detect)
  *
- * CHANGES FROM V48:
- * 1. UI: Removed "Data Mode". Logic now Auto-Detects Lat/Lon dimensions.
- * 2. FIX: "Hide Null/0" logic improved to handle Pivots correctly.
- * 3. CONTENT: Added Oil Rig, Dam, Car, Truck icons.
- * 4. UI: Icons sorted Alphabetically. Custom URL is at the top.
- * 5. FIX: Drill menu aggregates links from ALL selected measures.
+ * CHANGES FROM V49:
+ * 1. FIX: Added automatic CORS Proxy (wsrv.nl) for Custom Icon URLs.
+ * This solves the "Access-Control-Allow-Origin" errors in your logs.
+ * Any custom URL will now be routed through a proxy to ensure it loads in WebGL.
  *
- * UPDATES IN THIS VERSION (User Request):
- * - Fixed "Hide Null/0" to work at the Layer Level (filters based on the calculated value).
- * - Added "Size by Value" boolean for Points and Icons.
- * - Added "Icon Faces Camera" (Billboard) boolean to control tilting.
+ * PREVIOUS FEATURES (V49):
+ * - Auto-Detect Lat/Lon
+ * - Improved "Hide Null/0" logic (Layer level)
+ * - "Size by Value" option
+ * - "Icon Billboard" toggle
  */
 
 // --- ICONS LIBRARY (Sorted Alphabetically) ---
@@ -154,7 +153,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 12
     },
-    // NEW OPTION: Size by Value
     [`layer${n}_size_by_value`]: {
       type: "boolean",
       label: `L${n} Size Proportional to Value?`,
@@ -220,7 +218,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 16
     },
-    // NEW OPTION: Billboard Toggle
     [`layer${n}_icon_billboard`]: {
       type: "boolean",
       label: `L${n} Icons Face Camera? (Billboard)`,
@@ -231,20 +228,34 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER ---
+// --- HELPER: PRELOADER (WITH CORS PROXY FIX) ---
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
-    let url = ICONS[type] || customUrl;
-    if (type === 'custom' && customUrl) url = customUrl;
-    else if (ICONS[type]) url = ICONS[type];
+    let url = "";
+
+    // 1. Determine the raw URL
+    if (type === 'custom' && customUrl) {
+      url = customUrl;
+    } else if (ICONS[type]) {
+      url = ICONS[type];
+    }
 
     if (!url || url.length < 5) return resolve(ICONS['factory']);
+
+    // 2. APPLY CORS PROXY if it's a Custom URL
+    // We use wsrv.nl (a reliable image proxy) to force CORS headers.
+    // We skip this for data URIs or if it's already a proxied URL.
+    if (type === 'custom' && !url.startsWith('data:') && !url.includes('wsrv.nl')) {
+      // Encode the user URL to ensure special chars don't break the proxy
+      url = `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
+    }
 
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V49] Failed to load icon: ${url}`);
+      console.warn(`[Viz V50] Failed to load icon: ${url}`);
+      // Fallback to warning icon if proxy fails
       resolve(ICONS['warning']);
     };
     img.src = url;
@@ -252,13 +263,11 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v49",
-  label: "Combo Map 3D (V49 Auto)",
+  id: "combo_map_ultimate_v50",
+  label: "Combo Map 3D (V50 Auto)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
-
-    // REMOVED DATA MODE - Now Auto-Detected
 
     hide_no_data: {
       type: "boolean",
@@ -402,7 +411,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V49] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V50] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -439,7 +448,7 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V49] Data prepared, rendering layers...`);
+      console.log(`[Viz V50] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -454,7 +463,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V49] FATAL ERROR:", err);
+      console.error("[Viz V50] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -504,7 +513,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V49] GeoJSON load failed:", error);
+      console.warn("[Viz V50] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -646,7 +655,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V49] Layer ${i} Error:`, e);
+          console.error(`[Viz V50] Layer ${i} Error:`, e);
         }
       }
     }
@@ -819,7 +828,6 @@ looker.plugins.visualizations.add({
 
   _validateLayerData: function (data, config) {
     if (!data || !Array.isArray(data) || data.length === 0) return [];
-    // Basic coordinate validation
     return data.filter(d =>
       d.position &&
       d.position.length === 2 &&
@@ -893,7 +901,6 @@ looker.plugins.visualizations.add({
         const dataMap = processed.dataMaps ? processed.dataMaps[dimIdx] : null;
         if (!dataMap) return;
 
-        // GeoJSON Matches
         if (processed.geojson && processed.geojson.features) {
           processed.geojson.features.forEach(feature => {
             const props = feature.properties;
@@ -921,7 +928,6 @@ looker.plugins.visualizations.add({
           });
         }
 
-        // Lat/Lon fallback within regions mode
         Object.keys(dataMap).forEach(key => {
           const item = dataMap[key];
           let pos = [0, 0];
@@ -952,22 +958,17 @@ looker.plugins.visualizations.add({
     }
 
     // --- FILTER: Validate and Hide Nulls (Layer Logic) ---
-    // 1. Basic coordinate validation
     let safePointData = this._validateLayerData(rawPointData, config);
 
-    // 2. Hide Nulls/Zero Logic (Calculated per layer)
-    // If 'Hide Rows with 0/Null' is ON, we remove points where the calculated value is 0.
     if (hideNulls) {
       safePointData = safePointData.filter(d => {
         const val = getValue(d);
-        // Keep if value is non-zero
         return val !== 0 && val !== null && !isNaN(val);
       });
     }
 
-    // --- CALCULATE MAX VALUE (For sizing/gradients) ---
     const allVals = safePointData.map(d => getValue(d));
-    const maxVal = Math.max(...allVals, 0.1); // Avoid div by zero
+    const maxVal = Math.max(...allVals, 0.1);
 
     const id = `layer-${idx}-${type}`;
     const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx, hideNulls, sizeByValue];
@@ -1091,7 +1092,6 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          // FIX: Added Size Proportional Logic
           getRadius: d => {
             if (sizeByValue) return (Math.sqrt(getValue(d) / maxVal) * radius);
             return radius;
@@ -1151,15 +1151,13 @@ looker.plugins.visualizations.add({
           iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false, anchorY: 128 } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
-          // FIX: Added Size Proportional Logic
           getSize: d => {
-            const baseSize = radius / 100; // normalize
+            const baseSize = radius / 100;
             if (sizeByValue) return baseSize * (getValue(d) / maxVal);
             return baseSize;
           },
           sizeScale: 1,
           sizeMinPixels: 20,
-          // FIX: Added Billboard Toggle (Controls tilting/rotation towards camera)
           billboard: iconBillboard,
           autoHighlight: false,
           onClick: onClickHandler,
@@ -1192,10 +1190,8 @@ looker.plugins.visualizations.add({
     if (value === undefined || value === null) return '0';
     if (typeof value !== 'number') return value;
 
-    // Default formatting if no LookML format provided
     if (!formatStr) return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-    // Detect Currency
     let style = 'decimal';
     let currency = undefined;
 
@@ -1205,13 +1201,12 @@ looker.plugins.visualizations.add({
     else if (formatStr.includes('¥')) { style = 'currency'; currency = 'JPY'; }
     else if (formatStr.includes('%')) { style = 'percent'; }
 
-    // Detect Decimals (0.00 -> 2 digits)
     let decimals = 0;
     if (formatStr.includes('.')) {
       const afterDot = formatStr.split('.')[1];
       if (afterDot) decimals = afterDot.replace(/[^0#]/g, '').length;
     } else if (style === 'currency') {
-      decimals = 2; // Default for currency
+      decimals = 2;
     }
 
     try {
@@ -1222,7 +1217,6 @@ looker.plugins.visualizations.add({
       };
       if (currency) options.currency = currency;
 
-      // Handle "K" or "M" shorthand in LookML (basic support)
       if (formatStr.toLowerCase().includes('"k"')) {
         return (value / 1000).toLocaleString(undefined, options) + 'k';
       }
