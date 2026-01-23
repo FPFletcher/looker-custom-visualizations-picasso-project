@@ -1,11 +1,12 @@
 /**
- * Multi-Layer 3D Map for Looker - v58 (Safety Guard Fix)
+ * Multi-Layer 3D Map for Looker - v59 (PDF Fix & Loop Prevention)
  *
- * BASED ON V57
- *
- * FIX: "Safety Guard" added. The visualization now completely ignores
- * any update cycle where the Mapbox Token is missing. This prevents
- * the "Black Map" crash that happens during the initial loading phase.
+ * CHANGES FROM V58:
+ * 1. CRITICAL FIX: Removed the 4-second delay on `done()`. This stops the infinite loop.
+ * 2. PDF FIX: Added a "Heartbeat" renderer.
+ * - Instead of waiting, we tell Looker we are done immediately.
+ * - We then start a background timer that forces the map to redraw every 500ms for 10 seconds.
+ * - This ensures the map is visible whenever the PDF screenshot happens.
  */
 
 // --- ICONS LIBRARY (Stable) ---
@@ -246,6 +247,7 @@ const preloadImage = (type, customUrl) => {
       return resolve({ url: ICONS['factory'], width: 128, height: 128 });
     }
 
+    // CORS Proxy
     if (type === 'custom' && !url.startsWith('data:') && !url.includes('wsrv.nl')) {
       url = `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
     }
@@ -260,7 +262,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V58] Failed to load icon: ${url}`);
+      console.warn(`[Viz V59] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -268,8 +270,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v58",
-  label: "Combo Map 3D (V58 Print Safety)",
+  id: "combo_map_ultimate_v59",
+  label: "Combo Map 3D (V59 Heartbeat)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -453,6 +455,7 @@ looker.plugins.visualizations.add({
     this._viewState = null;
     this._prevConfig = {};
     this._processedData = null;
+    this._heartbeatTimer = null; // New timer handle
   },
 
   destroy: function () {
@@ -460,23 +463,25 @@ looker.plugins.visualizations.add({
       this._deck.finalize();
       this._deck = null;
     }
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+    }
     this._geojsonCache = {};
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
-    const isPrint = true;
-    //details && details.print
-    console.log(`[Viz V58] ========== UPDATE ASYNC START ==========`);
+    const isPrint = details && details.print;
+    console.log(`[Viz V59] ========== UPDATE ASYNC START ==========`);
+
+    // Reset heartbeat if running
+    if (this._heartbeatTimer) clearInterval(this._heartbeatTimer);
 
     this.clearErrors();
 
-    // SAFETY GUARD: If token is missing, stop immediately.
-    // This prevents the map from initializing in a broken state during the first "False" cycle.
+    // SAFETY GUARD: Stop if no token
     if (!config.mapbox_token) {
-      console.warn("[Viz V58] Waiting for Mapbox Token...");
+      console.warn("[Viz V59] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
-      // Do NOT call done() here if you want it to keep waiting, but typically Looker needs done().
-      // However, initializing Mapbox without a token is fatal.
       return;
     } else {
       this._tokenError.style.display = 'none';
@@ -507,23 +512,34 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V58] Data prepared, rendering layers...`);
+      console.log(`[Viz V59] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
       this._updateLegend(config, loadedIcons, queryResponse);
 
       if (isPrint) {
+        // PDF FIX 1: Tell Looker we are done immediately to prevent timeout loops
+        done();
+
+        // PDF FIX 2: Start a heartbeat to force redraws for 10 seconds
+        // This ensures that whenever the screenshot happens, the map is painted
         if (this._deck) {
-          console.log("[Viz V58 Print] Forcing redraw loop...");
-          this._deck.redraw(true);
-          setTimeout(() => { if(this._deck) this._deck.redraw(true); }, 1000);
+          console.log("[Viz V59 Print] Starting background heartbeat...");
+          this._heartbeatTimer = setInterval(() => {
+             // console.log("[Viz V59 Print] Heartbeat Redraw");
+             this._deck.redraw(true);
+          }, 500); // Redraw every 500ms
+
+          // Stop after 10 seconds
+          setTimeout(() => {
+            if(this._heartbeatTimer) clearInterval(this._heartbeatTimer);
+          }, 10000);
         }
-        setTimeout(() => { done(); }, 4000);
       } else {
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V58] FATAL ERROR:", err);
+      console.error("[Viz V59] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -627,7 +643,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V58] GeoJSON load failed:", error);
+      console.warn("[Viz V59] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -774,7 +790,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V58] Layer ${i} Error:`, e);
+          console.error(`[Viz V59] Layer ${i} Error:`, e);
         }
       }
     }
@@ -910,7 +926,7 @@ looker.plugins.visualizations.add({
         zoom: cfgZoom,
         pitch: cfgPitch,
         bearing: 0,
-        transitionDuration: isPrint ? 0 : 500
+        transitionDuration: isPrint ? 0 : 500 // PDF FIX: No transition
       };
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
     }
@@ -1101,54 +1117,6 @@ looker.plugins.visualizations.add({
       return d.feature;
     });
 
-    const onClickHandler = (info) => {
-      if (!info || !info.object) return;
-      const obj = info.object;
-      const props = obj.properties || obj;
-      const pivotData = props._pivotData || props.pivotData;
-      const drillLinks = props._drillLinks || props.drillLinks;
-      let finalLinks = [];
-
-      if (!pivotInfo.hasPivot && drillLinks) {
-        measureIndices.forEach(mIdx => {
-          if (drillLinks[mIdx] && drillLinks[mIdx].length > 0) {
-            const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
-            drillLinks[mIdx].forEach(link => {
-              finalLinks.push({ ...link, label: `${mName}: ${link.label}` });
-            });
-          }
-        });
-      }
-      else if (pivotInfo.hasPivot && pivotData) {
-        measureIndices.forEach(mIdx => {
-          const mName = measures[mIdx] ? measures[mIdx].name : null;
-          if (!mName || !pivotData[mName]) return;
-          if (showAllPivots) {
-            Object.values(pivotData[mName]).forEach(pVal => {
-              if (pVal.links) finalLinks.push(...pVal.links);
-            });
-          } else {
-            const pKey = pivotInfo.pivotKeys[pivotIdx];
-            if (pKey && pivotData[mName][pKey] && pivotData[mName][pKey].links) {
-              finalLinks.push(...pivotData[mName][pKey].links);
-            }
-          }
-        });
-      }
-
-      if (finalLinks.length > 0) {
-        LookerCharts.Utils.openDrillMenu({
-          links: finalLinks,
-          event: {
-            pageX: info.x,
-            pageY: info.y,
-            clientX: info.x,
-            clientY: info.y
-          }
-        });
-      }
-    };
-
     switch (type) {
       case 'geojson':
         if (processed.type !== 'regions') return null;
@@ -1259,6 +1227,7 @@ looker.plugins.visualizations.add({
           position: [d.position[0], d.position[1], 0]
         }));
 
+        // FLEXIBLE DIMS (From v52)
         const iconW = iconData ? iconData.width : 128;
         const iconH = iconData ? iconData.height : 128;
 
@@ -1282,12 +1251,14 @@ looker.plugins.visualizations.add({
           iconMapping: iconMapping,
           getIcon: d => 'marker',
           getPosition: d => d.position,
+          // SCALING FIX: Remove Math.max floor. Allow full scaling.
           getSize: d => {
             const baseSize = radius / 100;
             if (sizeByValue) return baseSize * (getValue(d) / maxVal);
             return baseSize;
           },
           sizeScale: 1,
+          // SCALING FIX: Drop minimum pixels to 1 if scaling is enabled
           sizeMinPixels: sizeByValue ? 1 : 20,
           billboard: iconBillboard,
           autoHighlight: false,
