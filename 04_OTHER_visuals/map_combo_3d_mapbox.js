@@ -1,10 +1,12 @@
 /**
- * Multi-Layer 3D Map for Looker - v60 (ReferenceError Fix + Force Print Debug)
+ * Multi-Layer 3D Map for Looker - v61 (Camera Wiggle Fix)
  *
- * FIXES:
- * 1. CRITICAL: Moved 'onClickHandler' to the top of the layer builder to fix ReferenceError.
- * 2. DEBUG: Forced 'isPrint = true' permanently for debugging purposes as requested.
- * 3. CORE: Includes all v59 features (Heartbeat, Flexible Icons, Legend).
+ * CHANGES FROM V60:
+ * 1. PDF FIX: Replaced static "Heartbeat" with "Camera Wiggle".
+ * - Micro-adjusts pitch (+/- 0.1 deg) every 700ms.
+ * - Forces Mapbox base map to repaint (fixing the black background).
+ * 2. DEBUG: Kept 'isPrint = true' (Hardcoded) for your testing.
+ * 3. STABILITY: Added 'onLoad' log to confirm DeckGL initialization.
  */
 
 // --- ICONS LIBRARY (Stable) ---
@@ -260,7 +262,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V60] Failed to load icon: ${url}`);
+      console.warn(`[Viz V61] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -268,8 +270,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v60",
-  label: "Combo Map 3D (V60 Debug Mode)",
+  id: "combo_map_ultimate_v61",
+  label: "Combo Map 3D (V61 Wiggle Fix)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -468,18 +470,15 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
-    // FORCE PRINT MODE FOR DEBUGGING AS REQUESTED
-    const isPrint = true;
-
-    console.log(`[Viz V60] ========== UPDATE ASYNC START ==========`);
+    const isPrint = true; // FORCE DEBUG AS REQUESTED
+    console.log(`[Viz V61] ========== UPDATE ASYNC START ==========`);
 
     if (this._heartbeatTimer) clearInterval(this._heartbeatTimer);
 
     this.clearErrors();
 
-    // SAFETY GUARD
     if (!config.mapbox_token) {
-      console.warn("[Viz V60] Waiting for Mapbox Token...");
+      console.warn("[Viz V61] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
       return;
     } else {
@@ -511,27 +510,42 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V60] Data prepared, rendering layers...`);
+      console.log(`[Viz V61] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
       this._updateLegend(config, loadedIcons, queryResponse);
 
       if (isPrint) {
         done();
         if (this._deck) {
-          console.log("[Viz V60 Print] Starting background heartbeat...");
+          console.log("[Viz V61 Print] Starting WIGGLE heartbeat...");
+          let tick = 0;
           this._heartbeatTimer = setInterval(() => {
+             tick++;
+             // WIGGLE: Micro-adjust pitch to force Mapbox refresh
+             // This tricks Mapbox into thinking the user moved the camera
+             const wiggle = (tick % 2 === 0) ? 0.1 : -0.1;
+             if (this._viewState) {
+               this._deck.setProps({
+                 viewState: {
+                   ...this._viewState,
+                   pitch: this._viewState.pitch + wiggle,
+                   transitionDuration: 0
+                 }
+               });
+             }
              this._deck.redraw(true);
-          }, 500);
+          }, 700);
+
           setTimeout(() => {
             if(this._heartbeatTimer) clearInterval(this._heartbeatTimer);
-          }, 10000);
+          }, 15000);
         }
       } else {
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V60] FATAL ERROR:", err);
+      console.error("[Viz V61] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -635,7 +649,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V60] GeoJSON load failed:", error);
+      console.warn("[Viz V61] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -757,9 +771,18 @@ looker.plugins.visualizations.add({
   },
 
   _render: function (processed, config, queryResponse, details, loadedIcons) {
-    const isPrint = true; // FORCE DEBUG
+    const isPrint = true; // DEBUG MODE
     const layerObjects = [];
     let iconIndex = 0;
+
+    // --- MOVED UP: GLOBAL HANDLER DEF ---
+    const pivotInfo = this._pivotInfo;
+    const measures = queryResponse.fields.measure_like;
+
+    // We define a GENERIC handler here that we can bind later if needed,
+    // or we define it per layer.
+    // In V60 we moved it inside _buildSingleLayer to capture scope.
+    // Let's keep it there, but Ensure it is defined before usage.
 
     for (let i = 1; i <= 4; i++) {
       const enabled = config[`layer${i}_enabled`];
@@ -782,7 +805,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V60] Layer ${i} Error:`, e);
+          console.error(`[Viz V61] Layer ${i} Error:`, e);
         }
       }
     }
@@ -846,10 +869,10 @@ looker.plugins.visualizations.add({
         html += `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
       }
 
-      const measures = queryResponse.fields.measure_like;
+      const lMeasures = queryResponse.fields.measure_like;
 
       if (config.tooltip_mode !== 'name') {
-        measures.forEach((m, idx) => {
+        lMeasures.forEach((m, idx) => {
           if (!activeMeasureIndices.includes(idx)) return;
 
           if (pivotData && this._pivotInfo && this._pivotInfo.hasPivot) {
@@ -938,7 +961,11 @@ looker.plugins.visualizations.add({
         controller: true,
         layers: layers,
         getTooltip: getTooltip,
-        glOptions: { preserveDrawingBuffer: true, willReadFrequently: true }
+        glOptions: { preserveDrawingBuffer: true, willReadFrequently: true },
+        // LOG ON LOAD TO CONFIRM INIT
+        onLoad: () => {
+           console.log("[Viz V61] DeckGL + Mapbox Loaded.");
+        }
       });
     } else {
       this._deck.setProps({
@@ -975,7 +1002,7 @@ looker.plugins.visualizations.add({
   },
 
   _buildSingleLayer: function (idx, config, processed, iconData, isCustomIcon) {
-    // --- MOVED TO TOP to fix ReferenceError ---
+    // DEFINE HANDLER AT THE TOP
     const pivotInfo = this._pivotInfo;
     const queryResponse = this._queryResponse;
     const measures = queryResponse.fields.measure_like;
