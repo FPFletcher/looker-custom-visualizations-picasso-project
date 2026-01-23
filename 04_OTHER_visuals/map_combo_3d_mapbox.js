@@ -1,18 +1,17 @@
 /**
- * Multi-Layer 3D Map for Looker - v48 (Final Polish & Logic Fixes)
+ * Multi-Layer 3D Map for Looker - v49 (Auto-Detect & Icon Expansion)
  *
- * CHANGES FROM V47:
- * 1. FIXED: Floating Icons forced to Z=0 coordinate.
- * 2. NEW: "Hide Rows with 0/Null" toggle in Plot tab (Defaults to True).
- * 3. FIXED: Tooltip now respects the "Measure Indices" setting (hides unselected measures).
- * 4. FIXED: Drill Menu now aggregates links from ALL selected measures.
- * 5. REMOVED: Clustered Hexagon Layer.
- * 6. UI: Icons sorted alphabetically, Custom first. Oil Barrel removed.
+ * CHANGES FROM V48:
+ * 1. UI: Removed "Data Mode". Logic now Auto-Detects Lat/Lon dimensions.
+ * 2. FIX: "Hide Null/0" logic improved to handle Pivots correctly.
+ * 3. CONTENT: Added Oil Rig, Dam, Car, Truck icons.
+ * 4. UI: Icons sorted Alphabetically. Custom URL is at the top.
+ * 5. FIX: Drill menu aggregates links from ALL selected measures.
  */
 
-// --- ICONS8 CDN & OTHERS ---
+// --- ICONS LIBRARY (Sorted Alphabetically) ---
 const ICONS = {
-  // Custom is handled by logic, these are the presets
+  "custom": "custom", // Placeholder for logic
   "box": "https://img.icons8.com/color/96/box.png",
   "building": "https://img.icons8.com/color/96/office-building.png",
   "car": "https://img.icons8.com/color/96/car--v1.png",
@@ -25,6 +24,7 @@ const ICONS = {
   "hospital": "https://img.icons8.com/color/96/hospital-3.png",
   "info": "https://img.icons8.com/color/96/info--v1.png",
   "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
+  "oil_barrel": "https://img.icons8.com/color/96/oil-barrel.png",
   "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
   "pin": "https://img.icons8.com/color/96/marker.png",
   "plane": "https://img.icons8.com/color/96/airport.png",
@@ -74,7 +74,7 @@ const getLayerOptions = (n) => {
         { "Points (Fixed Size)": "point" },
         { "Bubbles (Value Size)": "bubble" },
         { "Icon (Image)": "icon" },
-        { "Heatmap (Sum Density)": "heatmap" } // Removed Hexagon
+        { "Heatmap (Sum Density)": "heatmap" }
       ],
       default: def.type,
       section: "Layers",
@@ -183,6 +183,7 @@ const getLayerOptions = (n) => {
         { "Info": "info" },
         { "Map Pin": "pin" },
         { "Marker (Truck Blue)": "marker_blue" },
+        { "Oil Barrel": "oil_barrel" },
         { "Oil Rig": "oil_rig" },
         { "Plane": "plane" },
         { "Semi Truck": "semi_truck" },
@@ -213,13 +214,16 @@ const getLayerOptions = (n) => {
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = ICONS[type] || customUrl;
+    if (type === 'custom' && customUrl) url = customUrl;
+    else if (ICONS[type]) url = ICONS[type];
+
     if (!url || url.length < 5) return resolve(ICONS['factory']);
 
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V48] Failed to load icon: ${url}`);
+      console.warn(`[Viz V49] Failed to load icon: ${url}`);
       resolve(ICONS['warning']);
     };
     img.src = url;
@@ -227,24 +231,14 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v48",
-  label: "Combo Map 3D (V48 Final)",
+  id: "combo_map_ultimate_v49",
+  label: "Combo Map 3D (V49 Auto)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
 
-    data_mode: {
-      type: "string",
-      label: "Data Mode",
-      display: "select",
-      values: [
-        { "Region Data (Names)": "regions" },
-        { "Point Data (Lat/Lng)": "points" }
-      ],
-      default: "regions",
-      section: "Plot",
-      order: 2
-    },
+    // REMOVED DATA MODE - Now Auto-Detected
+
     hide_no_data: {
       type: "boolean",
       label: "Hide Rows with 0/Null",
@@ -254,7 +248,7 @@ looker.plugins.visualizations.add({
     },
     map_layer_source: {
       type: "string",
-      label: "Region Map Source",
+      label: "Region Map Source (If not Points)",
       display: "select",
       values: [
         { "Custom URL": "custom" },
@@ -387,7 +381,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V48] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V49] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -424,7 +418,7 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V48] Data prepared, rendering layers...`);
+      console.log(`[Viz V49] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -439,7 +433,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V48] FATAL ERROR:", err);
+      console.error("[Viz V49] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -463,15 +457,18 @@ looker.plugins.visualizations.add({
     const measures = queryResponse.fields.measure_like;
     const dims = queryResponse.fields.dimension_like;
 
-    if (config.data_mode === 'points') {
-      const latF = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
-      const lngF = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lon'));
-      if (!latF || !lngF) throw new Error("Latitude/Longitude dimensions missing.");
+    // AUTO-DETECT DATA MODE
+    const latDim = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
+    const lonDim = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lng') || d.name.toLowerCase().includes('lon'));
 
+    // If we have Lat/Lon, use POINTS mode. Otherwise use REGIONS.
+    const isPointsMode = (latDim && lonDim);
+
+    if (isPointsMode) {
       const points = data.map((row, idx) => {
         const pointData = this._extractRowData(row, measures, dims, idx);
         return {
-          position: [parseFloat(row[lngF.name].value), parseFloat(row[latF.name].value)],
+          position: [parseFloat(row[lonDim.name].value), parseFloat(latDim.name ? row[latDim.name].value : row[latDim].value)],
           ...pointData,
           name: "Point"
         };
@@ -480,12 +477,13 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures, dims };
     }
 
+    // REGIONS MODE (Default if no Lat/Lon found)
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V48] GeoJSON load failed:", error);
+      console.warn("[Viz V49] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -627,7 +625,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V48] Layer ${i} Error:`, e);
+          console.error(`[Viz V49] Layer ${i} Error:`, e);
         }
       }
     }
@@ -635,7 +633,7 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP (V48 FIXED LOGIC: Respects Measure Indices) ---
+    // --- TOOLTIP (V49 FIXED: Respects Measure Indices) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
@@ -805,7 +803,7 @@ looker.plugins.visualizations.add({
   _validateLayerData: function (data, config) {
     if (!data || !Array.isArray(data) || data.length === 0) return [];
 
-    // Default validation
+    // Default validation (Location validity)
     let validData = data.filter(d =>
       d.position &&
       d.position.length === 2 &&
@@ -818,9 +816,16 @@ looker.plugins.visualizations.add({
     if (config.hide_no_data) {
         validData = validData.filter(d => {
             const vals = d.values || (d.properties && d.properties._values);
-            if (!vals) return false;
-            // Check if ANY measure in the row has a value > 0
-            return vals.some(v => parseFloat(v) > 0);
+            // If values are completely missing, hide.
+            if (!vals || vals.length === 0) return false;
+
+            // For Pivots, values are usually totals.
+            // We check if at least ONE measure has a non-zero value.
+            // If all values are 0 or null/NaN, hide the row.
+            return vals.some(v => {
+                const num = parseFloat(v);
+                return !isNaN(num) && Math.abs(num) > 0;
+            });
         });
     }
 
@@ -877,7 +882,7 @@ looker.plugins.visualizations.add({
           }
         }
       });
-      return totalValue;
+      return totalValue || 0; // Ensure 0 return on null
     };
 
     const onClickHandler = (info) => {
@@ -896,7 +901,6 @@ looker.plugins.visualizations.add({
         measureIndices.forEach(mIdx => {
           if (drillLinks[mIdx] && drillLinks[mIdx].length > 0) {
              const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
-             // Label the drill links by their measure name
              drillLinks[mIdx].forEach(link => {
                  finalLinks.push({ ...link, label: `${mName}: ${link.label}` });
              });
@@ -1122,7 +1126,7 @@ looker.plugins.visualizations.add({
           pickable: true,
           opacity: opacity,
           iconAtlas: iconUrlOverride || ICONS['factory'],
-          // Anchor Y at 128 (bottom) assuming 128x128 max atlas mapping
+          // FIX: AnchorY at 128 (bottom) for standard 128px atlas cells
           iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false, anchorY: 128 } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
@@ -1139,13 +1143,11 @@ looker.plugins.visualizations.add({
         return new deck.HeatmapLayer({
           id: id,
           data: safePointData,
-          // FIX: Enabled pickable so drill actions might trigger if deck.gl allows it
-          pickable: true,
+          pickable: true, // Allow tooltip density readout
           getPosition: d => d.position,
           getWeight: d => getValue(d),
           radiusPixels: radius / 500,
           colorRange: this._generateColorRange(startColorHex, endColorHex),
-          onClick: onClickHandler, // Mapped drill handler
           updateTriggers: { getWeight: updateTriggersBase }
         });
 
