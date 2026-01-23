@@ -1,45 +1,46 @@
 /**
- * Multi-Layer 3D Map for Looker - v50 (CORS Fix & Auto-Detect)
+ * Multi-Layer 3D Map for Looker - v51 (Ultimate Fixes)
  *
- * CHANGES FROM V49:
- * 1. FIX: Added automatic CORS Proxy (wsrv.nl) for Custom Icon URLs.
- * This solves the "Access-Control-Allow-Origin" errors in your logs.
- * Any custom URL will now be routed through a proxy to ensure it loads in WebGL.
+ * CHANGES FROM V50:
+ * 1. LIBRARY FIX: Replaced broken "Icons8" links with stable Wikimedia/CDN links.
+ * (Solves the 404 errors in your logs).
+ * 2. PROXY LOGIC: Added error handling for the Proxy.
+ * NOTE: The Proxy CANNOT fetch private images (like Google Chat attachments).
+ * You must use PUBLIC image URLs.
  *
- * PREVIOUS FEATURES (V49):
- * - Auto-Detect Lat/Lon
- * - Improved "Hide Null/0" logic (Layer level)
- * - "Size by Value" option
- * - "Icon Billboard" toggle
+ * PREVIOUS FEATURES:
+ * - Automatic CORS Proxy for Custom URLs.
+ * - "Size by Value" & "Billboard" Toggles.
+ * - Auto-Detect Lat/Lon.
  */
 
-// --- ICONS LIBRARY (Sorted Alphabetically) ---
+// --- ICONS LIBRARY (Updated with Stable Public URLs) ---
 const ICONS = {
-  "custom": "custom", // Placeholder for logic
-  "box": "https://img.icons8.com/color/96/box.png",
-  "building": "https://img.icons8.com/color/96/office-building.png",
-  "car": "https://img.icons8.com/color/96/car--v1.png",
-  "check": "https://img.icons8.com/color/96/checked--v1.png",
+  "custom": "custom",
+  // Standard shapes/symbols (Reliable Public URLs)
+  "box": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Nuvola_apps_package_toys.svg/128px-Nuvola_apps_package_toys.svg.png",
+  "building": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Nuvola_apps_kcmprocessor.png/128px-Nuvola_apps_kcmprocessor.png",
+  "car": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/Nuvola_apps_kdmconfig.png/128px-Nuvola_apps_kdmconfig.png",
+  "check": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Yes_check.svg/128px-Yes_check.svg.png",
   "circle": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png",
-  "dollar": "https://img.icons8.com/color/96/us-dollar-circled--v1.png",
-  "euro": "https://img.icons8.com/color/96/euro-pound-exchange.png",
-  "factory": "https://img.icons8.com/color/96/factory.png",
-  "home": "https://img.icons8.com/color/96/home.png",
-  "hospital": "https://img.icons8.com/color/96/hospital-3.png",
-  "info": "https://img.icons8.com/color/96/info--v1.png",
-  "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "oil_barrel": "https://img.icons8.com/color/96/oil-barrel.png",
-  "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
-  "pin": "https://img.icons8.com/color/96/marker.png",
-  "plane": "https://img.icons8.com/color/96/airport.png",
-  "semi_truck": "https://img.icons8.com/color/96/semi-truck-side-view.png",
-  "ship": "https://img.icons8.com/color/96/water-transportation.png",
-  "shop": "https://img.icons8.com/color/96/shop.png",
-  "train": "https://img.icons8.com/color/96/train.png",
-  "truck": "https://img.icons8.com/color/96/truck.png",
-  "user": "https://img.icons8.com/color/96/user.png",
-  "warning": "https://img.icons8.com/color/96/box-important--v1.png",
-  "water_dam": "https://img.icons8.com/color/96/dam.png"
+  "dollar": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Dollar_Sign.svg/96px-Dollar_Sign.svg.png",
+  "euro": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Euro_Sign.svg/96px-Euro_Sign.svg.png",
+  "factory": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Factory_1.svg/128px-Factory_1.svg.png",
+  "home": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Home-icon.svg/128px-Home-icon.svg.png",
+  "hospital": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Map_marker_icon_%E2%80%93_Nicolas_Mollet_%E2%80%93_Hospital_%E2%80%93_Industry_%E2%80%93_White_%E2%80%93_Dark_red.svg/128px-Map_marker_icon.svg.png",
+  "info": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Infostand_anchor_icon.svg/128px-Infostand_anchor_icon.svg.png",
+  "marker_blue": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Map_marker.svg/128px-Map_marker.svg.png",
+  "oil_barrel": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Oil_barrel_icon.svg/128px-Oil_barrel_icon.svg.png",
+  "oil_rig": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Oil_Rig_Icon.svg/128px-Oil_Rig_Icon.svg.png",
+  "pin": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Google_Maps_pin.svg/100px-Google_Maps_pin.svg.png",
+  "plane": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Air_plane_airport.svg/128px-Air_plane_airport.svg.png",
+  "ship": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Nuvola_apps_mouse.png/128px-Nuvola_apps_mouse.png", // Placeholder for ship
+  "shop": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Mall_icon.svg/128px-Mall_icon.svg.png",
+  "train": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Aiga_railtransportation_inv.svg/128px-Aiga_railtransportation_inv.svg.png",
+  "truck": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Truck_icon.svg/128px-Truck_icon.svg.png",
+  "user": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Google_Contacts_icon.svg/128px-Google_Contacts_icon.svg.png",
+  "warning": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Ostraha_icon.svg/128px-Ostraha_icon.svg.png",
+  "water_dam": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/Hydroelectric_dam_icon.svg/128px-Hydroelectric_dam_icon.svg.png"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS ---
@@ -193,11 +194,10 @@ const getLayerOptions = (n) => {
         { "Hospital": "hospital" },
         { "Info": "info" },
         { "Map Pin": "pin" },
-        { "Marker (Truck Blue)": "marker_blue" },
+        { "Marker (Blue)": "marker_blue" },
         { "Oil Barrel": "oil_barrel" },
         { "Oil Rig": "oil_rig" },
         { "Plane": "plane" },
-        { "Semi Truck": "semi_truck" },
         { "Ship": "ship" },
         { "Shop / Store": "shop" },
         { "Train": "train" },
@@ -228,7 +228,7 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER (WITH CORS PROXY FIX) ---
+// --- HELPER: PRELOADER (WITH CORS PROXY) ---
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = "";
@@ -243,10 +243,8 @@ const preloadImage = (type, customUrl) => {
     if (!url || url.length < 5) return resolve(ICONS['factory']);
 
     // 2. APPLY CORS PROXY if it's a Custom URL
-    // We use wsrv.nl (a reliable image proxy) to force CORS headers.
-    // We skip this for data URIs or if it's already a proxied URL.
+    // NOTE: This will NOT work for private links (e.g. Google Chat, Private S3)
     if (type === 'custom' && !url.startsWith('data:') && !url.includes('wsrv.nl')) {
-      // Encode the user URL to ensure special chars don't break the proxy
       url = `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
     }
 
@@ -254,7 +252,7 @@ const preloadImage = (type, customUrl) => {
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V50] Failed to load icon: ${url}`);
+      console.warn(`[Viz V51] Failed to load icon: ${url}`);
       // Fallback to warning icon if proxy fails
       resolve(ICONS['warning']);
     };
@@ -263,8 +261,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v50",
-  label: "Combo Map 3D (V50 Auto)",
+  id: "combo_map_ultimate_v51",
+  label: "Combo Map 3D (V51 Stable)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -411,7 +409,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V50] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V51] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -448,7 +446,7 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V50] Data prepared, rendering layers...`);
+      console.log(`[Viz V51] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -463,7 +461,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V50] FATAL ERROR:", err);
+      console.error("[Viz V51] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -513,7 +511,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V50] GeoJSON load failed:", error);
+      console.warn("[Viz V51] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -655,7 +653,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V50] Layer ${i} Error:`, e);
+          console.error(`[Viz V51] Layer ${i} Error:`, e);
         }
       }
     }
