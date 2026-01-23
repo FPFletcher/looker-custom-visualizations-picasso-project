@@ -4,7 +4,7 @@
  * Features: Nested layout (parent groups with visible children), "Others" grouping,
  *           Value format options (numeric/percent), LookML value_format support.
  *
- * Version: 5.0 - Proper nested treemap layout
+ * Version: 6.0 - Fixed nested layout sizing + header values
  */
 
 looker.plugins.visualizations.add({
@@ -17,26 +17,30 @@ looker.plugins.visualizations.add({
       label: "Background Color",
       default: "#FFFFFF",
       display: "color",
-      section: "Plot"
+      section: "Plot",
+      order: 1
     },
     border_color: {
       type: "string",
       label: "Border Color",
       default: "#FFFFFF",
       display: "color",
-      section: "Plot"
+      section: "Plot",
+      order: 2
     },
     border_width: {
       type: "number",
       label: "Border Width",
       default: 1,
-      section: "Plot"
+      section: "Plot",
+      order: 3
     },
     enable_drill_down: {
       type: "boolean",
       label: "Enable Drill Down",
       default: true,
-      section: "Plot"
+      section: "Plot",
+      order: 4
     },
     others_toggle: {
       type: "boolean",
@@ -55,7 +59,6 @@ looker.plugins.visualizations.add({
       section: "Plot",
       order: 6
     },
-    // Nested Layout Option
     nested_layout: {
       type: "boolean",
       label: "Nested Layout (Group by 1st Dimension)",
@@ -293,6 +296,34 @@ looker.plugins.visualizations.add({
       display: "color",
       section: "Values",
       order: 11
+    },
+    // Group Header Value Display
+    values_divider_1: {
+      type: "string",
+      label: "── Group Header Values ──",
+      display: "divider",
+      section: "Values",
+      order: 20
+    },
+    show_header_values: {
+      type: "boolean",
+      label: "Show Values in Group Headers",
+      default: false,
+      section: "Values",
+      order: 21
+    },
+    header_value_display: {
+      type: "string",
+      label: "Header Value Display",
+      display: "select",
+      values: [
+        {"Value Only": "value"},
+        {"Percent Only": "percent"},
+        {"Value and Percent": "both"}
+      ],
+      default: "both",
+      section: "Values",
+      order: 22
     }
   },
 
@@ -388,8 +419,8 @@ looker.plugins.visualizations.add({
       }
     `;
 
-    if (!document.getElementById('treemap-styles-v5')) {
-      style.id = 'treemap-styles-v5';
+    if (!document.getElementById('treemap-styles-v6')) {
+      style.id = 'treemap-styles-v6';
       document.head.appendChild(style);
     }
 
@@ -478,7 +509,6 @@ looker.plugins.visualizations.add({
     const measure = measures[0].name;
 
     // Check if we should use nested layout
-    // Only use nested layout at top level (drillStack empty) and when we have 2+ dimensions
     const useNestedLayout = config.nested_layout &&
                             dimensions.length >= 2 &&
                             currentLevel === 0;
@@ -520,7 +550,6 @@ looker.plugins.visualizations.add({
     const parentDim = dimensions[0].name;
     const childDim = dimensions[1].name;
 
-    // Group by parent dimension
     const parentGroups = {};
 
     data.forEach(row => {
@@ -544,7 +573,6 @@ looker.plugins.visualizations.add({
       parentGroups[parentKey].rawValue += val;
       parentGroups[parentKey].rows.push(row);
 
-      // Group children within parent
       if (!parentGroups[parentKey].children[childKey]) {
         parentGroups[parentKey].children[childKey] = {
           name: childKey,
@@ -564,11 +592,9 @@ looker.plugins.visualizations.add({
       parentGroups[parentKey].children[childKey].rows.push(row);
     });
 
-    // Convert to array and sort
     const result = Object.values(parentGroups).map(parent => {
       let childrenArray = Object.values(parent.children).filter(c => c.value > 0);
 
-      // Apply "Others" grouping to children if enabled
       if (config.others_toggle && childrenArray.length > 5) {
         const threshold = (config.others_threshold || 0.5) / 100;
         const parentTotal = parent.value;
@@ -599,7 +625,6 @@ looker.plugins.visualizations.add({
         childrenArray = visible;
       }
 
-      // Sort children by value
       childrenArray.sort((a, b) => {
         if (a.isOthers) return 1;
         if (b.isOthers) return -1;
@@ -612,79 +637,77 @@ looker.plugins.visualizations.add({
       };
     }).filter(p => p.value > 0);
 
-    // Sort parent groups by value
     result.sort((a, b) => b.value - a.value);
 
     return result;
   },
 
-  // Render nested treemap with parent groups and children
+  // Render nested treemap with FIXED sizing logic
   renderNestedTreemap: function(data, config, queryResponse) {
     const svgNS = "http://www.w3.org/2000/svg";
     this._svg.innerHTML = '';
 
     const rect = this._container.getBoundingClientRect();
     const breadcrumbHeight = this._drillStack.length > 0 ? 36 : 0;
-    const width = Math.floor(rect.width);
-    const height = Math.floor(rect.height - breadcrumbHeight);
+    const width = rect.width;
+    const height = rect.height - breadcrumbHeight;
 
     if (width <= 0 || height <= 0) return;
 
     this._svg.style.marginTop = `${breadcrumbHeight}px`;
     this._svg.style.height = `calc(100% - ${breadcrumbHeight}px)`;
     this._svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    this._svg.setAttribute('preserveAspectRatio', 'none');
 
     const totalValue = data.reduce((sum, d) => sum + d.value, 0);
-    const rootArea = width * height;
     const headerHeight = config.group_header_height || 20;
     const groupPadding = config.group_padding || 2;
 
-    // Calculate parent group areas
-    const parentNodes = data.map(d => ({
-      ...d,
-      area: (d.value / totalValue) * rootArea
-    }));
-
-    // Layout parent groups
-    const parentLayout = this.squarify(parentNodes, 0, 0, width, height);
+    // Create defs element for gradients
+    const defs = document.createElementNS(svgNS, 'defs');
+    this._svg.appendChild(defs);
 
     // Get colors for parent groups
     const parentColors = this.getCategoricalColors(data.length, config);
 
-    parentLayout.forEach((parent, parentIndex) => {
+    // FIXED: Use slice-and-dice for parent layout to better handle varying sizes
+    const parentRects = this.calculateNestedLayout(data, 0, 0, width, height, totalValue);
+
+    parentRects.forEach((parentRect, parentIndex) => {
+      const parent = data[parentIndex];
       const g = document.createElementNS(svgNS, 'g');
 
-      const px = Math.round(parent.x);
-      const py = Math.round(parent.y);
-      const pw = Math.round(parent.width);
-      const ph = Math.round(parent.height);
+      const px = parentRect.x;
+      const py = parentRect.y;
+      const pw = parentRect.width;
+      const ph = parentRect.height;
 
-      // Draw parent border/background
-      const parentRect = document.createElementNS(svgNS, 'rect');
-      parentRect.setAttribute('x', px);
-      parentRect.setAttribute('y', py);
-      parentRect.setAttribute('width', pw);
-      parentRect.setAttribute('height', ph);
-      parentRect.setAttribute('fill', 'none');
-      parentRect.setAttribute('stroke', config.border_color || '#FFFFFF');
-      parentRect.setAttribute('stroke-width', Math.max(1, config.border_width || 1));
-      parentRect.setAttribute('class', 'treemap-group-rect');
-      g.appendChild(parentRect);
+      // Skip if too small
+      if (pw < 2 || ph < 2) return;
 
-      // Draw header background
-      if (headerHeight > 0) {
+      // Draw parent border
+      const borderRect = document.createElementNS(svgNS, 'rect');
+      borderRect.setAttribute('x', px);
+      borderRect.setAttribute('y', py);
+      borderRect.setAttribute('width', pw);
+      borderRect.setAttribute('height', ph);
+      borderRect.setAttribute('fill', 'none');
+      borderRect.setAttribute('stroke', config.border_color || '#FFFFFF');
+      borderRect.setAttribute('stroke-width', Math.max(1, config.border_width || 1));
+      borderRect.setAttribute('class', 'treemap-group-rect');
+      g.appendChild(borderRect);
+
+      // Calculate actual header height (don't exceed parent height)
+      const actualHeaderHeight = Math.min(headerHeight, ph - 2);
+
+      // Draw header if there's room
+      if (actualHeaderHeight > 0 && ph > 10) {
         // Determine header fill color
         let headerFillColor;
         const defaultParentColor = parentColors[parentIndex % parentColors.length];
 
         if (config.use_group_header_gradient) {
-          // Create gradient definition
           const gradientId = `header-gradient-${parentIndex}`;
-          const defs = this._svg.querySelector('defs') || document.createElementNS(svgNS, 'defs');
-          if (!this._svg.querySelector('defs')) {
-            this._svg.insertBefore(defs, this._svg.firstChild);
-          }
-
           const gradient = document.createElementNS(svgNS, 'linearGradient');
           gradient.setAttribute('id', gradientId);
           gradient.setAttribute('x1', '0%');
@@ -711,77 +734,125 @@ looker.plugins.visualizations.add({
           headerFillColor = defaultParentColor;
         }
 
-        const headerRect = document.createElementNS(svgNS, 'rect');
-        headerRect.setAttribute('x', px);
-        headerRect.setAttribute('y', py);
-        headerRect.setAttribute('width', pw);
-        headerRect.setAttribute('height', Math.min(headerHeight, ph));
-        headerRect.setAttribute('fill', headerFillColor);
-        headerRect.setAttribute('class', 'treemap-group-rect');
-        g.appendChild(headerRect);
+        const headerRectEl = document.createElementNS(svgNS, 'rect');
+        headerRectEl.setAttribute('x', px);
+        headerRectEl.setAttribute('y', py);
+        headerRectEl.setAttribute('width', pw);
+        headerRectEl.setAttribute('height', actualHeaderHeight);
+        headerRectEl.setAttribute('fill', headerFillColor);
+        headerRectEl.setAttribute('class', 'treemap-group-rect');
+        g.appendChild(headerRectEl);
 
-        // Draw header label
-        if (pw > 40) {
+        // Draw header label and optional value
+        if (pw > 30) {
+          const parentPercent = ((parent.value / totalValue) * 100).toFixed(1);
+          const parentFormattedValue = this.formatValue(parent.rawValue, config, null);
+
+          // Build header text
+          let headerText = parent.name;
+          let headerValueText = '';
+
+          if (config.show_header_values) {
+            const headerDisplay = config.header_value_display || 'both';
+            if (headerDisplay === 'value') {
+              headerValueText = parentFormattedValue;
+            } else if (headerDisplay === 'percent') {
+              headerValueText = parentPercent + '%';
+            } else {
+              headerValueText = `${parentFormattedValue} (${parentPercent}%)`;
+            }
+          }
+
+          // Calculate available width for text
+          const textPadding = 5;
+          const availableWidth = pw - (textPadding * 2);
+
+          // Create label
           const headerLabel = document.createElementNS(svgNS, 'text');
-          headerLabel.setAttribute('x', px + 5);
-          headerLabel.setAttribute('y', py + Math.min(headerHeight, ph) - 5);
+          headerLabel.setAttribute('x', px + textPadding);
+          headerLabel.setAttribute('y', py + actualHeaderHeight - 5);
           headerLabel.setAttribute('fill', config.group_label_color || '#FFFFFF');
           headerLabel.setAttribute('class', 'treemap-group-label');
 
-          let labelText = parent.name;
-          if (this.estimateTextWidth(labelText, 11) > pw - 10) {
-            labelText = this.ellipsize(labelText, pw - 10, 11);
+          // If showing header values, split the space
+          if (config.show_header_values && headerValueText && availableWidth > 100) {
+            // Name on left, value on right
+            let labelText = headerText;
+            const labelWidth = availableWidth * 0.6;
+            if (this.estimateTextWidth(labelText, 11) > labelWidth) {
+              labelText = this.ellipsize(labelText, labelWidth, 11);
+            }
+            headerLabel.textContent = labelText;
+            g.appendChild(headerLabel);
+
+            // Value text on right
+            const valueLabel = document.createElementNS(svgNS, 'text');
+            valueLabel.setAttribute('x', px + pw - textPadding);
+            valueLabel.setAttribute('y', py + actualHeaderHeight - 5);
+            valueLabel.setAttribute('fill', config.group_label_color || '#FFFFFF');
+            valueLabel.setAttribute('text-anchor', 'end');
+            valueLabel.setAttribute('class', 'treemap-group-label');
+            valueLabel.setAttribute('font-size', '10px');
+            valueLabel.textContent = headerValueText;
+            g.appendChild(valueLabel);
+          } else {
+            // Just name (or name + value if small)
+            let labelText = headerText;
+            if (this.estimateTextWidth(labelText, 11) > availableWidth) {
+              labelText = this.ellipsize(labelText, availableWidth, 11);
+            }
+            headerLabel.textContent = labelText;
+            g.appendChild(headerLabel);
           }
-          headerLabel.textContent = labelText;
-          g.appendChild(headerLabel);
         }
       }
 
-      // Calculate child area
+      // Calculate child area - FIXED: proper bounds calculation
       const childX = px + groupPadding;
-      const childY = py + headerHeight + groupPadding;
-      const childW = pw - (groupPadding * 2);
-      const childH = ph - headerHeight - (groupPadding * 2);
+      const childY = py + actualHeaderHeight + groupPadding;
+      const childW = Math.max(0, pw - (groupPadding * 2));
+      const childH = Math.max(0, ph - actualHeaderHeight - (groupPadding * 2));
 
-      if (childW > 0 && childH > 0 && parent.childrenArray && parent.childrenArray.length > 0) {
+      if (childW > 5 && childH > 5 && parent.childrenArray && parent.childrenArray.length > 0) {
+        // Calculate child layout using squarify within the bounded area
         const childTotal = parent.childrenArray.reduce((sum, c) => sum + c.value, 0);
-        const childArea = childW * childH;
 
-        // Create child nodes
+        // FIXED: Use proper squarify with correct bounds
         const childNodes = parent.childrenArray.map(child => ({
           ...child,
-          area: (child.value / childTotal) * childArea,
+          area: (child.value / childTotal) * (childW * childH),
           percent: (child.value / totalValue) * 100,
           parentColor: parentColors[parentIndex % parentColors.length]
         }));
 
-        // Layout children within parent
-        const childLayout = this.squarify(childNodes, childX, childY, childW, childH);
+        const childLayout = this.squarifyWithBounds(childNodes, childX, childY, childW, childH);
 
-        // Get child colors based on config
+        // Get child colors
         let childColors;
         if (config.color_by === 'parent') {
-          // Shade variations of parent color
           childColors = this.getShadeVariations(parentColors[parentIndex % parentColors.length], childLayout.length);
         } else if (config.color_by === 'metric' && config.use_gradient) {
-          childColors = null; // Will be calculated per-child
+          childColors = null;
         } else {
           childColors = this.getColors(childLayout, config);
         }
 
         childLayout.forEach((child, childIndex) => {
+          // FIXED: Ensure child stays within bounds
+          const cx = Math.max(childX, Math.min(child.x, childX + childW - 1));
+          const cy = Math.max(childY, Math.min(child.y, childY + childH - 1));
+          const cw = Math.max(1, Math.min(child.width, childX + childW - cx));
+          const ch = Math.max(1, Math.min(child.height, childY + childH - cy));
+
+          if (cw < 1 || ch < 1) return;
+
           const childG = document.createElementNS(svgNS, 'g');
+          const childRectEl = document.createElementNS(svgNS, 'rect');
 
-          const cx = Math.round(child.x);
-          const cy = Math.round(child.y);
-          const cw = Math.max(1, Math.round(child.width));
-          const ch = Math.max(1, Math.round(child.height));
-
-          const childRect = document.createElementNS(svgNS, 'rect');
-          childRect.setAttribute('x', cx);
-          childRect.setAttribute('y', cy);
-          childRect.setAttribute('width', cw);
-          childRect.setAttribute('height', ch);
+          childRectEl.setAttribute('x', cx);
+          childRectEl.setAttribute('y', cy);
+          childRectEl.setAttribute('width', cw);
+          childRectEl.setAttribute('height', ch);
 
           // Determine fill color
           let fillColor;
@@ -797,31 +868,28 @@ looker.plugins.visualizations.add({
             }
             fillColor = this.interpolateColor(startColor, endColor, ratio);
           } else {
-            fillColor = childColors[childIndex % childColors.length];
+            fillColor = childColors ? childColors[childIndex % childColors.length] : parentColors[parentIndex % parentColors.length];
           }
 
-          childRect.setAttribute('fill', fillColor);
-          childRect.setAttribute('stroke', config.border_color || '#FFFFFF');
-          childRect.setAttribute('stroke-width', Math.max(0.5, (config.border_width || 1) * 0.5));
-          childRect.setAttribute('class', 'treemap-rect');
+          childRectEl.setAttribute('fill', fillColor);
+          childRectEl.setAttribute('stroke', config.border_color || '#FFFFFF');
+          childRectEl.setAttribute('stroke-width', Math.max(0.5, (config.border_width || 1) * 0.5));
+          childRectEl.setAttribute('class', 'treemap-rect');
 
-          // Click handler - drill down to this child
-          childRect.addEventListener('click', (e) => {
+          // Click handler
+          childRectEl.addEventListener('click', (e) => {
             e.stopPropagation();
 
             if (this._config.enable_drill_down) {
               if (child.isOthers) {
-                // For "Others", show its children as flat list
                 this._drillStack.push(parent.name);
                 this.drawTreemap(child.rows, this._config, this._queryResponse);
               } else {
-                // Drill into this specific item
                 this._drillStack.push(parent.name);
                 this._drillStack.push(child.name);
                 this.drawTreemap(null, this._config, this._queryResponse);
               }
             } else {
-              // LookML drill
               let drillLinks = [];
               if (child.rows && child.rows.length > 0) {
                 const firstRow = child.rows[0];
@@ -838,7 +906,7 @@ looker.plugins.visualizations.add({
           });
 
           // Tooltip
-          childRect.addEventListener('mouseenter', () => {
+          childRectEl.addEventListener('mouseenter', () => {
             const formattedValue = this.formatValue(child.rawValue, config, child.rendered);
             const pct = child.percent.toFixed(1);
             this._tooltip.innerHTML = `
@@ -849,7 +917,7 @@ looker.plugins.visualizations.add({
             this._tooltip.style.display = 'block';
           });
 
-          childRect.addEventListener('mousemove', (e) => {
+          childRectEl.addEventListener('mousemove', (e) => {
             const tooltipRect = this._tooltip.getBoundingClientRect();
             let left = e.pageX + 12;
             let top = e.pageY + 12;
@@ -859,13 +927,13 @@ looker.plugins.visualizations.add({
             this._tooltip.style.top = top + 'px';
           });
 
-          childRect.addEventListener('mouseleave', () => {
+          childRectEl.addEventListener('mouseleave', () => {
             this._tooltip.style.display = 'none';
           });
 
-          childG.appendChild(childRect);
+          childG.appendChild(childRectEl);
 
-          // Add labels if space permits
+          // Add labels
           if (cw > 25 && ch > 15 && child.percent >= (config.label_threshold || 0)) {
             this.addLabelsToRect(childG, {
               x: cx, y: cy, width: cw, height: ch,
@@ -885,61 +953,135 @@ looker.plugins.visualizations.add({
     });
   },
 
-  // Get categorical colors for parent groups
-  getCategoricalColors: function(count, config) {
-    const palettes = {
-      categorical: ['#E07D54', '#7EB77F', '#64B5F6', '#BA68C8', '#FFB74D', '#4FC3F7', '#F06292', '#AED581', '#90A4AE', '#FFD54F'],
-      google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC', '#7BAAF7', '#F07B72', '#FCD04F'],
-      green_scale: ['#1B5E20', '#2E7D32', '#388E3C', '#43A047', '#4CAF50', '#66BB6A', '#81C784', '#A5D6A7', '#C8E6C9', '#E8F5E9'],
-      blue_scale: ['#0D47A1', '#1565C0', '#1976D2', '#1E88E5', '#2196F3', '#42A5F5', '#64B5F6', '#90CAF9', '#BBDEFB', '#E3F2FD'],
-      viridis: ['#440154', '#482475', '#414487', '#355F8D', '#2A788E', '#21908C', '#22A884', '#42BE71', '#7AD151', '#FDE725'],
-      warm: ['#7F2704', '#A63603', '#D94801', '#F16913', '#FD8D3C', '#FDAE6B', '#FDD0A2', '#FEE6CE', '#FFF5EB'],
-      cool: ['#08306B', '#08519C', '#2171B5', '#4292C6', '#6BAED6', '#9ECAE1', '#C6DBEF', '#DEEBF7', '#F0F9FF']
-    };
+  // FIXED: Calculate parent layout with proper squarify
+  calculateNestedLayout: function(data, x, y, width, height, totalValue) {
+    const nodes = data.map(d => ({
+      ...d,
+      area: (d.value / totalValue) * width * height
+    }));
 
-    let palette = palettes[config.color_palette] || palettes.categorical;
-    if (config.reverse_palette) {
-      palette = [...palette].reverse();
-    }
-
-    // Extend palette if needed
-    const colors = [];
-    for (let i = 0; i < count; i++) {
-      colors.push(palette[i % palette.length]);
-    }
-    return colors;
+    return this.squarifyWithBounds(nodes, x, y, width, height);
   },
 
-  // Get shade variations of a color
-  getShadeVariations: function(baseColor, count) {
-    const shades = [];
-    for (let i = 0; i < count; i++) {
-      const factor = 0.7 + (0.3 * (i / Math.max(1, count - 1)));
-      shades.push(this.adjustBrightness(baseColor, factor));
+  // FIXED: Squarify that respects bounds strictly
+  squarifyWithBounds: function(nodes, x, y, width, height) {
+    const results = [];
+    if (nodes.length === 0 || width <= 0 || height <= 0) return results;
+
+    // Sort by area descending
+    const sortedNodes = nodes.slice().sort((a, b) => b.area - a.area);
+
+    let remaining = sortedNodes.slice();
+    let currentX = x;
+    let currentY = y;
+    let remainingW = width;
+    let remainingH = height;
+
+    while (remaining.length > 0) {
+      // Determine if we're laying out horizontally or vertically
+      const isHorizontal = remainingW >= remainingH;
+      const shortSide = isHorizontal ? remainingH : remainingW;
+
+      // Find optimal row
+      const row = [];
+      let rowArea = 0;
+
+      for (let i = 0; i < remaining.length; i++) {
+        const testRow = row.concat(remaining[i]);
+        const testArea = rowArea + remaining[i].area;
+
+        if (row.length === 0) {
+          row.push(remaining[i]);
+          rowArea = remaining[i].area;
+        } else {
+          const currentRatio = this.worstRatio(row, rowArea, shortSide);
+          const newRatio = this.worstRatio(testRow, testArea, shortSide);
+
+          if (newRatio <= currentRatio) {
+            row.push(remaining[i]);
+            rowArea = testArea;
+          } else {
+            break;
+          }
+        }
+      }
+
+      // Layout the row
+      const rowLength = rowArea / shortSide;
+      let offset = 0;
+
+      row.forEach((node, i) => {
+        const nodeSize = node.area / rowLength;
+
+        let nodeX, nodeY, nodeW, nodeH;
+
+        if (isHorizontal) {
+          nodeX = currentX;
+          nodeY = currentY + offset;
+          nodeW = rowLength;
+          nodeH = (i === row.length - 1) ? (remainingH - offset) : nodeSize;
+        } else {
+          nodeX = currentX + offset;
+          nodeY = currentY;
+          nodeW = (i === row.length - 1) ? (remainingW - offset) : nodeSize;
+          nodeH = rowLength;
+        }
+
+        // Clamp to bounds
+        nodeW = Math.max(0, Math.min(nodeW, x + width - nodeX));
+        nodeH = Math.max(0, Math.min(nodeH, y + height - nodeY));
+
+        results.push({
+          ...node,
+          x: nodeX,
+          y: nodeY,
+          width: nodeW,
+          height: nodeH
+        });
+
+        offset += nodeSize;
+      });
+
+      // Update remaining area
+      if (isHorizontal) {
+        currentX += rowLength;
+        remainingW -= rowLength;
+      } else {
+        currentY += rowLength;
+        remainingH -= rowLength;
+      }
+
+      // Remove laid out nodes
+      remaining = remaining.slice(row.length);
     }
-    return shades;
+
+    return results;
   },
 
-  adjustBrightness: function(color, factor) {
-    let c = color.replace('#', '');
-    if (c.length === 3) {
-      c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
-    }
-    const r = Math.min(255, Math.round(parseInt(c.substring(0, 2), 16) * factor));
-    const g = Math.min(255, Math.round(parseInt(c.substring(2, 4), 16) * factor));
-    const b = Math.min(255, Math.round(parseInt(c.substring(4, 6), 16) * factor));
-    return `rgb(${r}, ${g}, ${b})`;
+  worstRatio: function(row, totalArea, shortSide) {
+    if (row.length === 0 || totalArea === 0) return Infinity;
+
+    const rowLength = totalArea / shortSide;
+    let worst = 0;
+
+    row.forEach(node => {
+      const nodeSize = node.area / rowLength;
+      const ratio = Math.max(rowLength / nodeSize, nodeSize / rowLength);
+      if (ratio > worst) worst = ratio;
+    });
+
+    return worst;
   },
 
-  // Standard flat treemap rendering (existing logic)
+  // Standard flat treemap rendering
   renderTreemap: function(data, config, dimension, queryResponse) {
     const svgNS = "http://www.w3.org/2000/svg";
     this._svg.innerHTML = '';
 
     const rect = this._container.getBoundingClientRect();
     const breadcrumbHeight = this._drillStack.length > 0 ? 36 : 0;
-    const width = Math.floor(rect.width);
-    const height = Math.floor(rect.height - breadcrumbHeight);
+    const width = rect.width;
+    const height = rect.height - breadcrumbHeight;
 
     if (width <= 0 || height <= 0) return;
 
@@ -948,41 +1090,35 @@ looker.plugins.visualizations.add({
     this._svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
     const totalValue = data.reduce((sum, d) => sum + d.value, 0);
-    const rootArea = width * height;
 
     const nodes = data.map(d => ({
       ...d,
-      area: (d.value / totalValue) * rootArea,
+      area: (d.value / totalValue) * width * height,
       percent: (d.value / totalValue) * 100,
       drillLinks: (d.children && d.children.length > 0 && dimension && d.children[0][dimension])
         ? (d.children[0][dimension].links || [])
         : [],
       rawData: d.children || []
     }));
-    let layout = this.squarify(nodes, 0, 0, width, height);
 
-    if (layout.length > 0) {
-      const lastItem = layout[layout.length - 1];
-      lastItem.width = width - lastItem.x;
-      lastItem.height = height - lastItem.y;
-    }
-
+    const layout = this.squarifyWithBounds(nodes, 0, 0, width, height);
     const colors = this.getColors(data, config);
 
     layout.forEach((item, i) => {
       const g = document.createElementNS(svgNS, 'g');
       const rectEl = document.createElementNS(svgNS, 'rect');
 
-      const isLast = (i === layout.length - 1);
-      const x = Math.round(item.x);
-      const y = Math.round(item.y);
-      const w = isLast ? (width - x) : (Math.round(item.x + item.width) - x);
-      const h = isLast ? (height - y) : (Math.round(item.y + item.height) - y);
+      const x = item.x;
+      const y = item.y;
+      const w = item.width;
+      const h = item.height;
+
+      if (w < 1 || h < 1) return;
 
       rectEl.setAttribute('x', x);
       rectEl.setAttribute('y', y);
-      rectEl.setAttribute('width', Math.max(1, w));
-      rectEl.setAttribute('height', Math.max(1, h));
+      rectEl.setAttribute('width', w);
+      rectEl.setAttribute('height', h);
 
       let fillColor;
       if (config.color_by === 'metric' && config.use_gradient) {
@@ -1195,137 +1331,6 @@ looker.plugins.visualizations.add({
     return Object.values(grouped).filter(d => d.value > 0);
   },
 
-  // Squarify algorithm
-  squarify: function(nodes, x, y, width, height) {
-    const results = [];
-    if (nodes.length === 0) return results;
-
-    let remainingNodes = nodes.slice();
-    let container = { x, y, width, height };
-
-    let currentRow = [];
-    while (remainingNodes.length > 0) {
-      const nextNode = remainingNodes[0];
-      if (this.improvesRatio(currentRow, nextNode, container)) {
-        currentRow.push(remainingNodes.shift());
-      } else {
-        this.layoutRow(currentRow, container, results);
-        currentRow = [];
-      }
-    }
-    if (currentRow.length > 0) {
-      this.layoutLastRow(currentRow, container, results);
-    }
-    return results;
-  },
-
-  improvesRatio: function(currentRow, nextNode, container) {
-    if (currentRow.length === 0) return true;
-    const newRow = currentRow.concat(nextNode);
-    const currentWorst = this.calculateWorstRatio(currentRow, container);
-    const nextWorst = this.calculateWorstRatio(newRow, container);
-    return nextWorst <= currentWorst;
-  },
-
-  calculateWorstRatio: function(row, container) {
-    if (row.length === 0) return Infinity;
-    const sideLength = Math.min(container.width, container.height);
-    const totalArea = row.reduce((sum, node) => sum + node.area, 0);
-    const rowThickness = totalArea / sideLength;
-    let maxRatio = 0;
-    for (let i = 0; i < row.length; i++) {
-      const itemLength = row[i].area / rowThickness;
-      const ratio = Math.max(rowThickness / itemLength, itemLength / rowThickness);
-      if (ratio > maxRatio) maxRatio = ratio;
-    }
-    return maxRatio;
-  },
-
-  layoutRow: function(row, container, results) {
-    const totalArea = row.reduce((sum, node) => sum + node.area, 0);
-    const useWidth = container.width < container.height;
-
-    if (useWidth) {
-      const rowHeight = totalArea / container.width;
-      let runningX = container.x;
-      row.forEach((node, i) => {
-        let nodeWidth;
-        if (i === row.length - 1) {
-          nodeWidth = Math.max(0, (container.x + container.width) - runningX);
-        } else {
-          nodeWidth = node.area / rowHeight;
-        }
-        results.push({ ...node, x: runningX, y: container.y, width: nodeWidth, height: rowHeight });
-        runningX += nodeWidth;
-      });
-      container.y += rowHeight;
-      container.height -= rowHeight;
-    } else {
-      const rowWidth = totalArea / container.height;
-      let runningY = container.y;
-      row.forEach((node, i) => {
-        let nodeHeight;
-        if (i === row.length - 1) {
-          nodeHeight = Math.max(0, (container.y + container.height) - runningY);
-        } else {
-          nodeHeight = node.area / rowWidth;
-        }
-        results.push({ ...node, x: container.x, y: runningY, width: rowWidth, height: nodeHeight });
-        runningY += nodeHeight;
-      });
-      container.x += rowWidth;
-      container.width -= rowWidth;
-    }
-  },
-
-  layoutLastRow: function(row, container, results) {
-    const useWidth = container.width < container.height;
-
-    if (useWidth) {
-      const totalArea = row.reduce((sum, n) => sum + n.area, 0);
-      let runningX = container.x;
-
-      row.forEach((node, i) => {
-        let nodeWidth;
-        if (i === row.length - 1) {
-          nodeWidth = container.x + container.width - runningX;
-        } else {
-          nodeWidth = (node.area / totalArea) * container.width;
-        }
-
-        results.push({
-          ...node,
-          x: runningX,
-          y: container.y,
-          width: nodeWidth,
-          height: container.height
-        });
-        runningX += nodeWidth;
-      });
-    } else {
-      const totalArea = row.reduce((sum, n) => sum + n.area, 0);
-      let runningY = container.y;
-
-      row.forEach((node, i) => {
-        let nodeHeight;
-        if (i === row.length - 1) {
-          nodeHeight = container.y + container.height - runningY;
-        } else {
-          nodeHeight = (node.area / totalArea) * container.height;
-        }
-
-        results.push({
-          ...node,
-          x: container.x,
-          y: runningY,
-          width: container.width,
-          height: nodeHeight
-        });
-        runningY += nodeHeight;
-      });
-    }
-  },
-
   // Value formatting
   getValueDisplayText: function(item, config, totalValue) {
     const displayFormat = config.value_display_format || 'value';
@@ -1500,6 +1505,49 @@ looker.plugins.visualizations.add({
         this.drawTreemap(null, this._config, this._queryResponse);
       });
     });
+  },
+
+  getCategoricalColors: function(count, config) {
+    const palettes = {
+      categorical: ['#E07D54', '#7EB77F', '#64B5F6', '#BA68C8', '#FFB74D', '#4FC3F7', '#F06292', '#AED581', '#90A4AE', '#FFD54F'],
+      google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC', '#7BAAF7', '#F07B72', '#FCD04F'],
+      green_scale: ['#1B5E20', '#2E7D32', '#388E3C', '#43A047', '#4CAF50', '#66BB6A', '#81C784', '#A5D6A7', '#C8E6C9', '#E8F5E9'],
+      blue_scale: ['#0D47A1', '#1565C0', '#1976D2', '#1E88E5', '#2196F3', '#42A5F5', '#64B5F6', '#90CAF9', '#BBDEFB', '#E3F2FD'],
+      viridis: ['#440154', '#482475', '#414487', '#355F8D', '#2A788E', '#21908C', '#22A884', '#42BE71', '#7AD151', '#FDE725'],
+      warm: ['#7F2704', '#A63603', '#D94801', '#F16913', '#FD8D3C', '#FDAE6B', '#FDD0A2', '#FEE6CE', '#FFF5EB'],
+      cool: ['#08306B', '#08519C', '#2171B5', '#4292C6', '#6BAED6', '#9ECAE1', '#C6DBEF', '#DEEBF7', '#F0F9FF']
+    };
+
+    let palette = palettes[config.color_palette] || palettes.categorical;
+    if (config.reverse_palette) {
+      palette = [...palette].reverse();
+    }
+
+    const colors = [];
+    for (let i = 0; i < count; i++) {
+      colors.push(palette[i % palette.length]);
+    }
+    return colors;
+  },
+
+  getShadeVariations: function(baseColor, count) {
+    const shades = [];
+    for (let i = 0; i < count; i++) {
+      const factor = 0.7 + (0.3 * (i / Math.max(1, count - 1)));
+      shades.push(this.adjustBrightness(baseColor, factor));
+    }
+    return shades;
+  },
+
+  adjustBrightness: function(color, factor) {
+    let c = color.replace('#', '');
+    if (c.length === 3) {
+      c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+    }
+    const r = Math.min(255, Math.round(parseInt(c.substring(0, 2), 16) * factor));
+    const g = Math.min(255, Math.round(parseInt(c.substring(2, 4), 16) * factor));
+    const b = Math.min(255, Math.round(parseInt(c.substring(4, 6), 16) * factor));
+    return `rgb(${r}, ${g}, ${b})`;
   },
 
   getColors: function(data, config) {
