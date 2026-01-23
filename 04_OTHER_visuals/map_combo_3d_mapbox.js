@@ -1,17 +1,17 @@
 /**
- * Multi-Layer 3D Map for Looker - v49 (Auto-Detect & Icon Expansion)
+ * Multi-Layer 3D Map for Looker - v50 (Proportional Sizes & Strict Hiding)
  *
- * CHANGES FROM V48:
- * 1. UI: Removed "Data Mode". Logic now Auto-Detects Lat/Lon dimensions.
- * 2. FIX: "Hide Null/0" logic improved to handle Pivots correctly.
- * 3. CONTENT: Added Oil Rig, Dam, Car, Truck icons.
- * 4. UI: Icons sorted Alphabetically. Custom URL is at the top.
- * 5. FIX: Drill menu aggregates links from ALL selected measures.
+ * CHANGES FROM V49:
+ * 1. LOGIC: "Hide Null/0" now filters PER LAYER based on the specific measure selected.
+ * 2. FEATURE: Added "Size Proportional to Value" boolean for all layers.
+ * 3. FEATURE: Added "Icon: Face Camera" toggle to control tilting (Billboard).
+ * 4. CONTENT: Removed broken Oil Barrel icon.
+ * 5. FIX: Removed floating artifacts by forcing Z=0 and proper anchoring.
  */
 
 // --- ICONS LIBRARY (Sorted Alphabetically) ---
 const ICONS = {
-  "custom": "custom", // Placeholder for logic
+  "custom": "custom",
   "box": "https://img.icons8.com/color/96/box.png",
   "building": "https://img.icons8.com/color/96/office-building.png",
   "car": "https://img.icons8.com/color/96/car--v1.png",
@@ -24,7 +24,6 @@ const ICONS = {
   "hospital": "https://img.icons8.com/color/96/hospital-3.png",
   "info": "https://img.icons8.com/color/96/info--v1.png",
   "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "oil_barrel": "https://img.icons8.com/color/96/oil-barrel.png",
   "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
   "pin": "https://img.icons8.com/color/96/marker.png",
   "plane": "https://img.icons8.com/color/96/airport.png",
@@ -71,10 +70,10 @@ const getLayerOptions = (n) => {
       values: [
         { "Choropleth (Region Only)": "geojson" },
         { "3D Columns": "column" },
-        { "Points (Fixed Size)": "point" },
-        { "Bubbles (Value Size)": "bubble" },
+        { "Points": "point" },
+        { "Bubbles": "bubble" },
         { "Icon (Image)": "icon" },
-        { "Heatmap (Sum Density)": "heatmap" }
+        { "Heatmap": "heatmap" }
       ],
       default: def.type,
       section: "Layers",
@@ -144,17 +143,24 @@ const getLayerOptions = (n) => {
     },
     [`layer${n}_radius`]: {
       type: "number",
-      label: `L${n} Radius / Size`,
+      label: `L${n} Radius / Size (Base)`,
       default: def.radius,
       section: "Layers",
       order: b + 12
+    },
+    [`layer${n}_size_by_value`]: {
+      type: "boolean",
+      label: `L${n} Size Proportional to Value?`,
+      default: false,
+      section: "Layers",
+      order: b + 13
     },
     [`layer${n}_height`]: {
       type: "number",
       label: `L${n} Height (3D)`,
       default: def.height,
       section: "Layers",
-      order: b + 13
+      order: b + 14
     },
     [`layer${n}_opacity`]: {
       type: "number",
@@ -162,7 +168,7 @@ const getLayerOptions = (n) => {
       default: 0.7,
       min: 0, max: 1, step: 0.1,
       section: "Layers",
-      order: b + 14
+      order: b + 15
     },
     [`layer${n}_icon_type`]: {
       type: "string",
@@ -183,7 +189,6 @@ const getLayerOptions = (n) => {
         { "Info": "info" },
         { "Map Pin": "pin" },
         { "Marker (Truck Blue)": "marker_blue" },
-        { "Oil Barrel": "oil_barrel" },
         { "Oil Rig": "oil_rig" },
         { "Plane": "plane" },
         { "Semi Truck": "semi_truck" },
@@ -197,7 +202,7 @@ const getLayerOptions = (n) => {
       ],
       default: "factory",
       section: "Layers",
-      order: b + 15
+      order: b + 16
     },
     [`layer${n}_icon_url`]: {
       type: "string",
@@ -205,7 +210,14 @@ const getLayerOptions = (n) => {
       default: "",
       placeholder: "https://...",
       section: "Layers",
-      order: b + 16
+      order: b + 17
+    },
+    [`layer${n}_icon_billboard`]: {
+      type: "boolean",
+      label: `L${n} Icon: Face Camera (Billboard)`,
+      default: true,
+      section: "Layers",
+      order: b + 18
     }
   };
 };
@@ -223,7 +235,7 @@ const preloadImage = (type, customUrl) => {
     img.crossOrigin = "Anonymous";
     img.onload = () => resolve(url);
     img.onerror = () => {
-      console.warn(`[Viz V49] Failed to load icon: ${url}`);
+      console.warn(`[Viz V50] Failed to load icon: ${url}`);
       resolve(ICONS['warning']);
     };
     img.src = url;
@@ -231,13 +243,11 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v49",
-  label: "Combo Map 3D (V49 Auto)",
+  id: "combo_map_ultimate_v50",
+  label: "Combo Map 3D (V50 Pro)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
-
-    // REMOVED DATA MODE - Now Auto-Detected
 
     hide_no_data: {
       type: "boolean",
@@ -381,7 +391,7 @@ looker.plugins.visualizations.add({
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V49] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V50] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
@@ -408,6 +418,8 @@ looker.plugins.visualizations.add({
         const preset = config[`layer${i}_icon_type`];
         const custom = config[`layer${i}_icon_url`];
         iconPromises.push(preloadImage(preset, custom));
+      } else {
+        iconPromises.push(Promise.resolve(null)); // Keep array size for index matching
       }
     }
 
@@ -418,7 +430,7 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V49] Data prepared, rendering layers...`);
+      console.log(`[Viz V50] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
 
       if (isPrint) {
@@ -433,7 +445,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V49] FATAL ERROR:", err);
+      console.error("[Viz V50] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -460,8 +472,6 @@ looker.plugins.visualizations.add({
     // AUTO-DETECT DATA MODE
     const latDim = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
     const lonDim = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lng') || d.name.toLowerCase().includes('lon'));
-
-    // If we have Lat/Lon, use POINTS mode. Otherwise use REGIONS.
     const isPointsMode = (latDim && lonDim);
 
     if (isPointsMode) {
@@ -477,13 +487,12 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures, dims };
     }
 
-    // REGIONS MODE (Default if no Lat/Lon found)
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V49] GeoJSON load failed:", error);
+      console.warn("[Viz V50] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -606,7 +615,16 @@ looker.plugins.visualizations.add({
 
   _render: function (processed, config, queryResponse, details, loadedIcons) {
     const layerObjects = [];
-    let iconIndex = 0;
+
+    // Only increment for enabled layers
+    let validIconMap = {};
+    let iconLoadIndex = 0;
+    for (let i = 1; i <= 4; i++) {
+        if(config[`layer${i}_enabled`] && config[`layer${i}_type`] === 'icon') {
+            validIconMap[i] = loadedIcons[iconLoadIndex];
+            iconLoadIndex++;
+        }
+    }
 
     for (let i = 1; i <= 4; i++) {
       const enabled = config[`layer${i}_enabled`];
@@ -616,8 +634,7 @@ looker.plugins.visualizations.add({
         try {
           let iconUrlOverride = null;
           if (type === 'icon') {
-            iconUrlOverride = loadedIcons[iconIndex] || ICONS['factory'];
-            iconIndex++;
+            iconUrlOverride = validIconMap[i] || ICONS['factory'];
           }
           const layer = this._buildSingleLayer(i, config, processed, iconUrlOverride);
           if (layer) {
@@ -625,7 +642,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V49] Layer ${i} Error:`, e);
+          console.error(`[Viz V50] Layer ${i} Error:`, e);
         }
       }
     }
@@ -633,7 +650,7 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP (V49 FIXED: Respects Measure Indices) ---
+    // --- TOOLTIP (V50: Strict Measure Index Match) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
@@ -641,7 +658,6 @@ looker.plugins.visualizations.add({
       const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
 
       let layerDimIdx = 0;
-      // Get Measure Indices for this layer to filter the tooltip
       let activeMeasureIndices = [];
       if (layerIdx) {
           const dimStr = config[`layer${layerIdx}_dimension_idx`];
@@ -654,10 +670,9 @@ looker.plugins.visualizations.add({
           if (measStr !== undefined && measStr !== null) {
               activeMeasureIndices = String(measStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
           } else {
-              activeMeasureIndices = [layerIdx - 1]; // Default fallback
+              activeMeasureIndices = [layerIdx - 1];
           }
       } else {
-          // Heatmap or generic fallback
           activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
       }
 
@@ -696,7 +711,6 @@ looker.plugins.visualizations.add({
 
       if (config.tooltip_mode !== 'name') {
         measures.forEach((m, idx) => {
-          // FIX: Only show measures selected for this layer
           if (!activeMeasureIndices.includes(idx)) return;
 
           if (pivotData && this._pivotInfo && this._pivotInfo.hasPivot) {
@@ -800,38 +814,6 @@ looker.plugins.visualizations.add({
     }
   },
 
-  _validateLayerData: function (data, config) {
-    if (!data || !Array.isArray(data) || data.length === 0) return [];
-
-    // Default validation (Location validity)
-    let validData = data.filter(d =>
-      d.position &&
-      d.position.length === 2 &&
-      !isNaN(d.position[0]) &&
-      !isNaN(d.position[1]) &&
-      d.position[1] >= -90 && d.position[1] <= 90
-    );
-
-    // FIX: Hide 0/Null Data logic
-    if (config.hide_no_data) {
-        validData = validData.filter(d => {
-            const vals = d.values || (d.properties && d.properties._values);
-            // If values are completely missing, hide.
-            if (!vals || vals.length === 0) return false;
-
-            // For Pivots, values are usually totals.
-            // We check if at least ONE measure has a non-zero value.
-            // If all values are 0 or null/NaN, hide the row.
-            return vals.some(v => {
-                const num = parseFloat(v);
-                return !isNaN(num) && Math.abs(num) > 0;
-            });
-        });
-    }
-
-    return validData;
-  },
-
   _buildSingleLayer: function (idx, config, processed, iconUrlOverride) {
     const type = config[`layer${idx}_type`];
 
@@ -854,11 +836,14 @@ looker.plugins.visualizations.add({
     const radius = Number(config[`layer${idx}_radius`]) || 1000;
     const heightScale = Number(config[`layer${idx}_height`]) || 1000;
     const opacity = Number(config[`layer${idx}_opacity`]) || 0.7;
+    const sizeByValue = config[`layer${idx}_size_by_value`] || false;
+    const billboard = config[`layer${idx}_icon_billboard`] !== false; // Default true
 
     const pivotInfo = this._pivotInfo;
     const queryResponse = this._queryResponse;
     const measures = queryResponse.fields.measure_like;
 
+    // --- GET VALUE HELPER (Sum of Selected Measures) ---
     const getValue = (d) => {
       let totalValue = 0;
       measureIndices.forEach(mIdx => {
@@ -882,9 +867,10 @@ looker.plugins.visualizations.add({
           }
         }
       });
-      return totalValue || 0; // Ensure 0 return on null
+      return totalValue || 0;
     };
 
+    // --- CLICK HANDLER (Aggregates All Links) ---
     const onClickHandler = (info) => {
       if (!info || !info.object) return;
 
@@ -895,9 +881,7 @@ looker.plugins.visualizations.add({
 
       let finalLinks = [];
 
-      // FIX: Aggregated Drill Logic
       if (!pivotInfo.hasPivot && drillLinks) {
-        // Collect links for ALL selected measures in this layer
         measureIndices.forEach(mIdx => {
           if (drillLinks[mIdx] && drillLinks[mIdx].length > 0) {
              const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
@@ -938,6 +922,7 @@ looker.plugins.visualizations.add({
       }
     };
 
+    // --- DATA PREPARATION ---
     let pointData = [];
     if (processed.type === 'regions') {
       dimIndices.forEach(dimIdx => {
@@ -970,41 +955,32 @@ looker.plugins.visualizations.add({
             }
           });
         }
-
-        Object.keys(dataMap).forEach(key => {
-          const item = dataMap[key];
-          let pos = [0, 0];
-          if (Array.isArray(item.rawName) && item.rawName.length === 2) {
-            pos = [Number(item.rawName[1]), Number(item.rawName[0])];
-          } else if (typeof item.rawName === 'string' && item.rawName.includes(',')) {
-            const parts = item.rawName.split(',');
-            if (parts.length === 2) {
-              pos = [parseFloat(parts[1]), parseFloat(parts[0])];
-            }
-          }
-
-          if (pos[0] || pos[1]) {
-            pointData.push({
-              position: pos,
-              values: item.values,
-              pivotData: item.pivotData,
-              drillLinks: item.drillLinks,
-              name: item.rawName.toString(),
-              feature: null,
-              allowedMeasures: measureIndices
-            });
-          }
-        });
       });
     } else {
       pointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
     }
 
-    const safePointData = this._validateLayerData(pointData, config);
+    // --- STRICT FILTERING (Hide Rows with 0/Null for THIS Layer's Measures) ---
+    // If config.hide_no_data is true, check if the calculated value is > 0
+    let safePointData = pointData.filter(d =>
+      d.position &&
+      d.position.length === 2 &&
+      !isNaN(d.position[0]) &&
+      !isNaN(d.position[1]) &&
+      d.position[1] >= -90 && d.position[1] <= 90
+    );
+
+    if (config.hide_no_data) {
+        safePointData = safePointData.filter(d => {
+            const val = getValue(d);
+            return val !== null && val !== undefined && Math.abs(val) > 0;
+        });
+    }
+
     const id = `layer-${idx}-${type}`;
     const allVals = safePointData.map(d => getValue(d));
-    const maxVal = Math.max(...allVals, 0.1);
-    const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx];
+    const maxVal = Math.max(...allVals, 0.1); // Avoid division by zero
+    const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx, sizeByValue];
 
     const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
       d.feature.properties._values = d.values;
@@ -1014,6 +990,14 @@ looker.plugins.visualizations.add({
       d.feature.properties._allowedMeasures = d.allowedMeasures;
       return d.feature;
     });
+
+    // --- SCALING FUNCTION ---
+    const getScaledSize = (d) => {
+        if (!sizeByValue) return radius;
+        // Simple scale: (Value / Max) * Radius * Factor (adjust factor as needed)
+        // Using square root for area-proportional sizing
+        return (Math.sqrt(getValue(d)) / Math.sqrt(maxVal)) * radius;
+    };
 
     switch (type) {
       case 'geojson':
@@ -1043,7 +1027,7 @@ looker.plugins.visualizations.add({
           id: id,
           data: safePointData,
           diskResolution: 6,
-          radius: radius,
+          radius: radius, // Columns usually have fixed width, but can scale
           extruded: true,
           pickable: true,
           getPosition: d => d.position,
@@ -1075,7 +1059,7 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          getRadius: radius,
+          getRadius: d => getScaledSize(d),
           getFillColor: d => {
             if (!useGradient) return startColor;
             const val = getValue(d);
@@ -1083,7 +1067,10 @@ looker.plugins.visualizations.add({
           },
           getLineColor: [255, 255, 255],
           onClick: onClickHandler,
-          updateTriggers: { getFillColor: updateTriggersBase }
+          updateTriggers: {
+              getFillColor: updateTriggersBase,
+              getRadius: updateTriggersBase
+          }
         });
 
       case 'bubble':
@@ -1098,7 +1085,8 @@ looker.plugins.visualizations.add({
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
-          getRadius: d => Math.sqrt(getValue(d) / maxVal) * radius,
+          // Bubbles are intrinsically sized by value, but we apply the scaler logic
+          getRadius: d => getScaledSize(d),
           getFillColor: d => {
             if (!useGradient) return startColor;
             const val = getValue(d);
@@ -1108,7 +1096,7 @@ looker.plugins.visualizations.add({
           onClick: onClickHandler,
           updateTriggers: {
             getFillColor: updateTriggersBase,
-            getRadius: [...updateTriggersBase, radius]
+            getRadius: updateTriggersBase
           }
         });
 
@@ -1130,12 +1118,18 @@ looker.plugins.visualizations.add({
           iconMapping: { marker: { x: 0, y: 0, width: 128, height: 128, mask: false, anchorY: 128 } },
           getIcon: d => 'marker',
           getPosition: d => d.position,
-          getSize: d => radius / 100,
+          getSize: d => {
+              if (sizeByValue) return (Math.sqrt(getValue(d)) / Math.sqrt(maxVal)) * (radius / 100) * 50;
+              return radius / 2; // Fixed adjust
+          },
           sizeScale: 1,
-          sizeMinPixels: 20,
-          billboard: true,
+          sizeMinPixels: 15,
+          billboard: billboard, // Toggleable
           autoHighlight: false,
-          onClick: onClickHandler
+          onClick: onClickHandler,
+          updateTriggers: {
+              getSize: updateTriggersBase
+          }
         });
 
       case 'heatmap':
@@ -1143,7 +1137,7 @@ looker.plugins.visualizations.add({
         return new deck.HeatmapLayer({
           id: id,
           data: safePointData,
-          pickable: true, // Allow tooltip density readout
+          pickable: true,
           getPosition: d => d.position,
           getWeight: d => getValue(d),
           radiusPixels: radius / 500,
@@ -1160,27 +1154,22 @@ looker.plugins.visualizations.add({
   _applyLookerFormat: function (value, formatStr) {
     if (value === undefined || value === null) return '0';
     if (typeof value !== 'number') return value;
-
-    // Default formatting if no LookML format provided
     if (!formatStr) return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-    // Detect Currency
     let style = 'decimal';
     let currency = undefined;
-
     if (formatStr.includes('$')) { style = 'currency'; currency = 'USD'; }
     else if (formatStr.includes('€')) { style = 'currency'; currency = 'EUR'; }
     else if (formatStr.includes('£')) { style = 'currency'; currency = 'GBP'; }
     else if (formatStr.includes('¥')) { style = 'currency'; currency = 'JPY'; }
     else if (formatStr.includes('%')) { style = 'percent'; }
 
-    // Detect Decimals (0.00 -> 2 digits)
     let decimals = 0;
     if (formatStr.includes('.')) {
         const afterDot = formatStr.split('.')[1];
         if (afterDot) decimals = afterDot.replace(/[^0#]/g, '').length;
     } else if (style === 'currency') {
-        decimals = 2; // Default for currency
+        decimals = 2;
     }
 
     try {
@@ -1191,7 +1180,6 @@ looker.plugins.visualizations.add({
         };
         if (currency) options.currency = currency;
 
-        // Handle "K" or "M" shorthand in LookML (basic support)
         if (formatStr.toLowerCase().includes('"k"')) {
              return (value / 1000).toLocaleString(undefined, options) + 'k';
         }
