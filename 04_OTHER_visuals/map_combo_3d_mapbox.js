@@ -1,9 +1,8 @@
 /**
- * Multi-Layer 3D Map for Looker - v70 (Production Ready)
+ * Multi-Layer 3D Map for Looker - v71 (Tooltip Fix)
  *
- * CHANGES FROM V69:
- * 1. REMOVED: force_static_map debug option (PDF works, not needed)
- * 2. FIXED: Tooltip crash when values array is undefined or index out of bounds
+ * CHANGES FROM V70:
+ * 1. REVERTED: Tooltip code back to v59 working version
  */
 
 // --- ICONS LIBRARY (Stable) ---
@@ -259,7 +258,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V70] Failed to load icon: ${url}`);
+      console.warn(`[Viz V71] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -267,8 +266,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v70",
-  label: "Combo Map 3D (V70)",
+  id: "combo_map_ultimate_v71",
+  label: "Combo Map 3D (V71)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -486,14 +485,14 @@ looker.plugins.visualizations.add({
     // Detect Print or Force Static via UI Toggle
     const isPrint = details && details.print;
 
-    console.log(`[Viz V70] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V71] ========== UPDATE ASYNC START ==========`);
 
     if (this._heartbeatTimer) clearInterval(this._heartbeatTimer);
 
     this.clearErrors();
 
     if (!config.mapbox_token) {
-      console.warn("[Viz V70] Waiting for Mapbox Token...");
+      console.warn("[Viz V71] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
       return;
     } else {
@@ -525,11 +524,11 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V70] Data prepared.`);
+      console.log(`[Viz V71] Data prepared.`);
 
       // --- STATIC MAP FALLBACK LOGIC ---
       if (isPrint) {
-        console.log("[Viz V70] Print/Static Mode Active.");
+        console.log("[Viz V71] Print/Static Mode Active.");
 
         const viewState = this._viewState || {
           longitude: Number(config.center_lng) || 2,
@@ -543,7 +542,7 @@ looker.plugins.visualizations.add({
         const height = this._container.clientHeight || 600;
 
         const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
-        console.log("[Viz V70] Static URL:", staticUrl);
+        console.log("[Viz V71] Static URL:", staticUrl);
 
         // Apply background immediately (don't wait for load - like v63)
         this._container.style.backgroundImage = `url('${staticUrl}')`;
@@ -566,7 +565,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V70] FATAL ERROR:", err);
+      console.error("[Viz V71] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -670,7 +669,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V70] GeoJSON load failed:", error);
+      console.warn("[Viz V71] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -858,7 +857,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V70] Layer ${i} Error:`, e);
+          console.error(`[Viz V71] Layer ${i} Error:`, e);
         }
       }
     }
@@ -892,9 +891,11 @@ looker.plugins.visualizations.add({
         activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
       }
 
+      // FIX: Better name extraction - check _name first (set during layer build), then GeoJSON properties
       const rawName = object.properties?._name || object.name || (object.properties && object.properties.name);
       const cleanName = this._normalizeName(rawName);
 
+      // Lookup aggregated data from our processed data maps
       let aggregatedData = null;
       if (this._processedData &&
         this._processedData.dataMaps &&
@@ -903,6 +904,7 @@ looker.plugins.visualizations.add({
         aggregatedData = this._processedData.dataMaps[layerDimIdx][cleanName];
       }
 
+      // FIX: Build source from aggregatedData OR from object properties
       let source = aggregatedData || (object.properties && object.properties._name ? {
         name: object.properties._name,
         values: object.properties._values,
@@ -910,7 +912,8 @@ looker.plugins.visualizations.add({
         allowedMeasures: object.properties._allowedMeasures
       } : object);
 
-      const name = source.rawName || source.name;
+      // FIX: Get display name - prefer rawName from aggregated data, then _name, then name
+      const name = source.rawName || source.name || rawName || 'Unknown';
       const values = source.values || source._values;
       const pivotData = source.pivotData || source._pivotData;
 
