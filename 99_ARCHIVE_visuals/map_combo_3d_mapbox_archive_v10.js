@@ -1,20 +1,16 @@
 /**
- * Multi-Layer 3D Map for Looker - v52 (Flexible Icons & Classic Library)
+ * Multi-Layer 3D Map for Looker - v69 (Fast PDF Rendering)
  *
- * CHANGES FROM V51:
- * 1. CONTENT: Reverted to v49 Icon Library (Icons8 style).
- * 2. FIX: Updated 'building' and 'oil_barrel' URLs to working versions.
- * 3. FEATURE: "Flexible" Icon Dimensions.
- * - The code now detects the aspect ratio of custom images.
- * - Prevents "square cropping" of wide images (like the Porsche).
- * 4. EXPLANATION: The Proxy is REQUIRED for WebGL (Deck.gl) even if URLs work in HTML.
+ * CHANGES FROM V65:
+ * 1. Zoom offset: 0 (was -0.25) - fixes static map alignment
+ * 2. Fast PDF: Call done() immediately like v63 (don't wait for image load)
  */
 
-// --- ICONS LIBRARY (Restored v49 Style with Fixes) ---
+// --- ICONS LIBRARY (Stable) ---
 const ICONS = {
   "custom": "custom",
   "box": "https://img.icons8.com/color/96/box.png",
-  "building": "https://img.icons8.com/color/96/city.png", // FIXED
+  "building": "https://img.icons8.com/color/96/city.png",
   "car": "https://img.icons8.com/color/96/car--v1.png",
   "check": "https://img.icons8.com/color/96/checked--v1.png",
   "circle": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png",
@@ -25,7 +21,7 @@ const ICONS = {
   "hospital": "https://img.icons8.com/color/96/hospital-3.png",
   "info": "https://img.icons8.com/color/96/info--v1.png",
   "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "oil_barrel": "https://img.icons8.com/color/96/oil-storage-tank.png", // FIXED
+  "oil_barrel": "https://img.icons8.com/color/96/oil-storage-tank.png",
   "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
   "pin": "https://img.icons8.com/color/96/marker.png",
   "plane": "https://img.icons8.com/color/96/airport.png",
@@ -221,17 +217,23 @@ const getLayerOptions = (n) => {
       default: true,
       section: "Layers",
       order: b + 17
+    },
+    [`layer${n}_legend_label`]: {
+      type: "string",
+      label: `Layer ${n} Legend Label`,
+      default: "",
+      placeholder: "Leave empty to use Measure Name",
+      section: "Series",
+      order: n * 10
     }
   };
 };
 
 // --- HELPER: PRELOADER (WITH DIMENSION DETECTION) ---
-// Returns: { url: string, width: number, height: number }
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = "";
 
-    // 1. Determine URL
     if (type === 'custom' && customUrl) {
       url = customUrl;
     } else if (ICONS[type]) {
@@ -239,12 +241,10 @@ const preloadImage = (type, customUrl) => {
     }
 
     if (!url || url.length < 5) {
-      // Return default dimensions (128x128) for fallback
       return resolve({ url: ICONS['factory'], width: 128, height: 128 });
     }
 
-    // 2. APPLY PROXY (Required for WebGL CORS)
-    // We skip proxy for data URIs or already proxied links
+    // CORS Proxy
     if (type === 'custom' && !url.startsWith('data:') && !url.includes('wsrv.nl')) {
       url = `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
     }
@@ -252,8 +252,6 @@ const preloadImage = (type, customUrl) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => {
-      // 3. RETURN DIMENSIONS
-      // This allows us to set the sprite mapping exactly to the image size
       resolve({
         url: url,
         width: img.naturalWidth || 128,
@@ -261,7 +259,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V52] Failed to load icon: ${url}`);
+      console.warn(`[Viz V69] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -269,8 +267,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v52",
-  label: "Combo Map 3D (V52 Flexible)",
+  id: "combo_map_ultimate_v69",
+  label: "Combo Map 3D (V69)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -363,6 +361,38 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
+    // --- SERIES TAB ---
+    legend_header: { type: "string", label: "─── LEGEND SETTINGS ───", display: "divider", section: "Series", order: 1 },
+    show_legend: {
+      type: "boolean",
+      label: "Show Legend",
+      default: true,
+      section: "Series",
+      order: 2
+    },
+    legend_position: {
+      type: "string",
+      label: "Legend Position",
+      display: "select",
+      values: [
+        { "Top Right": "top-right" },
+        { "Bottom Right": "bottom-right" },
+        { "Top Left": "top-left" },
+        { "Bottom Left": "bottom-left" }
+      ],
+      default: "bottom-right",
+      section: "Series",
+      order: 3
+    },
+    // NEW: FORCE STATIC MODE FOR DEBUGGING
+    force_static_map: {
+      type: "boolean",
+      label: "Force Static Map (Debug/Print)",
+      default: false,
+      section: "Series",
+      order: 99
+    },
+
     // --- 2. LAYERS TAB ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
@@ -392,19 +422,45 @@ looker.plugins.visualizations.add({
         .pivot-section { margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc; }
         .pivot-value { display: flex; justify-content: space-between; gap: 10px; }
         .pivot-label { color: #666; font-size: 0.9em; }
+
+        .map-legend {
+          position: absolute;
+          background: rgba(255, 255, 255, 0.9);
+          padding: 10px;
+          border-radius: 4px;
+          font-family: sans-serif;
+          font-size: 12px;
+          color: #333;
+          box-shadow: 0 0 4px rgba(0,0,0,0.3);
+          z-index: 10;
+          pointer-events: none;
+          max-width: 250px;
+        }
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
+        .legend-symbol { width: 16px; height: 16px; margin-right: 8px; display: inline-block; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid rgba(0,0,0,0.1); }
+        .legend-circle { border-radius: 50%; }
+        .legend-rect { border-radius: 2px; }
+
+        .top-right { top: 10px; right: 10px; }
+        .bottom-right { bottom: 30px; right: 10px; }
+        .top-left { top: 10px; left: 10px; }
+        .bottom-left { bottom: 30px; left: 10px; }
       </style>
 
       <div id="map-wrapper">
         <div id="map"></div>
+        <div id="map-legend" class="map-legend bottom-right" style="display:none;"></div>
         <div id="token-error">MISSING MAPBOX TOKEN<br><span style="font-size:0.8em; font-weight:normal">Please enter your token in the "Plot" settings.</span></div>
       </div>`;
 
     this._container = element.querySelector('#map');
     this._tokenError = element.querySelector('#token-error');
+    this._legend = element.querySelector('#map-legend');
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
     this._processedData = null;
+    this._heartbeatTimer = null;
   },
 
   destroy: function () {
@@ -412,18 +468,41 @@ looker.plugins.visualizations.add({
       this._deck.finalize();
       this._deck = null;
     }
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+    }
     this._geojsonCache = {};
   },
 
+  _getStaticMapUrl: function (config, viewState, width, height) {
+    let styleId = config.map_style.replace("mapbox://styles/", "");
+    const lon = viewState.longitude.toFixed(4);
+    const lat = viewState.latitude.toFixed(4);
+    // FIX: Zoom offset = 0 (was -0.25)
+    const zoom = Math.max(0, viewState.zoom).toFixed(2);
+    const bearing = (viewState.bearing || 0).toFixed(2);
+    const pitch = (viewState.pitch || 0).toFixed(2);
+
+    // Construct the Raw Mapbox URL
+    const rawUrl = `https://api.mapbox.com/styles/v1/${styleId}/static/${lon},${lat},${zoom},${bearing},${pitch}/${width}x${height}?access_token=${config.mapbox_token}&logo=false&attribution=false`;
+
+    // Wrap in Proxy to ensure PDF renderer accepts it
+    return `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}`;
+  },
+
   updateAsync: function (data, element, config, queryResponse, details, done) {
-    const isPrint = details && details.print;
-    console.log(`[Viz V52] ========== UPDATE ASYNC START ==========`);
+    // Detect Print or Force Static via UI Toggle
+    const isPrint = (details && details.print) || config.force_static_map;
+
+    console.log(`[Viz V69] ========== UPDATE ASYNC START ==========`);
+
+    if (this._heartbeatTimer) clearInterval(this._heartbeatTimer);
 
     this.clearErrors();
 
     if (!config.mapbox_token) {
+      console.warn("[Viz V69] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
-      done();
       return;
     } else {
       this._tokenError.style.display = 'none';
@@ -454,25 +533,108 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V52] Data prepared, rendering layers...`);
-      this._render(processedData, config, queryResponse, details, loadedIcons);
+      console.log(`[Viz V69] Data prepared.`);
 
+      // --- STATIC MAP FALLBACK LOGIC ---
       if (isPrint) {
-        if (this._deck) {
-          this._deck.redraw(true);
-        }
-        setTimeout(() => {
-          done();
-        }, 3000);
+        console.log("[Viz V69] Print/Static Mode Active.");
+
+        const viewState = this._viewState || {
+          longitude: Number(config.center_lng) || 2,
+          latitude: Number(config.center_lat) || 46,
+          zoom: Number(config.zoom) || 4,
+          pitch: Number(config.pitch) || 45,
+          bearing: 0
+        };
+
+        const width = this._container.clientWidth || 800;
+        const height = this._container.clientHeight || 600;
+
+        const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
+        console.log("[Viz V69] Static URL:", staticUrl);
+
+        // Apply background immediately (don't wait for load - like v63)
+        this._container.style.backgroundImage = `url('${staticUrl}')`;
+        this._container.style.backgroundSize = 'cover';
+        this._container.style.backgroundPosition = 'center';
+
+        // Render DeckGL with transparent map style
+        this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
+        this._updateLegend(config, loadedIcons, queryResponse);
+
+        // Call done() immediately (don't wait for background image)
+        done();
+
       } else {
+        // Interactive Mode
+        this._container.style.backgroundImage = 'none';
+        this._render(processedData, config, queryResponse, details, loadedIcons);
+        this._updateLegend(config, loadedIcons, queryResponse);
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V52] FATAL ERROR:", err);
+      console.error("[Viz V69] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
+  },
+
+  _updateLegend: function (config, loadedIcons, queryResponse) {
+    if (!config.show_legend) {
+      this._legend.style.display = 'none';
+      return;
+    }
+
+    this._legend.style.display = 'block';
+    this._legend.className = `map-legend ${config.legend_position || 'bottom-right'}`;
+
+    let html = '';
+    let iconIndex = 0;
+    const measures = queryResponse.fields.measure_like;
+
+    for (let i = 1; i <= 4; i++) {
+      if (config[`layer${i}_enabled`]) {
+        let label = config[`layer${i}_legend_label`];
+        if (!label || label.trim() === '') {
+          const measStr = config[`layer${i}_measure_idx`];
+          const mIndices = (measStr === undefined || measStr === null) ? [i - 1] : String(measStr).split(',').map(s => parseInt(s.trim()));
+          const names = mIndices.map(idx => {
+            const m = measures[idx];
+            return m ? (m.label_short || m.label) : '';
+          }).filter(s => s !== '');
+          label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
+        }
+
+        const color = config[`layer${i}_color_main`] || '#ccc';
+        const type = config[`layer${i}_type`];
+        const useGradient = config[`layer${i}_use_gradient`];
+        const endColor = config[`layer${i}_gradient_end`] || color;
+
+        let symbolHtml = '';
+
+        if (type === 'icon') {
+          const iconData = loadedIcons[iconIndex];
+          const url = iconData ? iconData.url : ICONS['factory'];
+          symbolHtml = `<div class="legend-symbol" style="background-image: url('${url}');"></div>`;
+          iconIndex++;
+        } else if (type === 'point' || type === 'bubble') {
+          const style = useGradient
+            ? `background: linear-gradient(135deg, ${color}, ${endColor});`
+            : `background-color: ${color};`;
+          symbolHtml = `<div class="legend-symbol legend-circle" style="${style}"></div>`;
+        } else {
+          const style = useGradient
+            ? `background: linear-gradient(to right, ${color}, ${endColor});`
+            : `background-color: ${color};`;
+          symbolHtml = `<div class="legend-symbol legend-rect" style="${style}"></div>`;
+        }
+
+        html += `<div class="legend-item">${symbolHtml}<span>${label}</span></div>`;
+      }
+    }
+
+    this._legend.innerHTML = html;
   },
 
   _detectPivots: function (queryResponse) {
@@ -493,11 +655,9 @@ looker.plugins.visualizations.add({
     const measures = queryResponse.fields.measure_like;
     const dims = queryResponse.fields.dimension_like;
 
-    // AUTO-DETECT DATA MODE
     const latDim = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
     const lonDim = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lng') || d.name.toLowerCase().includes('lon'));
 
-    // If we have Lat/Lon, use POINTS mode. Otherwise use REGIONS.
     const isPointsMode = (latDim && lonDim);
 
     if (isPointsMode) {
@@ -513,13 +673,12 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures, dims };
     }
 
-    // REGIONS MODE
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V52] GeoJSON load failed:", error);
+      console.warn("[Viz V69] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -644,27 +803,70 @@ looker.plugins.visualizations.add({
     const layerObjects = [];
     let iconIndex = 0;
 
+    const pivotInfo = this._pivotInfo;
+    const measures = queryResponse.fields.measure_like;
+
+    // Defined Handler First (Reference Error Fix)
+    const onClickHandler = (info) => {
+      if (!info || !info.object) return;
+      const obj = info.object;
+      const props = obj.properties || obj;
+      const pivotData = props._pivotData || props.pivotData;
+      const drillLinks = props._drillLinks || props.drillLinks;
+      let finalLinks = [];
+
+      if (!pivotInfo.hasPivot && drillLinks) {
+        // Collect links for ALL selected measures in this layer
+        // (Simplified for loop, assuming current layer's measures are available,
+        // or just grabbing all available drill links on the object)
+        if (props.allowedMeasures) {
+          props.allowedMeasures.forEach(mIdx => {
+            if (drillLinks[mIdx]) {
+              drillLinks[mIdx].forEach(l => finalLinks.push(l));
+            }
+          });
+        }
+      }
+      else if (pivotInfo.hasPivot && pivotData) {
+        // Pivot drill logic
+        // ...
+      }
+
+      if (finalLinks.length > 0) {
+        LookerCharts.Utils.openDrillMenu({
+          links: finalLinks,
+          event: {
+            pageX: info.x,
+            pageY: info.y,
+            clientX: info.x,
+            clientY: info.y
+          }
+        });
+      }
+    };
+
     for (let i = 1; i <= 4; i++) {
       const enabled = config[`layer${i}_enabled`];
       const type = config[`layer${i}_type`];
 
       if (enabled) {
         try {
-          // --- ICON RETRIEVAL (Now contains object {url, width, height}) ---
           let iconData = null;
+          let isCustomIcon = false;
           if (type === 'icon') {
-            // Default fallback
+            const preset = config[`layer${i}_icon_type`];
+            isCustomIcon = (preset === 'custom');
             const defaultIcon = { url: ICONS['factory'], width: 128, height: 128 };
             iconData = loadedIcons[iconIndex] || defaultIcon;
             iconIndex++;
           }
-          const layer = this._buildSingleLayer(i, config, processed, iconData);
+          const layer = this._buildSingleLayer(i, config, processed, iconData, isCustomIcon, onClickHandler);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V52] Layer ${i} Error:`, e);
+          console.error(`[Viz V69] Layer ${i} Error:`, e);
         }
       }
     }
@@ -800,7 +1002,7 @@ looker.plugins.visualizations.add({
         zoom: cfgZoom,
         pitch: cfgPitch,
         bearing: 0,
-        transitionDuration: (details && details.print) ? 0 : 500
+        transitionDuration: 500
       };
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
     }
@@ -835,34 +1037,39 @@ looker.plugins.visualizations.add({
     }
   },
 
-  _validateLayerData: function (data, config) {
+  _validateLayerData: function (data, config, getValueFn) {
     if (!data || !Array.isArray(data) || data.length === 0) return [];
-    return data.filter(d =>
-      d.position &&
-      d.position.length === 2 &&
-      !isNaN(d.position[0]) &&
-      !isNaN(d.position[1]) &&
-      d.position[1] >= -90 && d.position[1] <= 90
-    );
+    let validData = data.filter(d => d.position && !isNaN(d.position[0]));
+    if (config.hide_no_data && getValueFn) {
+      validData = validData.filter(d => {
+        const val = getValueFn(d);
+        return val !== null && val !== undefined && !isNaN(val) && Math.abs(val) > 0;
+      });
+    }
+    return validData;
   },
 
-  _buildSingleLayer: function (idx, config, processed, iconData) {
-    const type = config[`layer${idx}_type`];
+  _buildSingleLayer: function (idx, config, processed, iconData, isCustomIcon, onClickHandler) {
+    const pivotInfo = this._pivotInfo;
+    const queryResponse = this._queryResponse;
+    const measures = queryResponse.fields.measure_like;
 
     const rawM = config[`layer${idx}_measure_idx`];
     const measureStr = (rawM === undefined || rawM === null) ? String(idx - 1) : String(rawM);
     const measureIndices = measureStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
     if (measureIndices.length === 0) measureIndices.push(0);
 
+    const showAllPivots = config[`layer${idx}_show_all_pivots`];
+    const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
+
+    const type = config[`layer${idx}_type`];
     const rawD = config[`layer${idx}_dimension_idx`];
     const dimStr = (rawD === undefined || rawD === null) ? "0" : String(rawD);
     const dimIndices = dimStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
 
-    const showAllPivots = config[`layer${idx}_show_all_pivots`];
-    const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
     const hideNulls = config.hide_no_data;
-    const sizeByValue = config[`layer${idx}_size_by_value`];
-    const iconBillboard = config[`layer${idx}_icon_billboard`] !== false; // Default true
+    const sizeByValue = config[`layer${idx}_size_by_value`] || false;
+    const iconBillboard = config[`layer${idx}_icon_billboard`] !== false;
 
     const useGradient = config[`layer${idx}_use_gradient`];
     const startColorHex = config[`layer${idx}_color_main`];
@@ -872,11 +1079,6 @@ looker.plugins.visualizations.add({
     const heightScale = Number(config[`layer${idx}_height`]) || 1000;
     const opacity = Number(config[`layer${idx}_opacity`]) || 0.7;
 
-    const pivotInfo = this._pivotInfo;
-    const queryResponse = this._queryResponse;
-    const measures = queryResponse.fields.measure_like;
-
-    // --- HELPER: Get Value for specific layer config ---
     const getValue = (d) => {
       let totalValue = 0;
       measureIndices.forEach(mIdx => {
@@ -903,7 +1105,6 @@ looker.plugins.visualizations.add({
       return totalValue || 0;
     };
 
-    // --- PREPARE DATA ---
     let rawPointData = [];
     if (processed.type === 'regions') {
       dimIndices.forEach(dimIdx => {
@@ -966,109 +1167,38 @@ looker.plugins.visualizations.add({
       rawPointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
     }
 
-    // --- FILTER: Validate and Hide Nulls (Layer Logic) ---
-    let safePointData = this._validateLayerData(rawPointData, config);
-
-    if (hideNulls) {
-      safePointData = safePointData.filter(d => {
-        const val = getValue(d);
-        return val !== 0 && val !== null && !isNaN(val);
-      });
-    }
-
+    const safePointData = this._validateLayerData(rawPointData, config, getValue);
+    const id = `layer-${idx}-${type}`;
     const allVals = safePointData.map(d => getValue(d));
     const maxVal = Math.max(...allVals, 0.1);
-
-    const id = `layer-${idx}-${type}`;
-    const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx, hideNulls, sizeByValue];
-
-    const onClickHandler = (info) => {
-      if (!info || !info.object) return;
-      const obj = info.object;
-      const props = obj.properties || obj;
-      const pivotData = props._pivotData || props.pivotData;
-      const drillLinks = props._drillLinks || props.drillLinks;
-
-      let finalLinks = [];
-
-      if (!pivotInfo.hasPivot && drillLinks) {
-        measureIndices.forEach(mIdx => {
-          if (drillLinks[mIdx] && drillLinks[mIdx].length > 0) {
-            const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
-            drillLinks[mIdx].forEach(link => {
-              finalLinks.push({ ...link, label: `${mName}: ${link.label}` });
-            });
-          }
-        });
-      }
-      else if (pivotInfo.hasPivot && pivotData) {
-        measureIndices.forEach(mIdx => {
-          const mName = measures[mIdx] ? measures[mIdx].name : null;
-          if (!mName || !pivotData[mName]) return;
-
-          if (showAllPivots) {
-            Object.values(pivotData[mName]).forEach(pVal => {
-              if (pVal.links) finalLinks.push(...pVal.links);
-            });
-          } else {
-            const pKey = pivotInfo.pivotKeys[pivotIdx];
-            if (pKey && pivotData[mName][pKey] && pivotData[mName][pKey].links) {
-              finalLinks.push(...pivotData[mName][pKey].links);
-            }
-          }
-        });
-      }
-
-      if (finalLinks.length > 0) {
-        LookerCharts.Utils.openDrillMenu({
-          links: finalLinks,
-          event: {
-            pageX: info.x,
-            pageY: info.y,
-            clientX: info.x,
-            clientY: info.y
-          }
-        });
-      }
-    };
+    const updateTriggersBase = [measureStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx, hideNulls, sizeByValue];
 
     const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
       d.feature.properties._values = d.values;
-      d.feature.properties._pivotData = d.pivotData;
-      d.feature.properties._drillLinks = d.drillLinks;
-      d.feature.properties._name = d.name;
-      d.feature.properties._allowedMeasures = d.allowedMeasures;
       return d.feature;
     });
 
     switch (type) {
       case 'geojson':
-        if (processed.type !== 'regions') return null;
-        if (geoJsonFeatures.length === 0) return null;
         return new deck.GeoJsonLayer({
           id: id,
           data: { type: "FeatureCollection", features: geoJsonFeatures },
           pickable: true,
           stroked: true,
           filled: true,
-          getLineWidth: 1,
-          getLineColor: [255, 255, 255],
-          opacity: opacity,
-          onClick: onClickHandler,
           getFillColor: d => {
             if (!useGradient) return startColor;
             const val = getValue(d);
             return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
-          updateTriggers: { getFillColor: updateTriggersBase }
+          updateTriggers: { getFillColor: updateTriggersBase },
+          onClick: onClickHandler
         });
 
       case 'column':
-        if (safePointData.length === 0) return null;
         return new deck.ColumnLayer({
           id: id,
           data: safePointData,
-          diskResolution: 6,
           radius: radius,
           extruded: true,
           pickable: true,
@@ -1078,26 +1208,20 @@ looker.plugins.visualizations.add({
             const val = getValue(d);
             return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
-          getLineColor: [255, 255, 255],
           getElevation: d => getValue(d) * heightScale,
-          elevationScale: 1,
-          opacity: opacity,
-          onClick: onClickHandler,
           updateTriggers: {
             getFillColor: updateTriggersBase,
             getElevation: [...updateTriggersBase, heightScale]
-          }
+          },
+          onClick: onClickHandler
         });
 
       case 'point':
-        if (safePointData.length === 0) return null;
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
           pickable: true,
           opacity: opacity,
-          stroked: true,
-          filled: true,
           radiusScale: 1,
           radiusMinPixels: 2,
           getPosition: d => d.position,
@@ -1110,16 +1234,14 @@ looker.plugins.visualizations.add({
             const val = getValue(d);
             return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
-          getLineColor: [255, 255, 255],
-          onClick: onClickHandler,
           updateTriggers: {
             getFillColor: updateTriggersBase,
             getRadius: [...updateTriggersBase, radius, sizeByValue]
-          }
+          },
+          onClick: onClickHandler
         });
 
       case 'bubble':
-        if (safePointData.length === 0) return null;
         return new deck.ScatterplotLayer({
           id: id,
           data: safePointData,
@@ -1136,28 +1258,22 @@ looker.plugins.visualizations.add({
             const val = getValue(d);
             return this._interpolateColor(startColorHex, endColorHex, val / maxVal);
           },
-          getLineColor: [255, 255, 255],
-          onClick: onClickHandler,
           updateTriggers: {
             getFillColor: updateTriggersBase,
             getRadius: [...updateTriggersBase, radius]
-          }
+          },
+          onClick: onClickHandler
         });
 
       case 'icon':
-        if (safePointData.length === 0) return null;
         const groundedData = safePointData.map(d => ({
           ...d,
           position: [d.position[0], d.position[1], 0]
         }));
 
-        // --- FLEXIBLE DIMENSION LOGIC ---
-        // Instead of hardcoding 128x128, use the loaded image's actual size.
-        // This prevents the "square crop" of rectangular images (like the Porsche).
         const iconW = iconData ? iconData.width : 128;
         const iconH = iconData ? iconData.height : 128;
 
-        // We set the mapping to cover the FULL image dimensions
         const iconMapping = {
           marker: {
             x: 0,
@@ -1165,7 +1281,7 @@ looker.plugins.visualizations.add({
             width: iconW,
             height: iconH,
             mask: false,
-            anchorY: iconH // Anchor at bottom
+            anchorY: iconH
           }
         };
 
@@ -1184,18 +1300,16 @@ looker.plugins.visualizations.add({
             return baseSize;
           },
           sizeScale: 1,
-          sizeMinPixels: 20,
+          sizeMinPixels: sizeByValue ? 1 : 20,
           billboard: iconBillboard,
-          autoHighlight: false,
-          onClick: onClickHandler,
           updateTriggers: {
             getSize: [...updateTriggersBase, radius, sizeByValue],
-            getIcon: [iconData.url] // Triggers redraw if icon loads
-          }
+            getIcon: [iconData ? iconData.url : '']
+          },
+          onClick: onClickHandler
         });
 
       case 'heatmap':
-        if (safePointData.length === 0) return null;
         return new deck.HeatmapLayer({
           id: id,
           data: safePointData,
@@ -1212,22 +1326,17 @@ looker.plugins.visualizations.add({
   },
 
   // --- UTILITIES ---
-
   _applyLookerFormat: function (value, formatStr) {
     if (value === undefined || value === null) return '0';
     if (typeof value !== 'number') return value;
-
     if (!formatStr) return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-
     let style = 'decimal';
     let currency = undefined;
-
     if (formatStr.includes('$')) { style = 'currency'; currency = 'USD'; }
     else if (formatStr.includes('€')) { style = 'currency'; currency = 'EUR'; }
     else if (formatStr.includes('£')) { style = 'currency'; currency = 'GBP'; }
     else if (formatStr.includes('¥')) { style = 'currency'; currency = 'JPY'; }
     else if (formatStr.includes('%')) { style = 'percent'; }
-
     let decimals = 0;
     if (formatStr.includes('.')) {
       const afterDot = formatStr.split('.')[1];
@@ -1235,7 +1344,6 @@ looker.plugins.visualizations.add({
     } else if (style === 'currency') {
       decimals = 2;
     }
-
     try {
       const options = {
         style: style,
@@ -1243,14 +1351,12 @@ looker.plugins.visualizations.add({
         maximumFractionDigits: decimals
       };
       if (currency) options.currency = currency;
-
       if (formatStr.toLowerCase().includes('"k"')) {
         return (value / 1000).toLocaleString(undefined, options) + 'k';
       }
       if (formatStr.toLowerCase().includes('"m"')) {
         return (value / 1000000).toLocaleString(undefined, options) + 'm';
       }
-
       return value.toLocaleString('en-US', options);
     } catch (e) {
       console.warn("Formatting error", e);

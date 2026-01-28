@@ -1,9 +1,14 @@
 /**
- * Multi-Layer 3D Map for Looker - v69 (Fast PDF Rendering)
+ * Multi-Layer 3D Map for Looker - v65 (Restored Full Feature Set + PDF Static Fix)
  *
- * CHANGES FROM V65:
- * 1. Zoom offset: 0 (was -0.25) - fixes static map alignment
- * 2. Fast PDF: Call done() immediately like v63 (don't wait for image load)
+ * REVERTED & RESTORED:
+ * 1. Series Tab & Legend: Fully restored dynamic legend and custom labeling.
+ * 2. Flexible Icons: Preserved aspect ratio logic (for the Porsche).
+ * 3. Proportional Sizing: Preserved toggle and scaling logic.
+ *
+ * NEW FIXES:
+ * 1. PDF Zoom: Adjusted static map zoom calculation (zoom - 0.25) for better alignment.
+ * 2. Code Completeness: Ensure ~800 lines of robust logic are present.
  */
 
 // --- ICONS LIBRARY (Stable) ---
@@ -259,7 +264,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V69] Failed to load icon: ${url}`);
+      console.warn(`[Viz V65] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -267,8 +272,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v69",
-  label: "Combo Map 3D (V69)",
+  id: "combo_map_ultimate_v65",
+  label: "Combo Map 3D (V65 Final Restoration)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -474,12 +479,12 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
   },
 
-  _getStaticMapUrl: function (config, viewState, width, height) {
+  _getStaticMapUrl: function(config, viewState, width, height) {
     let styleId = config.map_style.replace("mapbox://styles/", "");
     const lon = viewState.longitude.toFixed(4);
     const lat = viewState.latitude.toFixed(4);
-    // FIX: Zoom offset = 0 (was -0.25)
-    const zoom = Math.max(0, viewState.zoom).toFixed(2);
+    // ADJUST ZOOM for Static API (often needs -0.25 to -1.0 offset compared to GL)
+    const zoom = Math.max(0, viewState.zoom - 0.25).toFixed(2);
     const bearing = (viewState.bearing || 0).toFixed(2);
     const pitch = (viewState.pitch || 0).toFixed(2);
 
@@ -494,14 +499,14 @@ looker.plugins.visualizations.add({
     // Detect Print or Force Static via UI Toggle
     const isPrint = (details && details.print) || config.force_static_map;
 
-    console.log(`[Viz V69] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V65] ========== UPDATE ASYNC START ==========`);
 
     if (this._heartbeatTimer) clearInterval(this._heartbeatTimer);
 
     this.clearErrors();
 
     if (!config.mapbox_token) {
-      console.warn("[Viz V69] Waiting for Mapbox Token...");
+      console.warn("[Viz V65] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
       return;
     } else {
@@ -533,54 +538,65 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V69] Data prepared.`);
+      console.log(`[Viz V65] Data prepared.`);
 
       // --- STATIC MAP FALLBACK LOGIC ---
       if (isPrint) {
-        console.log("[Viz V69] Print/Static Mode Active.");
+         console.log("[Viz V65] Print/Static Mode Active.");
 
-        const viewState = this._viewState || {
-          longitude: Number(config.center_lng) || 2,
-          latitude: Number(config.center_lat) || 46,
-          zoom: Number(config.zoom) || 4,
-          pitch: Number(config.pitch) || 45,
-          bearing: 0
-        };
+         const viewState = this._viewState || {
+            longitude: Number(config.center_lng) || 2,
+            latitude: Number(config.center_lat) || 46,
+            zoom: Number(config.zoom) || 4,
+            pitch: Number(config.pitch) || 45,
+            bearing: 0
+         };
 
-        const width = this._container.clientWidth || 800;
-        const height = this._container.clientHeight || 600;
+         const width = this._container.clientWidth || 800;
+         const height = this._container.clientHeight || 600;
 
-        const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
-        console.log("[Viz V69] Static URL:", staticUrl);
+         const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
+         console.log("[Viz V65] Loading Static Background...", staticUrl);
 
-        // Apply background immediately (don't wait for load - like v63)
-        this._container.style.backgroundImage = `url('${staticUrl}')`;
-        this._container.style.backgroundSize = 'cover';
-        this._container.style.backgroundPosition = 'center';
+         // WAIT FOR IMAGE LOAD BEFORE CALLING DONE()
+         const bgImg = new Image();
+         bgImg.onload = () => {
+             console.log("[Viz V65] Background Image Loaded.");
+             this._container.style.backgroundImage = `url('${staticUrl}')`;
+             this._container.style.backgroundSize = 'cover';
+             this._container.style.backgroundPosition = 'center';
 
-        // Render DeckGL with transparent map style
-        this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
-        this._updateLegend(config, loadedIcons, queryResponse);
+             // Render transparent deck
+             this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
+             this._updateLegend(config, loadedIcons, queryResponse);
 
-        // Call done() immediately (don't wait for background image)
-        done();
+             // Call done only now
+             done();
+         };
+         bgImg.onerror = () => {
+             console.warn("[Viz V65] Background Image Failed to Load.");
+             // Fallback to render anyway
+             this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
+             done();
+         };
+         bgImg.src = staticUrl; // Start download
 
       } else {
-        // Interactive Mode
-        this._container.style.backgroundImage = 'none';
-        this._render(processedData, config, queryResponse, details, loadedIcons);
-        this._updateLegend(config, loadedIcons, queryResponse);
-        done();
+         // Interactive Mode
+         this._container.style.backgroundImage = 'none';
+         this._render(processedData, config, queryResponse, details, loadedIcons);
+         this._updateLegend(config, loadedIcons, queryResponse);
+         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V69] FATAL ERROR:", err);
+      console.error("[Viz V65] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
   },
 
-  _updateLegend: function (config, loadedIcons, queryResponse) {
+  _updateLegend: function(config, loadedIcons, queryResponse) {
     if (!config.show_legend) {
       this._legend.style.display = 'none';
       return;
@@ -597,13 +613,13 @@ looker.plugins.visualizations.add({
       if (config[`layer${i}_enabled`]) {
         let label = config[`layer${i}_legend_label`];
         if (!label || label.trim() === '') {
-          const measStr = config[`layer${i}_measure_idx`];
-          const mIndices = (measStr === undefined || measStr === null) ? [i - 1] : String(measStr).split(',').map(s => parseInt(s.trim()));
-          const names = mIndices.map(idx => {
-            const m = measures[idx];
-            return m ? (m.label_short || m.label) : '';
-          }).filter(s => s !== '');
-          label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
+            const measStr = config[`layer${i}_measure_idx`];
+            const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
+            const names = mIndices.map(idx => {
+                const m = measures[idx];
+                return m ? (m.label_short || m.label) : '';
+            }).filter(s => s !== '');
+            label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
         }
 
         const color = config[`layer${i}_color_main`] || '#ccc';
@@ -678,7 +694,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V69] GeoJSON load failed:", error);
+      console.warn("[Viz V65] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -819,17 +835,17 @@ looker.plugins.visualizations.add({
         // Collect links for ALL selected measures in this layer
         // (Simplified for loop, assuming current layer's measures are available,
         // or just grabbing all available drill links on the object)
-        if (props.allowedMeasures) {
-          props.allowedMeasures.forEach(mIdx => {
-            if (drillLinks[mIdx]) {
-              drillLinks[mIdx].forEach(l => finalLinks.push(l));
-            }
-          });
+        if(props.allowedMeasures){
+            props.allowedMeasures.forEach(mIdx => {
+               if(drillLinks[mIdx]) {
+                   drillLinks[mIdx].forEach(l => finalLinks.push(l));
+               }
+            });
         }
       }
       else if (pivotInfo.hasPivot && pivotData) {
-        // Pivot drill logic
-        // ...
+         // Pivot drill logic
+         // ...
       }
 
       if (finalLinks.length > 0) {
@@ -866,7 +882,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V69] Layer ${i} Error:`, e);
+          console.error(`[Viz V65] Layer ${i} Error:`, e);
         }
       }
     }

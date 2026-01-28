@@ -1,14 +1,12 @@
 /**
- * Multi-Layer 3D Map for Looker - v58 (Safety Guard Fix)
+ * Multi-Layer 3D Map for Looker - v58 + v71 Print Hybrid
  *
- * BASED ON V57
- *
- * FIX: "Safety Guard" added. The visualization now completely ignores
- * any update cycle where the Mapbox Token is missing. This prevents
- * the "Black Map" crash that happens during the initial loading phase.
+ * BASE: v58 (Layers, Tooltips, Drill Menus, Data Processing)
+ * MODIFICATION: Replaced PDF printing logic with v71 (Static Map Fallback).
+ * REMOVED: v58 specific "Safety Guard" comments/logic where it differed from v71.
  */
 
-// --- ICONS LIBRARY (Stable) ---
+// --- ICONS LIBRARY (Stable - v58) ---
 const ICONS = {
   "custom": "custom",
   "box": "https://img.icons8.com/color/96/box.png",
@@ -37,7 +35,7 @@ const ICONS = {
   "water_dam": "https://img.icons8.com/color/96/dam.png"
 };
 
-// --- HELPER: GENERATE LAYER OPTIONS ---
+// --- HELPER: GENERATE LAYER OPTIONS (v58) ---
 const getLayerOptions = (n) => {
   const defaults = [
     { type: 'geojson', color: '#2E7D32', radius: 1000, height: 1000 },
@@ -231,7 +229,7 @@ const getLayerOptions = (n) => {
   };
 };
 
-// --- HELPER: PRELOADER (WITH DIMENSION DETECTION) ---
+// --- HELPER: PRELOADER (v58) ---
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = "";
@@ -260,7 +258,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V58] Failed to load icon: ${url}`);
+      console.warn(`[Viz] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -268,8 +266,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v58",
-  label: "Combo Map 3D (V58 Print Safety)",
+  id: "combo_map_ultimate_hybrid",
+  label: "Combo Map 3D (v58 Hybrid)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -463,19 +461,33 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
   },
 
+  // --- MERGED FROM V71: STATIC MAP HELPER (For Printing) ---
+  _getStaticMapUrl: function (config, viewState, width, height) {
+    let styleId = config.map_style.replace("mapbox://styles/", "");
+    const lon = viewState.longitude.toFixed(4);
+    const lat = viewState.latitude.toFixed(4);
+    const zoom = Math.max(0, viewState.zoom).toFixed(2);
+    const bearing = (viewState.bearing || 0).toFixed(2);
+    const pitch = (viewState.pitch || 0).toFixed(2);
+
+    // Construct the Raw Mapbox URL
+    const rawUrl = `https://api.mapbox.com/styles/v1/${styleId}/static/${lon},${lat},${zoom},${bearing},${pitch}/${width}x${height}?access_token=${config.mapbox_token}&logo=false&attribution=false`;
+
+    // Wrap in Proxy to ensure PDF renderer accepts it
+    return `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}`;
+  },
+
   updateAsync: function (data, element, config, queryResponse, details, done) {
+    // MOD: Check details.print (V71 style)
     const isPrint = details && details.print;
-    console.log(`[Viz V58] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz Hybrid] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
-    // SAFETY GUARD: If token is missing, stop immediately.
-    // This prevents the map from initializing in a broken state during the first "False" cycle.
+    // TOKEN CHECK (Standard from v71 - removed v58 specific "Safety Guard" comments)
     if (!config.mapbox_token) {
-      console.warn("[Viz V58] Waiting for Mapbox Token...");
+      console.warn("[Viz] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
-      // Do NOT call done() here if you want it to keep waiting, but typically Looker needs done().
-      // However, initializing Mapbox without a token is fatal.
       return;
     } else {
       this._tokenError.style.display = 'none';
@@ -506,23 +518,48 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V58] Data prepared, rendering layers...`);
-      this._render(processedData, config, queryResponse, details, loadedIcons);
-      this._updateLegend(config, loadedIcons, queryResponse);
+      console.log(`[Viz Hybrid] Data prepared.`);
 
+      // --- MOD: V71 PRINT LOGIC IMPLEMENTATION ---
       if (isPrint) {
-        if (this._deck) {
-          console.log("[Viz V58 Print] Forcing redraw loop...");
-          this._deck.redraw(true);
-          setTimeout(() => { if(this._deck) this._deck.redraw(true); }, 1000);
-        }
-        setTimeout(() => { done(); }, 4000);
+        console.log("[Viz Hybrid] Print/Static Mode Active.");
+
+        const viewState = this._viewState || {
+          longitude: Number(config.center_lng) || 2,
+          latitude: Number(config.center_lat) || 46,
+          zoom: Number(config.zoom) || 4,
+          pitch: Number(config.pitch) || 45,
+          bearing: 0
+        };
+
+        const width = this._container.clientWidth || 800;
+        const height = this._container.clientHeight || 600;
+
+        const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
+        console.log("[Viz Hybrid] Static URL:", staticUrl);
+
+        // Apply background immediately (Static Map Fallback)
+        this._container.style.backgroundImage = `url('${staticUrl}')`;
+        this._container.style.backgroundSize = 'cover';
+        this._container.style.backgroundPosition = 'center';
+
+        // Render DeckGL with transparent map style so background shows through
+        this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
+        this._updateLegend(config, loadedIcons, queryResponse);
+
+        // Call done() immediately (V71 strategy - no waiting for timeouts)
+        done();
+
       } else {
+        // Interactive Mode (Standard v58 Rendering)
+        this._container.style.backgroundImage = 'none';
+        this._render(processedData, config, queryResponse, details, loadedIcons);
+        this._updateLegend(config, loadedIcons, queryResponse);
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V58] FATAL ERROR:", err);
+      console.error("[Viz Hybrid] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -626,7 +663,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V58] GeoJSON load failed:", error);
+      console.warn("[Viz] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -773,7 +810,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V58] Layer ${i} Error:`, e);
+          console.error(`[Viz] Layer ${i} Error:`, e);
         }
       }
     }
@@ -781,7 +818,7 @@ looker.plugins.visualizations.add({
     layerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = layerObjects.map(obj => obj.layer);
 
-    // --- TOOLTIP ---
+    // --- TOOLTIP (v58 Logic) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
@@ -1314,7 +1351,7 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // --- UTILITIES ---
+  // --- UTILITIES (v58) ---
 
   _applyLookerFormat: function (value, formatStr) {
     if (value === undefined || value === null) return '0';
