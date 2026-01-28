@@ -479,7 +479,7 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
   },
 
-  _getStaticMapUrl: function(config, viewState, width, height) {
+  _getStaticMapUrl: function (config, viewState, width, height) {
     let styleId = config.map_style.replace("mapbox://styles/", "");
     const lon = viewState.longitude.toFixed(4);
     const lat = viewState.latitude.toFixed(4);
@@ -542,51 +542,51 @@ looker.plugins.visualizations.add({
 
       // --- STATIC MAP FALLBACK LOGIC ---
       if (isPrint) {
-         console.log("[Viz V65] Print/Static Mode Active.");
+        console.log("[Viz V65] Print/Static Mode Active.");
 
-         const viewState = this._viewState || {
-            longitude: Number(config.center_lng) || 2,
-            latitude: Number(config.center_lat) || 46,
-            zoom: Number(config.zoom) || 4,
-            pitch: Number(config.pitch) || 45,
-            bearing: 0
-         };
+        const viewState = this._viewState || {
+          longitude: Number(config.center_lng) || 2,
+          latitude: Number(config.center_lat) || 46,
+          zoom: Number(config.zoom) || 4,
+          pitch: Number(config.pitch) || 45,
+          bearing: 0
+        };
 
-         const width = this._container.clientWidth || 800;
-         const height = this._container.clientHeight || 600;
+        const width = this._container.clientWidth || 800;
+        const height = this._container.clientHeight || 600;
 
-         const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
-         console.log("[Viz V65] Loading Static Background...", staticUrl);
+        const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
+        console.log("[Viz V65] Loading Static Background...", staticUrl);
 
-         // WAIT FOR IMAGE LOAD BEFORE CALLING DONE()
-         const bgImg = new Image();
-         bgImg.onload = () => {
-             console.log("[Viz V65] Background Image Loaded.");
-             this._container.style.backgroundImage = `url('${staticUrl}')`;
-             this._container.style.backgroundSize = 'cover';
-             this._container.style.backgroundPosition = 'center';
+        // WAIT FOR IMAGE LOAD BEFORE CALLING DONE()
+        const bgImg = new Image();
+        bgImg.onload = () => {
+          console.log("[Viz V65] Background Image Loaded.");
+          this._container.style.backgroundImage = `url('${staticUrl}')`;
+          this._container.style.backgroundSize = 'cover';
+          this._container.style.backgroundPosition = 'center';
 
-             // Render transparent deck
-             this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
-             this._updateLegend(config, loadedIcons, queryResponse);
+          // Render transparent deck
+          this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
+          this._updateLegend(config, loadedIcons, queryResponse);
 
-             // Call done only now
-             done();
-         };
-         bgImg.onerror = () => {
-             console.warn("[Viz V65] Background Image Failed to Load.");
-             // Fallback to render anyway
-             this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
-             done();
-         };
-         bgImg.src = staticUrl; // Start download
+          // Call done only now
+          done();
+        };
+        bgImg.onerror = () => {
+          console.warn("[Viz V65] Background Image Failed to Load.");
+          // Fallback to render anyway
+          this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
+          done();
+        };
+        bgImg.src = staticUrl; // Start download
 
       } else {
-         // Interactive Mode
-         this._container.style.backgroundImage = 'none';
-         this._render(processedData, config, queryResponse, details, loadedIcons);
-         this._updateLegend(config, loadedIcons, queryResponse);
-         done();
+        // Interactive Mode
+        this._container.style.backgroundImage = 'none';
+        this._render(processedData, config, queryResponse, details, loadedIcons);
+        this._updateLegend(config, loadedIcons, queryResponse);
+        done();
       }
 
     }).catch(err => {
@@ -596,7 +596,7 @@ looker.plugins.visualizations.add({
     });
   },
 
-  _updateLegend: function(config, loadedIcons, queryResponse) {
+  _updateLegend: function (config, loadedIcons, queryResponse) {
     if (!config.show_legend) {
       this._legend.style.display = 'none';
       return;
@@ -613,13 +613,13 @@ looker.plugins.visualizations.add({
       if (config[`layer${i}_enabled`]) {
         let label = config[`layer${i}_legend_label`];
         if (!label || label.trim() === '') {
-            const measStr = config[`layer${i}_measure_idx`];
-            const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
-            const names = mIndices.map(idx => {
-                const m = measures[idx];
-                return m ? (m.label_short || m.label) : '';
-            }).filter(s => s !== '');
-            label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
+          const measStr = config[`layer${i}_measure_idx`];
+          const mIndices = (measStr === undefined || measStr === null) ? [i - 1] : String(measStr).split(',').map(s => parseInt(s.trim()));
+          const names = mIndices.map(idx => {
+            const m = measures[idx];
+            return m ? (m.label_short || m.label) : '';
+          }).filter(s => s !== '');
+          label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
         }
 
         const color = config[`layer${i}_color_main`] || '#ccc';
@@ -835,17 +835,17 @@ looker.plugins.visualizations.add({
         // Collect links for ALL selected measures in this layer
         // (Simplified for loop, assuming current layer's measures are available,
         // or just grabbing all available drill links on the object)
-        if(props.allowedMeasures){
-            props.allowedMeasures.forEach(mIdx => {
-               if(drillLinks[mIdx]) {
-                   drillLinks[mIdx].forEach(l => finalLinks.push(l));
-               }
-            });
+        if (props.allowedMeasures) {
+          props.allowedMeasures.forEach(mIdx => {
+            if (drillLinks[mIdx]) {
+              drillLinks[mIdx].forEach(l => finalLinks.push(l));
+            }
+          });
         }
       }
       else if (pivotInfo.hasPivot && pivotData) {
-         // Pivot drill logic
-         // ...
+        // Pivot drill logic
+        // ...
       }
 
       if (finalLinks.length > 0) {
