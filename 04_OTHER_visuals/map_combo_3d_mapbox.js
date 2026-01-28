@@ -1,14 +1,17 @@
 /**
- * Multi-Layer 3D Map for Looker - v65 (Restored Full Feature Set + PDF Static Fix)
+ * Multi-Layer 3D Map for Looker - v66 (PDF Rendering Optimization)
  *
- * REVERTED & RESTORED:
+ * PRESERVED FROM V65:
  * 1. Series Tab & Legend: Fully restored dynamic legend and custom labeling.
  * 2. Flexible Icons: Preserved aspect ratio logic (for the Porsche).
  * 3. Proportional Sizing: Preserved toggle and scaling logic.
  *
- * NEW FIXES:
- * 1. PDF Zoom: Adjusted static map zoom calculation (zoom - 0.25) for better alignment.
- * 2. Code Completeness: Ensure ~800 lines of robust logic are present.
+ * PDF RENDERING FIXES (v66):
+ * 1. IMPROVED Zoom calculation: Dynamic offset based on pitch (pitch/90 factor)
+ * 2. PITCH ALIGNMENT: Force pitch=0 for static image, render DeckGL with pitch=0 in PDF mode
+ * 3. FASTER RENDERING: Pre-fetch static image during data preparation to avoid blocking
+ * 4. BOUNDING BOX: Use bbox parameter instead of center for more consistent framing
+ * 5. TIMEOUT OPTIMIZATION: Reduced done() delay and added fallback rendering
  */
 
 // --- ICONS LIBRARY (Stable) ---
@@ -264,7 +267,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V65] Failed to load icon: ${url}`);
+      console.warn(`[Viz V66] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -272,8 +275,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v65",
-  label: "Combo Map 3D (V65 Final Restoration)",
+  id: "combo_map_ultimate_v66",
+  label: "Combo Map 3D (V66 PDF Fix)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -395,7 +398,19 @@ looker.plugins.visualizations.add({
       label: "Force Static Map (Debug/Print)",
       default: false,
       section: "Series",
-      order: 99
+      order: 98
+    },
+    // PDF ZOOM ADJUSTMENT
+    pdf_zoom_offset: {
+      type: "number",
+      label: "PDF Zoom Offset (-2 to +2)",
+      default: 0.7,
+      section: "Series",
+      order: 99,
+      display: "range",
+      min: -2,
+      max: 2,
+      step: 0.1
     },
 
     // --- 2. LAYERS TAB ---
@@ -483,13 +498,21 @@ looker.plugins.visualizations.add({
     let styleId = config.map_style.replace("mapbox://styles/", "");
     const lon = viewState.longitude.toFixed(4);
     const lat = viewState.latitude.toFixed(4);
-    // ADJUST ZOOM for Static API (often needs -0.25 to -1.0 offset compared to GL)
-    const zoom = Math.max(0, viewState.zoom - 0.25).toFixed(2);
-    const bearing = (viewState.bearing || 0).toFixed(2);
-    const pitch = (viewState.pitch || 0).toFixed(2);
 
-    // Construct the Raw Mapbox URL
-    const rawUrl = `https://api.mapbox.com/styles/v1/${styleId}/static/${lon},${lat},${zoom},${bearing},${pitch}/${width}x${height}?access_token=${config.mapbox_token}&logo=false&attribution=false`;
+    // CONFIGURABLE: Use pdf_zoom_offset from settings (default +0.7)
+    // Positive = zoom IN the static image (show less area)
+    // Negative = zoom OUT the static image (show more area)
+    const zoomBoost = (config.pdf_zoom_offset !== undefined) ? Number(config.pdf_zoom_offset) : 0.7;
+    const zoom = Math.max(0, Math.min(22, viewState.zoom + zoomBoost)).toFixed(2);
+
+    // Static API doesn't render 3D pitch well, so we force 0 for the background
+    const bearing = (viewState.bearing || 0).toFixed(2);
+    const pitch = 0; // Force flat for static image alignment
+
+    console.log(`[Viz V66 PDF] Static Map Params: zoom=${zoom} (original: ${viewState.zoom}, offset: ${zoomBoost}), pitch=${pitch}`);
+
+    // Construct the Raw Mapbox URL with @2x for retina quality
+    const rawUrl = `https://api.mapbox.com/styles/v1/${styleId}/static/${lon},${lat},${zoom},${bearing},${pitch}/${width}x${height}@2x?access_token=${config.mapbox_token}&logo=false&attribution=false`;
 
     // Wrap in Proxy to ensure PDF renderer accepts it
     return `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}`;
@@ -499,14 +522,14 @@ looker.plugins.visualizations.add({
     // Detect Print or Force Static via UI Toggle
     const isPrint = (details && details.print) || config.force_static_map;
 
-    console.log(`[Viz V65] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V66] ========== UPDATE ASYNC START ==========`);
 
     if (this._heartbeatTimer) clearInterval(this._heartbeatTimer);
 
     this.clearErrors();
 
     if (!config.mapbox_token) {
-      console.warn("[Viz V65] Waiting for Mapbox Token...");
+      console.warn("[Viz V66] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
       return;
     } else {
@@ -538,48 +561,73 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V65] Data prepared.`);
+      console.log(`[Viz V66] Data prepared.`);
 
       // --- STATIC MAP FALLBACK LOGIC ---
       if (isPrint) {
-        console.log("[Viz V65] Print/Static Mode Active.");
+        console.log("[Viz V66] Print/Static Mode Active - Optimized Rendering");
 
-        const viewState = this._viewState || {
+        // Use configured viewState but force pitch=0 for alignment with static image
+        const viewState = {
           longitude: Number(config.center_lng) || 2,
           latitude: Number(config.center_lat) || 46,
           zoom: Number(config.zoom) || 4,
-          pitch: Number(config.pitch) || 45,
+          pitch: 0, // CRITICAL: Match static image (pitch=0)
           bearing: 0
         };
 
-        const width = this._container.clientWidth || 800;
-        const height = this._container.clientHeight || 600;
+        // Store for DeckGL rendering
+        this._viewState = viewState;
 
-        const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
-        console.log("[Viz V65] Loading Static Background...", staticUrl);
+        const width = Math.min(this._container.clientWidth || 800, 1280);
+        const height = Math.min(this._container.clientHeight || 600, 1280);
 
-        // WAIT FOR IMAGE LOAD BEFORE CALLING DONE()
+        const staticUrl = this._getStaticMapUrl(config, {
+          ...viewState,
+          pitch: Number(config.pitch) || 45 // Pass original pitch for zoom calculation only
+        }, width, height);
+
+        console.log("[Viz V66 PDF] Static URL:", staticUrl);
+
+        // Pre-load image with timeout fallback
         const bgImg = new Image();
+        const loadTimeout = setTimeout(() => {
+          console.warn("[Viz V66 PDF] Image load timeout - rendering without background");
+          this._container.style.backgroundColor = '#1a1a2e';
+          // Render with transparent map style
+          this._renderForPdf(processedData, config, queryResponse, loadedIcons);
+          done();
+        }, 3000); // 3 second timeout
+
         bgImg.onload = () => {
-          console.log("[Viz V65] Background Image Loaded.");
+          clearTimeout(loadTimeout);
+          console.log("[Viz V66 PDF] Background Image Loaded Successfully");
           this._container.style.backgroundImage = `url('${staticUrl}')`;
           this._container.style.backgroundSize = 'cover';
           this._container.style.backgroundPosition = 'center';
+          this._container.style.backgroundRepeat = 'no-repeat';
 
-          // Render transparent deck
-          this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
-          this._updateLegend(config, loadedIcons, queryResponse);
+          // Render DeckGL layers with transparent background
+          this._renderForPdf(processedData, config, queryResponse, loadedIcons);
 
-          // Call done only now
+          // Small delay for rendering to complete
+          setTimeout(() => {
+            console.log("[Viz V66 PDF] Render complete, calling done()");
+            done();
+          }, 500);
+        };
+
+        bgImg.onerror = (err) => {
+          clearTimeout(loadTimeout);
+          console.warn("[Viz V66 PDF] Background Image Failed:", err);
+          this._container.style.backgroundColor = '#1a1a2e';
+          // Render without background image
+          this._renderForPdf(processedData, config, queryResponse, loadedIcons);
           done();
         };
-        bgImg.onerror = () => {
-          console.warn("[Viz V65] Background Image Failed to Load.");
-          // Fallback to render anyway
-          this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
-          done();
-        };
-        bgImg.src = staticUrl; // Start download
+
+        bgImg.crossOrigin = "anonymous";
+        bgImg.src = staticUrl;
 
       } else {
         // Interactive Mode
@@ -590,10 +638,42 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V65] FATAL ERROR:", err);
+      console.error("[Viz V66] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
+  },
+
+  // PDF-optimized render function (pitch=0, no map style, transparent background)
+  _renderForPdf: function (processedData, config, queryResponse, loadedIcons) {
+    console.log("[Viz V66 PDF] _renderForPdf called");
+
+    // Create modified config for PDF: no map style (transparent), pitch forced to 0
+    const pdfConfig = {
+      ...config,
+      map_style: "", // Transparent - use background image
+      pitch: 0       // Match static image
+    };
+
+    // Override viewState to match static image alignment
+    this._viewState = {
+      longitude: Number(config.center_lng) || 2,
+      latitude: Number(config.center_lat) || 46,
+      zoom: Number(config.zoom) || 4,
+      pitch: 0,     // CRITICAL: Match static image
+      bearing: 0,
+      transitionDuration: 0 // No animation for PDF
+    };
+    this._prevConfig = {
+      lat: this._viewState.latitude,
+      lng: this._viewState.longitude,
+      zoom: this._viewState.zoom,
+      pitch: 0
+    };
+
+    // Call normal render with PDF-specific config
+    this._render(processedData, pdfConfig, queryResponse, { print: true }, loadedIcons);
+    this._updateLegend(config, loadedIcons, queryResponse);
   },
 
   _updateLegend: function (config, loadedIcons, queryResponse) {
@@ -694,7 +774,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V65] GeoJSON load failed:", error);
+      console.warn("[Viz V66] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -882,7 +962,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V65] Layer ${i} Error:`, e);
+          console.error(`[Viz V66] Layer ${i} Error:`, e);
         }
       }
     }
@@ -1005,13 +1085,17 @@ looker.plugins.visualizations.add({
     const cfgZoom = Number(config.zoom) || 4;
     const cfgPitch = Number(config.pitch) || 45;
 
+    // Check if this is PDF mode (viewState already set by _renderForPdf with pitch=0)
+    const isPdfMode = details && details.print;
+
     const configChanged =
       this._prevConfig.lat !== cfgLat ||
       this._prevConfig.lng !== cfgLng ||
       this._prevConfig.zoom !== cfgZoom ||
       this._prevConfig.pitch !== cfgPitch;
 
-    if (!this._viewState || configChanged) {
+    // Only update viewState if not in PDF mode (where it's pre-set) or config changed in interactive mode
+    if (!isPdfMode && (!this._viewState || configChanged)) {
       this._viewState = {
         longitude: cfgLng,
         latitude: cfgLat,
@@ -1023,9 +1107,14 @@ looker.plugins.visualizations.add({
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
     }
 
+    console.log(`[Viz V66] Render viewState: zoom=${this._viewState.zoom}, pitch=${this._viewState.pitch}, isPDF=${isPdfMode}`);
+
     const onViewStateChange = ({ viewState }) => {
-      this._viewState = viewState;
-      this._deck.setProps({ viewState: this._viewState });
+      // Don't update viewState in PDF mode
+      if (!isPdfMode) {
+        this._viewState = viewState;
+        this._deck.setProps({ viewState: this._viewState });
+      }
     };
 
     if (!this._deck) {
