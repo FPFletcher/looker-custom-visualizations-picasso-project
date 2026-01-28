@@ -1,19 +1,20 @@
 /**
- * Multi-Layer 3D Map for Looker - v59 (PDF Fix & Loop Prevention)
+ * Multi-Layer 3D Map for Looker - v52 (Flexible Icons & Classic Library)
  *
- * CHANGES FROM V58:
- * 1. CRITICAL FIX: Removed the 4-second delay on `done()`. This stops the infinite loop.
- * 2. PDF FIX: Added a "Heartbeat" renderer.
- * - Instead of waiting, we tell Looker we are done immediately.
- * - We then start a background timer that forces the map to redraw every 500ms for 10 seconds.
- * - This ensures the map is visible whenever the PDF screenshot happens.
+ * CHANGES FROM V51:
+ * 1. CONTENT: Reverted to v49 Icon Library (Icons8 style).
+ * 2. FIX: Updated 'building' and 'oil_barrel' URLs to working versions.
+ * 3. FEATURE: "Flexible" Icon Dimensions.
+ * - The code now detects the aspect ratio of custom images.
+ * - Prevents "square cropping" of wide images (like the Porsche).
+ * 4. EXPLANATION: The Proxy is REQUIRED for WebGL (Deck.gl) even if URLs work in HTML.
  */
 
-// --- ICONS LIBRARY (Stable) ---
+// --- ICONS LIBRARY (Restored v49 Style with Fixes) ---
 const ICONS = {
   "custom": "custom",
   "box": "https://img.icons8.com/color/96/box.png",
-  "building": "https://img.icons8.com/color/96/city.png",
+  "building": "https://img.icons8.com/color/96/city.png", // FIXED
   "car": "https://img.icons8.com/color/96/car--v1.png",
   "check": "https://img.icons8.com/color/96/checked--v1.png",
   "circle": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Basic_red_dot.png/64px-Basic_red_dot.png",
@@ -24,7 +25,7 @@ const ICONS = {
   "hospital": "https://img.icons8.com/color/96/hospital-3.png",
   "info": "https://img.icons8.com/color/96/info--v1.png",
   "marker_blue": "https://static.vecteezy.com/system/resources/thumbnails/035/907/415/small/ai-generated-blue-semi-truck-with-trailer-isolated-on-transparent-background-free-png.png",
-  "oil_barrel": "https://img.icons8.com/color/96/oil-storage-tank.png",
+  "oil_barrel": "https://img.icons8.com/color/96/oil-storage-tank.png", // FIXED
   "oil_rig": "https://img.icons8.com/color/96/oil-rig.png",
   "pin": "https://img.icons8.com/color/96/marker.png",
   "plane": "https://img.icons8.com/color/96/airport.png",
@@ -220,23 +221,17 @@ const getLayerOptions = (n) => {
       default: true,
       section: "Layers",
       order: b + 17
-    },
-    [`layer${n}_legend_label`]: {
-      type: "string",
-      label: `Layer ${n} Legend Label`,
-      default: "",
-      placeholder: "Leave empty to use Measure Name",
-      section: "Series",
-      order: n * 10
     }
   };
 };
 
 // --- HELPER: PRELOADER (WITH DIMENSION DETECTION) ---
+// Returns: { url: string, width: number, height: number }
 const preloadImage = (type, customUrl) => {
   return new Promise((resolve) => {
     let url = "";
 
+    // 1. Determine URL
     if (type === 'custom' && customUrl) {
       url = customUrl;
     } else if (ICONS[type]) {
@@ -244,10 +239,12 @@ const preloadImage = (type, customUrl) => {
     }
 
     if (!url || url.length < 5) {
+      // Return default dimensions (128x128) for fallback
       return resolve({ url: ICONS['factory'], width: 128, height: 128 });
     }
 
-    // CORS Proxy
+    // 2. APPLY PROXY (Required for WebGL CORS)
+    // We skip proxy for data URIs or already proxied links
     if (type === 'custom' && !url.startsWith('data:') && !url.includes('wsrv.nl')) {
       url = `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
     }
@@ -255,6 +252,8 @@ const preloadImage = (type, customUrl) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => {
+      // 3. RETURN DIMENSIONS
+      // This allows us to set the sprite mapping exactly to the image size
       resolve({
         url: url,
         width: img.naturalWidth || 128,
@@ -262,7 +261,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V59] Failed to load icon: ${url}`);
+      console.warn(`[Viz V52] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -270,8 +269,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v59",
-  label: "Combo Map 3D (V59 Heartbeat)",
+  id: "combo_map_ultimate_v52",
+  label: "Combo Map 3D (V52 Flexible)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -364,30 +363,6 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
-    // --- SERIES TAB ---
-    legend_header: { type: "string", label: "─── LEGEND SETTINGS ───", display: "divider", section: "Series", order: 1 },
-    show_legend: {
-      type: "boolean",
-      label: "Show Legend",
-      default: true,
-      section: "Series",
-      order: 2
-    },
-    legend_position: {
-      type: "string",
-      label: "Legend Position",
-      display: "select",
-      values: [
-        { "Top Right": "top-right" },
-        { "Bottom Right": "bottom-right" },
-        { "Top Left": "top-left" },
-        { "Bottom Left": "bottom-left" }
-      ],
-      default: "bottom-right",
-      section: "Series",
-      order: 3
-    },
-
     // --- 2. LAYERS TAB ---
     ...getLayerOptions(1),
     ...getLayerOptions(2),
@@ -417,45 +392,19 @@ looker.plugins.visualizations.add({
         .pivot-section { margin-top: 5px; padding-top: 5px; border-top: 1px dashed #ccc; }
         .pivot-value { display: flex; justify-content: space-between; gap: 10px; }
         .pivot-label { color: #666; font-size: 0.9em; }
-
-        .map-legend {
-          position: absolute;
-          background: rgba(255, 255, 255, 0.9);
-          padding: 10px;
-          border-radius: 4px;
-          font-family: sans-serif;
-          font-size: 12px;
-          color: #333;
-          box-shadow: 0 0 4px rgba(0,0,0,0.3);
-          z-index: 10;
-          pointer-events: none;
-          max-width: 250px;
-        }
-        .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
-        .legend-symbol { width: 16px; height: 16px; margin-right: 8px; display: inline-block; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid rgba(0,0,0,0.1); }
-        .legend-circle { border-radius: 50%; }
-        .legend-rect { border-radius: 2px; }
-
-        .top-right { top: 10px; right: 10px; }
-        .bottom-right { bottom: 30px; right: 10px; }
-        .top-left { top: 10px; left: 10px; }
-        .bottom-left { bottom: 30px; left: 10px; }
       </style>
 
       <div id="map-wrapper">
         <div id="map"></div>
-        <div id="map-legend" class="map-legend bottom-right" style="display:none;"></div>
         <div id="token-error">MISSING MAPBOX TOKEN<br><span style="font-size:0.8em; font-weight:normal">Please enter your token in the "Plot" settings.</span></div>
       </div>`;
 
     this._container = element.querySelector('#map');
     this._tokenError = element.querySelector('#token-error');
-    this._legend = element.querySelector('#map-legend');
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
     this._processedData = null;
-    this._heartbeatTimer = null; // New timer handle
   },
 
   destroy: function () {
@@ -463,25 +412,18 @@ looker.plugins.visualizations.add({
       this._deck.finalize();
       this._deck = null;
     }
-    if (this._heartbeatTimer) {
-      clearInterval(this._heartbeatTimer);
-    }
     this._geojsonCache = {};
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
     const isPrint = details && details.print;
-    console.log(`[Viz V59] ========== UPDATE ASYNC START ==========`);
-
-    // Reset heartbeat if running
-    if (this._heartbeatTimer) clearInterval(this._heartbeatTimer);
+    console.log(`[Viz V52] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
-    // SAFETY GUARD: Stop if no token
     if (!config.mapbox_token) {
-      console.warn("[Viz V59] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
+      done();
       return;
     } else {
       this._tokenError.style.display = 'none';
@@ -512,94 +454,25 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V59] Data prepared, rendering layers...`);
+      console.log(`[Viz V52] Data prepared, rendering layers...`);
       this._render(processedData, config, queryResponse, details, loadedIcons);
-      this._updateLegend(config, loadedIcons, queryResponse);
 
       if (isPrint) {
-        // PDF FIX 1: Tell Looker we are done immediately to prevent timeout loops
-        done();
-
-        // PDF FIX 2: Start a heartbeat to force redraws for 10 seconds
-        // This ensures that whenever the screenshot happens, the map is painted
         if (this._deck) {
-          console.log("[Viz V59 Print] Starting background heartbeat...");
-          this._heartbeatTimer = setInterval(() => {
-             // console.log("[Viz V59 Print] Heartbeat Redraw");
-             this._deck.redraw(true);
-          }, 500); // Redraw every 500ms
-
-          // Stop after 10 seconds
-          setTimeout(() => {
-            if(this._heartbeatTimer) clearInterval(this._heartbeatTimer);
-          }, 10000);
+          this._deck.redraw(true);
         }
+        setTimeout(() => {
+          done();
+        }, 3000);
       } else {
         done();
       }
 
     }).catch(err => {
-      console.error("[Viz V59] FATAL ERROR:", err);
+      console.error("[Viz V52] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
-  },
-
-  _updateLegend: function(config, loadedIcons, queryResponse) {
-    if (!config.show_legend) {
-      this._legend.style.display = 'none';
-      return;
-    }
-
-    this._legend.style.display = 'block';
-    this._legend.className = `map-legend ${config.legend_position || 'bottom-right'}`;
-
-    let html = '';
-    let iconIndex = 0;
-    const measures = queryResponse.fields.measure_like;
-
-    for (let i = 1; i <= 4; i++) {
-      if (config[`layer${i}_enabled`]) {
-        let label = config[`layer${i}_legend_label`];
-        if (!label || label.trim() === '') {
-            const measStr = config[`layer${i}_measure_idx`];
-            const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
-            const names = mIndices.map(idx => {
-                const m = measures[idx];
-                return m ? (m.label_short || m.label) : '';
-            }).filter(s => s !== '');
-            label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
-        }
-
-        const color = config[`layer${i}_color_main`] || '#ccc';
-        const type = config[`layer${i}_type`];
-        const useGradient = config[`layer${i}_use_gradient`];
-        const endColor = config[`layer${i}_gradient_end`] || color;
-
-        let symbolHtml = '';
-
-        if (type === 'icon') {
-          const iconData = loadedIcons[iconIndex];
-          const url = iconData ? iconData.url : ICONS['factory'];
-          symbolHtml = `<div class="legend-symbol" style="background-image: url('${url}');"></div>`;
-          iconIndex++;
-        } else if (type === 'point' || type === 'bubble') {
-          const style = useGradient
-            ? `background: linear-gradient(135deg, ${color}, ${endColor});`
-            : `background-color: ${color};`;
-          symbolHtml = `<div class="legend-symbol legend-circle" style="${style}"></div>`;
-        } else {
-          const style = useGradient
-            ? `background: linear-gradient(to right, ${color}, ${endColor});`
-            : `background-color: ${color};`;
-          symbolHtml = `<div class="legend-symbol legend-rect" style="${style}"></div>`;
-        }
-
-        html += `<div class="legend-item">${symbolHtml}<span>${label}</span></div>`;
-      }
-    }
-
-    this._legend.innerHTML = html;
   },
 
   _detectPivots: function (queryResponse) {
@@ -620,9 +493,11 @@ looker.plugins.visualizations.add({
     const measures = queryResponse.fields.measure_like;
     const dims = queryResponse.fields.dimension_like;
 
+    // AUTO-DETECT DATA MODE
     const latDim = dims.find(d => d.type === 'latitude' || d.name.toLowerCase().includes('lat'));
     const lonDim = dims.find(d => d.type === 'longitude' || d.name.toLowerCase().includes('lng') || d.name.toLowerCase().includes('lon'));
 
+    // If we have Lat/Lon, use POINTS mode. Otherwise use REGIONS.
     const isPointsMode = (latDim && lonDim);
 
     if (isPointsMode) {
@@ -638,12 +513,13 @@ looker.plugins.visualizations.add({
       return { type: 'points', data: points, measures, dims };
     }
 
+    // REGIONS MODE
     const url = this._getGeoJSONUrl(config);
     let geojson = null;
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V59] GeoJSON load failed:", error);
+      console.warn("[Viz V52] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -765,7 +641,6 @@ looker.plugins.visualizations.add({
   },
 
   _render: function (processed, config, queryResponse, details, loadedIcons) {
-    const isPrint = details && details.print;
     const layerObjects = [];
     let iconIndex = 0;
 
@@ -775,22 +650,21 @@ looker.plugins.visualizations.add({
 
       if (enabled) {
         try {
+          // --- ICON RETRIEVAL (Now contains object {url, width, height}) ---
           let iconData = null;
-          let isCustomIcon = false;
           if (type === 'icon') {
-            const preset = config[`layer${i}_icon_type`];
-            isCustomIcon = (preset === 'custom');
+            // Default fallback
             const defaultIcon = { url: ICONS['factory'], width: 128, height: 128 };
             iconData = loadedIcons[iconIndex] || defaultIcon;
             iconIndex++;
           }
-          const layer = this._buildSingleLayer(i, config, processed, iconData, isCustomIcon);
+          const layer = this._buildSingleLayer(i, config, processed, iconData);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V59] Layer ${i} Error:`, e);
+          console.error(`[Viz V52] Layer ${i} Error:`, e);
         }
       }
     }
@@ -926,7 +800,7 @@ looker.plugins.visualizations.add({
         zoom: cfgZoom,
         pitch: cfgPitch,
         bearing: 0,
-        transitionDuration: isPrint ? 0 : 500 // PDF FIX: No transition
+        transitionDuration: (details && details.print) ? 0 : 500
       };
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
     }
@@ -961,28 +835,18 @@ looker.plugins.visualizations.add({
     }
   },
 
-  _validateLayerData: function (data, config, getValueFn) {
+  _validateLayerData: function (data, config) {
     if (!data || !Array.isArray(data) || data.length === 0) return [];
-
-    let validData = data.filter(d =>
+    return data.filter(d =>
       d.position &&
       d.position.length === 2 &&
       !isNaN(d.position[0]) &&
       !isNaN(d.position[1]) &&
       d.position[1] >= -90 && d.position[1] <= 90
     );
-
-    if (config.hide_no_data && getValueFn) {
-      validData = validData.filter(d => {
-        const val = getValueFn(d);
-        return val !== null && val !== undefined && !isNaN(val) && Math.abs(val) > 0;
-      });
-    }
-
-    return validData;
   },
 
-  _buildSingleLayer: function (idx, config, processed, iconData, isCustomIcon) {
+  _buildSingleLayer: function (idx, config, processed, iconData) {
     const type = config[`layer${idx}_type`];
 
     const rawM = config[`layer${idx}_measure_idx`];
@@ -997,10 +861,8 @@ looker.plugins.visualizations.add({
     const showAllPivots = config[`layer${idx}_show_all_pivots`];
     const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
     const hideNulls = config.hide_no_data;
-
-    const sizeByValue = config[`layer${idx}_size_by_value`] || false;
-
-    const iconBillboard = config[`layer${idx}_icon_billboard`] !== false;
+    const sizeByValue = config[`layer${idx}_size_by_value`];
+    const iconBillboard = config[`layer${idx}_icon_billboard`] !== false; // Default true
 
     const useGradient = config[`layer${idx}_use_gradient`];
     const startColorHex = config[`layer${idx}_color_main`];
@@ -1014,6 +876,7 @@ looker.plugins.visualizations.add({
     const queryResponse = this._queryResponse;
     const measures = queryResponse.fields.measure_like;
 
+    // --- HELPER: Get Value for specific layer config ---
     const getValue = (d) => {
       let totalValue = 0;
       measureIndices.forEach(mIdx => {
@@ -1040,6 +903,7 @@ looker.plugins.visualizations.add({
       return totalValue || 0;
     };
 
+    // --- PREPARE DATA ---
     let rawPointData = [];
     if (processed.type === 'regions') {
       dimIndices.forEach(dimIdx => {
@@ -1102,11 +966,71 @@ looker.plugins.visualizations.add({
       rawPointData = processed.data.map(p => ({ ...p, allowedMeasures: measureIndices }));
     }
 
-    const safePointData = this._validateLayerData(rawPointData, config, getValue);
-    const id = `layer-${idx}-${type}`;
+    // --- FILTER: Validate and Hide Nulls (Layer Logic) ---
+    let safePointData = this._validateLayerData(rawPointData, config);
+
+    if (hideNulls) {
+      safePointData = safePointData.filter(d => {
+        const val = getValue(d);
+        return val !== 0 && val !== null && !isNaN(val);
+      });
+    }
+
     const allVals = safePointData.map(d => getValue(d));
     const maxVal = Math.max(...allVals, 0.1);
+
+    const id = `layer-${idx}-${type}`;
     const updateTriggersBase = [measureStr, dimStr, useGradient, startColorHex, endColorHex, showAllPivots, pivotIdx, hideNulls, sizeByValue];
+
+    const onClickHandler = (info) => {
+      if (!info || !info.object) return;
+      const obj = info.object;
+      const props = obj.properties || obj;
+      const pivotData = props._pivotData || props.pivotData;
+      const drillLinks = props._drillLinks || props.drillLinks;
+
+      let finalLinks = [];
+
+      if (!pivotInfo.hasPivot && drillLinks) {
+        measureIndices.forEach(mIdx => {
+          if (drillLinks[mIdx] && drillLinks[mIdx].length > 0) {
+            const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
+            drillLinks[mIdx].forEach(link => {
+              finalLinks.push({ ...link, label: `${mName}: ${link.label}` });
+            });
+          }
+        });
+      }
+      else if (pivotInfo.hasPivot && pivotData) {
+        measureIndices.forEach(mIdx => {
+          const mName = measures[mIdx] ? measures[mIdx].name : null;
+          if (!mName || !pivotData[mName]) return;
+
+          if (showAllPivots) {
+            Object.values(pivotData[mName]).forEach(pVal => {
+              if (pVal.links) finalLinks.push(...pVal.links);
+            });
+          } else {
+            const pKey = pivotInfo.pivotKeys[pivotIdx];
+            if (pKey && pivotData[mName][pKey] && pivotData[mName][pKey].links) {
+              finalLinks.push(...pivotData[mName][pKey].links);
+            }
+          }
+        });
+      }
+
+      if (finalLinks.length > 0) {
+        LookerCharts.Utils.openDrillMenu({
+          links: finalLinks,
+          event: {
+            pageX: info.x,
+            pageY: info.y,
+            clientX: info.x,
+            clientY: info.y
+          }
+        });
+      }
+    };
 
     const geoJsonFeatures = safePointData.filter(d => d.feature).map(d => {
       d.feature.properties._values = d.values;
@@ -1227,10 +1151,13 @@ looker.plugins.visualizations.add({
           position: [d.position[0], d.position[1], 0]
         }));
 
-        // FLEXIBLE DIMS (From v52)
+        // --- FLEXIBLE DIMENSION LOGIC ---
+        // Instead of hardcoding 128x128, use the loaded image's actual size.
+        // This prevents the "square crop" of rectangular images (like the Porsche).
         const iconW = iconData ? iconData.width : 128;
         const iconH = iconData ? iconData.height : 128;
 
+        // We set the mapping to cover the FULL image dimensions
         const iconMapping = {
           marker: {
             x: 0,
@@ -1238,7 +1165,7 @@ looker.plugins.visualizations.add({
             width: iconW,
             height: iconH,
             mask: false,
-            anchorY: iconH
+            anchorY: iconH // Anchor at bottom
           }
         };
 
@@ -1251,21 +1178,19 @@ looker.plugins.visualizations.add({
           iconMapping: iconMapping,
           getIcon: d => 'marker',
           getPosition: d => d.position,
-          // SCALING FIX: Remove Math.max floor. Allow full scaling.
           getSize: d => {
             const baseSize = radius / 100;
             if (sizeByValue) return baseSize * (getValue(d) / maxVal);
             return baseSize;
           },
           sizeScale: 1,
-          // SCALING FIX: Drop minimum pixels to 1 if scaling is enabled
-          sizeMinPixels: sizeByValue ? 1 : 20,
+          sizeMinPixels: 20,
           billboard: iconBillboard,
           autoHighlight: false,
           onClick: onClickHandler,
           updateTriggers: {
             getSize: [...updateTriggersBase, radius, sizeByValue],
-            getIcon: [iconData ? iconData.url : '']
+            getIcon: [iconData.url] // Triggers redraw if icon loads
           }
         });
 
