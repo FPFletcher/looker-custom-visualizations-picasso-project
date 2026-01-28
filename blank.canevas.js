@@ -1,8 +1,15 @@
 /**
- * Multi-Layer 3D Map for Looker - v68 (PDF Zoom Fix)
+ * Multi-Layer 3D Map for Looker - v67 (PDF Zoom Fix Only)
  *
- * IDENTICAL TO V65 EXCEPT:
- * - Changed static map zoom offset from -0.25 to 0 (line ~487)
+ * PRESERVED FROM V65 (NO OTHER CHANGES):
+ * 1. Series Tab & Legend: Fully restored dynamic legend and custom labeling.
+ * 2. Flexible Icons: Preserved aspect ratio logic (for the Porsche).
+ * 3. Proportional Sizing: Preserved toggle and scaling logic.
+ * 4. 3D Tilt: Preserved pitch handling.
+ *
+ * MINIMAL FIX (v67):
+ * 1. Changed default zoom offset from -0.25 to +0.5 (static image was too zoomed out)
+ * 2. Added configurable "PDF Zoom Offset" slider in Series tab
  */
 
 // --- ICONS LIBRARY (Stable) ---
@@ -258,7 +265,7 @@ const preloadImage = (type, customUrl) => {
       });
     };
     img.onerror = () => {
-      console.warn(`[Viz V68] Failed to load icon: ${url}`);
+      console.warn(`[Viz V67] Failed to load icon: ${url}`);
       resolve({ url: ICONS['warning'], width: 128, height: 128 });
     };
     img.src = url;
@@ -266,8 +273,8 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "combo_map_ultimate_v68",
-  label: "Combo Map 3D (V68)",
+  id: "combo_map_ultimate_v67",
+  label: "Combo Map 3D (V67 PDF Zoom Fix)",
   options: {
     // --- 1. PLOT TAB ---
     region_header: { type: "string", label: "─── DATA & REGIONS ───", display: "divider", section: "Plot", order: 1 },
@@ -389,7 +396,19 @@ looker.plugins.visualizations.add({
       label: "Force Static Map (Debug/Print)",
       default: false,
       section: "Series",
-      order: 99
+      order: 98
+    },
+    // PDF ZOOM OFFSET - Adjust if background map doesn't align
+    pdf_zoom_offset: {
+      type: "number",
+      label: "PDF Zoom Offset",
+      default: 0.5,
+      section: "Series",
+      order: 99,
+      display: "range",
+      min: -2,
+      max: 2,
+      step: 0.1
     },
 
     // --- 2. LAYERS TAB ---
@@ -477,8 +496,10 @@ looker.plugins.visualizations.add({
     let styleId = config.map_style.replace("mapbox://styles/", "");
     const lon = viewState.longitude.toFixed(4);
     const lat = viewState.latitude.toFixed(4);
-    // FIX: Changed from -0.25 to 0 (tested and confirmed working)
-    const zoom = Math.max(0, viewState.zoom).toFixed(2);
+    // CONFIGURABLE zoom offset: positive = zoom in static image, negative = zoom out
+    // Default +0.5 (was -0.25 which made static image too zoomed out)
+    const zoomOffset = (config.pdf_zoom_offset !== undefined) ? Number(config.pdf_zoom_offset) : 0.5;
+    const zoom = Math.max(0, Math.min(22, viewState.zoom + zoomOffset)).toFixed(2);
     const bearing = (viewState.bearing || 0).toFixed(2);
     const pitch = (viewState.pitch || 0).toFixed(2);
 
@@ -493,14 +514,14 @@ looker.plugins.visualizations.add({
     // Detect Print or Force Static via UI Toggle
     const isPrint = (details && details.print) || config.force_static_map;
 
-    console.log(`[Viz V68] ========== UPDATE ASYNC START ==========`);
+    console.log(`[Viz V67] ========== UPDATE ASYNC START ==========`);
 
     if (this._heartbeatTimer) clearInterval(this._heartbeatTimer);
 
     this.clearErrors();
 
     if (!config.mapbox_token) {
-      console.warn("[Viz V68] Waiting for Mapbox Token...");
+      console.warn("[Viz V67] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
       return;
     } else {
@@ -532,11 +553,11 @@ looker.plugins.visualizations.add({
 
       this._processedData = processedData;
 
-      console.log(`[Viz V68] Data prepared.`);
+      console.log(`[Viz V67] Data prepared.`);
 
       // --- STATIC MAP FALLBACK LOGIC ---
       if (isPrint) {
-        console.log("[Viz V68] Print/Static Mode Active.");
+        console.log("[Viz V67] Print/Static Mode Active.");
 
         const viewState = this._viewState || {
           longitude: Number(config.center_lng) || 2,
@@ -550,12 +571,12 @@ looker.plugins.visualizations.add({
         const height = this._container.clientHeight || 600;
 
         const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
-        console.log("[Viz V68] Loading Static Background...", staticUrl);
+        console.log("[Viz V67] Loading Static Background...", staticUrl);
 
         // WAIT FOR IMAGE LOAD BEFORE CALLING DONE()
         const bgImg = new Image();
         bgImg.onload = () => {
-          console.log("[Viz V68] Background Image Loaded.");
+          console.log("[Viz V67] Background Image Loaded.");
           this._container.style.backgroundImage = `url('${staticUrl}')`;
           this._container.style.backgroundSize = 'cover';
           this._container.style.backgroundPosition = 'center';
@@ -568,7 +589,7 @@ looker.plugins.visualizations.add({
           done();
         };
         bgImg.onerror = () => {
-          console.warn("[Viz V68] Background Image Failed to Load.");
+          console.warn("[Viz V67] Background Image Failed to Load.");
           // Fallback to render anyway
           this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
           done();
@@ -584,7 +605,7 @@ looker.plugins.visualizations.add({
       }
 
     }).catch(err => {
-      console.error("[Viz V68] FATAL ERROR:", err);
+      console.error("[Viz V67] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
     });
@@ -688,7 +709,7 @@ looker.plugins.visualizations.add({
     try {
       geojson = await this._loadGeoJSON(url);
     } catch (error) {
-      console.warn("[Viz V68] GeoJSON load failed:", error);
+      console.warn("[Viz V67] GeoJSON load failed:", error);
       geojson = { type: "FeatureCollection", features: [] };
     }
 
@@ -876,7 +897,7 @@ looker.plugins.visualizations.add({
             layerObjects.push({ layer: layer, zIndex: z });
           }
         } catch (e) {
-          console.error(`[Viz V68] Layer ${i} Error:`, e);
+          console.error(`[Viz V67] Layer ${i} Error:`, e);
         }
       }
     }
