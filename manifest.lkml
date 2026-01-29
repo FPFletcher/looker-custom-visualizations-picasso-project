@@ -9,25 +9,21 @@ visualization: {
   id: "scorecard_sparkline_viz"
   label: "Scorecard"
   file: "01_STUDIO_visuals/scorecard_sparkline.js"
-
-  # No external dependencies needed
-  dependencies: []
 }
 
 visualization: {
   id: "treemap_studio_viz"
   label: "Treemap (Studio)"
   file: "01_STUDIO_visuals/treemap.js"
-  dependencies: []
 }
 
 visualization: {
   id: "bar_chart_conditional_formatting_viz"
   label: "Bar Chart (Conditional formatting)"
   file: "01_STUDIO_visuals/bar_chart_conditional.js"
-  dependencies: [
-    "https://code.highcharts.com/highcharts.js"
-  ]
+  # dependencies: [
+  #"https://code.highcharts.com/highcharts.js"
+  # ]
 }
 
 
@@ -39,23 +35,19 @@ visualization: {
   id: "single_value_picture_background"
   label: "Single Value (Picture lookML version)"
   file: "04_OTHER_visuals/single_value_picture.js"
-
-  dependencies: [
-  ]
 }
 
 visualization: {
   id: "combo_map_3d"
   label: "Combo Map 3D"
   file: "04_OTHER_visuals/map_combo_3d_mapbox.js"
-
-  dependencies: [
-  ]
+  # dependencies: [
+  #"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
+  # "https://unpkg.com/deck.gl@latest/dist.min.js",
+  # "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
+  # "https://unpkg.com/topojson-client@3"
+  # ]
 }
-#"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
-# "https://unpkg.com/deck.gl@latest/dist.min.js",
-# "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
-# "https://unpkg.com/topojson-client@3"
 
 visualization: {
   id: "url-embed-visual"
