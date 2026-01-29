@@ -1,48 +1,11 @@
 /**
- * Bar Chart (Conditional Formatting) - CDN Version
- *
- * MODIFICATION: Added auto-loading of Highcharts dependency
- * because Admin-panel visuals cannot use manifest dependencies.
+ * Conditional Bar Chart for Looker
+ * OPTIMIZED FOR PDF PRINTING & DEBUGGING
  */
 
-// --- 1. DEPENDENCY LOADER (Required for CDN) ---
-const loadScript = (src) => {
-  return new Promise((resolve, reject) => {
-    // Check if script is already present
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      if (existing.dataset.loaded === "true") return resolve();
-      existing.addEventListener('load', resolve);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.dataset.loaded = "false";
-    script.onload = () => {
-      script.dataset.loaded = "true";
-      resolve();
-    };
-    script.onerror = () => {
-      console.error(`[Viz Loader] Failed to load ${src}`);
-      reject();
-    };
-    document.head.appendChild(script);
-  });
-};
-
-// Trigger loading immediately
-loadScript("https://code.highcharts.com/highcharts.js")
-  .then(() => console.log("[Viz Loader] Highcharts loaded."))
-  .catch((e) => console.error("[Viz Loader] Highcharts failed to load", e));
-
-
-// --- VISUALIZATION CODE ---
 looker.plugins.visualizations.add({
-  // UPDATED ID: Must match your Admin Panel ID exactly
-  id: "bar_chart_conditional_formatting_viz",
-  label: "Bar Chart (Conditional formatting)",
+  id: "conditional_bar_chart",
+  label: "Bar Chart (Conditional)",
   options: {
     // ========== PLOT SECTION ==========
     chart_type: {
@@ -1011,13 +974,6 @@ looker.plugins.visualizations.add({
 
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    // --- 1. DEPENDENCY CHECK FOR CDN ---
-    if (typeof Highcharts === "undefined") {
-      console.log("[Viz] Waiting for Highcharts...");
-      setTimeout(() => this.updateAsync(data, element, config, queryResponse, details, done), 100);
-      return;
-    }
-
     // --- PDF / PRINT MODE DETECTION ---
     console.log("[Viz] 1. Update Async Started"); // LOG ADDED
     const isPrint = details && details.print;
