@@ -1,58 +1,10 @@
 /**
- * Multi-Layer 3D Map for Looker - v58 + v71 Print Hybrid (CDN Version)
+ * Multi-Layer 3D Map for Looker - v58 + v71 Print Hybrid
  *
  * BASE: v58 (Layers, Tooltips, Drill Menus, Data Processing)
- * MODIFICATION 1: Replaced PDF printing logic with v71 (Static Map Fallback).
- * MODIFICATION 2: Added Manual Dependency Loader (DeckGL, Mapbox, TopoJSON) for CDN support.
- * ID: map_combo_3d_mapbox_cdn
+ * MODIFICATION: Replaced PDF printing logic with v71 (Static Map Fallback).
+ * REMOVED: v58 specific "Safety Guard" comments/logic where it differed from v71.
  */
-
-// --- 1. DEPENDENCY LOADER (Required for CDN) ---
-const loadScript = (src) => {
-  return new Promise((resolve, reject) => {
-    // Check if script is already present
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      if (existing.dataset.loaded === "true") return resolve();
-      existing.addEventListener('load', resolve);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.dataset.loaded = "false";
-    script.onload = () => {
-      script.dataset.loaded = "true";
-      resolve();
-    };
-    script.onerror = () => {
-      console.error(`[Viz Loader] Failed to load ${src}`);
-      reject();
-    };
-    document.head.appendChild(script);
-  });
-};
-
-const loadDependencies = async () => {
-  try {
-    console.log("[Viz Loader] Loading dependencies...");
-    // Load Mapbox & TopoJSON first
-    await Promise.all([
-      loadScript("https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"),
-      loadScript("https://unpkg.com/topojson-client@3")
-    ]);
-    // Load DeckGL after Mapbox is ready
-    await loadScript("https://unpkg.com/deck.gl@latest/dist.min.js");
-    console.log("[Viz Loader] All dependencies loaded.");
-  } catch (e) {
-    console.error("[Viz Loader] Dependency loading failed", e);
-  }
-};
-
-// Trigger loading immediately
-loadDependencies();
-
 
 // --- ICONS LIBRARY (Stable - v58) ---
 const ICONS = {
@@ -314,7 +266,7 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "map_combo_3d_mapbox_cdn", // UPDATED: Matches Admin Panel ID
+  id: "combo_map_ultimate_hybrid",
   label: "Combo Map 3D (v58 Hybrid)",
   options: {
     // --- 1. PLOT TAB ---
@@ -526,30 +478,25 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
-
-    // --- DEPENDENCY CHECK ---
-    // If dependencies are not loaded yet, wait and retry.
-    if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined' || typeof topojson === 'undefined') {
-      console.log("[Viz Hybrid] Waiting for dependencies...");
-      setTimeout(() => {
-        this.updateAsync(data, element, config, queryResponse, details, done);
-      }, 100);
-      return;
-    }
-
     // MOD: Check details.print (V71 style)
     const isPrint = details && details.print;
     console.log(`[Viz Hybrid] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
-    // TOKEN CHECK
+    // TOKEN CHECK (Standard from v71 - removed v58 specific "Safety Guard" comments)
     if (!config.mapbox_token) {
       console.warn("[Viz] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
       return;
     } else {
       this._tokenError.style.display = 'none';
+    }
+
+    if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined') {
+      this.addError({ title: "Missing Dependencies", message: "Add deck.gl and mapbox-gl to manifest." });
+      done();
+      return;
     }
 
     this._queryResponse = queryResponse;
