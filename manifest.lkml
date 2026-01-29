@@ -44,17 +44,17 @@ visualization: {
   ]
 }
 
-visualization: {
-  id: "combo_map_3d"
-  label: "Combo Map 3D"
-  file: "04_OTHER_visuals/map_combo_3d_mapbox.js"
+# visualization: {
+#   id: "combo_map_3d"
+#   label: "Combo Map 3D"
+#   file: "04_OTHER_visuals/map_combo_3d_mapbox.js"
 
-  dependencies: [
-    "https://unpkg.com/deck.gl@latest/dist.min.js",
-    "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
-    "https://unpkg.com/topojson-client@3"
-  ]
-}
+#   dependencies: [
+#     "https://unpkg.com/deck.gl@latest/dist.min.js",
+#     "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
+#     "https://unpkg.com/topojson-client@3"
+#   ]
+# }
 #"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
 
 visualization: {
