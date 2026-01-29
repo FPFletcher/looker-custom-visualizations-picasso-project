@@ -86,7 +86,7 @@ In terms of process used, a detailed guide can be found in our community platfor
 ## Scorecard with Sparkline
 ![STUDIO Scorecard visualization](./99_ASSETS/STUDIO_scorecard.gif)
 
-**🔗 CDN Link -** https://viz.mentoree.eu/single_value_picture.js  
+**🔗 CDN Link -** coming soon
 
 **📊 What it does**  
 Displays a primary metric with a secondary comparison value, percentage variance, and an inline sparkline trend chart. Perfect for executive dashboards and KPI monitoring.
@@ -109,7 +109,7 @@ Displays a primary metric with a secondary comparison value, percentage variance
 ## Treemap
 ![STUDIO Treemap visualization](./99_ASSETS/STUDIO_treemap.gif)
 
-**🔗 CDN Link -** https://viz.mentoree.eu/single_value_picture.js  
+**🔗 CDN Link -** https://viz.mentoree.eu/treemap.js  
 
 **📊 What it does**  
 Hierarchical visualization that displays nested data as proportionally-sized rectangles. Supports multi-level drill-down navigation through dimension hierarchies with automatic grouping of small values into an "Others" category.
@@ -133,7 +133,7 @@ Hierarchical visualization that displays nested data as proportionally-sized rec
 ## Bar Chart (Conditional Formatting)
 ![STUDIO Bar Chart _Conditional_visualization](./99_ASSETS/STUDIO_bar_chart_conditional.gif)
 
-**🔗 CDN Link -** https://viz.mentoree.eu/single_value_picture.js  
+**🔗 CDN Link -** https://viz.mentoree.eu/bar_chart_conditional.js  
 
 **📊 What it does**  
 Enhanced column/bar chart with advanced conditional formatting capabilities. Supports multiple chart types (column, bar, area, line) with comprehensive formatting rules and reference/trend lines.
@@ -157,19 +157,42 @@ Enhanced column/bar chart with advanced conditional formatting capabilities. Sup
 
 ---
 
-# 02. POWERBI Visuals
-
-*(Coming soon)*
-
----
-
-# 03. TABLEAU Visuals
-
-*(Coming soon)*
-
----
-
 # 04. OTHER Visuals
+
+## Treemap
+![STUDIO Treemap visualization](./99_ASSETS/STUDIO_treemap.gif)
+
+**🔗 CDN Link -** https://viz.mentoree.eu/treemap.js  
+
+**📊 What it does**  
+Enterprise-grade data grid designed for advanced reporting within Looker supporting complex row hierarchies, nested subtotals, and in-cell visual analytics to make dense datasets readable at a glance
+
+
+---
+
+## Treemap
+![STUDIO Treemap visualization](./99_ASSETS/STUDIO_treemap.gif)
+
+**🔗 CDN Link -** https://viz.mentoree.eu/treemap.js  
+
+**📊 What it does**  
+Hierarchical visualization that displays nested data as proportionally-sized rectangles. Supports multi-level drill-down navigation through dimension hierarchies with automatic grouping of small values into an "Others" category.
+
+<details>
+<summary><b>✨ Unique value</b></summary>
+<br>
+<ul>
+<li><b>Native LookML drill fields integration</b> - seamlessly opens Looker's drill menu at the last hierarchy level (works independently from drill-down navigation)</li>
+<li><b>Intelligent "Others" grouping</b> with configurable threshold to reduce clutter</li>
+<li><b>Multi-level drill-down</b> through dimension hierarchies with breadcrumb navigation</li>
+<li><b>Gap-free layout algorithm</b> ensures no wasted space in the visualization</li>
+<li><b>Flexible color schemes</b> with gradient or categorical coloring options</li>
+<li><b>Smart label positioning</b> with automatic text wrapping and truncation</li>
+<li><b>No external dependencies</b> - works on all Looker deployments</li>
+</ul>
+</details>
+
+---
 
 ## Single Value with Picture
 ![OTHER Value with Picture visualization](./99_ASSETS/OTHER_single_value_picture.gif)
