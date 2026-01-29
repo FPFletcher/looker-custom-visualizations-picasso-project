@@ -83,29 +83,6 @@ In terms of process used, a detailed guide can be found in our community platfor
 
 # 01. STUDIO Visuals
 
-## Scorecard with Sparkline
-![STUDIO Scorecard visualization](./99_ASSETS/STUDIO_scorecard.gif)
-
-**🔗 CDN Link -** coming soon
-
-**📊 What it does**  
-Displays a primary metric with a secondary comparison value, percentage variance, and an inline sparkline trend chart. Perfect for executive dashboards and KPI monitoring.
-
-<details>
-<summary><b>✨ Unique value</b></summary>
-<br>
-<ul>
-<li><b>Accurate sparkline rendering</b> with proper time-series visualization</li>
-<li><b>Customizable metric positioning</b> for flexible dashboard layouts</li>
-<li><b>Dual-measure comparison</b> with automatic percentage calculation</li>
-<li><b>Visual variance indicators</b> with color-coded positive/negative changes</li>
-<li><b>Compact design</b> that fits more KPIs per dashboard tile</li>
-<li><b>No external dependencies</b> - works on all Looker deployments</li>
-</ul>
-</details>
-
----
-
 ## Treemap
 ![STUDIO Treemap visualization](./99_ASSETS/STUDIO_treemap.gif)
 
@@ -152,6 +129,29 @@ Enhanced column/bar chart with advanced conditional formatting capabilities. Sup
 <li><b>Total labels for stacked charts</b> with customizable styling</li>
 <li><b>Professional color palettes</b> including Google, Looker Classic, Viridis, and custom options</li>
 <li><b>⚠️ External dependency:</b> Requires <code>code.highcharts.com</code> domain access</li>
+</ul>
+</details>
+
+---
+
+## Scorecard with Sparkline
+![STUDIO Scorecard visualization](./99_ASSETS/STUDIO_scorecard.gif)
+
+**🔗 CDN Link -** coming soon
+
+**📊 What it does**  
+Displays a primary metric with a secondary comparison value, percentage variance, and an inline sparkline trend chart. Perfect for executive dashboards and KPI monitoring.
+
+<details>
+<summary><b>✨ Unique value</b></summary>
+<br>
+<ul>
+<li><b>Accurate sparkline rendering</b> with proper time-series visualization</li>
+<li><b>Customizable metric positioning</b> for flexible dashboard layouts</li>
+<li><b>Dual-measure comparison</b> with automatic percentage calculation</li>
+<li><b>Visual variance indicators</b> with color-coded positive/negative changes</li>
+<li><b>Compact design</b> that fits more KPIs per dashboard tile</li>
+<li><b>No external dependencies</b> - works on all Looker deployments</li>
 </ul>
 </details>
 
