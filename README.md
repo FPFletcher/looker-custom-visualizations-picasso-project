@@ -219,7 +219,7 @@ High-performance geospatial visualization that enables multi-layered 3D storytel
 **🔗 CDN Link -** https://viz.mentoree.eu/single_value_picture.js  
 
 **📊 What it does**  
-Displays two key metrics overlaid on customizable water drop images with a percentage comparison indicator. Ideal for visual storytelling in executive dashboards where brand imagery matters.
+Displays two key metrics overlaid on almost ANY customizable images you have access to and compare their variance.
 
 <details>
 <summary><b>✨ Unique value</b></summary>
