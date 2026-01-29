@@ -159,36 +159,54 @@ Enhanced column/bar chart with advanced conditional formatting capabilities. Sup
 
 # 04. OTHER Visuals
 
-## Treemap
-![STUDIO Treemap visualization](./99_ASSETS/STUDIO_treemap.gif)
+## Advanced Table (v23.0)
+![Advanced Table visualization](./99_ASSETS/TABLE_advanced_viz.gif)
 
-**🔗 CDN Link -** https://viz.mentoree.eu/treemap.js  
+**🔗 CDN Link -** https://viz.mentoree.eu/table_modern_viz.js
 
-**📊 What it does**  
-Enterprise-grade data grid designed for advanced reporting within Looker supporting complex row hierarchies, nested subtotals, and in-cell visual analytics to make dense datasets readable at a glance
-
-
----
-
-## Treemap
-![STUDIO Treemap visualization](./99_ASSETS/STUDIO_treemap.gif)
-
-**🔗 CDN Link -** https://viz.mentoree.eu/treemap.js  
-
-**📊 What it does**  
-Hierarchical visualization that displays nested data as proportionally-sized rectangles. Supports multi-level drill-down navigation through dimension hierarchies with automatic grouping of small values into an "Others" category.
+**📊 What it does**
+Enterprise-grade data grid designed for advanced reporting within Looker, supporting complex row hierarchies, nested subtotals, and in-cell visual analytics to make dense datasets readable at a glance.
 
 <details>
 <summary><b>✨ Unique value</b></summary>
 <br>
 <ul>
-<li><b>Native LookML drill fields integration</b> - seamlessly opens Looker's drill menu at the last hierarchy level (works independently from drill-down navigation)</li>
-<li><b>Intelligent "Others" grouping</b> with configurable threshold to reduce clutter</li>
-<li><b>Multi-level drill-down</b> through dimension hierarchies with breadcrumb navigation</li>
-<li><b>Gap-free layout algorithm</b> ensures no wasted space in the visualization</li>
-<li><b>Flexible color schemes</b> with gradient or categorical coloring options</li>
-<li><b>Smart label positioning</b> with automatic text wrapping and truncation</li>
+<li><b>Multi-Level Row Hierarchy</b> - Supports a tree-grouping similar to SAP BO with expandable and collapsible sections for deep navigation and ANY subtotal aggregations</li>
+<li><b>In-Cell Visual Analytics</b> - Embed customizable bar charts or heatmaps directly within cells to highlight performance distribution instantly</li>
+<li><b>Smart Period-over-Period</b> - Built-in comparison logic with automatic color-coded trend arrows and percentage delta calculations</li>
+<li><b>Advanced Frozen Column Logic</b> - Sticky first-column and header-row support that maintains background colors and striping during horizontal scrolls</li>
+<li><b>Column Grouping</b> - Define custom "Master Headers" to group multiple measures or dimensions under a shared category title</li>
+<li><b>Semantic Data Chips</b> - Transform status text into colorful "pills" based on custom match rules like "Success", "Warning", or "Failed"</li>
+<li><b>Dynamic Pagination</b> - High-speed client-side pagination that intelligently respects subtotal groupings and hierarchies to prevent data fragmentation</li>
+<li><b>Pro Theme Library</b> - Includes pre-built themes for Google, Looker, and Dark Mode for instant brand alignment without manual CSS</li>
+<li><b>Native Integration</b> - Full support for Looker drill menus, custom field formatting, and pivot row or grand totals</li>
 <li><b>No external dependencies</b> - works on all Looker deployments</li>
+</ul>
+</details>
+
+---
+
+## 3D Combo Map
+![3D Combo Map visualization](./99_ASSETS/MAP_combo_3d.gif)
+
+**🔗 CDN Link -** https://viz.mentoree.eu/map_combo_3d_mapbox.js
+
+**📊 What it does**
+High-performance geospatial visualization that enables multi-layered 3D storytelling by allowing users to overlay up to four independent data layers—such as 3D columns, choropleths, and heatmaps—on a single interactive map. 
+
+<details>
+<summary><b>✨ Unique value</b></summary>
+<br>
+<ul>
+<li><b>Dynamic Layer Configuration</b> - Access multiple prebuilt region maps (US, EU, UK) or input a custom GeoJSON URL directly in the UI settings without needing LookML updates [cite: 1]</li>
+<li><b>4-Layer Compositing</b> - Mix and match different visualization types, such as a Heatmap under 3D Columns, within a single view</li>
+<li><b>Intelligent 3D Extrusion</b> - Automatically scales column or region height based on measure values for instant density analysis</li>
+<li><b>Hybrid Printing Logic</b> - Features a static map fallback to capture high-resolution imagery for PDF reports while remaining interactive in-browser</li>
+<li><b>Preloaded GeoJSON Library</b> - Built-in support for US States, World Countries, and major European regions with custom URL support</li>
+<li><b>Professional Icon Suite</b> - Over 20 built-in presets (factories, trucks, oil rigs) with support for custom image URLs and billboard controls</li>
+<li><b>Pivot-Aware Tooltips</b> - Dynamically generates detailed breakdowns of pivoted data and "total" summaries directly in the hover-state</li>
+<li><b>Interactive Drill Menus</b> - Full support for native Looker drill links across all layer types and pivot values</li>
+<li><b>⚠️ External dependency:</b> Requires <code>api.mapbox.com</code> and <code>unpkg.com</code> domain access</li>
 </ul>
 </details>
 
