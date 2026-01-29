@@ -17,14 +17,14 @@ visualization: {
   file: "01_STUDIO_visuals/treemap.js"
 }
 
-visualization: {
-  id: "bar_chart_conditional_formatting_viz"
-  label: "Bar Chart (Conditional formatting)"
-  file: "01_STUDIO_visuals/bar_chart_conditional.js"
-  # dependencies: [
-  #"https://code.highcharts.com/highcharts.js"
-  # ]
-}
+# visualization: {
+#   id: "bar_chart_conditional_formatting_viz"
+#   label: "Bar Chart (Conditional formatting)"
+#   file: "01_STUDIO_visuals/bar_chart_conditional.js"
+#   # dependencies: [
+#   #"https://code.highcharts.com/highcharts.js"
+#   # ]
+# }
 
 
 ########################################################################################
@@ -37,17 +37,17 @@ visualization: {
   file: "04_OTHER_visuals/single_value_picture.js"
 }
 
-visualization: {
-  id: "combo_map_3d"
-  label: "Combo Map 3D"
-  file: "04_OTHER_visuals/map_combo_3d_mapbox.js"
-  # dependencies: [
-  #"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
-  # "https://unpkg.com/deck.gl@latest/dist.min.js",
-  # "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
-  # "https://unpkg.com/topojson-client@3"
-  # ]
-}
+# visualization: {
+#   id: "combo_map_3d"
+#   label: "Combo Map 3D"
+#   file: "04_OTHER_visuals/map_combo_3d_mapbox.js"
+#   # dependencies: [
+#   #"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
+#   # "https://unpkg.com/deck.gl@latest/dist.min.js",
+#   # "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
+#   # "https://unpkg.com/topojson-client@3"
+#   # ]
+# }
 
 visualization: {
   id: "url-embed-visual"
