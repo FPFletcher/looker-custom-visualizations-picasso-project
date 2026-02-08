@@ -106,6 +106,19 @@ Hierarchical visualization that displays nested data as proportionally-sized rec
 </ul>
 </details>
 
+<details>
+<summary>ℹ️ <b>How to use</b></summary>
+<br>
+<ul>
+<li><b>Data Requirement:</b> Select exactly <b>1 Dimension</b> and <b>1 Measure</b> for a standard flat treemap.</li>
+<li><b>Nested Layout:</b> To activate the "Nested" (Header) layout, you must select <b>2 Dimensions</b> (Parent and Child) and enable the "Nested Layout" toggle in the Plot tab.</li>
+<li><b>Drill Down:</b> By default, clicking a square drills down into the hierarchy. To see LookML drill menus instead, disable "Enable Drill Down" in the Plot tab.</li>
+<li><b>Others Grouping:</b> Use the "Others Threshold %" setting to automatically group small values (e.g., < 0.5%) into a single grey box to clean up the visual.</li>
+</ul>
+<br>
+<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
+</details>
+
 ---
 
 ## Bar Chart (Conditional Formatting)
@@ -133,6 +146,19 @@ Enhanced column/bar chart with advanced conditional formatting capabilities. Sup
 </ul>
 </details>
 
+<details>
+<summary>ℹ️ <b>How to use</b></summary>
+<br>
+<ul>
+<li><b>Rule Priority:</b> There are 3 rule slots. Rule 1 overrides Rule 2, and Rule 2 overrides Rule 3. Use Rule 1 for your most critical alerts (e.g., "Performance < 50%").</li>
+<li><b>Formatting Target:</b> In the "Plot" tab, you can choose to apply formatting to the "First Measure" only or "All Measures". For stacked charts, select "Stacked Measures" to color based on the total stack value.</li>
+<li><b>Gradient Logic:</b> If using the "Color Gradient" rule type, select a "Start" and "End" color. The visual will interpolate colors based on the min/max values in your dataset.</li>
+<li><b>Trend Lines:</b> You can add a trend line (Linear or Moving Average) via the "Y" menu. It can calculate trends based on the first measure or the sum of stacked measures.</li>
+</ul>
+<br>
+<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
+</details>
+
 ---
 
 ## Scorecard with Sparkline
@@ -154,6 +180,19 @@ Displays a primary metric with a secondary comparison value, percentage variance
 <li><b>Compact design</b> that fits more KPIs per dashboard tile</li>
 <li><b>No external dependencies</b> - works on all Looker deployments</li>
 </ul>
+</details>
+
+<details>
+<summary>ℹ️ <b>How to use</b></summary>
+<br>
+<ul>
+<li><b>Data Requirement:</b> Requires 1 Dimension (Time) and at least 2 Measures (Current Period, Previous Period).</li>
+<li><b>Calculation:</b> The variance percentage is automatically calculated as <code>(Measure 1 - Measure 2) / Measure 2</code>.</li>
+<li><b>Sparkline:</b> The sparkline automatically renders using the time dimension on the X-axis. Ensure your results are sorted chronologically.</li>
+<li><b>Layout:</b> Use the "Plot" tab to align the KPI left, center, or right depending on your dashboard tile structure.</li>
+</ul>
+<br>
+<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
 </details>
 
 ---
@@ -185,6 +224,19 @@ Enterprise-grade data grid designed for advanced reporting within Looker, suppor
 </ul>
 </details>
 
+<details>
+<summary>ℹ️ <b>How to use</b></summary>
+<br>
+<ul>
+<li><b>Specific Column Targeting:</b> When configuring "Cell Bars", "Data Chips", or "Comparison Fields", you must use the full <code>view_name.field_name</code> syntax (e.g., <code>orders.count</code>) or the column header name if renamed.</li>
+<li><b>Hierarchies:</b> Enable "BO-Style Hierarchy" in the "Plot" tab. Enter your dimensions in the "Hierarchy Levels" input (comma-separated, e.g., <code>brand, category</code>) to create expandable tree rows.</li>
+<li><b>Subtotals:</b> For subtotals to appear, you must have the "Subtotals" checkbox enabled in the native Looker Data bar <b>AND</b> enable "Standard Subtotals" in the viz options.</li>
+<li><b>Comparison Mode:</b> To enable Period-over-Period (PoP) arrows, select "Comparison Mode" in the Series tab and define the "Period Offset" (usually -1 for the previous column).</li>
+</ul>
+<br>
+<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
+</details>
+
 ---
 
 ## 3D Combo Map
@@ -199,7 +251,7 @@ High-performance geospatial visualization that enables multi-layered 3D storytel
 <summary><b>✨ Unique value</b></summary>
 <br>
 <ul>
-<li><b>Dynamic Layer Configuration</b> - Access multiple prebuilt region maps (US, EU, UK) or input a custom GeoJSON URL directly in the UI settings without needing LookML updates [cite: 1]</li>
+<li><b>Dynamic Layer Configuration</b> - Access multiple prebuilt region maps (US, EU, UK) or input a custom GeoJSON URL directly in the UI settings without needing LookML updates</li>
 <li><b>4-Layer Compositing</b> - Mix and match different visualization types, such as a Heatmap under 3D Columns, within a single view</li>
 <li><b>Intelligent 3D Extrusion</b> - Automatically scales column or region height based on measure values for instant density analysis</li>
 <li><b>Hybrid Printing Logic</b> - Features a static map fallback to capture high-resolution imagery for PDF reports while remaining interactive in-browser</li>
@@ -211,6 +263,19 @@ High-performance geospatial visualization that enables multi-layered 3D storytel
 </ul>
 </details>
 
+<details>
+<summary>ℹ️ <b>How to use</b></summary>
+<br>
+<ul>
+<li><b>Mapbox Token:</b> This visual <b>requires</b> a valid Mapbox public token entered in the "Plot" tab to render the base map tiles.</li>
+<li><b>Layer Configuration:</b> You can configure up to 4 layers. Use "Layer 1 Type", "Layer 2 Type", etc., to define if data should appear as 3D Columns, Choropleths (Regions), or Icons.</li>
+<li><b>Data Mapping:</b> In the "Layer N Dimension Indices" field, enter the <b>index number</b> of the dimension you want to use (e.g., <code>0</code> for the first dimension, <code>1</code> for the second). Do not use field names here.</li>
+<li><b>Custom Regions:</b> To use a custom map, set "Region Map Source" to "Custom URL" and paste a direct link to a GeoJSON/TopoJSON file (e.g., hosted on GitHub raw or a public bucket).</li>
+</ul>
+<br>
+<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
+</details>
+
 ---
 
 ## Single Value with Picture
@@ -218,8 +283,7 @@ High-performance geospatial visualization that enables multi-layered 3D storytel
 
 **🔗 CDN Link -** https://viz.mentoree.eu/single_value_picture.js  
 
-**📊 What it does**  
-Displays two key metrics overlaid on almost ANY customizable images you have access to and compare their variance.
+**📊 What it does** Displays two key metrics overlaid on almost ANY customizable images you have access to and compare their variance.
 
 <details>
 <summary><b>✨ Unique value</b></summary>
@@ -235,6 +299,19 @@ Displays two key metrics overlaid on almost ANY customizable images you have acc
 <li><b>Multiple calculation modes:</b> Secondary/Primary ratio or use a third measure for percentages</li>
 <li><b>No external dependencies</b> - works on all Looker deployments</li>
 </ul>
+</details>
+
+<details>
+<summary>ℹ️ <b>How to use</b></summary>
+<br>
+<ul>
+<li><b>Measure Order:</b> This visual reads the <b>first measure</b> as the Primary Value (Big) and the <b>second measure</b> as the Secondary Value (Small).</li>
+<li><b>Custom Images:</b> You can replace the default water drop images by pasting any public image URL into the "Primary/Secondary Image URL" fields in the Plot tab.</li>
+<li><b>Percentage Logic:</b> By default, the percentage is calculated as <code>Secondary / Primary</code>. You can change this to "Use 3rd Measure" in the Formatting tab if you want to provide a pre-calculated LookML variance.</li>
+<li><b>Positioning:</b> Use the X/Y coordinate sliders in the Plot tab to move the numbers and images to fit your specific background image layout.</li>
+</ul>
+<br>
+<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
 </details>
 
 ---
