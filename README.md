@@ -150,13 +150,15 @@ Enhanced column/bar chart with advanced conditional formatting capabilities. Sup
 <summary>ℹ️ <b>How to use</b></summary>
 <br>
 <ul>
-<li><b>Rule Priority:</b> There are 3 rule slots. Rule 1 overrides Rule 2, and Rule 2 overrides Rule 3. Use Rule 1 for your most critical alerts (e.g., "Performance < 50%").</li>
-<li><b>Formatting Target:</b> In the "Plot" tab, you can choose to apply formatting to the "First Measure" only or "All Measures". For stacked charts, select "Stacked Measures" to color based on the total stack value.</li>
-<li><b>Gradient Logic:</b> If using the "Color Gradient" rule type, select a "Start" and "End" color. The visual will interpolate colors based on the min/max values in your dataset.</li>
-<li><b>Trend Lines:</b> You can add a trend line (Linear or Moving Average) via the "Y" menu. It can calculate trends based on the first measure or the sum of stacked measures.</li>
+<li><b>Specific Column Targeting:</b> When configuring "Cell Bars", "Data Chips", or "Comparison Fields", you must use the full <code>view_name.field_name</code> syntax (e.g., <code>orders.count</code>) or the column header name if renamed.</li>
+<li><b>Hierarchies:</b> Enable "BO-Style Hierarchy" in the "Plot" tab. Enter your dimensions in the "Hierarchy Levels" input (comma-separated, e.g., <code>brand, category</code>) to create expandable tree rows.</li>
+<li><b>Subtotals:</b> For subtotals to appear, you must have the "Subtotals" checkbox enabled in the native Looker Data bar <b>AND</b> enable "Standard Subtotals" in the viz options.</li>
+<li><b>Comparison Mode:</b> To enable Period-over-Period (PoP) arrows, select "Comparison Mode" in the Series tab and define the "Period Offset" (usually -1 for the previous column).</li>
 </ul>
 <br>
-<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
+<a href="https://www.youtube.com/watch?v=gNAgwwcTfhE" target="_blank">
+ <img src="https://img.youtube.com/vi/gNAgwwcTfhE/maxresdefault.jpg" alt="Watch the demo video" width="480" height="360" border="10" />
+</a>
 </details>
 
 ---
