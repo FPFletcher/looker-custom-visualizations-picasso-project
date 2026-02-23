@@ -1,5 +1,72 @@
 project_name: "custom_viz_artefact_demo"
 
+
+########################################################################################
+# 01. STUDIO visuals
+########################################################################################
+
+visualization: {
+  id: "scorecard_sparkline_viz"
+  label: "Scorecard"
+  file: "01_STUDIO_visuals/scorecard_sparkline.js"
+}
+
+visualization: {
+  id: "treemap_studio_viz"
+  label: "Treemap (Studio)"
+  file: "01_STUDIO_visuals/treemap.js"
+}
+
+# visualization: {
+#   id: "bar_chart_conditional_formatting_viz"
+#   label: "Bar Chart (Conditional formatting)"
+#   file: "01_STUDIO_visuals/bar_chart_conditional.js"
+#   # dependencies: [
+#   #"https://code.highcharts.com/highcharts.js"
+#   # ]
+# }
+
+
+########################################################################################
+# 04. OTHER visuals
+########################################################################################
+
+visualization: {
+  id: "single_value_picture_background"
+  label: "Single Value (Picture lookML version)"
+  file: "04_OTHER_visuals/single_value_picture.js"
+}
+
+# visualization: {
+#   id: "combo_map_3d"
+#   label: "Combo Map 3D"
+#   file: "04_OTHER_visuals/map_combo_3d_mapbox.js"
+#   # dependencies: [
+#   #"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
+#   # "https://unpkg.com/deck.gl@latest/dist.min.js",
+#   # "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
+#   # "https://unpkg.com/topojson-client@3"
+#   # ]
+# }
+
+visualization: {
+  id: "url-embed-visual"
+  label: "URL embed"
+  file: "04_OTHER_visuals/url_embed.js"
+}
+
+visualization: {
+  id: "custom-advanced-cross-filter"
+  label: "Advanced Cross Filtering"
+  file: "04_OTHER_visuals/advanced_cross_filtering.js"
+}
+
+visualization: {
+  id: "table_modern_viz"
+  label: "Table Modern"
+  file: "04_OTHER_visuals/table_modern_viz.js"
+}
+
 visualization: {
   id: "table_vis"
   label: "Test"
@@ -7,181 +74,33 @@ visualization: {
   # Define the visualization parameters
 }
 
-visualization: {
-  id: "my_new_vis"
-  label: "My new vis - Guillaume"
-  file: "my_new_vis.js"
 
-  dependencies: [
-    "https://d3js.org/d3.v6.min.js",
-"https://www.gstatic.com/charts/loader.js",
-"https://code.highcharts.com/highcharts.js",
-"https://code.highcharts.com/highcharts-more.js",
-"https://code.highcharts.com/modules/solid-gauge.js",
-"https://code.highcharts.com/modules/sankey.js"
-  ]
+########################################################################################
+# 10. APPLICATIONS Dashboard or AI focus
+########################################################################################
 
+application: dashboard_tabs {
+  label: "Dashboard Tabs"
+  url: "https://cdn.lkr.dev/apps/dashboard-tabs/latest/bundle.js"
+  entitlements: {
+    core_api_methods: [
+      "me",
+      "dashboard",
+      "search_dashboards",
+      "folder_dashboards",
+      "board",
+      "search_boards",
+      "folder",
+      "search_folders",
+      "create_board",
+      "create_board_section",
+      "create_board_item",
+      "create_content_favorite"
+    ]
+    navigation: yes
+    use_embeds: yes
+    use_iframes: yes
+    new_window: yes
+    use_form_submit: yes
+  }
 }
-
-# project_name: "looker_dashboard_sandbox"
-
-# ## Use local_dependency: To enable referencing of another project
-# ## on this instance with include: statements
-# ## TEST
-
-# ### LOCAL VARIABLES ###
-
-# constant: project {
-#   value: "marketingview-eo-prod"
-#   export: override_required
-# }
-# constant: dataset {
-#   value: "marketingview_bqd_04_dm_eo"
-#   export: override_required
-# }
-# constant: scope_sub {
-#   value: "regional"
-#   export: override_required
-# }
-# constant: scope_country {
-#   value: "'EO Regional'"
-#   export: override_required
-# }
-
-# constant: looker_region {
-#   value: "artefactfrance"
-#   export: override_required
-# }
-
-# constant: region {
-#   value: "EO"
-#   export: override_required
-# }
-
-# ### CURRENCY VARIABLES ###
-
-# constant: currency_crm {
-
-#   value: "
-#   {% if aaxhybris_crm.currency_selector._parameter_value == 'eur' %}
-#   €
-#   {% elsif aaxhybris_crm.currency_selector._parameter_value == 'usd' %}
-#   $
-#   {% else %}
-#   {% if ac_crm.country._in_query or ac_crm.subsidiary._in_query %}
-#   {{ ac_crm.currency._value }}
-#   {% else %}
-#   €
-#   {% endif %}
-#   {% endif %}"
-#   export: override_optional
-# }
-
-# constant: currency_aaxhybris_pm {
-
-#   value: "
-#   {% if aaxhybris_for_pm.currency_selector._parameter_value == 'eur' %}
-#   €
-#   {% elsif aaxhybris_for_pm.currency_selector._parameter_value == 'usd' %}
-#   $
-#   {% else %}
-#   {% if aaxhybris_for_pm.market._in_query or aaxhybris_for_pm.subsidiary._in_query %}
-#   {{ aaxhybris_for_pm.currency._value }}
-#   {% else %}
-#   €
-#   {% endif %}
-#   {% endif %}"
-#   export: override_optional
-# }
-
-# constant: currency_aaxestore_pm {
-
-#   value: "
-#   {% if aa_estore_titan.currency_selector._parameter_value == 'eur' %}
-#   €
-#   {% elsif aa_estore_titan.currency_selector._parameter_value == 'usd' %}
-#   $
-#   {% else %}
-#   {% if aa_estore_titan.market._in_query or aa_estore_titan.subsidiary._in_query %}
-#   {{ aa_estore_titan.currency._value }}
-#   {% else %}
-#   €
-#   {% endif %}
-#   {% endif %}"
-#   export: override_optional
-# }
-
-# constant: currency_exe {
-#   value: "
-#   {% if executive_overview_prod_new.currency_selector._parameter_value == 'eur' %}
-#   €
-#   {% elsif executive_overview_prod_new.currency_selector._parameter_value == 'usd' %}
-#   $
-#   {% else %}
-#   €
-#   {% endif %}"
-#   export: override_optional
-# }
-
-# constant: currency_affiliate_transac {
-
-#   value: "
-#   {% if affiliate.currency_selector._parameter_value == 'eur' %}
-#   €
-#   {% elsif affiliate.currency_selector._parameter_value == 'usd' %}
-#   $
-#   {% else %}
-#   {% if affiliate.market._in_query or affiliate.subsidiary._in_query %}
-#   {{ affiliate.currency._value }}
-#   {% else %}
-#   €
-#   {% endif %}
-#   {% endif %}"
-#   export: override_optional
-# }
-
-# constant: currency_affiliate_transac_w_awareness {
-
-#   value: "
-#   {% if affiliate_with_awareness.currency_selector._parameter_value == 'eur' %}
-#   €
-#   {% elsif affiliate_with_awareness.currency_selector._parameter_value == 'usd' %}
-#   $
-#   {% else %}
-#   {% if affiliate_with_awareness.market._in_query or affiliate.subsidiary._in_query %}
-#   {{ affiliate_with_awareness.currency._value }}
-#   {% else %}
-#   €
-#   {% endif %}
-#   {% endif %}"
-#   export: override_optional
-# }
-
-# ### this constant used to have
-
-# #     {% else %}
-# #      {% if executive_overview_prod_new.country._in_query or executive_overview_prod_new.subsidiary._in_query %}
-# #        {{ executive_overview_prod_new.currency._value }} this is case 3
-# #      {% else %}
-# #        €
-# #      {% endif %}
-
-# constant: currency_aaxestore_qa {
-#   value: " {% if aa_estore_full_join_qa.currency_selector_aaxhybris._parameter_value == 'eur' %}
-#   €
-#   {% elsif aa_estore_full_join_qa.currency_selector_aaxhybris._parameter_value == 'usd' %}
-#   $
-#   {% else %}
-#   {% if aa_estore_full_join_qa.subsidiary._in_query %}
-#   {{ aa_estore_full_join_qa.currency._value }}
-#   {% else %}
-#   €
-#   {% endif %}
-#   {% endif %}"
-#   export: override_optional
-# }
-
-# constant: currency_default {
-#   value: "eur"
-#   export: override_optional
-# }

@@ -1,0 +1,816 @@
+/**
+ * Treemap Visualization for Looker
+ * Studio-inspired hierarchical treemap with drill-down and multi-dimension support
+ * Features: Robust layout (no gaps), horizontal-only labels, "Others" grouping.
+ */
+
+looker.plugins.visualizations.add({
+  id: "treemap_viz",
+  label: "Treemap",
+  options: {
+    // ========== PLOT SECTION ==========
+    background_color: {
+      type: "string",
+      label: "Background Color",
+      default: "#FFFFFF",
+      display: "color",
+      section: "Plot"
+    },
+    border_color: {
+      type: "string",
+      label: "Border Color",
+      default: "#FFFFFF",
+      display: "color",
+      section: "Plot"
+    },
+    border_width: {
+      type: "number",
+      label: "Border Width",
+      default: 1,
+      section: "Plot"
+    },
+    enable_drill_down: {
+      type: "boolean",
+      label: "Enable Drill Down",
+      default: true,
+      section: "Plot"
+    },
+    others_toggle: {
+      type: "boolean",
+      label: "Group Small Items into 'Others'",
+      default: true,
+      section: "Plot",
+      order: 5
+    },
+    others_threshold: {
+      type: "number",
+      label: "Others Threshold % (0.1 - 10)",
+      default: 0.5, // Much smaller default (0.5%)
+      min: 0.1,
+      max: 10,
+      step: 0.1,
+      section: "Plot",
+      order: 6
+    },
+
+    // ========== SERIES SECTION ==========
+    color_by: {
+      type: "string",
+      label: "Color By",
+      display: "select",
+      values: [
+        {"Dimension Values": "dimension"},
+        {"Metric Value": "metric"}
+      ],
+      default: "metric",
+      section: "Series"
+    },
+    color_palette: {
+      type: "string",
+      label: "Color Palette",
+      display: "select",
+      values: [
+        {"Green Scale": "green_scale"},
+        {"Blue Scale": "blue_scale"},
+        {"Google Colors": "google"},
+        {"Viridis": "viridis"},
+        {"Warm": "warm"},
+        {"Cool": "cool"}
+      ],
+      default: "green_scale",
+      section: "Series"
+    },
+    use_gradient: {
+      type: "boolean",
+      label: "Use Gradient (Metric Color)",
+      default: true,
+      section: "Series"
+    },
+    reverse_palette: {
+      type: "boolean",
+      label: "Reverse Palette",
+      default: false,
+      section: "Series"
+    },
+    gradient_start_color: {
+      type: "string",
+      label: "Gradient Start Color",
+      default: "#F1F8E9",
+      display: "color",
+      section: "Series"
+    },
+    gradient_end_color: {
+      type: "string",
+      label: "Gradient End Color",
+      default: "#33691E",
+      display: "color",
+      section: "Series"
+    },
+
+    // ========== VALUES SECTION ==========
+    show_labels: {
+      type: "boolean",
+      label: "Show Labels",
+      default: true,
+      section: "Values"
+    },
+    show_values: {
+      type: "boolean",
+      label: "Show Values",
+      default: true,
+      section: "Values"
+    },
+    label_threshold: {
+      type: "number",
+      label: "Min % to Show Label",
+      default: 0.01,
+      section: "Values"
+    },
+    wrap_labels: {
+      type: "boolean",
+      label: "Wrap Long Labels",
+      default: true,
+      section: "Values"
+    },
+    label_font_size: {
+      type: "number",
+      label: "Label Font Size",
+      default: 12,
+      section: "Values"
+    },
+    value_font_size: {
+      type: "number",
+      label: "Value Font Size",
+      default: 12,
+      section: "Values"
+    },
+    label_color: {
+      type: "string",
+      label: "Label Color",
+      default: "#000000",
+      display: "color",
+      section: "Values"
+    },
+    value_color: {
+      type: "string",
+      label: "Value Color",
+      default: "#000000",
+      display: "color",
+      section: "Values"
+    }
+  },
+
+  create: function(element, config) {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .treemap-container {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        font-family: 'Roboto', 'Open Sans', Arial, sans-serif;
+        overflow: hidden;
+        padding: 0;
+        margin: 0;
+      }
+      .treemap-svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .treemap-rect {
+        cursor: pointer;
+        transition: opacity 0.1s ease;
+        shape-rendering: crispEdges;
+      }
+      .treemap-rect:hover {
+        opacity: 0.9;
+      }
+      .treemap-label, .treemap-value {
+        pointer-events: none;
+        user-select: none;
+        font-family: inherit;
+      }
+      .treemap-label {
+        font-weight: 500;
+      }
+      .treemap-value {
+        font-weight: 400;
+        opacity: 0.8;
+      }
+      .treemap-breadcrumb {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 8px 12px;
+        border-bottom: 1px solid #ddd;
+        font-size: 13px;
+        z-index: 10;
+        display: none;
+        box-sizing: border-box;
+      }
+      .breadcrumb-item {
+        cursor: pointer;
+        color: #1976D2;
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .breadcrumb-item:hover {
+        text-decoration: underline;
+      }
+      .breadcrumb-separator {
+        margin: 0 8px;
+        color: #999;
+      }
+      .treemap-tooltip {
+        position: absolute;
+        background: rgba(33, 33, 33, 0.9);
+        color: white;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        pointer-events: none;
+        z-index: 1000;
+        display: none;
+        white-space: nowrap;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      }
+    `;
+
+    if (!document.getElementById('treemap-styles')) {
+      style.id = 'treemap-styles';
+      document.head.appendChild(style);
+    }
+
+    element.innerHTML = `
+      <div class="treemap-container">
+        <div class="treemap-breadcrumb"></div>
+        <svg class="treemap-svg"></svg>
+        <div class="treemap-tooltip"></div>
+      </div>
+    `;
+
+    this._container = element.querySelector('.treemap-container');
+    this._svg = element.querySelector('.treemap-svg');
+    this._tooltip = element.querySelector('.treemap-tooltip');
+    this._breadcrumb = element.querySelector('.treemap-breadcrumb');
+    this._drillStack = [];
+  },
+
+  updateAsync: function(data, element, config, queryResponse, details, done) {
+    this.clearErrors();
+
+    if (!data || data.length === 0) {
+      this._svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#999">No data to display</text>';
+      done();
+      return;
+    }
+
+    const dimensions = queryResponse.fields.dimension_like;
+    const measures = queryResponse.fields.measure_like;
+
+    if (dimensions.length === 0 || measures.length === 0) {
+      this._svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#999">Treemap requires 1 Dimension and 1 Measure</text>';
+      done();
+      return;
+    }
+
+    this._container.style.backgroundColor = config.background_color;
+    this._queryResponse = queryResponse;
+    this._config = config;
+    this._allData = data;
+
+    // FIX: Reset drill if Others toggle or threshold changed
+    const othersChanged = this._lastOthersToggle !== config.others_toggle ||
+    this._lastOthersThreshold !== config.others_threshold;
+
+    if (othersChanged) {
+      this._drillStack = [];
+      this._lastOthersToggle = config.others_toggle;
+      this._lastOthersThreshold = config.others_threshold;
+    }
+
+    if (this._lastDimensionCount !== dimensions.length) {
+      this._drillStack = [];
+      this._lastDimensionCount = dimensions.length;
+    }
+
+    this.drawTreemap(data, config, queryResponse);
+    done();
+  },
+
+  drawTreemap: function(data, config, queryResponse) {
+    const dimensions = queryResponse.fields.dimension_like;
+    const measures = queryResponse.fields.measure_like;
+    const currentLevel = this._drillStack.length;
+    const dimension = dimensions[Math.min(currentLevel, dimensions.length - 1)].name;
+    const measure = measures[0].name;
+
+    let treemapData;
+    // Build hierarchical or flat data based on drill level
+    if (dimensions.length > 1 && currentLevel < dimensions.length) {
+      treemapData = this.buildHierarchicalData(data, dimensions, measure, currentLevel);
+    } else {
+      treemapData = data.map(row => ({
+        name: row[dimension].value,
+        value: Math.max(0, row[measure].value || 0),
+        rawValue: row[measure].value || 0,
+        dimension: dimension,
+        level: currentLevel,
+        children: null
+      })).filter(d => d.value > 0);
+    }
+
+    // --- GROUPING LOGIC ---
+    // Only group if toggle is ON and there are enough items to justify it
+    if (config.others_toggle && treemapData.length > 5) {
+      // Convert percentage input (e.g., 0.5) to decimal (0.005)
+      const threshold = (config.others_threshold || 0.5) / 100;
+      treemapData = this.groupSmallItems(treemapData, threshold);
+    }
+
+    // --- SORTING LOGIC ---
+    // Sort descending (b.value - a.value) so largest items are top-left.
+    // Explicitly force the "Others" node to the end of the list so it renders bottom-right.
+    treemapData.sort((a, b) => {
+      if (a.isOthers) return 1;  // 'a' is Others, push it to the end
+      if (b.isOthers) return -1; // 'b' is Others, keep it at the end
+      return b.value - a.value;  // Standard descending sort for the rest
+    });
+
+    this.updateBreadcrumb();
+    this.renderTreemap(treemapData, config);
+  },
+
+  // --- NEW GROUPING FUNCTION ---
+  groupSmallItems: function(data, threshold) {
+    const total = data.reduce((sum, d) => sum + d.value, 0);
+    const visible = [];
+    const others = [];
+
+    data.forEach(d => {
+      if (d.isOthers || (d.value / total) >= threshold) {
+        visible.push(d);
+      } else {
+        others.push(d);
+      }
+    });
+
+    if (others.length > 1) {
+      // FIX: Ensure children maintain full hierarchical structure
+      const othersNode = {
+        name: "Others",
+        value: others.reduce((s, d) => s + d.value, 0),
+        rawValue: others.reduce((s, d) => s + d.rawValue, 0),
+        children: others.map(o => ({...o})), // Clone children properly
+        isOthers: true,
+        level: others[0].level,
+        dimension: others[0].dimension
+      };
+      visible.push(othersNode);
+      return visible;
+    }
+
+    return data;
+  },
+
+  buildHierarchicalData: function(data, dimensions, measure, currentLevel) {
+    const dimension = dimensions[currentLevel].name;
+    const grouped = {};
+
+    data.forEach(row => {
+      const key = row[dimension].value;
+      const safeKey = "k_" + key;
+      if (!grouped[safeKey]) {
+        grouped[safeKey] = {
+          name: key,
+          value: 0,
+          rawValue: 0,
+          children: [],
+          level: currentLevel
+        };
+      }
+      const val = row[measure].value || 0;
+      grouped[safeKey].value += Math.max(0, val);
+      grouped[safeKey].rawValue += val;
+
+      if (dimensions[currentLevel + 1]) {
+        grouped[safeKey].children.push(row);
+      }
+    });
+
+    return Object.values(grouped).filter(d => d.value > 0);
+  },
+
+// This is the most important function by far as it dictates the treemap shaping logic
+  renderTreemap: function(data, config) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    this._svg.innerHTML = '';
+
+    const rect = this._container.getBoundingClientRect();
+    const breadcrumbHeight = this._drillStack.length > 0 ? 36 : 0;
+    const width = Math.floor(rect.width);  // Force integer
+    const height = Math.floor(rect.height - breadcrumbHeight);  // Force integer
+
+    if (width <= 0 || height <= 0) return;
+
+    this._svg.style.marginTop = `${breadcrumbHeight}px`;
+    this._svg.style.height = `calc(100% - ${breadcrumbHeight}px)`;
+    this._svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    const totalValue = data.reduce((sum, d) => sum + d.value, 0);
+    const rootArea = width * height;
+
+    const nodes = data.map(d => ({
+      ...d,
+      area: (d.value / totalValue) * rootArea
+    }));
+
+    const layout = this.squarify(nodes, 0, 0, width, height);
+    const colors = this.getColors(data, config);
+
+    layout.forEach((item, i) => {
+      const g = document.createElementNS(svgNS, 'g');
+      const rect = document.createElementNS(svgNS, 'rect');
+
+      // Round to pixel boundaries to prevent sub-pixel gaps
+      const x = Math.round(item.x);
+      const y = Math.round(item.y);
+      const w = Math.round(item.x + item.width) - x;
+      const h = Math.round(item.y + item.height) - y;
+
+      rect.setAttribute('x', x);
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', Math.max(1, w));
+      rect.setAttribute('height', Math.max(1, h));
+
+      let fillColor;
+      if (config.color_by === 'metric' && config.use_gradient) {
+        const allValues = data.filter(d => !d.isOthers).map(d => d.value);
+        const min = Math.min(...allValues);
+        const max = Math.max(...allValues);
+        const ratio = (max === min) ? 0.5 : (item.value - min) / (max - min);
+
+        let startColor = config.gradient_start_color || '#F1F8E9';
+        let endColor = config.gradient_end_color || '#33691E';
+
+        if (config.reverse_palette) {
+          [startColor, endColor] = [endColor, startColor];
+        }
+
+        fillColor = this.interpolateColor(startColor, endColor, ratio);
+      } else {
+        fillColor = colors[i % colors.length];
+      }
+
+      rect.setAttribute('fill', fillColor);
+      rect.setAttribute('stroke', config.border_color);
+      rect.setAttribute('stroke-width', config.border_width);
+      rect.setAttribute('class', 'treemap-rect');
+
+      if (config.enable_drill_down && item.children && item.children.length > 0) {
+        rect.addEventListener('click', () => {
+          this._drillStack.push(item.name);
+
+          let childData = item.children;
+          if (item.isOthers) {
+            const currentLevel = this._drillStack.length;
+            const dimensions = this._queryResponse.fields.dimension_like;
+            if (currentLevel < dimensions.length) {
+              childData = this.buildHierarchicalData(
+              childData,
+              dimensions,
+              this._queryResponse.fields.measure_like[0].name,
+              currentLevel
+              );
+            }
+          }
+
+          this.drawTreemap(childData, config, this._queryResponse);
+        });
+      }
+
+      rect.addEventListener('mouseenter', () => {
+        const pct = ((item.value / totalValue) * 100).toFixed(1);
+        this._tooltip.innerHTML = `
+        <div style="font-weight:600; margin-bottom:2px">${item.name}</div>
+        <div>${this.formatValue(item.rawValue)} (${pct}%)</div>
+        ${item.children && item.children.length > 0 ? '<div style="font-size:10px; opacity:0.8">(Click to drill down)</div>' : ''}
+        `;
+        this._tooltip.style.display = 'block';
+      });
+      rect.addEventListener('mousemove', (e) => {
+        const tooltipRect = this._tooltip.getBoundingClientRect();
+        let left = e.pageX + 12;
+        let top = e.pageY + 12;
+        if (left + tooltipRect.width > window.innerWidth) left = e.pageX - tooltipRect.width - 12;
+        if (top + tooltipRect.height > window.innerHeight) top = e.pageY - tooltipRect.height - 12;
+        this._tooltip.style.left = left + 'px';
+        this._tooltip.style.top = top + 'px';
+      });
+      rect.addEventListener('mouseleave', () => {
+        this._tooltip.style.display = 'none';
+      });
+
+      g.appendChild(rect);
+
+      if ((item.value / totalValue) * 100 >= (config.label_threshold || 0)) {
+        this.addLabels(g, item, config, svgNS);
+      }
+
+      this._svg.appendChild(g);
+    });
+  },
+
+  squarify: function(nodes, x, y, width, height) {
+    const results = [];
+    if (nodes.length === 0) return results;
+
+    let remainingNodes = nodes.slice();
+    let container = { x, y, width, height };
+
+    let currentRow = [];
+    while (remainingNodes.length > 0) {
+      const nextNode = remainingNodes[0];
+      if (this.improvesRatio(currentRow, nextNode, container)) {
+         currentRow.push(remainingNodes.shift());
+      } else {
+         this.layoutRow(currentRow, container, results);
+         currentRow = [];
+      }
+    }
+    if (currentRow.length > 0) {
+       this.layoutLastRow(currentRow, container, results);
+    }
+    return results;
+  },
+
+  improvesRatio: function(currentRow, nextNode, container) {
+    if (currentRow.length === 0) return true;
+    const newRow = currentRow.concat(nextNode);
+    const currentWorst = this.calculateWorstRatio(currentRow, container);
+    const nextWorst = this.calculateWorstRatio(newRow, container);
+    return nextWorst <= currentWorst;
+  },
+
+  calculateWorstRatio: function(row, container) {
+     if (row.length === 0) return Infinity;
+     const sideLength = Math.min(container.width, container.height);
+     const totalArea = row.reduce((sum, node) => sum + node.area, 0);
+     const rowThickness = totalArea / sideLength;
+     let maxRatio = 0;
+     for (let i = 0; i < row.length; i++) {
+        const itemLength = row[i].area / rowThickness;
+        const ratio = Math.max(rowThickness / itemLength, itemLength / rowThickness);
+        if (ratio > maxRatio) maxRatio = ratio;
+     }
+     return maxRatio;
+  },
+
+  // --- ROBUST LAYOUT (No Grey Space) ---
+  layoutRow: function(row, container, results) {
+     const totalArea = row.reduce((sum, node) => sum + node.area, 0);
+     const useWidth = container.width < container.height;
+
+     if (useWidth) {
+        const rowHeight = totalArea / container.width;
+        let runningX = container.x;
+        row.forEach((node, i) => {
+           let nodeWidth;
+           if (i === row.length - 1) {
+              nodeWidth = Math.max(0, (container.x + container.width) - runningX);
+           } else {
+              nodeWidth = node.area / rowHeight;
+           }
+           results.push({ ...node, x: runningX, y: container.y, width: nodeWidth, height: rowHeight });
+           runningX += nodeWidth;
+        });
+        container.y += rowHeight;
+        container.height -= rowHeight;
+     } else {
+        const rowWidth = totalArea / container.height;
+        let runningY = container.y;
+        row.forEach((node, i) => {
+           let nodeHeight;
+           if (i === row.length - 1) {
+             nodeHeight = Math.max(0, (container.y + container.height) - runningY);
+           } else {
+             nodeHeight = node.area / rowWidth;
+           }
+           results.push({ ...node, x: container.x, y: runningY, width: rowWidth, height: nodeHeight });
+           runningY += nodeHeight;
+        });
+        container.x += rowWidth;
+        container.width -= rowWidth;
+     }
+  },
+
+  layoutLastRow: function(row, container, results) {
+    const useWidth = container.width < container.height;
+
+    if (useWidth) {
+      const totalArea = row.reduce((sum, n) => sum + n.area, 0);
+      let runningX = container.x;
+
+      row.forEach((node, i) => {
+        let nodeWidth;
+        if (i === row.length - 1) {
+          // ABSOLUTE FILL to edge
+          nodeWidth = container.x + container.width - runningX;
+        } else {
+          nodeWidth = (node.area / totalArea) * container.width;
+        }
+
+        results.push({
+          ...node,
+          x: runningX,
+          y: container.y,
+          width: nodeWidth,
+          height: container.height
+        });
+        runningX += nodeWidth;
+      });
+    } else {
+      const totalArea = row.reduce((sum, n) => sum + n.area, 0);
+      let runningY = container.y;
+
+      row.forEach((node, i) => {
+        let nodeHeight;
+        if (i === row.length - 1) {
+          // ABSOLUTE FILL to edge
+          nodeHeight = container.y + container.height - runningY;
+        } else {
+          nodeHeight = (node.area / totalArea) * container.height;
+        }
+
+        results.push({
+          ...node,
+          x: container.x,
+          y: runningY,
+          width: container.width,
+          height: nodeHeight
+        });
+        runningY += nodeHeight;
+      });
+    }
+  },
+
+  addLabels: function(g, item, config, svgNS) {
+    const labelFontSize = config.label_font_size || 12;
+    const valueFontSize = config.value_font_size || 12;
+    const padding = 4;
+
+    if (item.width < 20 || item.height < 15) return;
+
+    const maxWidth = item.width - (padding * 2);
+    const maxHeight = item.height - (padding * 2);
+
+    const showLabel = config.show_labels && (maxWidth >= 30) && (maxHeight >= labelFontSize + 4);
+    const showValue = config.show_values && (maxWidth >= 30) && (maxHeight >= valueFontSize + 4);
+
+    if (!showLabel && !showValue) return;
+
+    const labelText = item.name;
+    const valueText = this.formatValue(item.rawValue);
+    const canFitStacked = showLabel && showValue && (maxHeight >= (labelFontSize + valueFontSize + 8));
+    let currentY = item.y + (item.height / 2);
+
+    if (canFitStacked) currentY -= 2;
+
+    if (showLabel) {
+       const labelEl = document.createElementNS(svgNS, 'text');
+       labelEl.setAttribute('x', item.x + (item.width / 2));
+       labelEl.setAttribute('y', canFitStacked ? currentY - (valueFontSize / 2) : currentY + (labelFontSize/3));
+       labelEl.setAttribute('text-anchor', 'middle');
+       labelEl.setAttribute('fill', config.label_color);
+       labelEl.setAttribute('font-size', labelFontSize);
+       labelEl.setAttribute('class', 'treemap-label');
+
+       let finalLabel = labelText;
+       if (this.estimateTextWidth(labelText, labelFontSize) > maxWidth) {
+          finalLabel = this.ellipsize(labelText, maxWidth, labelFontSize);
+       }
+       labelEl.textContent = finalLabel;
+       g.appendChild(labelEl);
+    }
+
+    if (showValue) {
+       if (!canFitStacked && showLabel) return;
+
+       const valEl = document.createElementNS(svgNS, 'text');
+       valEl.setAttribute('x', item.x + (item.width / 2));
+       valEl.setAttribute('y', canFitStacked ? currentY + valueFontSize + 2 : currentY + (valueFontSize/3));
+       valEl.setAttribute('text-anchor', 'middle');
+       valEl.setAttribute('fill', config.value_color);
+       valEl.setAttribute('font-size', valueFontSize);
+       valEl.setAttribute('class', 'treemap-value');
+       valEl.textContent = valueText;
+
+       if (this.estimateTextWidth(valueText, valueFontSize) > maxWidth) {
+          g.removeChild(valEl);
+       } else {
+          g.appendChild(valEl);
+       }
+    }
+  },
+
+  ellipsize: function(text, maxWidth, fontSize) {
+     const estimatedCharWidth = fontSize * 0.6;
+     const maxChars = Math.floor(maxWidth / estimatedCharWidth);
+     if (text.length <= maxChars) return text;
+     return text.substring(0, Math.max(0, maxChars - 2)) + '..';
+  },
+
+  estimateTextWidth: function(text, fontSize) {
+    return text.length * (fontSize * 0.6);
+  },
+
+  updateBreadcrumb: function() {
+    if (this._drillStack.length === 0) {
+      this._breadcrumb.style.display = 'none';
+      return;
+    }
+    this._breadcrumb.style.display = 'block';
+    let html = '<span class="breadcrumb-item" data-level="-1">All</span>';
+    this._drillStack.forEach((item, idx) => {
+      html += '<span class="breadcrumb-separator">/</span>';
+      html += `<span class="breadcrumb-item" data-level="${idx}">${item}</span>`;
+    });
+    this._breadcrumb.innerHTML = html;
+    this._breadcrumb.querySelectorAll('.breadcrumb-item').forEach(elem => {
+      elem.addEventListener('click', (e) => {
+        const level = parseInt(e.target.getAttribute('data-level'));
+        this._drillStack = (level === -1) ? [] : this._drillStack.slice(0, level + 1);
+        this.drawTreemap(this._allData, this._config, this._queryResponse);
+      });
+    });
+  },
+
+  getColors: function(data, config) {
+    const palettes = {
+      green_scale: ['#F1F8E9', '#DCEDC8', '#C5E1A5', '#AED581', '#9CCC65', '#8BC34A', '#7CB342', '#689F38', '#558B2F', '#33691E', '#1B5E20'],
+        blue_scale: ['#E3F2FD', '#BBDEFB', '#90CAF9', '#64B5F6', '#42A5F5', '#2196F3', '#1E88E5', '#1976D2', '#1565C0', '#0D47A1', '#0A3D91'],
+        google: ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D00', '#46BDC6', '#AB47BC', '#7BAAF7', '#F07B72', '#FCD04F', '#71C287'],
+        viridis: ['#440154', '#482475', '#414487', '#355F8D', '#2A788E', '#21908C', '#22A884', '#42BE71', '#7AD151', '#BDDF26', '#FDE725'],
+        warm: ['#FFF5EB', '#FEE6CE', '#FDD0A2', '#FDAE6B', '#FD8D3C', '#F16913', '#E6550D', '#D94801', '#A63603', '#7F2704'],
+        cool: ['#F0F9FF', '#DEEBF7', '#C6DBEF', '#9ECAE1', '#6BAED6', '#4292C6', '#2171B5', '#08519C', '#08306B', '#041E42']
+        };
+
+        let palette = palettes[config.color_palette] || palettes.green_scale;
+
+      // Reverse if requested
+      if (config.reverse_palette) {
+        palette = [...palette].reverse();
+      }
+
+      // Generate gradient across all items
+      const nonOthersData = data.filter(d => !d.isOthers);
+      const itemCount = nonOthersData.length;
+
+      if (itemCount <= palette.length) {
+        return palette.slice(0, itemCount);
+      }
+
+      // Interpolate to create smooth gradient for many items
+      const colors = [];
+      for (let i = 0; i < itemCount; i++) {
+        const position = i / Math.max(1, itemCount - 1);
+        const paletteIndex = position * (palette.length - 1);
+        const lowerIndex = Math.floor(paletteIndex);
+        const upperIndex = Math.min(palette.length - 1, Math.ceil(paletteIndex));
+        const blend = paletteIndex - lowerIndex;
+
+        colors.push(this.interpolateColor(palette[lowerIndex], palette[upperIndex], blend));
+      }
+
+      return colors;
+    },
+
+  interpolateColor: function(color1, color2, ratio) {
+    const hex = (c) => {
+       c = c.replace('#', '');
+       return {
+         r: parseInt(c.substring(0, 2), 16),
+         g: parseInt(c.substring(2, 4), 16),
+         b: parseInt(c.substring(4, 6), 16)
+       };
+    };
+    const c1 = hex(color1), c2 = hex(color2);
+    const r = Math.round(c1.r + (c2.r - c1.r) * ratio);
+    const g = Math.round(c1.g + (c2.g - c1.g) * ratio);
+    const b = Math.round(c1.b + (c2.b - c1.b) * ratio);
+    return `rgb(${r}, ${g}, ${b})`;
+  },
+
+  formatValue: function(value) {
+    if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
+    if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+    if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+    return value.toFixed(0);
+  }
+});
