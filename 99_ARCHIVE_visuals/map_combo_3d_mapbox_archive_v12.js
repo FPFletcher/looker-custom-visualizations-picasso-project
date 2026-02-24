@@ -1,9 +1,10 @@
 /**
  * Multi-Layer 3D Map for Looker - v58 + v71 Print Hybrid (CDN Version)
- * Status = ALL is working, just missing value display on legend and/ or on map
+ * Status = ALL is working
  * BASE: v58 (Layers, Tooltips, Drill Menus, Data Processing)
  * MODIFICATION 1: Replaced PDF printing logic with v71 (Static Map Fallback).
  * MODIFICATION 2: Added Manual Dependency Loader (DeckGL, Mapbox, TopoJSON) for CDN support.
+ * MODIFICATION 3: Added legend value ranges toggle (show_legend_values).
  * ID: map_combo_3d_mapbox_cdn
  */
 
@@ -314,7 +315,7 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "map_combo_3d_mapbox_cdn", // UPDATED: Matches Admin Panel ID
+  id: "map_combo_3d_mapbox_cdn",
   label: "Combo Map 3D (v58 Hybrid)",
   options: {
     // --- 1. PLOT TAB ---
@@ -417,6 +418,14 @@ looker.plugins.visualizations.add({
       section: "Series",
       order: 2
     },
+    // NEW: Show min-max value ranges below each legend label
+    show_legend_values: {
+      type: "boolean",
+      label: "Show Value Ranges in Legend",
+      default: false,
+      section: "Series",
+      order: 3
+    },
     legend_position: {
       type: "string",
       label: "Legend Position",
@@ -429,7 +438,7 @@ looker.plugins.visualizations.add({
       ],
       default: "bottom-right",
       section: "Series",
-      order: 3
+      order: 4
     },
 
     // --- 2. LAYERS TAB ---
@@ -476,9 +485,11 @@ looker.plugins.visualizations.add({
           max-width: 250px;
         }
         .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
-        .legend-symbol { width: 16px; height: 16px; margin-right: 8px; display: inline-block; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid rgba(0,0,0,0.1); }
+        .legend-symbol { width: 16px; height: 16px; margin-right: 8px; flex-shrink: 0; display: inline-block; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid rgba(0,0,0,0.1); }
         .legend-circle { border-radius: 50%; }
         .legend-rect { border-radius: 2px; }
+        .legend-label-wrap { display: flex; flex-direction: column; }
+        .legend-range { font-size: 10px; color: #888; margin-top: 1px; }
 
         .top-right { top: 10px; right: 10px; }
         .bottom-right { bottom: 30px; right: 10px; }
@@ -517,18 +528,12 @@ looker.plugins.visualizations.add({
     const zoom = Math.max(0, viewState.zoom).toFixed(2);
     const bearing = (viewState.bearing || 0).toFixed(2);
     const pitch = (viewState.pitch || 0).toFixed(2);
-
-    // Construct the Raw Mapbox URL
     const rawUrl = `https://api.mapbox.com/styles/v1/${styleId}/static/${lon},${lat},${zoom},${bearing},${pitch}/${width}x${height}?access_token=${config.mapbox_token}&logo=false&attribution=false`;
-
-    // Wrap in Proxy to ensure PDF renderer accepts it
     return `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}`;
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
 
-    // --- DEPENDENCY CHECK ---
-    // If dependencies are not loaded yet, wait and retry.
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined' || typeof topojson === 'undefined') {
       console.log("[Viz Hybrid] Waiting for dependencies...");
       setTimeout(() => {
@@ -537,13 +542,11 @@ looker.plugins.visualizations.add({
       return;
     }
 
-    // MOD: Check details.print (V71 style)
     const isPrint = details && details.print;
     console.log(`[Viz Hybrid] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
-    // TOKEN CHECK
     if (!config.mapbox_token) {
       console.warn("[Viz] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
@@ -570,13 +573,10 @@ looker.plugins.visualizations.add({
     ]).then(([processedData, ...loadedIcons]) => {
 
       this._processedData = processedData;
-
       console.log(`[Viz Hybrid] Data prepared.`);
 
-      // --- MOD: V71 PRINT LOGIC IMPLEMENTATION ---
       if (isPrint) {
         console.log("[Viz Hybrid] Print/Static Mode Active.");
-
         const viewState = this._viewState || {
           longitude: Number(config.center_lng) || 2,
           latitude: Number(config.center_lat) || 46,
@@ -584,30 +584,20 @@ looker.plugins.visualizations.add({
           pitch: Number(config.pitch) || 45,
           bearing: 0
         };
-
         const width = this._container.clientWidth || 800;
         const height = this._container.clientHeight || 600;
-
         const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
         console.log("[Viz Hybrid] Static URL:", staticUrl);
-
-        // Apply background immediately (Static Map Fallback)
         this._container.style.backgroundImage = `url('${staticUrl}')`;
         this._container.style.backgroundSize = 'cover';
         this._container.style.backgroundPosition = 'center';
-
-        // Render DeckGL with transparent map style so background shows through
         this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
-        this._updateLegend(config, loadedIcons, queryResponse);
-
-        // Call done() immediately (V71 strategy - no waiting for timeouts)
+        this._updateLegend(config, loadedIcons, queryResponse, processedData);
         done();
-
       } else {
-        // Interactive Mode (Standard v58 Rendering)
         this._container.style.backgroundImage = 'none';
         this._render(processedData, config, queryResponse, details, loadedIcons);
-        this._updateLegend(config, loadedIcons, queryResponse);
+        this._updateLegend(config, loadedIcons, queryResponse, processedData);
         done();
       }
 
@@ -618,7 +608,63 @@ looker.plugins.visualizations.add({
     });
   },
 
-  _updateLegend: function(config, loadedIcons, queryResponse) {
+  // NEW: Compute min/max value range for a given layer across all data
+  _getLayerValueRange: function (config, layerIdx, processedData, queryResponse) {
+    const rawM = config[`layer${layerIdx}_measure_idx`];
+    const measureStr = (rawM === undefined || rawM === null) ? String(layerIdx - 1) : String(rawM);
+    const measureIndices = measureStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    if (measureIndices.length === 0) measureIndices.push(0);
+
+    const rawD = config[`layer${layerIdx}_dimension_idx`];
+    const dimStr = (rawD === undefined || rawD === null) ? "0" : String(rawD);
+    const dimIndices = dimStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+
+    const showAllPivots = config[`layer${layerIdx}_show_all_pivots`];
+    const pivotIdx = Number(config[`layer${layerIdx}_pivot_idx`]) || 0;
+    const pivotInfo = this._pivotInfo;
+    const measures = queryResponse.fields.measure_like;
+
+    const getValue = (d) => {
+      let totalValue = 0;
+      measureIndices.forEach(mIdx => {
+        if (mIdx < 0) return;
+        if (!pivotInfo || !pivotInfo.hasPivot) {
+          if (d.values && d.values[mIdx] !== undefined) {
+            totalValue += parseFloat(d.values[mIdx]) || 0;
+          }
+        } else {
+          if (showAllPivots) {
+            if (d.values && d.values[mIdx] !== undefined) totalValue += parseFloat(d.values[mIdx]) || 0;
+          } else {
+            const mName = measures[mIdx] ? measures[mIdx].name : null;
+            const pKey = pivotInfo.pivotKeys[pivotIdx];
+            if (mName && pKey && d.pivotData && d.pivotData[mName] && d.pivotData[mName][pKey]) {
+              totalValue += (d.pivotData[mName][pKey].value || 0);
+            }
+          }
+        }
+      });
+      return totalValue || 0;
+    };
+
+    let allValues = [];
+    if (processedData.type === 'regions' && processedData.dataMaps) {
+      dimIndices.forEach(dimIdx => {
+        const dataMap = processedData.dataMaps[dimIdx];
+        if (dataMap) {
+          Object.values(dataMap).forEach(item => allValues.push(getValue(item)));
+        }
+      });
+    } else if (processedData.type === 'points' && processedData.data) {
+      processedData.data.forEach(item => allValues.push(getValue(item)));
+    }
+
+    allValues = allValues.filter(v => !isNaN(v) && v !== 0);
+    if (allValues.length === 0) return { min: null, max: null };
+    return { min: Math.min(...allValues), max: Math.max(...allValues) };
+  },
+
+  _updateLegend: function(config, loadedIcons, queryResponse, processedData) {
     if (!config.show_legend) {
       this._legend.style.display = 'none';
       return;
@@ -627,6 +673,7 @@ looker.plugins.visualizations.add({
     this._legend.style.display = 'block';
     this._legend.className = `map-legend ${config.legend_position || 'bottom-right'}`;
 
+    const showValues = config.show_legend_values || false;
     let html = '';
     let iconIndex = 0;
     const measures = queryResponse.fields.measure_like;
@@ -635,13 +682,13 @@ looker.plugins.visualizations.add({
       if (config[`layer${i}_enabled`]) {
         let label = config[`layer${i}_legend_label`];
         if (!label || label.trim() === '') {
-            const measStr = config[`layer${i}_measure_idx`];
-            const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
-            const names = mIndices.map(idx => {
-                const m = measures[idx];
-                return m ? (m.label_short || m.label) : '';
-            }).filter(s => s !== '');
-            label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
+          const measStr = config[`layer${i}_measure_idx`];
+          const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
+          const names = mIndices.map(idx => {
+            const m = measures[idx];
+            return m ? (m.label_short || m.label) : '';
+          }).filter(s => s !== '');
+          label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
         }
 
         const color = config[`layer${i}_color_main`] || '#ccc';
@@ -649,8 +696,22 @@ looker.plugins.visualizations.add({
         const useGradient = config[`layer${i}_use_gradient`];
         const endColor = config[`layer${i}_gradient_end`] || color;
 
-        let symbolHtml = '';
+        // Compute value range if show_legend_values is on
+        let rangeHtml = '';
+        if (showValues && processedData && type !== 'heatmap') {
+          const range = this._getLayerValueRange(config, i, processedData, queryResponse);
+          if (range.min !== null && range.max !== null) {
+            const measStr = config[`layer${i}_measure_idx`];
+            const mIdx = parseInt(String(measStr !== undefined && measStr !== null ? measStr : i-1).split(',')[0].trim());
+            const m = measures[mIdx];
+            const fmt = m ? m.value_format : null;
+            const minStr = this._applyLookerFormat(range.min, fmt);
+            const maxStr = this._applyLookerFormat(range.max, fmt);
+            rangeHtml = `<span class="legend-range">${minStr} – ${maxStr}</span>`;
+          }
+        }
 
+        let symbolHtml = '';
         if (type === 'icon') {
           const iconData = loadedIcons[iconIndex];
           const url = iconData ? iconData.url : ICONS['factory'];
@@ -668,7 +729,14 @@ looker.plugins.visualizations.add({
           symbolHtml = `<div class="legend-symbol legend-rect" style="${style}"></div>`;
         }
 
-        html += `<div class="legend-item">${symbolHtml}<span>${label}</span></div>`;
+        html += `
+          <div class="legend-item">
+            ${symbolHtml}
+            <div class="legend-label-wrap">
+              <span>${label}</span>
+              ${rangeHtml}
+            </div>
+          </div>`;
       }
     }
 
@@ -891,7 +959,7 @@ looker.plugins.visualizations.add({
         if (measStr !== undefined && measStr !== null) {
           activeMeasureIndices = String(measStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
         } else {
-          activeMeasureIndices = [layerIdx - 1]; // Default fallback
+          activeMeasureIndices = [layerIdx - 1];
         }
       } else {
         activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
@@ -1072,7 +1140,6 @@ looker.plugins.visualizations.add({
     const hideNulls = config.hide_no_data;
 
     const sizeByValue = config[`layer${idx}_size_by_value`] || false;
-
     const iconBillboard = config[`layer${idx}_icon_billboard`] !== false;
 
     const useGradient = config[`layer${idx}_use_gradient`];
