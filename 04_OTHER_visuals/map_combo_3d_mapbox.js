@@ -5,6 +5,7 @@
  * MODIFICATION 2: Added Manual Dependency Loader (DeckGL, Mapbox, TopoJSON) for CDN support.
  * MODIFICATION 3: Added Legend Value Ranges toggle.
  * MODIFICATION 4: Added per-layer on-map value label display (VALUE SETTINGS section).
+ * MODIFICATION 5: Forced 0 decimals for Legend Value Ranges.
  * ID: map_combo_3d_mapbox_cdn
  */
 
@@ -780,8 +781,9 @@ looker.plugins.visualizations.add({
             const mIdx = parseInt(String(measStr || i-1).split(',')[0].trim());
             const m = measures[mIdx];
             const fmt = m ? m.value_format : null;
-            const minStr = this._applyLookerFormat(range.min, fmt);
-            const maxStr = this._applyLookerFormat(range.max, fmt);
+            // Force zero decimals here using our new third parameter
+            const minStr = this._applyLookerFormat(range.min, fmt, true);
+            const maxStr = this._applyLookerFormat(range.max, fmt, true);
             rangeHtml = `<span class="legend-range">${minStr} – ${maxStr}</span>`;
           }
         }
@@ -1726,11 +1728,14 @@ looker.plugins.visualizations.add({
 
   // --- UTILITIES (v58) ---
 
-  _applyLookerFormat: function (value, formatStr) {
+  // MOD: Added forceNoDecimals parameter for legend overrides
+  _applyLookerFormat: function (value, formatStr, forceNoDecimals = false) {
     if (value === undefined || value === null) return '0';
     if (typeof value !== 'number') return value;
 
-    if (!formatStr) return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (!formatStr) {
+      return value.toLocaleString(undefined, { maximumFractionDigits: forceNoDecimals ? 0 : 2 });
+    }
 
     let style = 'decimal';
     let currency = undefined;
@@ -1742,11 +1747,15 @@ looker.plugins.visualizations.add({
     else if (formatStr.includes('%')) { style = 'percent'; }
 
     let decimals = 0;
-    if (formatStr.includes('.')) {
-      const afterDot = formatStr.split('.')[1];
-      if (afterDot) decimals = afterDot.replace(/[^0#]/g, '').length;
-    } else if (style === 'currency') {
-      decimals = 2;
+
+    // Only parse for decimals if we aren't forcing zero
+    if (!forceNoDecimals) {
+      if (formatStr.includes('.')) {
+        const afterDot = formatStr.split('.')[1];
+        if (afterDot) decimals = afterDot.replace(/[^0#]/g, '').length;
+      } else if (style === 'currency') {
+        decimals = 2;
+      }
     }
 
     try {
