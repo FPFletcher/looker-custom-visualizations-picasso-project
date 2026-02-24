@@ -1817,13 +1817,20 @@ looker.plugins.visualizations.add({
 
   _getGeoJSONUrl: function (config) {
     if (config.map_layer_source === 'custom') return config.custom_geojson_url;
+    // All URLs use unpkg or jsdelivr (npm CDNs) — reliably whitelisted in
+    // corporate/Looker environments. raw.githubusercontent.com is intentionally
+    // avoided as it is frequently blocked by CSP / network policies.
     const URLS = {
-      world_countries: 'https://unpkg.com/world-atlas@2/countries-110m.json',
-      us_states: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
-      france_regions: 'https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/regions.geojson',
-      uk_regions: 'https://martinjc.github.io/UK-GeoJSON/json/eng/topo_eer.json',
-      germany_states: 'https://raw.githubusercontent.com/isellsoap/deutschlandGeoJSON/main/2_bundeslaender/3_mittel.geo.json',
-      spain_communities: 'https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/spain-communities.geojson',
+      world_countries: 'https://unpkg.com/world-atlas@2.0.2/countries-110m.json',
+      us_states: 'https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-10m.json',
+      // france-geojson npm package (gregoiredavid)
+      france_regions: 'https://cdn.jsdelivr.net/npm/france-geojson@0.2.0/regions.geojson',
+      // @martinjc/uk-geojson npm package — EER (English regions) TopoJSON
+      uk_regions: 'https://cdn.jsdelivr.net/npm/@martinjc/uk-geojson@0.2.6/json/eng/topo_eer.json',
+      // german-states npm package (topojson)
+      germany_states: 'https://cdn.jsdelivr.net/npm/german-states-geojson@1.0.0/states.geojson',
+      // spain-communities via npm (click_that_hood mirror)
+      spain_communities: 'https://cdn.jsdelivr.net/npm/spain-geojson@1.0.2/spain-communities.geojson',
     };
     const COMBOS = {
       combined_europe_major: [
@@ -1831,7 +1838,8 @@ looker.plugins.visualizations.add({
         URLS.germany_states,
         URLS.uk_regions,
         URLS.spain_communities,
-        'https://raw.githubusercontent.com/openpolis/geojson-italy/master/geojson/limits_IT_regions.geojson'
+        // italy regions — geojson-italy npm package
+        'https://cdn.jsdelivr.net/npm/geojson-italy@1.0.0/regioni.geojson'
       ]
     };
     if (COMBOS[config.map_layer_source]) return COMBOS[config.map_layer_source];
@@ -1851,15 +1859,26 @@ looker.plugins.visualizations.add({
   _loadSingleGeoJSON: async function (url) {
     if (!url) return { type: "FeatureCollection", features: [] };
     if (this._geojsonCache[url]) return this._geojsonCache[url];
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
-    let geojson = await res.json();
-    if (geojson.type === 'Topology' && typeof topojson !== 'undefined') {
-      const key = Object.keys(geojson.objects)[0];
-      geojson = topojson.feature(geojson, geojson.objects[key]);
+    // 15-second timeout so a blocked URL fails fast rather than hanging
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+      let geojson = await res.json();
+      if (geojson.type === 'Topology' && typeof topojson !== 'undefined') {
+        const key = Object.keys(geojson.objects)[0];
+        geojson = topojson.feature(geojson, geojson.objects[key]);
+      }
+      this._geojsonCache[url] = geojson;
+      return geojson;
+    } catch (e) {
+      clearTimeout(timer);
+      console.warn(`[Viz] GeoJSON fetch failed for ${url}:`, e.message);
+      // Return empty collection so layer renders gracefully (no crash)
+      return { type: "FeatureCollection", features: [] };
     }
-    this._geojsonCache[url] = geojson;
-    return geojson;
   },
 
   _getCentroid: function (geometry) {
