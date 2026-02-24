@@ -970,7 +970,11 @@ looker.plugins.visualizations.add({
 
   _render: function (processed, config, queryResponse, details, loadedIcons) {
     const isPrint = details && details.print;
-    const layerObjects = [];
+    // Geo layers and label layers are kept separate so labels always render
+    // on top of ALL geometry layers, while still respecting z-index order
+    // among themselves.
+    const geoLayerObjects = [];
+    const labelLayerObjects = [];
     let iconIndex = 0;
 
     for (let i = 1; i <= 4; i++) {
@@ -991,15 +995,15 @@ looker.plugins.visualizations.add({
           const layer = this._buildSingleLayer(i, config, processed, iconData, isCustomIcon);
           if (layer) {
             const z = Number(config[`layer${i}_z_index`]) || i;
-            layerObjects.push({ layer: layer, zIndex: z });
+            geoLayerObjects.push({ layer: layer, zIndex: z });
           }
 
-          // NEW: Build text label layer if enabled
+          // Label layers collected separately — will be appended AFTER all geo layers
           if (config[`layer${i}_show_labels`]) {
             const labelLayer = this._buildLabelLayer(i, config, processed, queryResponse);
             if (labelLayer) {
               const z = Number(config[`layer${i}_z_index`]) || i;
-              layerObjects.push({ layer: labelLayer, zIndex: z + 0.5 });
+              labelLayerObjects.push({ layer: labelLayer, zIndex: z });
             }
           }
 
@@ -1009,8 +1013,14 @@ looker.plugins.visualizations.add({
       }
     }
 
-    layerObjects.sort((a, b) => a.zIndex - b.zIndex);
-    const layers = layerObjects.map(obj => obj.layer);
+    // Sort each group by z-index independently, then concatenate:
+    // geo layers first (bottom), label layers last (always on top of geo)
+    geoLayerObjects.sort((a, b) => a.zIndex - b.zIndex);
+    labelLayerObjects.sort((a, b) => a.zIndex - b.zIndex);
+    const layers = [
+      ...geoLayerObjects.map(obj => obj.layer),
+      ...labelLayerObjects.map(obj => obj.layer)
+    ];
 
     // --- TOOLTIP (v58 Logic) ---
     const getTooltip = ({ object, layer }) => {
