@@ -35,17 +35,36 @@ const loadScript = (src) => {
   });
 };
 
+// Known-good pinned CDN URLs — avoids @latest resolution timeouts
+const DEP_URLS = {
+  mapboxgl: "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
+  topojson: "https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js",
+  // Primary: unpkg pinned. Fallback: jsdelivr (same version).
+  deckgl_primary: "https://unpkg.com/deck.gl@8.9.35/dist.min.js",
+  deckgl_fallback: "https://cdn.jsdelivr.net/npm/deck.gl@8.9.35/dist.min.js"
+};
+
+let _depsLoadFailed = false;
+
 const loadDependencies = async () => {
   try {
     console.log("[Viz Loader] Loading dependencies...");
+    // Load mapbox + topojson in parallel (fast/reliable CDNs)
     await Promise.all([
-      loadScript("https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"),
-      loadScript("https://unpkg.com/topojson-client@3")
+      loadScript(DEP_URLS.mapboxgl),
+      loadScript(DEP_URLS.topojson)
     ]);
-    await loadScript("https://unpkg.com/deck.gl@latest/dist.min.js");
+    // Load deck.gl — try primary CDN, fall back to jsdelivr on failure
+    try {
+      await loadScript(DEP_URLS.deckgl_primary);
+    } catch (e) {
+      console.warn("[Viz Loader] Primary deck.gl CDN failed, trying fallback...");
+      await loadScript(DEP_URLS.deckgl_fallback);
+    }
     console.log("[Viz Loader] All dependencies loaded.");
   } catch (e) {
-    console.error("[Viz Loader] Dependency loading failed", e);
+    console.error("[Viz Loader] Dependency loading failed — all CDNs exhausted.", e);
+    _depsLoadFailed = true;
   }
 };
 
@@ -554,6 +573,8 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
+    this._prevMapStyle = null;
+    this._prevToken = null;
     this._processedData = null;
   },
 
@@ -563,6 +584,8 @@ looker.plugins.visualizations.add({
       this._deck = null;
     }
     this._geojsonCache = {};
+    this._prevMapStyle = null;
+    this._prevToken = null;
   },
 
   // --- MERGED FROM V71: STATIC MAP HELPER (For Printing) ---
@@ -581,10 +604,18 @@ looker.plugins.visualizations.add({
   updateAsync: function (data, element, config, queryResponse, details, done) {
 
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined' || typeof topojson === 'undefined') {
+      if (_depsLoadFailed) {
+        this.addError({
+          title: "Dependency Load Failed",
+          message: "Could not load deck.gl from CDN. Check network connectivity and try refreshing. If the issue persists, the CDN may be unavailable."
+        });
+        done();
+        return;
+      }
       console.log("[Viz Hybrid] Waiting for dependencies...");
       setTimeout(() => {
         this.updateAsync(data, element, config, queryResponse, details, done);
-      }, 100);
+      }, 200);
       return;
     }
 
@@ -1175,11 +1206,24 @@ looker.plugins.visualizations.add({
         getTooltip: getTooltip,
         glOptions: { preserveDrawingBuffer: true, willReadFrequently: true }
       });
+      // Track the map style and token so we only re-apply when they actually change
+      this._prevMapStyle = config.map_style;
+      this._prevToken = config.mapbox_token;
     } else {
+      // Only include mapStyle/token in setProps when they have changed.
+      // Passing them on every update causes DeckGL to re-initialize Mapbox
+      // which blanks the base map.
+      const baseMapProps = {};
+      if (config.map_style !== this._prevMapStyle || config.mapbox_token !== this._prevToken) {
+        baseMapProps.mapStyle = config.map_style;
+        baseMapProps.mapboxApiAccessToken = config.mapbox_token;
+        this._prevMapStyle = config.map_style;
+        this._prevToken = config.mapbox_token;
+      }
+
       this._deck.setProps({
+        ...baseMapProps,
         layers: layers,
-        mapStyle: config.map_style,
-        mapboxApiAccessToken: config.mapbox_token,
         getTooltip: getTooltip,
         viewState: this._viewState,
         controller: true,
