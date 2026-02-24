@@ -1,6 +1,5 @@
 /**
- * Multi-Layer 3D Map for Looker - v58 + v71 Print Hybrid (CDN Version)
- * Status = ALL is working
+ * Multi-Layer 3D Map for Looker - Stable Release
  * BASE: v58 (Layers, Tooltips, Drill Menus, Data Processing)
  * MODIFICATION 1: Replaced PDF printing logic with v71 (Static Map Fallback).
  * MODIFICATION 2: Added Manual Dependency Loader (DeckGL, Mapbox, TopoJSON) for CDN support.
@@ -12,6 +11,7 @@
 // --- 1. DEPENDENCY LOADER (Required for CDN) ---
 const loadScript = (src) => {
   return new Promise((resolve, reject) => {
+    // Check if script is already present
     const existing = document.querySelector(`script[src="${src}"]`);
     if (existing) {
       if (existing.dataset.loaded === "true") return resolve();
@@ -35,39 +35,23 @@ const loadScript = (src) => {
   });
 };
 
-// Known-good pinned CDN URLs — avoids @latest resolution timeouts
-const DEP_URLS = {
-  mapboxgl: "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
-  topojson: "https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js",
-  // Primary: unpkg pinned. Fallback: jsdelivr (same version).
-  deckgl_primary: "https://unpkg.com/deck.gl@8.9.35/dist.min.js",
-  deckgl_fallback: "https://cdn.jsdelivr.net/npm/deck.gl@8.9.35/dist.min.js"
-};
-
-let _depsLoadFailed = false;
-
 const loadDependencies = async () => {
   try {
     console.log("[Viz Loader] Loading dependencies...");
-    // Load mapbox + topojson in parallel (fast/reliable CDNs)
+    // Load Mapbox & TopoJSON first
     await Promise.all([
-      loadScript(DEP_URLS.mapboxgl),
-      loadScript(DEP_URLS.topojson)
+      loadScript("https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"),
+      loadScript("https://unpkg.com/topojson-client@3")
     ]);
-    // Load deck.gl — try primary CDN, fall back to jsdelivr on failure
-    try {
-      await loadScript(DEP_URLS.deckgl_primary);
-    } catch (e) {
-      console.warn("[Viz Loader] Primary deck.gl CDN failed, trying fallback...");
-      await loadScript(DEP_URLS.deckgl_fallback);
-    }
+    // Load DeckGL after Mapbox is ready
+    await loadScript("https://unpkg.com/deck.gl@latest/dist.min.js");
     console.log("[Viz Loader] All dependencies loaded.");
   } catch (e) {
-    console.error("[Viz Loader] Dependency loading failed — all CDNs exhausted.", e);
-    _depsLoadFailed = true;
+    console.error("[Viz Loader] Dependency loading failed", e);
   }
 };
 
+// Trigger loading immediately
 loadDependencies();
 
 
@@ -100,7 +84,7 @@ const ICONS = {
   "water_dam": "https://img.icons8.com/color/96/dam.png"
 };
 
-// --- HELPER: GENERATE LAYER OPTIONS (v58 + label options) ---
+// --- HELPER: GENERATE LAYER OPTIONS (v58) ---
 const getLayerOptions = (n) => {
   const defaults = [
     { type: 'geojson', color: '#2E7D32', radius: 1000, height: 1000 },
@@ -283,7 +267,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 17
     },
-    // --- Series tab options ---
     [`layer${n}_legend_label`]: {
       type: "string",
       label: `Layer ${n} Legend Label`,
@@ -370,7 +353,7 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "map_combo_3d_mapbox_cdn",
+  id: "map_combo_3d_mapbox_cdn", // UPDATED: Matches Admin Panel ID
   label: "Combo Map 3D (v58 Hybrid)",
   options: {
     // --- 1. PLOT TAB ---
@@ -464,7 +447,7 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
-    // --- SERIES TAB: LEGEND SETTINGS ---
+    // --- SERIES TAB ---
     legend_header: { type: "string", label: "─── LEGEND SETTINGS ───", display: "divider", section: "Series", order: 1 },
     show_legend: {
       type: "boolean",
@@ -473,7 +456,6 @@ looker.plugins.visualizations.add({
       section: "Series",
       order: 2
     },
-    // NEW: Legend value ranges toggle
     show_legend_values: {
       type: "boolean",
       label: "Show Value Ranges in Legend",
@@ -573,8 +555,6 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
     this._viewState = null;
     this._prevConfig = {};
-    this._prevMapStyle = null;
-    this._prevToken = null;
     this._processedData = null;
   },
 
@@ -584,8 +564,6 @@ looker.plugins.visualizations.add({
       this._deck = null;
     }
     this._geojsonCache = {};
-    this._prevMapStyle = null;
-    this._prevToken = null;
   },
 
   // --- MERGED FROM V71: STATIC MAP HELPER (For Printing) ---
@@ -597,25 +575,21 @@ looker.plugins.visualizations.add({
     const bearing = (viewState.bearing || 0).toFixed(2);
     const pitch = (viewState.pitch || 0).toFixed(2);
 
+    // Construct the Raw Mapbox URL
     const rawUrl = `https://api.mapbox.com/styles/v1/${styleId}/static/${lon},${lat},${zoom},${bearing},${pitch}/${width}x${height}?access_token=${config.mapbox_token}&logo=false&attribution=false`;
+
+    // Wrap in Proxy to ensure PDF renderer accepts it
     return `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}`;
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
 
+    // --- DEPENDENCY CHECK ---
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined' || typeof topojson === 'undefined') {
-      if (_depsLoadFailed) {
-        this.addError({
-          title: "Dependency Load Failed",
-          message: "Could not load deck.gl from CDN. Check network connectivity and try refreshing. If the issue persists, the CDN may be unavailable."
-        });
-        done();
-        return;
-      }
       console.log("[Viz Hybrid] Waiting for dependencies...");
       setTimeout(() => {
         this.updateAsync(data, element, config, queryResponse, details, done);
-      }, 200);
+      }, 100);
       return;
     }
 
@@ -624,6 +598,7 @@ looker.plugins.visualizations.add({
 
     this.clearErrors();
 
+    // TOKEN CHECK
     if (!config.mapbox_token) {
       console.warn("[Viz] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
@@ -650,8 +625,10 @@ looker.plugins.visualizations.add({
     ]).then(([processedData, ...loadedIcons]) => {
 
       this._processedData = processedData;
+
       console.log(`[Viz Hybrid] Data prepared.`);
 
+      // --- MOD: V71 PRINT LOGIC IMPLEMENTATION ---
       if (isPrint) {
         console.log("[Viz Hybrid] Print/Static Mode Active.");
 
@@ -669,16 +646,20 @@ looker.plugins.visualizations.add({
         const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
         console.log("[Viz Hybrid] Static URL:", staticUrl);
 
+        // Apply background immediately (Static Map Fallback)
         this._container.style.backgroundImage = `url('${staticUrl}')`;
         this._container.style.backgroundSize = 'cover';
         this._container.style.backgroundPosition = 'center';
 
+        // Render DeckGL with transparent map style so background shows through
         this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
         this._updateLegend(config, loadedIcons, queryResponse, processedData);
 
+        // Call done() immediately (V71 strategy - no waiting for timeouts)
         done();
 
       } else {
+        // Interactive Mode (Standard v58 Rendering)
         this._container.style.backgroundImage = 'none';
         this._render(processedData, config, queryResponse, details, loadedIcons);
         this._updateLegend(config, loadedIcons, queryResponse, processedData);
@@ -776,13 +757,13 @@ looker.plugins.visualizations.add({
       if (config[`layer${i}_enabled`]) {
         let label = config[`layer${i}_legend_label`];
         if (!label || label.trim() === '') {
-          const measStr = config[`layer${i}_measure_idx`];
-          const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
-          const names = mIndices.map(idx => {
-            const m = measures[idx];
-            return m ? (m.label_short || m.label) : '';
-          }).filter(s => s !== '');
-          label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
+            const measStr = config[`layer${i}_measure_idx`];
+            const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
+            const names = mIndices.map(idx => {
+                const m = measures[idx];
+                return m ? (m.label_short || m.label) : '';
+            }).filter(s => s !== '');
+            label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
         }
 
         const color = config[`layer${i}_color_main`] || '#ccc';
@@ -806,6 +787,7 @@ looker.plugins.visualizations.add({
         }
 
         let symbolHtml = '';
+
         if (type === 'icon') {
           const iconData = loadedIcons[iconIndex];
           const url = iconData ? iconData.url : ICONS['factory'];
@@ -1001,9 +983,6 @@ looker.plugins.visualizations.add({
 
   _render: function (processed, config, queryResponse, details, loadedIcons) {
     const isPrint = details && details.print;
-    // Geo layers and label layers are kept separate so labels always render
-    // on top of ALL geometry layers, while still respecting z-index order
-    // among themselves.
     const geoLayerObjects = [];
     const labelLayerObjects = [];
     let iconIndex = 0;
@@ -1044,8 +1023,8 @@ looker.plugins.visualizations.add({
       }
     }
 
-    // Sort each group by z-index independently, then concatenate:
-    // geo layers first (bottom), label layers last (always on top of geo)
+    // Sort each group independently by z-index, then string them together
+    // This inherently places ALL labels mathematically on top of all maps
     geoLayerObjects.sort((a, b) => a.zIndex - b.zIndex);
     labelLayerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = [
@@ -1057,7 +1036,7 @@ looker.plugins.visualizations.add({
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
-      // Ignore tooltip on text label layers
+      // Ensure Tooltip ignores text layers so clicks/hovers pass through map objects below
       if (layer && layer.id && layer.id.includes('-labels')) return null;
 
       const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
@@ -1076,7 +1055,7 @@ looker.plugins.visualizations.add({
         if (measStr !== undefined && measStr !== null) {
           activeMeasureIndices = String(measStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
         } else {
-          activeMeasureIndices = [layerIdx - 1];
+          activeMeasureIndices = [layerIdx - 1]; // Default fallback
         }
       } else {
         activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
@@ -1206,24 +1185,11 @@ looker.plugins.visualizations.add({
         getTooltip: getTooltip,
         glOptions: { preserveDrawingBuffer: true, willReadFrequently: true }
       });
-      // Track the map style and token so we only re-apply when they actually change
-      this._prevMapStyle = config.map_style;
-      this._prevToken = config.mapbox_token;
     } else {
-      // Only include mapStyle/token in setProps when they have changed.
-      // Passing them on every update causes DeckGL to re-initialize Mapbox
-      // which blanks the base map.
-      const baseMapProps = {};
-      if (config.map_style !== this._prevMapStyle || config.mapbox_token !== this._prevToken) {
-        baseMapProps.mapStyle = config.map_style;
-        baseMapProps.mapboxApiAccessToken = config.mapbox_token;
-        this._prevMapStyle = config.map_style;
-        this._prevToken = config.mapbox_token;
-      }
-
       this._deck.setProps({
-        ...baseMapProps,
         layers: layers,
+        mapStyle: config.map_style,
+        mapboxApiAccessToken: config.mapbox_token,
         getTooltip: getTooltip,
         viewState: this._viewState,
         controller: true,
@@ -1291,7 +1257,6 @@ looker.plugins.visualizations.add({
       return this._applyLookerFormat(val, m ? m.value_format : null);
     };
 
-    // Build point data same as _buildSingleLayer
     let rawPointData = [];
 
     if (processed.type === 'regions') {
@@ -1346,7 +1311,6 @@ looker.plugins.visualizations.add({
       rawPointData = processed.data.map(p => ({ ...p }));
     }
 
-    // Filter out zero/null if needed
     let labelData = rawPointData.filter(d =>
       d.position &&
       d.position.length === 2 &&
@@ -1817,20 +1781,13 @@ looker.plugins.visualizations.add({
 
   _getGeoJSONUrl: function (config) {
     if (config.map_layer_source === 'custom') return config.custom_geojson_url;
-    // All URLs use unpkg or jsdelivr (npm CDNs) — reliably whitelisted in
-    // corporate/Looker environments. raw.githubusercontent.com is intentionally
-    // avoided as it is frequently blocked by CSP / network policies.
     const URLS = {
-      world_countries: 'https://unpkg.com/world-atlas@2.0.2/countries-110m.json',
-      us_states: 'https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-10m.json',
-      // france-geojson npm package (gregoiredavid)
-      france_regions: 'https://cdn.jsdelivr.net/npm/france-geojson@0.2.0/regions.geojson',
-      // @martinjc/uk-geojson npm package — EER (English regions) TopoJSON
-      uk_regions: 'https://cdn.jsdelivr.net/npm/@martinjc/uk-geojson@0.2.6/json/eng/topo_eer.json',
-      // german-states npm package (topojson)
-      germany_states: 'https://cdn.jsdelivr.net/npm/german-states-geojson@1.0.0/states.geojson',
-      // spain-communities via npm (click_that_hood mirror)
-      spain_communities: 'https://cdn.jsdelivr.net/npm/spain-geojson@1.0.2/spain-communities.geojson',
+      world_countries: 'https://unpkg.com/world-atlas@2/countries-110m.json',
+      us_states: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
+      france_regions: 'https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/regions.geojson',
+      uk_regions: 'https://martinjc.github.io/UK-GeoJSON/json/eng/topo_eer.json',
+      germany_states: 'https://raw.githubusercontent.com/isellsoap/deutschlandGeoJSON/main/2_bundeslaender/3_mittel.geo.json',
+      spain_communities: 'https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/spain-communities.geojson',
     };
     const COMBOS = {
       combined_europe_major: [
@@ -1838,8 +1795,7 @@ looker.plugins.visualizations.add({
         URLS.germany_states,
         URLS.uk_regions,
         URLS.spain_communities,
-        // italy regions — geojson-italy npm package
-        'https://cdn.jsdelivr.net/npm/geojson-italy@1.0.0/regioni.geojson'
+        'https://raw.githubusercontent.com/openpolis/geojson-italy/master/geojson/limits_IT_regions.geojson'
       ]
     };
     if (COMBOS[config.map_layer_source]) return COMBOS[config.map_layer_source];
@@ -1859,26 +1815,15 @@ looker.plugins.visualizations.add({
   _loadSingleGeoJSON: async function (url) {
     if (!url) return { type: "FeatureCollection", features: [] };
     if (this._geojsonCache[url]) return this._geojsonCache[url];
-    // 15-second timeout so a blocked URL fails fast rather than hanging
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    try {
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
-      let geojson = await res.json();
-      if (geojson.type === 'Topology' && typeof topojson !== 'undefined') {
-        const key = Object.keys(geojson.objects)[0];
-        geojson = topojson.feature(geojson, geojson.objects[key]);
-      }
-      this._geojsonCache[url] = geojson;
-      return geojson;
-    } catch (e) {
-      clearTimeout(timer);
-      console.warn(`[Viz] GeoJSON fetch failed for ${url}:`, e.message);
-      // Return empty collection so layer renders gracefully (no crash)
-      return { type: "FeatureCollection", features: [] };
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+    let geojson = await res.json();
+    if (geojson.type === 'Topology' && typeof topojson !== 'undefined') {
+      const key = Object.keys(geojson.objects)[0];
+      geojson = topojson.feature(geojson, geojson.objects[key]);
     }
+    this._geojsonCache[url] = geojson;
+    return geojson;
   },
 
   _getCentroid: function (geometry) {
