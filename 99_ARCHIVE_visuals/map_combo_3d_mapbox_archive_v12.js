@@ -1,17 +1,16 @@
 /**
  * Multi-Layer 3D Map for Looker - v58 + v71 Print Hybrid (CDN Version)
- * Status = ALL is working
+ * Status = ALL is working, just missing value display on legend and/ or on map
  * BASE: v58 (Layers, Tooltips, Drill Menus, Data Processing)
  * MODIFICATION 1: Replaced PDF printing logic with v71 (Static Map Fallback).
  * MODIFICATION 2: Added Manual Dependency Loader (DeckGL, Mapbox, TopoJSON) for CDN support.
- * MODIFICATION 3: Added Legend Value Ranges toggle.
- * MODIFICATION 4: Added per-layer on-map value label display (VALUE SETTINGS section).
  * ID: map_combo_3d_mapbox_cdn
  */
 
 // --- 1. DEPENDENCY LOADER (Required for CDN) ---
 const loadScript = (src) => {
   return new Promise((resolve, reject) => {
+    // Check if script is already present
     const existing = document.querySelector(`script[src="${src}"]`);
     if (existing) {
       if (existing.dataset.loaded === "true") return resolve();
@@ -38,10 +37,12 @@ const loadScript = (src) => {
 const loadDependencies = async () => {
   try {
     console.log("[Viz Loader] Loading dependencies...");
+    // Load Mapbox & TopoJSON first
     await Promise.all([
       loadScript("https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"),
       loadScript("https://unpkg.com/topojson-client@3")
     ]);
+    // Load DeckGL after Mapbox is ready
     await loadScript("https://unpkg.com/deck.gl@latest/dist.min.js");
     console.log("[Viz Loader] All dependencies loaded.");
   } catch (e) {
@@ -49,6 +50,7 @@ const loadDependencies = async () => {
   }
 };
 
+// Trigger loading immediately
 loadDependencies();
 
 
@@ -81,7 +83,7 @@ const ICONS = {
   "water_dam": "https://img.icons8.com/color/96/dam.png"
 };
 
-// --- HELPER: GENERATE LAYER OPTIONS (v58 + label options) ---
+// --- HELPER: GENERATE LAYER OPTIONS (v58) ---
 const getLayerOptions = (n) => {
   const defaults = [
     { type: 'geojson', color: '#2E7D32', radius: 1000, height: 1000 },
@@ -264,7 +266,6 @@ const getLayerOptions = (n) => {
       section: "Layers",
       order: b + 17
     },
-    // --- Series tab options ---
     [`layer${n}_legend_label`]: {
       type: "string",
       label: `Layer ${n} Legend Label`,
@@ -272,44 +273,6 @@ const getLayerOptions = (n) => {
       placeholder: "Leave empty to use Measure Name",
       section: "Series",
       order: n * 10
-    },
-    // --- VALUE SETTINGS: per-layer label toggles ---
-    [`layer${n}_show_labels`]: {
-      type: "boolean",
-      label: `Layer ${n} Show Value Labels on Map`,
-      default: false,
-      section: "Series",
-      order: 500 + (n * 10) + 1
-    },
-    [`layer${n}_label_size`]: {
-      type: "number",
-      label: `Layer ${n} Label Font Size (px)`,
-      default: 12,
-      section: "Series",
-      order: 500 + (n * 10) + 2
-    },
-    [`layer${n}_label_color`]: {
-      type: "string",
-      label: `Layer ${n} Label Color`,
-      display: "color",
-      default: "#FFFFFF",
-      section: "Series",
-      order: 500 + (n * 10) + 3
-    },
-    [`layer${n}_label_bg_color`]: {
-      type: "string",
-      label: `Layer ${n} Label Background Color`,
-      display: "color",
-      default: "#000000",
-      section: "Series",
-      order: 500 + (n * 10) + 4
-    },
-    [`layer${n}_label_offset_y`]: {
-      type: "number",
-      label: `Layer ${n} Label Vertical Offset (px)`,
-      default: 0,
-      section: "Series",
-      order: 500 + (n * 10) + 5
     }
   };
 };
@@ -351,7 +314,7 @@ const preloadImage = (type, customUrl) => {
 };
 
 looker.plugins.visualizations.add({
-  id: "map_combo_3d_mapbox_cdn",
+  id: "map_combo_3d_mapbox_cdn", // UPDATED: Matches Admin Panel ID
   label: "Combo Map 3D (v58 Hybrid)",
   options: {
     // --- 1. PLOT TAB ---
@@ -445,7 +408,7 @@ looker.plugins.visualizations.add({
       order: 22
     },
 
-    // --- SERIES TAB: LEGEND SETTINGS ---
+    // --- SERIES TAB ---
     legend_header: { type: "string", label: "─── LEGEND SETTINGS ───", display: "divider", section: "Series", order: 1 },
     show_legend: {
       type: "boolean",
@@ -453,14 +416,6 @@ looker.plugins.visualizations.add({
       default: true,
       section: "Series",
       order: 2
-    },
-    // NEW: Legend value ranges toggle
-    show_legend_values: {
-      type: "boolean",
-      label: "Show Value Ranges in Legend",
-      default: false,
-      section: "Series",
-      order: 3
     },
     legend_position: {
       type: "string",
@@ -474,16 +429,7 @@ looker.plugins.visualizations.add({
       ],
       default: "bottom-right",
       section: "Series",
-      order: 4
-    },
-
-    // --- SERIES TAB: VALUE SETTINGS (on-map labels) ---
-    value_settings_header: {
-      type: "string",
-      label: "─── VALUE LABELS ON MAP ───",
-      display: "divider",
-      section: "Series",
-      order: 490
+      order: 3
     },
 
     // --- 2. LAYERS TAB ---
@@ -530,11 +476,9 @@ looker.plugins.visualizations.add({
           max-width: 250px;
         }
         .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
-        .legend-symbol { width: 16px; height: 16px; margin-right: 8px; display: inline-block; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
+        .legend-symbol { width: 16px; height: 16px; margin-right: 8px; display: inline-block; background-size: contain; background-repeat: no-repeat; background-position: center; border: 1px solid rgba(0,0,0,0.1); }
         .legend-circle { border-radius: 50%; }
         .legend-rect { border-radius: 2px; }
-        .legend-label-wrap { display: flex; flex-direction: column; }
-        .legend-range { font-size: 10px; color: #888; margin-top: 1px; }
 
         .top-right { top: 10px; right: 10px; }
         .bottom-right { bottom: 30px; right: 10px; }
@@ -574,12 +518,17 @@ looker.plugins.visualizations.add({
     const bearing = (viewState.bearing || 0).toFixed(2);
     const pitch = (viewState.pitch || 0).toFixed(2);
 
+    // Construct the Raw Mapbox URL
     const rawUrl = `https://api.mapbox.com/styles/v1/${styleId}/static/${lon},${lat},${zoom},${bearing},${pitch}/${width}x${height}?access_token=${config.mapbox_token}&logo=false&attribution=false`;
+
+    // Wrap in Proxy to ensure PDF renderer accepts it
     return `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}`;
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
 
+    // --- DEPENDENCY CHECK ---
+    // If dependencies are not loaded yet, wait and retry.
     if (typeof deck === 'undefined' || typeof mapboxgl === 'undefined' || typeof topojson === 'undefined') {
       console.log("[Viz Hybrid] Waiting for dependencies...");
       setTimeout(() => {
@@ -588,11 +537,13 @@ looker.plugins.visualizations.add({
       return;
     }
 
+    // MOD: Check details.print (V71 style)
     const isPrint = details && details.print;
     console.log(`[Viz Hybrid] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
+    // TOKEN CHECK
     if (!config.mapbox_token) {
       console.warn("[Viz] Waiting for Mapbox Token...");
       this._tokenError.style.display = 'block';
@@ -619,8 +570,10 @@ looker.plugins.visualizations.add({
     ]).then(([processedData, ...loadedIcons]) => {
 
       this._processedData = processedData;
+
       console.log(`[Viz Hybrid] Data prepared.`);
 
+      // --- MOD: V71 PRINT LOGIC IMPLEMENTATION ---
       if (isPrint) {
         console.log("[Viz Hybrid] Print/Static Mode Active.");
 
@@ -638,19 +591,23 @@ looker.plugins.visualizations.add({
         const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
         console.log("[Viz Hybrid] Static URL:", staticUrl);
 
+        // Apply background immediately (Static Map Fallback)
         this._container.style.backgroundImage = `url('${staticUrl}')`;
         this._container.style.backgroundSize = 'cover';
         this._container.style.backgroundPosition = 'center';
 
+        // Render DeckGL with transparent map style so background shows through
         this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
-        this._updateLegend(config, loadedIcons, queryResponse, processedData);
+        this._updateLegend(config, loadedIcons, queryResponse);
 
+        // Call done() immediately (V71 strategy - no waiting for timeouts)
         done();
 
       } else {
+        // Interactive Mode (Standard v58 Rendering)
         this._container.style.backgroundImage = 'none';
         this._render(processedData, config, queryResponse, details, loadedIcons);
-        this._updateLegend(config, loadedIcons, queryResponse, processedData);
+        this._updateLegend(config, loadedIcons, queryResponse);
         done();
       }
 
@@ -661,73 +618,7 @@ looker.plugins.visualizations.add({
     });
   },
 
-  // --- HELPER: Compute value range for a given layer ---
-  _getLayerValueRange: function (config, layerIdx, processedData, queryResponse) {
-    if (!processedData) return { min: null, max: null };
-
-    const rawM = config[`layer${layerIdx}_measure_idx`];
-    const measureStr = (rawM === undefined || rawM === null) ? String(layerIdx - 1) : String(rawM);
-    const measureIndices = measureStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-
-    const rawD = config[`layer${layerIdx}_dimension_idx`];
-    const dimStr = (rawD === undefined || rawD === null) ? "0" : String(rawD);
-    const dimIndices = dimStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-
-    const showAllPivots = config[`layer${layerIdx}_show_all_pivots`];
-    const pivotIdx = Number(config[`layer${layerIdx}_pivot_idx`]) || 0;
-    const pivotInfo = this._pivotInfo;
-    const measures = queryResponse.fields.measure_like;
-
-    const getValue = (d) => {
-      let totalValue = 0;
-      measureIndices.forEach(mIdx => {
-        if (mIdx < 0) return;
-        if (!pivotInfo || !pivotInfo.hasPivot) {
-          if (d.values && d.values[mIdx] !== undefined) {
-            totalValue += parseFloat(d.values[mIdx]) || 0;
-          }
-        } else {
-          if (showAllPivots) {
-            if (d.values && d.values[mIdx] !== undefined) totalValue += parseFloat(d.values[mIdx]) || 0;
-          } else {
-            const mName = measures[mIdx] ? measures[mIdx].name : null;
-            const pKey = pivotInfo.pivotKeys[pivotIdx];
-            if (mName && pKey && d.pivotData && d.pivotData[mName] && d.pivotData[mName][pKey]) {
-              totalValue += (d.pivotData[mName][pKey].value || 0);
-            }
-          }
-        }
-      });
-      return totalValue || 0;
-    };
-
-    let allValues = [];
-
-    if (processedData.type === 'regions' && processedData.dataMaps) {
-      dimIndices.forEach(dimIdx => {
-        const dataMap = processedData.dataMaps[dimIdx];
-        if (dataMap) {
-          Object.values(dataMap).forEach(item => {
-            allValues.push(getValue(item));
-          });
-        }
-      });
-    } else if (processedData.type === 'points' && processedData.data) {
-      processedData.data.forEach(item => {
-        allValues.push(getValue(item));
-      });
-    }
-
-    allValues = allValues.filter(v => !isNaN(v) && v !== 0);
-
-    if (allValues.length === 0) return { min: null, max: null };
-    return {
-      min: Math.min(...allValues),
-      max: Math.max(...allValues)
-    };
-  },
-
-  _updateLegend: function(config, loadedIcons, queryResponse, processedData) {
+  _updateLegend: function(config, loadedIcons, queryResponse) {
     if (!config.show_legend) {
       this._legend.style.display = 'none';
       return;
@@ -736,7 +627,6 @@ looker.plugins.visualizations.add({
     this._legend.style.display = 'block';
     this._legend.className = `map-legend ${config.legend_position || 'bottom-right'}`;
 
-    const showValues = config.show_legend_values || false;
     let html = '';
     let iconIndex = 0;
     const measures = queryResponse.fields.measure_like;
@@ -745,13 +635,13 @@ looker.plugins.visualizations.add({
       if (config[`layer${i}_enabled`]) {
         let label = config[`layer${i}_legend_label`];
         if (!label || label.trim() === '') {
-          const measStr = config[`layer${i}_measure_idx`];
-          const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
-          const names = mIndices.map(idx => {
-            const m = measures[idx];
-            return m ? (m.label_short || m.label) : '';
-          }).filter(s => s !== '');
-          label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
+            const measStr = config[`layer${i}_measure_idx`];
+            const mIndices = (measStr === undefined || measStr === null) ? [i-1] : String(measStr).split(',').map(s => parseInt(s.trim()));
+            const names = mIndices.map(idx => {
+                const m = measures[idx];
+                return m ? (m.label_short || m.label) : '';
+            }).filter(s => s !== '');
+            label = names.length > 0 ? names.join(' | ') : `Layer ${i}`;
         }
 
         const color = config[`layer${i}_color_main`] || '#ccc';
@@ -759,22 +649,8 @@ looker.plugins.visualizations.add({
         const useGradient = config[`layer${i}_use_gradient`];
         const endColor = config[`layer${i}_gradient_end`] || color;
 
-        // Compute value range if needed
-        let rangeHtml = '';
-        if (showValues && type !== 'heatmap') {
-          const range = this._getLayerValueRange(config, i, processedData, queryResponse);
-          if (range.min !== null && range.max !== null) {
-            const measStr = config[`layer${i}_measure_idx`];
-            const mIdx = parseInt(String(measStr || i-1).split(',')[0].trim());
-            const m = measures[mIdx];
-            const fmt = m ? m.value_format : null;
-            const minStr = this._applyLookerFormat(range.min, fmt);
-            const maxStr = this._applyLookerFormat(range.max, fmt);
-            rangeHtml = `<span class="legend-range">${minStr} – ${maxStr}</span>`;
-          }
-        }
-
         let symbolHtml = '';
+
         if (type === 'icon') {
           const iconData = loadedIcons[iconIndex];
           const url = iconData ? iconData.url : ICONS['factory'];
@@ -792,14 +668,7 @@ looker.plugins.visualizations.add({
           symbolHtml = `<div class="legend-symbol legend-rect" style="${style}"></div>`;
         }
 
-        html += `
-          <div class="legend-item">
-            ${symbolHtml}
-            <div class="legend-label-wrap">
-              <span>${label}</span>
-              ${rangeHtml}
-            </div>
-          </div>`;
+        html += `<div class="legend-item">${symbolHtml}<span>${label}</span></div>`;
       }
     }
 
@@ -993,16 +862,6 @@ looker.plugins.visualizations.add({
             const z = Number(config[`layer${i}_z_index`]) || i;
             layerObjects.push({ layer: layer, zIndex: z });
           }
-
-          // NEW: Build text label layer if enabled
-          if (config[`layer${i}_show_labels`]) {
-            const labelLayer = this._buildLabelLayer(i, config, processed, queryResponse);
-            if (labelLayer) {
-              const z = Number(config[`layer${i}_z_index`]) || i;
-              layerObjects.push({ layer: labelLayer, zIndex: z + 0.5 });
-            }
-          }
-
         } catch (e) {
           console.error(`[Viz] Layer ${i} Error:`, e);
         }
@@ -1015,9 +874,6 @@ looker.plugins.visualizations.add({
     // --- TOOLTIP (v58 Logic) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
-
-      // Ignore tooltip on text label layers
-      if (layer && layer.id && layer.id.includes('-labels')) return null;
 
       const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
       const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
@@ -1035,7 +891,7 @@ looker.plugins.visualizations.add({
         if (measStr !== undefined && measStr !== null) {
           activeMeasureIndices = String(measStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
         } else {
-          activeMeasureIndices = [layerIdx - 1];
+          activeMeasureIndices = [layerIdx - 1]; // Default fallback
         }
       } else {
         activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
@@ -1178,165 +1034,6 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // --- NEW: Build TextLayer for on-map value labels ---
-  _buildLabelLayer: function (idx, config, processed, queryResponse) {
-    const rawM = config[`layer${idx}_measure_idx`];
-    const measureStr = (rawM === undefined || rawM === null) ? String(idx - 1) : String(rawM);
-    const measureIndices = measureStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-    if (measureIndices.length === 0) measureIndices.push(0);
-
-    const rawD = config[`layer${idx}_dimension_idx`];
-    const dimStr = (rawD === undefined || rawD === null) ? "0" : String(rawD);
-    const dimIndices = dimStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-
-    const showAllPivots = config[`layer${idx}_show_all_pivots`];
-    const pivotIdx = Number(config[`layer${idx}_pivot_idx`]) || 0;
-    const hideNulls = config.hide_no_data;
-
-    const pivotInfo = this._pivotInfo;
-    const measures = queryResponse.fields.measure_like;
-
-    const labelFontSize = Number(config[`layer${idx}_label_size`]) || 12;
-    const labelColorHex = config[`layer${idx}_label_color`] || '#FFFFFF';
-    const labelBgHex = config[`layer${idx}_label_bg_color`] || '#000000';
-    const labelOffsetY = Number(config[`layer${idx}_label_offset_y`]) || 0;
-
-    const labelColorRgb = this._hexToRgb(labelColorHex);
-    const labelBgRgb = this._hexToRgb(labelBgHex);
-
-    const getValue = (d) => {
-      let totalValue = 0;
-      measureIndices.forEach(mIdx => {
-        if (mIdx < 0) return;
-        if (!pivotInfo || !pivotInfo.hasPivot) {
-          const arr = d.values || (d.properties && d.properties._values);
-          if (arr && arr[mIdx] !== undefined) {
-            totalValue += parseFloat(arr[mIdx]) || 0;
-          }
-        } else {
-          if (showAllPivots) {
-            const arr = d.values || (d.properties && d.properties._values);
-            if (arr && arr[mIdx] !== undefined) totalValue += parseFloat(arr[mIdx]) || 0;
-          } else {
-            const mName = measures[mIdx] ? measures[mIdx].name : null;
-            const pKey = pivotInfo.pivotKeys[pivotIdx];
-            const pData = d.pivotData || (d.properties && d.properties._pivotData);
-            if (mName && pKey && pData && pData[mName] && pData[mName][pKey]) {
-              totalValue += (pData[mName][pKey].value || 0);
-            }
-          }
-        }
-      });
-      return totalValue || 0;
-    };
-
-    const getFormattedValue = (d) => {
-      const val = getValue(d);
-      const mIdx = measureIndices[0];
-      const m = measures[mIdx];
-      return this._applyLookerFormat(val, m ? m.value_format : null);
-    };
-
-    // Build point data same as _buildSingleLayer
-    let rawPointData = [];
-
-    if (processed.type === 'regions') {
-      dimIndices.forEach(dimIdx => {
-        const dataMap = processed.dataMaps ? processed.dataMaps[dimIdx] : null;
-        if (!dataMap) return;
-
-        if (processed.geojson && processed.geojson.features) {
-          processed.geojson.features.forEach(feature => {
-            const props = feature.properties;
-            let match = null;
-            for (let key in props) {
-              if (props[key]) {
-                const cleanProp = this._normalizeName(props[key]);
-                if (dataMap[cleanProp]) {
-                  match = dataMap[cleanProp];
-                  break;
-                }
-              }
-            }
-            if (match) {
-              rawPointData.push({
-                position: this._getCentroid(feature.geometry),
-                values: match.values,
-                pivotData: match.pivotData,
-                name: match.rawName
-              });
-            }
-          });
-        }
-
-        Object.keys(dataMap).forEach(key => {
-          const item = dataMap[key];
-          let pos = [0, 0];
-          if (Array.isArray(item.rawName) && item.rawName.length === 2) {
-            pos = [Number(item.rawName[1]), Number(item.rawName[0])];
-          } else if (typeof item.rawName === 'string' && item.rawName.includes(',')) {
-            const parts = item.rawName.split(',');
-            if (parts.length === 2) pos = [parseFloat(parts[1]), parseFloat(parts[0])];
-          }
-          if (pos[0] || pos[1]) {
-            rawPointData.push({
-              position: pos,
-              values: item.values,
-              pivotData: item.pivotData,
-              name: item.rawName.toString()
-            });
-          }
-        });
-      });
-    } else {
-      rawPointData = processed.data.map(p => ({ ...p }));
-    }
-
-    // Filter out zero/null if needed
-    let labelData = rawPointData.filter(d =>
-      d.position &&
-      d.position.length === 2 &&
-      !isNaN(d.position[0]) &&
-      !isNaN(d.position[1]) &&
-      d.position[1] >= -90 && d.position[1] <= 90
-    );
-
-    if (hideNulls) {
-      labelData = labelData.filter(d => {
-        const val = getValue(d);
-        return val !== null && val !== undefined && !isNaN(val) && Math.abs(val) > 0;
-      });
-    }
-
-    if (labelData.length === 0) return null;
-
-    return new deck.TextLayer({
-      id: `layer-${idx}-labels`,
-      data: labelData,
-      pickable: false,
-      getPosition: d => [d.position[0], d.position[1], 0],
-      getText: d => getFormattedValue(d),
-      getSize: labelFontSize,
-      getColor: [...labelColorRgb, 255],
-      getBackgroundColor: [...labelBgRgb, 180],
-      background: true,
-      backgroundPadding: [4, 2, 4, 2],
-      getTextAnchor: 'middle',
-      getAlignmentBaseline: 'center',
-      fontFamily: 'Arial, sans-serif',
-      fontWeight: 'bold',
-      getPixelOffset: [0, labelOffsetY],
-      billboard: true,
-      updateTriggers: {
-        getText: [measureStr, showAllPivots, pivotIdx],
-        getSize: [labelFontSize],
-        getColor: [labelColorHex],
-        getBackgroundColor: [labelBgHex],
-        getPixelOffset: [labelOffsetY]
-      }
-    });
-  },
-
   _validateLayerData: function (data, config, getValueFn) {
     if (!data || !Array.isArray(data) || data.length === 0) return [];
 
@@ -1375,6 +1072,7 @@ looker.plugins.visualizations.add({
     const hideNulls = config.hide_no_data;
 
     const sizeByValue = config[`layer${idx}_size_by_value`] || false;
+
     const iconBillboard = config[`layer${idx}_icon_billboard`] !== false;
 
     const useGradient = config[`layer${idx}_use_gradient`];
