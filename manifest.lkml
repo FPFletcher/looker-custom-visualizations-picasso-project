@@ -49,11 +49,11 @@ visualization: {
   # ]
 }
 
-visualization: {
-  id: "url-embed-visual"
-  label: "URL embed"
-  file: "04_OTHER_visuals/url_embed.js"
-}
+# visualization: {
+#   id: "url-embed-visual"
+#   label: "URL embed"
+#   file: "04_OTHER_visuals/url_embed.js"
+# }
 
 visualization: {
   id: "custom-advanced-cross-filter"
