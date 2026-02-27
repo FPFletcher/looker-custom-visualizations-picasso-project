@@ -6,48 +6,36 @@
  */
 
 // --- 1. DEPENDENCY LOADER (Required for CDN) ---
-// Tries multiple CDN sources in order; resolves as soon as one succeeds.
-const _HC_CDNS = [
-  "https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.2.0/highcharts.min.js",
-  "https://cdn.jsdelivr.net/npm/highcharts@11.2.0/highcharts.min.js",
-  "https://code.highcharts.com/highcharts.js"
-];
-
 const loadScript = (src) => {
   return new Promise((resolve, reject) => {
+    // Check if script is already present
     const existing = document.querySelector(`script[src="${src}"]`);
     if (existing) {
       if (existing.dataset.loaded === "true") return resolve();
       existing.addEventListener('load', resolve);
-      existing.addEventListener('error', reject);
       return;
     }
+
     const script = document.createElement('script');
     script.src = src;
     script.async = true;
     script.dataset.loaded = "false";
-    script.onload = () => { script.dataset.loaded = "true"; resolve(); };
+    script.onload = () => {
+      script.dataset.loaded = "true";
+      resolve();
+    };
     script.onerror = () => {
-      console.warn(`[Viz Loader] Failed to load ${src}`);
+      console.error(`[Viz Loader] Failed to load ${src}`);
       reject();
     };
     document.head.appendChild(script);
   });
 };
 
-const loadHighchartsWithFallback = (cdns) => {
-  return cdns.reduce((promise, cdn) => {
-    return promise.catch(() => {
-      console.log(`[Viz Loader] Trying CDN: ${cdn}`);
-      return loadScript(cdn);
-    });
-  }, Promise.reject());
-};
-
-// Trigger loading immediately — tries each CDN in sequence on failure
-loadHighchartsWithFallback(_HC_CDNS)
-  .then(() => console.log("[Viz Loader] Highcharts loaded successfully."))
-  .catch(() => console.error("[Viz Loader] All Highcharts CDN sources failed. Chart cannot render."));
+// Trigger loading immediately
+loadScript("https://code.highcharts.com/highcharts.js")
+  .then(() => console.log("[Viz Loader] Highcharts loaded."))
+  .catch((e) => console.error("[Viz Loader] Highcharts failed to load", e));
 
 
 // --- VISUALIZATION CODE ---
@@ -1025,31 +1013,10 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     // --- 1. DEPENDENCY CHECK FOR CDN ---
     if (typeof Highcharts === "undefined") {
-      // Use a counter to avoid infinite polling when all CDN sources fail
-      this._hcRetryCount = (this._hcRetryCount || 0) + 1;
-      const MAX_RETRIES = 150; // 15 seconds total (150 x 100ms)
-
-      if (this._hcRetryCount > MAX_RETRIES) {
-        console.error("[Viz] Highcharts failed to load after all retries. All CDN sources may be blocked.");
-        if (this._chartContainer) {
-          this._chartContainer.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:center;height:100%;width:100%;font-family:sans-serif;color:#c0392b;flex-direction:column;gap:12px;padding:24px;box-sizing:border-box;text-align:center;">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <strong style="font-size:16px;">Chart library failed to load</strong>
-              <span style="font-size:13px;color:#666;max-width:400px;">Highcharts could not be fetched from any CDN source (possibly due to network restrictions or rate limits). Try refreshing the page, or contact your Looker admin to allowlist cdnjs.cloudflare.com and cdn.jsdelivr.net.</span>
-            </div>`;
-        }
-        done();
-        return;
-      }
-
-      console.log(`[Viz] Waiting for Highcharts... (attempt ${this._hcRetryCount}/${MAX_RETRIES})`);
+      console.log("[Viz] Waiting for Highcharts...");
       setTimeout(() => this.updateAsync(data, element, config, queryResponse, details, done), 100);
       return;
     }
-
-    // Reset retry counter on successful load
-    this._hcRetryCount = 0;
 
     // --- PDF / PRINT MODE DETECTION ---
     console.log("[Viz] 1. Update Async Started"); // LOG ADDED
