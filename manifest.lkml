@@ -39,7 +39,7 @@ visualization: {
 
 visualization: {
   id: "combo_map_3d"
-  label: "Combo Map 3D"
+  label: "Combo Map 3D (Mapbox)"
   file: "04_OTHER_visuals/map_combo_3d_mapbox.js"
   # dependencies: [
   #"https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css",
@@ -47,6 +47,12 @@ visualization: {
   # "https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js",
   # "https://unpkg.com/topojson-client@3"
   # ]
+}
+
+visualization: {
+  id: "combo_map_3d_arcgis"
+  label: "Combo Map 3D (ArcGIS)"
+  file: "04_OTHER_visuals/map_combo_3d_arcgis.js"
 }
 
 # visualization: {
