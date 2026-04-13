@@ -8,7 +8,8 @@
  * MODIFICATION 5: Forced 0 decimals for Legend Value Ranges.
  * MODIFICATION 6: Replaced Mapbox basemap with ArcGIS basemap.
  * MODIFICATION 7: Upgraded MapView to SceneView for 3D tilt sync and fixed ArcGIS basemap IDs.
- * MODIFICATION 8: Integrated @deck.gl/arcgis to run DeckGL natively inside ArcGIS WebGL context, fixing camera desync and GL errors.
+ * MODIFICATION 8: Integrated @deck.gl/arcgis DeckLayer for native WebGL sync and forced 'local' viewing mode.
+ * MODIFICATION 9: Reverted to strict 2D MapView and dual-canvas to fix Looker iframe WebGL mailbox crashes. Forced 0 pitch.
  * ID: map_combo_3d_arcgis_cdn
  */
 
@@ -50,15 +51,14 @@ const loadDependencies = async () => {
       document.head.appendChild(link);
     }
 
-    // Load Deck.gl and its ArcGIS plugin
     await Promise.all([
       loadScript("https://unpkg.com/deck.gl@latest/dist.min.js"),
       loadScript("https://unpkg.com/topojson-client@3")
     ]);
-    await loadScript("https://unpkg.com/@deck.gl/arcgis@latest/dist.min.js");
 
-    // Load ArcGIS last
+    // Mod 9: Removed @deck.gl/arcgis due to Looker iframe WebGL isolation crashes.
     await loadScript("https://js.arcgis.com/4.29/");
+
     console.log("[Viz Loader] All dependencies loaded.");
   } catch (e) {
     console.error("[Viz Loader] Dependency loading failed", e);
@@ -228,7 +228,7 @@ const getLayerOptions = (n) => {
     },
     [`layer${n}_height`]: {
       type: "number",
-      label: `L${n} Height (3D)`,
+      label: `L${n} Height (For Scale)`,
       default: def.height,
       section: "Layers",
       order: b + 13
@@ -446,7 +446,7 @@ looker.plugins.visualizations.add({
     center_lat: { type: "number", label: "Latitude", default: 46, section: "Plot", order: 13 },
     center_lng: { type: "number", label: "Longitude", default: 2, section: "Plot", order: 14 },
     zoom: { type: "number", label: "Zoom", default: 4, section: "Plot", order: 15 },
-    pitch: { type: "number", label: "3D Tilt (0-60)", default: 45, section: "Plot", order: 16 },
+    // Mod 9: Pitch parameter completely removed to enforce 2D stability
 
     // --- TOOLTIP ---
     tooltip_header: { type: "string", label: "─── TOOLTIP ───", display: "divider", section: "Plot", order: 20 },
@@ -583,20 +583,18 @@ looker.plugins.visualizations.add({
     this._viewState = null;
     this._prevConfig = {};
     this._processedData = null;
-    this._deckLayer = null;
   },
 
   destroy: function () {
-    if (this._deckLayer) {
-      if (this._arcgisView && this._arcgisView.map) {
-          this._arcgisView.map.remove(this._deckLayer);
-      }
-      this._deckLayer = null;
+    if (this._deck) {
+      this._deck.finalize();
+      this._deck = null;
     }
     if (this._arcgisView) {
       this._arcgisView.destroy();
       this._arcgisView = null;
     }
+    this._arcgisMap = null;
     this._geojsonCache = {};
   },
 
@@ -617,7 +615,7 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
-    if (typeof deck === 'undefined' || typeof deck.DeckLayer === 'undefined' || typeof topojson === 'undefined' || typeof window.require === 'undefined') {
+    if (typeof deck === 'undefined' || typeof topojson === 'undefined' || typeof window.require === 'undefined') {
       console.log("[Viz ArcGIS] Waiting for dependencies...");
       setTimeout(() => {
         this.updateAsync(data, element, config, queryResponse, details, done);
@@ -661,32 +659,9 @@ looker.plugins.visualizations.add({
 
       if (isPrint) {
         console.log("[Viz Hybrid] Print/Static Mode Active.");
-
-        // Strict check to allow explicit 0 pitch
-        const defaultPitch = (config.pitch === undefined || config.pitch === null || config.pitch === "") ? 45 : Number(config.pitch);
-
-        const viewState = this._viewState || {
-          longitude: Number(config.center_lng) || 2,
-          latitude: Number(config.center_lat) || 46,
-          zoom: Number(config.zoom) || 4,
-          pitch: defaultPitch,
-          bearing: 0
-        };
-
-        const width = this._container.clientWidth || 800;
-        const height = this._container.clientHeight || 600;
-
-        const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
-        console.log("[Viz Hybrid] Static URL:", staticUrl);
-
-        this._container.style.backgroundImage = `url('${staticUrl}')`;
-        this._container.style.backgroundSize = 'cover';
-        this._container.style.backgroundPosition = 'center';
-
-        this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons, esriRequire);
+        this._renderPrint(processedData, config, queryResponse, loadedIcons);
         this._updateLegend(config, loadedIcons, queryResponse, processedData);
         done();
-
       } else {
         this._container.style.backgroundImage = 'none';
         this._render(processedData, config, queryResponse, details, loadedIcons, esriRequire);
@@ -698,6 +673,311 @@ looker.plugins.visualizations.add({
       console.error("[Viz Hybrid] FATAL ERROR:", err);
       this.addError({ title: "Error", message: err.message });
       done();
+    });
+  },
+
+  _buildLayers: function(processed, config, queryResponse, loadedIcons) {
+      const geoLayerObjects = [];
+      const labelLayerObjects = [];
+      let iconIndex = 0;
+
+      for (let i = 1; i <= 4; i++) {
+        const enabled = config[`layer${i}_enabled`];
+        const type = config[`layer${i}_type`];
+
+        if (enabled) {
+          try {
+            let iconData = null;
+            let isCustomIcon = false;
+            if (type === 'icon') {
+              const preset = config[`layer${i}_icon_type`];
+              isCustomIcon = (preset === 'custom');
+              const defaultIcon = { url: ICONS['factory'], width: 128, height: 128 };
+              iconData = loadedIcons[iconIndex] || defaultIcon;
+              iconIndex++;
+            }
+            const layer = this._buildSingleLayer(i, config, processed, iconData, isCustomIcon);
+            if (layer) {
+              const z = Number(config[`layer${i}_z_index`]) || i;
+              geoLayerObjects.push({ layer: layer, zIndex: z });
+            }
+
+            if (config[`layer${i}_show_labels`]) {
+              const labelLayer = this._buildLabelLayer(i, config, processed, queryResponse);
+              if (labelLayer) {
+                const z = Number(config[`layer${i}_z_index`]) || i;
+                labelLayerObjects.push({ layer: labelLayer, zIndex: z });
+              }
+            }
+
+          } catch (e) {
+            console.error(`[Viz] Layer ${i} Error:`, e);
+          }
+        }
+      }
+
+      geoLayerObjects.sort((a, b) => a.zIndex - b.zIndex);
+      labelLayerObjects.sort((a, b) => a.zIndex - b.zIndex);
+
+      return [
+        ...geoLayerObjects.map(obj => obj.layer),
+        ...labelLayerObjects.map(obj => obj.layer)
+      ];
+  },
+
+  _getTooltipFn: function(config, queryResponse) {
+      return ({ object, layer }) => {
+        if (!object || config.tooltip_mode === 'none') return null;
+        if (layer && layer.id && layer.id.includes('-labels')) return null;
+
+        const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
+        const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
+
+        let layerDimIdx = 0;
+        let activeMeasureIndices = [];
+        if (layerIdx) {
+          const dimStr = config[`layer${layerIdx}_dimension_idx`];
+          if (dimStr !== undefined && dimStr !== null) {
+            const parts = String(dimStr).split(',');
+            const firstVal = parseInt(parts[0].trim());
+            if (!isNaN(firstVal)) layerDimIdx = firstVal;
+          }
+          const measStr = config[`layer${layerIdx}_measure_idx`];
+          if (measStr !== undefined && measStr !== null) {
+            activeMeasureIndices = String(measStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+          } else {
+            activeMeasureIndices = [layerIdx - 1];
+          }
+        } else {
+          activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
+        }
+
+        const rawName = object.properties?._name || object.name || (object.properties && object.properties.name);
+        const cleanName = this._normalizeName(rawName);
+
+        let aggregatedData = null;
+        if (this._processedData &&
+          this._processedData.dataMaps &&
+          this._processedData.dataMaps[layerDimIdx] &&
+          this._processedData.dataMaps[layerDimIdx][cleanName]) {
+          aggregatedData = this._processedData.dataMaps[layerDimIdx][cleanName];
+        }
+
+        let source = aggregatedData || (object.properties && object.properties._name ? {
+          name: object.properties._name,
+          values: object.properties._values,
+          pivotData: object.properties._pivotData,
+          allowedMeasures: object.properties._allowedMeasures
+        } : object);
+
+        const name = source.rawName || source.name;
+        const values = source.values || source._values;
+        const pivotData = source.pivotData || source._pivotData;
+
+        const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
+        const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
+
+        let html = "";
+        if (config.tooltip_mode !== 'values') {
+          html += `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
+        }
+
+        const measures = queryResponse.fields.measure_like;
+
+        if (config.tooltip_mode !== 'name') {
+          measures.forEach((m, idx) => {
+            if (!activeMeasureIndices.includes(idx)) return;
+
+            if (pivotData && this._pivotInfo && this._pivotInfo.hasPivot) {
+              html += `<div style="font-weight:bold; margin-top:5px;">${m.label_short || m.label}</div>`;
+              html += `<div class="pivot-section">`;
+
+              if (showAllPivots) {
+                let dimensionFilteredTotal = 0;
+                this._pivotInfo.pivotKeys.forEach((pk, pIdx) => {
+                  const pivotLabel = this._pivotInfo.pivotLabels[pIdx] || pk;
+                  const pData = pivotData[m.name] && pivotData[m.name][pk];
+                  let val = '0';
+                  if (pData) {
+                    dimensionFilteredTotal += pData.value;
+                    val = this._applyLookerFormat(pData.value, m.value_format);
+                  }
+                  html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
+                });
+
+                const totalVal = this._applyLookerFormat(dimensionFilteredTotal, m.value_format);
+                html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div>`;
+              } else {
+                const pk = this._pivotInfo.pivotKeys[pivotIdx];
+                const pivotLabel = this._pivotInfo.pivotLabels[pivotIdx] || pk;
+                const pData = pivotData[m.name] && pivotData[m.name][pk];
+                let val = pData ? this._applyLookerFormat(pData.value, m.value_format) : '0';
+                html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
+              }
+              html += `</div>`;
+            } else {
+              const val = this._applyLookerFormat(values[idx], m.value_format);
+              html += `<div style="display:flex; justify-content:space-between; gap:10px;"><span>${m.label_short || m.label}:</span><span style="font-weight:bold;">${val}</span></div>`;
+            }
+          });
+        }
+
+        return {
+          html,
+          style: {
+            backgroundColor: config.tooltip_bg_color || '#fff',
+            color: '#000',
+            fontSize: '0.8em',
+            padding: '8px',
+            borderRadius: '4px',
+            maxWidth: '300px'
+          }
+        };
+      };
+  },
+
+  _renderPrint: function (processed, config, queryResponse, loadedIcons) {
+      const layers = this._buildLayers(processed, config, queryResponse, loadedIcons);
+      const getTooltip = this._getTooltipFn(config, queryResponse);
+
+      const deckCanvas = document.createElement('canvas');
+      deckCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;';
+      this._container.appendChild(deckCanvas);
+
+      const cfgLat = Number(config.center_lat) || 46;
+      const cfgLng = Number(config.center_lng) || 2;
+      const cfgZoom = Number(config.zoom) || 4;
+
+      const viewState = {
+        longitude: cfgLng,
+        latitude: cfgLat,
+        zoom: cfgZoom,
+        pitch: 0, // Hardcoded 2D Pitch
+        bearing: 0
+      };
+
+      const width = this._container.clientWidth || 800;
+      const height = this._container.clientHeight || 600;
+      const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
+
+      this._container.style.backgroundImage = `url('${staticUrl}')`;
+      this._container.style.backgroundSize = 'cover';
+      this._container.style.backgroundPosition = 'center';
+
+      this._deck = new deck.Deck({
+          canvas: deckCanvas,
+          width: '100%',
+          height: '100%',
+          initialViewState: viewState,
+          controller: false,
+          layers: layers,
+          getTooltip: getTooltip,
+          style: { background: 'transparent' }
+      });
+  },
+
+  // Mod 9: Reverted to Dual-Canvas 2D MapView
+  _render: function (processed, config, queryResponse, details, loadedIcons, esriRequire) {
+    const layers = this._buildLayers(processed, config, queryResponse, loadedIcons);
+    const getTooltip = this._getTooltipFn(config, queryResponse);
+
+    const cfgLat = Number(config.center_lat) || 46;
+    const cfgLng = Number(config.center_lng) || 2;
+    const cfgZoom = Number(config.zoom) || 4;
+
+    const rawBasemap = config.map_style || "arcgis-dark-gray";
+    const basemap = BASEMAP_MAPPING[rawBasemap] || rawBasemap;
+
+    const configChanged =
+      this._prevConfig.lat !== cfgLat ||
+      this._prevConfig.lng !== cfgLng ||
+      this._prevConfig.zoom !== cfgZoom ||
+      this._prevConfig.basemap !== basemap;
+
+    this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: 0, basemap: basemap };
+
+    // --- VIEW STATE (Pitch explicitly locked to 0) ---
+    if (!this._viewState || configChanged) {
+      this._viewState = {
+        longitude: cfgLng,
+        latitude: cfgLat,
+        zoom: cfgZoom,
+        pitch: 0,
+        bearing: 0,
+        transitionDuration: 0
+      };
+    }
+
+    const onViewStateChange = ({ viewState }) => {
+      // Force pitch to 0 to prevent 2D/3D math clashes
+      viewState.pitch = 0;
+      viewState.bearing = 0;
+
+      this._viewState = viewState;
+      this._deck.setProps({ viewState: this._viewState });
+
+      if (this._arcgisView) {
+        this._arcgisView.goTo({
+          center: [viewState.longitude, viewState.latitude],
+          zoom: viewState.zoom
+        }, { animate: false }).catch(() => {});
+      }
+    };
+
+    // --- ARCGIS + DECKGL INIT ---
+    esriRequire([
+      "esri/Map",
+      "esri/views/MapView", // Swapped SceneView back to MapView
+      "esri/config"
+    ], (EsriMap, MapView, esriConfig) => {
+
+      esriConfig.apiKey = config.arcgis_token;
+
+      if (!this._arcgisMap) {
+        this._arcgisMap = new EsriMap({ basemap });
+
+        this._arcgisView = new MapView({
+          container: this._container,
+          map: this._arcgisMap,
+          center: [cfgLng, cfgLat],
+          zoom: cfgZoom,
+          ui: { components: [] }
+        });
+
+        this._arcgisView.when(() => {
+          const deckCanvas = document.createElement('canvas');
+          deckCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;';
+          this._container.appendChild(deckCanvas);
+
+          this._deck = new deck.Deck({
+            canvas: deckCanvas,
+            width: '100%',
+            height: '100%',
+            initialViewState: this._viewState,
+            controller: true, // DeckGL handles pan/zoom events, preventing lag
+            onViewStateChange: onViewStateChange,
+            layers: layers,
+            getTooltip: getTooltip,
+            glOptions: { preserveDrawingBuffer: true, willReadFrequently: true },
+            style: { background: 'transparent' }
+          });
+
+          deckCanvas.style.pointerEvents = 'auto';
+        });
+
+      } else {
+        this._deck.setProps({
+          layers: layers,
+          getTooltip: getTooltip,
+          viewState: this._viewState,
+          controller: true,
+          onViewStateChange: onViewStateChange
+        });
+
+        if (this._arcgisMap.basemap.id !== basemap) {
+          this._arcgisMap.basemap = basemap;
+        }
+      }
     });
   },
 
@@ -1005,264 +1285,6 @@ looker.plugins.visualizations.add({
       });
     });
     return dataMaps;
-  },
-
-  _render: function (processed, config, queryResponse, details, loadedIcons, esriRequire) {
-    const isPrint = details && details.print;
-    const geoLayerObjects = [];
-    const labelLayerObjects = [];
-    let iconIndex = 0;
-
-    for (let i = 1; i <= 4; i++) {
-      const enabled = config[`layer${i}_enabled`];
-      const type = config[`layer${i}_type`];
-
-      if (enabled) {
-        try {
-          let iconData = null;
-          let isCustomIcon = false;
-          if (type === 'icon') {
-            const preset = config[`layer${i}_icon_type`];
-            isCustomIcon = (preset === 'custom');
-            const defaultIcon = { url: ICONS['factory'], width: 128, height: 128 };
-            iconData = loadedIcons[iconIndex] || defaultIcon;
-            iconIndex++;
-          }
-          const layer = this._buildSingleLayer(i, config, processed, iconData, isCustomIcon);
-          if (layer) {
-            const z = Number(config[`layer${i}_z_index`]) || i;
-            geoLayerObjects.push({ layer: layer, zIndex: z });
-          }
-
-          if (config[`layer${i}_show_labels`]) {
-            const labelLayer = this._buildLabelLayer(i, config, processed, queryResponse);
-            if (labelLayer) {
-              const z = Number(config[`layer${i}_z_index`]) || i;
-              labelLayerObjects.push({ layer: labelLayer, zIndex: z });
-            }
-          }
-
-        } catch (e) {
-          console.error(`[Viz] Layer ${i} Error:`, e);
-        }
-      }
-    }
-
-    geoLayerObjects.sort((a, b) => a.zIndex - b.zIndex);
-    labelLayerObjects.sort((a, b) => a.zIndex - b.zIndex);
-    const layers = [
-      ...geoLayerObjects.map(obj => obj.layer),
-      ...labelLayerObjects.map(obj => obj.layer)
-    ];
-
-    const getTooltip = ({ object, layer }) => {
-      if (!object || config.tooltip_mode === 'none') return null;
-
-      if (layer && layer.id && layer.id.includes('-labels')) return null;
-
-      const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
-      const layerIdx = layerMatch ? parseInt(layerMatch[1]) : null;
-
-      let layerDimIdx = 0;
-      let activeMeasureIndices = [];
-      if (layerIdx) {
-        const dimStr = config[`layer${layerIdx}_dimension_idx`];
-        if (dimStr !== undefined && dimStr !== null) {
-          const parts = String(dimStr).split(',');
-          const firstVal = parseInt(parts[0].trim());
-          if (!isNaN(firstVal)) layerDimIdx = firstVal;
-        }
-        const measStr = config[`layer${layerIdx}_measure_idx`];
-        if (measStr !== undefined && measStr !== null) {
-          activeMeasureIndices = String(measStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-        } else {
-          activeMeasureIndices = [layerIdx - 1];
-        }
-      } else {
-        activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
-      }
-
-      const rawName = object.properties?._name || object.name || (object.properties && object.properties.name);
-      const cleanName = this._normalizeName(rawName);
-
-      let aggregatedData = null;
-      if (this._processedData &&
-        this._processedData.dataMaps &&
-        this._processedData.dataMaps[layerDimIdx] &&
-        this._processedData.dataMaps[layerDimIdx][cleanName]) {
-        aggregatedData = this._processedData.dataMaps[layerDimIdx][cleanName];
-      }
-
-      let source = aggregatedData || (object.properties && object.properties._name ? {
-        name: object.properties._name,
-        values: object.properties._values,
-        pivotData: object.properties._pivotData,
-        allowedMeasures: object.properties._allowedMeasures
-      } : object);
-
-      const name = source.rawName || source.name;
-      const values = source.values || source._values;
-      const pivotData = source.pivotData || source._pivotData;
-
-      const showAllPivots = layerIdx ? config[`layer${layerIdx}_show_all_pivots`] : true;
-      const pivotIdx = layerIdx ? (Number(config[`layer${layerIdx}_pivot_idx`]) || 0) : 0;
-
-      let html = "";
-      if (config.tooltip_mode !== 'values') {
-        html += `<div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">${name}</div>`;
-      }
-
-      const measures = queryResponse.fields.measure_like;
-
-      if (config.tooltip_mode !== 'name') {
-        measures.forEach((m, idx) => {
-          if (!activeMeasureIndices.includes(idx)) return;
-
-          if (pivotData && this._pivotInfo && this._pivotInfo.hasPivot) {
-            html += `<div style="font-weight:bold; margin-top:5px;">${m.label_short || m.label}</div>`;
-            html += `<div class="pivot-section">`;
-
-            if (showAllPivots) {
-              let dimensionFilteredTotal = 0;
-              this._pivotInfo.pivotKeys.forEach((pk, pIdx) => {
-                const pivotLabel = this._pivotInfo.pivotLabels[pIdx] || pk;
-                const pData = pivotData[m.name] && pivotData[m.name][pk];
-                let val = '0';
-                if (pData) {
-                  dimensionFilteredTotal += pData.value;
-                  val = this._applyLookerFormat(pData.value, m.value_format);
-                }
-                html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
-              });
-
-              const totalVal = this._applyLookerFormat(dimensionFilteredTotal, m.value_format);
-              html += `<div class="pivot-value" style="border-top:1px solid #ddd; margin-top:3px; padding-top:3px;"><span class="pivot-label">Total:</span><span style="font-weight:bold;">${totalVal}</span></div>`;
-            } else {
-              const pk = this._pivotInfo.pivotKeys[pivotIdx];
-              const pivotLabel = this._pivotInfo.pivotLabels[pivotIdx] || pk;
-              const pData = pivotData[m.name] && pivotData[m.name][pk];
-              let val = pData ? this._applyLookerFormat(pData.value, m.value_format) : '0';
-              html += `<div class="pivot-value"><span class="pivot-label">${pivotLabel}:</span><span style="font-weight:bold;">${val}</span></div>`;
-            }
-            html += `</div>`;
-          } else {
-            const val = this._applyLookerFormat(values[idx], m.value_format);
-            html += `<div style="display:flex; justify-content:space-between; gap:10px;"><span>${m.label_short || m.label}:</span><span style="font-weight:bold;">${val}</span></div>`;
-          }
-        });
-      }
-
-      return {
-        html,
-        style: {
-          backgroundColor: config.tooltip_bg_color || '#fff',
-          color: '#000',
-          fontSize: '0.8em',
-          padding: '8px',
-          borderRadius: '4px',
-          maxWidth: '300px'
-        }
-      };
-    };
-
-    // --- VIEW STATE ---
-    const cfgLat = Number(config.center_lat) || 46;
-    const cfgLng = Number(config.center_lng) || 2;
-    const cfgZoom = Number(config.zoom) || 4;
-
-    // Strict parsing to allow 0 to pass through without falling back to 45
-    const cfgPitch = (config.pitch === undefined || config.pitch === null || config.pitch === "") ? 45 : Number(config.pitch);
-
-    const rawBasemap = config.map_style || "arcgis-dark-gray";
-    const basemap = BASEMAP_MAPPING[rawBasemap] || rawBasemap;
-
-    const configChanged =
-      this._prevConfig.lat !== cfgLat ||
-      this._prevConfig.lng !== cfgLng ||
-      this._prevConfig.zoom !== cfgZoom ||
-      this._prevConfig.pitch !== cfgPitch ||
-      this._prevConfig.basemap !== basemap;
-
-    if (!this._viewState || configChanged) {
-      this._viewState = {
-        longitude: cfgLng,
-        latitude: cfgLat,
-        zoom: cfgZoom,
-        pitch: cfgPitch,
-        bearing: 0,
-        transitionDuration: isPrint ? 0 : 500
-      };
-      this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch, basemap: basemap };
-    }
-
-    // --- ARCGIS + DECKGL NATIVE INIT ---
-    esriRequire([
-      "esri/Map",
-      "esri/views/SceneView",
-      "esri/config"
-    ], (EsriMap, SceneView, esriConfig) => {
-
-      esriConfig.apiKey = config.arcgis_token;
-
-      if (!this._arcgisView) {
-        const esriMap = new EsriMap({ basemap });
-
-        this._arcgisView = new SceneView({
-          container: this._container,
-          map: esriMap,
-          center: [cfgLng, cfgLat],
-          zoom: cfgZoom,
-          tilt: cfgPitch,
-          viewingMode: 'local', // Forces flat 3D projection, removing globe curvature clash
-          ui: { components: [] }
-        });
-
-        // Initialize DeckGL natively as an ArcGIS Layer instead of a floating canvas
-        this._deckLayer = new deck.DeckLayer({
-          'deck.layers': layers,
-          'deck.getTooltip': getTooltip
-        });
-
-        esriMap.add(this._deckLayer);
-
-        // Save viewState for potential static printing fallback
-        this._arcgisView.watch("camera", () => {
-             this._viewState = {
-                 longitude: this._arcgisView.center.longitude,
-                 latitude: this._arcgisView.center.latitude,
-                 zoom: this._arcgisView.zoom,
-                 pitch: this._arcgisView.camera.tilt,
-                 bearing: this._arcgisView.camera.heading
-             };
-        });
-
-      } else {
-        // Safe update: Remove old DeckLayer and inject new one
-        if (this._deckLayer) {
-           this._arcgisView.map.remove(this._deckLayer);
-        }
-
-        this._deckLayer = new deck.DeckLayer({
-           'deck.layers': layers,
-           'deck.getTooltip': getTooltip
-        });
-        this._arcgisView.map.add(this._deckLayer);
-
-        // Safe basemap update
-        if (this._arcgisView.map.basemap && this._arcgisView.map.basemap.id !== basemap) {
-          this._arcgisView.map.basemap = basemap;
-        }
-
-        // Apply Config updates
-        if (configChanged) {
-            this._arcgisView.goTo({
-              center: [cfgLng, cfgLat],
-              zoom: cfgZoom,
-              tilt: cfgPitch
-            }, { animate: false }).catch(()=>{});
-        }
-      }
-    });
   },
 
   _buildLabelLayer: function (idx, config, processed, queryResponse) {
