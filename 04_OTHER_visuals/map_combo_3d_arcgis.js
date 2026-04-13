@@ -50,14 +50,14 @@ const loadDependencies = async () => {
       document.head.appendChild(link);
     }
 
-    // Load ArcGIS JS SDK & TopoJSON in parallel
+    // Load Deck.gl & TopoJSON first (before ArcGIS, to avoid AMD loader conflicts)
     await Promise.all([
-      loadScript("https://js.arcgis.com/4.29/"),
+      loadScript("https://unpkg.com/deck.gl@latest/dist.min.js"),
       loadScript("https://unpkg.com/topojson-client@3")
     ]);
 
-    // Load DeckGL after ArcGIS is ready
-    await loadScript("https://unpkg.com/deck.gl@latest/dist.min.js");
+    // Load ArcGIS SDK after Deck.gl (its AMD loader must come last)
+    await loadScript("https://js.arcgis.com/4.29/");
 
     console.log("[Viz Loader] All dependencies loaded.");
   } catch (e) {
@@ -609,13 +609,15 @@ looker.plugins.visualizations.add({
   updateAsync: function (data, element, config, queryResponse, details, done) {
 
     // --- DEPENDENCY CHECK ---
-    if (typeof deck === 'undefined' || typeof topojson === 'undefined' || typeof require === 'undefined') {
+    if (typeof deck === 'undefined' || typeof topojson === 'undefined' || typeof window.require === 'undefined') {
       console.log("[Viz ArcGIS] Waiting for dependencies...");
       setTimeout(() => {
         this.updateAsync(data, element, config, queryResponse, details, done);
       }, 100);
       return;
     }
+    // Local alias so _render() can call it safely
+    const esriRequire = window.require;
 
     const isPrint = details && details.print;
     console.log(`[Viz Hybrid] ========== UPDATE ASYNC START ==========`);
@@ -676,7 +678,7 @@ looker.plugins.visualizations.add({
         this._container.style.backgroundPosition = 'center';
 
         // Render DeckGL with transparent map style so background shows through
-        this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons);
+        this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons, esriRequire);
         this._updateLegend(config, loadedIcons, queryResponse, processedData);
 
         // Call done() immediately (V71 strategy - no waiting for timeouts)
@@ -685,7 +687,7 @@ looker.plugins.visualizations.add({
       } else {
         // Interactive Mode (Standard v58 Rendering)
         this._container.style.backgroundImage = 'none';
-        this._render(processedData, config, queryResponse, details, loadedIcons);
+        this._render(processedData, config, queryResponse, details, loadedIcons, esriRequire);
         this._updateLegend(config, loadedIcons, queryResponse, processedData);
         done();
       }
@@ -1006,7 +1008,7 @@ looker.plugins.visualizations.add({
     return dataMaps;
   },
 
-  _render: function (processed, config, queryResponse, details, loadedIcons) {
+  _render: function (processed, config, queryResponse, details, loadedIcons, esriRequire) {
     const isPrint = details && details.print;
     const geoLayerObjects = [];
     const labelLayerObjects = [];
@@ -1209,7 +1211,7 @@ looker.plugins.visualizations.add({
 
     // --- ARCGIS + DECKGL INIT ---
     // Use ArcGIS require() AMD loader (loaded via js.arcgis.com/4.29/)
-    require([
+    esriRequire([
       "esri/Map",
       "esri/views/MapView",
       "esri/config"
