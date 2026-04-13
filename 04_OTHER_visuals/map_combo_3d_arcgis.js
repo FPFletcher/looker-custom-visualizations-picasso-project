@@ -6,14 +6,14 @@
  * MODIFICATION 3: Added Legend Value Ranges toggle.
  * MODIFICATION 4: Added per-layer on-map value label display (VALUE SETTINGS section).
  * MODIFICATION 5: Forced 0 decimals for Legend Value Ranges.
- * MODIFICATION 6 (Option A): Replaced Mapbox basemap with ArcGIS basemap. Deck.gl layers unchanged.
+ * MODIFICATION 6: Replaced Mapbox basemap with ArcGIS basemap.
+ * MODIFICATION 7: Upgraded MapView to SceneView for 3D tilt sync and fixed ArcGIS basemap IDs.
  * ID: map_combo_3d_arcgis_cdn
  */
 
 // --- 1. DEPENDENCY LOADER (Required for CDN) ---
 const loadScript = (src) => {
   return new Promise((resolve, reject) => {
-    // Check if script is already present
     const existing = document.querySelector(`script[src="${src}"]`);
     if (existing) {
       if (existing.dataset.loaded === "true") return resolve();
@@ -41,7 +41,6 @@ const loadDependencies = async () => {
   try {
     console.log("[Viz Loader] Loading dependencies...");
 
-    // Load ArcGIS CSS
     if (!document.getElementById('arcgis-css')) {
       const link = document.createElement('link');
       link.id = 'arcgis-css';
@@ -50,24 +49,19 @@ const loadDependencies = async () => {
       document.head.appendChild(link);
     }
 
-    // Load Deck.gl & TopoJSON first (before ArcGIS, to avoid AMD loader conflicts)
     await Promise.all([
       loadScript("https://unpkg.com/deck.gl@latest/dist.min.js"),
       loadScript("https://unpkg.com/topojson-client@3")
     ]);
 
-    // Load ArcGIS SDK after Deck.gl (its AMD loader must come last)
     await loadScript("https://js.arcgis.com/4.29/");
-
     console.log("[Viz Loader] All dependencies loaded.");
   } catch (e) {
     console.error("[Viz Loader] Dependency loading failed", e);
   }
 };
 
-// Trigger loading immediately
 loadDependencies();
-
 
 // --- ICONS LIBRARY (Stable - v58) ---
 const ICONS = {
@@ -96,6 +90,18 @@ const ICONS = {
   "user": "https://img.icons8.com/color/96/user.png",
   "warning": "https://img.icons8.com/color/96/box-important--v1.png",
   "water_dam": "https://img.icons8.com/color/96/dam.png"
+};
+
+// --- BASEMAP MAPPING (Legacy config support) ---
+const BASEMAP_MAPPING = {
+  "dark-gray-vector": "arcgis-dark-gray",
+  "gray-vector": "arcgis-light-gray",
+  "streets-vector": "arcgis-streets",
+  "satellite": "arcgis-imagery",
+  "topo-vector": "arcgis-topographic",
+  "navigation-night-vector": "arcgis-navigation-night",
+  "navigation-vector": "arcgis-navigation",
+  "oceans": "arcgis-oceans"
 };
 
 // --- HELPER: GENERATE LAYER OPTIONS (v58) ---
@@ -289,7 +295,6 @@ const getLayerOptions = (n) => {
       section: "Series",
       order: n * 10
     },
-    // --- VALUE SETTINGS: per-layer label toggles ---
     [`layer${n}_show_labels`]: {
       type: "boolean",
       label: `Layer ${n} Show Value Labels on Map`,
@@ -421,16 +426,16 @@ looker.plugins.visualizations.add({
       label: "Map Style",
       display: "select",
       values: [
-        { "Dark Gray": "dark-gray-vector" },
-        { "Light Gray": "gray-vector" },
-        { "Streets": "streets-vector" },
-        { "Satellite": "satellite" },
-        { "Topographic": "topo-vector" },
-        { "Navigation (Dark)": "navigation-night-vector" },
-        { "Navigation (Light)": "navigation-vector" },
-        { "Oceans": "oceans" }
+        { "Dark Gray": "arcgis-dark-gray" },
+        { "Light Gray": "arcgis-light-gray" },
+        { "Streets": "arcgis-streets" },
+        { "Satellite": "arcgis-imagery" },
+        { "Topographic": "arcgis-topographic" },
+        { "Navigation (Dark)": "arcgis-navigation-night" },
+        { "Navigation (Light)": "arcgis-navigation" },
+        { "Oceans": "arcgis-oceans" }
       ],
-      default: "dark-gray-vector",
+      default: "arcgis-dark-gray",
       section: "Plot",
       order: 12
     },
@@ -513,7 +518,6 @@ looker.plugins.visualizations.add({
   },
 
   create: function (element, config) {
-    // ArcGIS CSS is loaded in loadDependencies() — update theme if needed
     const arcgisCss = document.getElementById('arcgis-css');
     const isDark = !config.map_style || config.map_style.includes('dark') || config.map_style.includes('night');
     if (arcgisCss) {
@@ -589,12 +593,11 @@ looker.plugins.visualizations.add({
     this._geojsonCache = {};
   },
 
-  // MOD 6: ArcGIS static export URL for print fallback
   _getStaticMapUrl: function (config, viewState, width, height) {
-    const basemapId = config.map_style || 'dark-gray-vector';
+    const rawBasemap = config.map_style || 'arcgis-dark-gray';
+    const basemapId = BASEMAP_MAPPING[rawBasemap] || rawBasemap;
     const lon = viewState.longitude.toFixed(4);
     const lat = viewState.latitude.toFixed(4);
-    // ArcGIS zoom to scale approximation (zoom 0 = ~591657527, halves each level)
     const scale = Math.round(591657527 / Math.pow(2, viewState.zoom || 4));
     const rawUrl = [
       `https://static.arcgis.com/arcgis/rest/services/World_Basemap_v2/VectorTileServer/export`,
@@ -607,8 +610,6 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
-
-    // --- DEPENDENCY CHECK ---
     if (typeof deck === 'undefined' || typeof topojson === 'undefined' || typeof window.require === 'undefined') {
       console.log("[Viz ArcGIS] Waiting for dependencies...");
       setTimeout(() => {
@@ -616,15 +617,13 @@ looker.plugins.visualizations.add({
       }, 100);
       return;
     }
-    // Local alias so _render() can call it safely
-    const esriRequire = window.require;
 
+    const esriRequire = window.require;
     const isPrint = details && details.print;
     console.log(`[Viz Hybrid] ========== UPDATE ASYNC START ==========`);
 
     this.clearErrors();
 
-    // TOKEN CHECK
     if (!config.arcgis_token) {
       console.warn("[Viz] Waiting for ArcGIS API Key...");
       this._tokenError.style.display = 'block';
@@ -651,13 +650,10 @@ looker.plugins.visualizations.add({
     ]).then(([processedData, ...loadedIcons]) => {
 
       this._processedData = processedData;
-
       console.log(`[Viz Hybrid] Data prepared.`);
 
-      // --- MOD: V71 PRINT LOGIC IMPLEMENTATION ---
       if (isPrint) {
         console.log("[Viz Hybrid] Print/Static Mode Active.");
-
         const viewState = this._viewState || {
           longitude: Number(config.center_lng) || 2,
           latitude: Number(config.center_lat) || 46,
@@ -672,20 +668,15 @@ looker.plugins.visualizations.add({
         const staticUrl = this._getStaticMapUrl(config, viewState, width, height);
         console.log("[Viz Hybrid] Static URL:", staticUrl);
 
-        // Apply background immediately (Static Map Fallback)
         this._container.style.backgroundImage = `url('${staticUrl}')`;
         this._container.style.backgroundSize = 'cover';
         this._container.style.backgroundPosition = 'center';
 
-        // Render DeckGL with transparent map style so background shows through
         this._render(processedData, { ...config, map_style: "" }, queryResponse, details, loadedIcons, esriRequire);
         this._updateLegend(config, loadedIcons, queryResponse, processedData);
-
-        // Call done() immediately (V71 strategy - no waiting for timeouts)
         done();
 
       } else {
-        // Interactive Mode (Standard v58 Rendering)
         this._container.style.backgroundImage = 'none';
         this._render(processedData, config, queryResponse, details, loadedIcons, esriRequire);
         this._updateLegend(config, loadedIcons, queryResponse, processedData);
@@ -699,7 +690,6 @@ looker.plugins.visualizations.add({
     });
   },
 
-  // --- HELPER: Compute value range for a given layer ---
   _getLayerValueRange: function (config, layerIdx, processedData, queryResponse) {
     if (!processedData) return { min: null, max: null };
 
@@ -797,7 +787,6 @@ looker.plugins.visualizations.add({
         const useGradient = config[`layer${i}_use_gradient`];
         const endColor = config[`layer${i}_gradient_end`] || color;
 
-        // Compute value range if needed
         let rangeHtml = '';
         if (showValues && type !== 'heatmap') {
           const range = this._getLayerValueRange(config, i, processedData, queryResponse);
@@ -806,7 +795,6 @@ looker.plugins.visualizations.add({
             const mIdx = parseInt(String(measStr || i-1).split(',')[0].trim());
             const m = measures[mIdx];
             const fmt = m ? m.value_format : null;
-            // Force zero decimals here using our new third parameter
             const minStr = this._applyLookerFormat(range.min, fmt, true);
             const maxStr = this._applyLookerFormat(range.max, fmt, true);
             rangeHtml = `<span class="legend-range">${minStr} – ${maxStr}</span>`;
@@ -1035,7 +1023,6 @@ looker.plugins.visualizations.add({
             geoLayerObjects.push({ layer: layer, zIndex: z });
           }
 
-          // Label layers collected separately — will be appended AFTER all geo layers
           if (config[`layer${i}_show_labels`]) {
             const labelLayer = this._buildLabelLayer(i, config, processed, queryResponse);
             if (labelLayer) {
@@ -1050,8 +1037,6 @@ looker.plugins.visualizations.add({
       }
     }
 
-    // Sort each group independently by z-index, then string them together
-    // This inherently places ALL labels mathematically on top of all maps
     geoLayerObjects.sort((a, b) => a.zIndex - b.zIndex);
     labelLayerObjects.sort((a, b) => a.zIndex - b.zIndex);
     const layers = [
@@ -1059,11 +1044,9 @@ looker.plugins.visualizations.add({
       ...labelLayerObjects.map(obj => obj.layer)
     ];
 
-    // --- TOOLTIP (v58 Logic) ---
     const getTooltip = ({ object, layer }) => {
       if (!object || config.tooltip_mode === 'none') return null;
 
-      // Ensure Tooltip ignores text layers so clicks/hovers pass through map objects below
       if (layer && layer.id && layer.id.includes('-labels')) return null;
 
       const layerMatch = layer && layer.id ? layer.id.match(/^layer-(\d+)-/) : null;
@@ -1082,7 +1065,7 @@ looker.plugins.visualizations.add({
         if (measStr !== undefined && measStr !== null) {
           activeMeasureIndices = String(measStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
         } else {
-          activeMeasureIndices = [layerIdx - 1]; // Default fallback
+          activeMeasureIndices = [layerIdx - 1];
         }
       } else {
         activeMeasureIndices = queryResponse.fields.measure_like.map((_, i) => i);
@@ -1177,11 +1160,15 @@ looker.plugins.visualizations.add({
     const cfgZoom = Number(config.zoom) || 4;
     const cfgPitch = Number(config.pitch) || 45;
 
+    const rawBasemap = config.map_style || "arcgis-dark-gray";
+    const basemap = BASEMAP_MAPPING[rawBasemap] || rawBasemap;
+
     const configChanged =
       this._prevConfig.lat !== cfgLat ||
       this._prevConfig.lng !== cfgLng ||
       this._prevConfig.zoom !== cfgZoom ||
-      this._prevConfig.pitch !== cfgPitch;
+      this._prevConfig.pitch !== cfgPitch ||
+      this._prevConfig.basemap !== basemap;
 
     if (!this._viewState || configChanged) {
       this._viewState = {
@@ -1192,13 +1179,12 @@ looker.plugins.visualizations.add({
         bearing: 0,
         transitionDuration: isPrint ? 0 : 500
       };
-      this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch };
+      this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch, basemap: basemap };
     }
 
     const onViewStateChange = ({ viewState }) => {
       this._viewState = viewState;
       this._deck.setProps({ viewState: this._viewState });
-      // Sync ArcGIS MapView camera to Deck.gl view state
       if (this._arcgisView) {
         this._arcgisView.goTo({
           center: [viewState.longitude, viewState.latitude],
@@ -1210,34 +1196,27 @@ looker.plugins.visualizations.add({
     };
 
     // --- ARCGIS + DECKGL INIT ---
-    // Use ArcGIS require() AMD loader (loaded via js.arcgis.com/4.29/)
     esriRequire([
       "esri/Map",
-      "esri/views/MapView",
+      "esri/views/SceneView",
       "esri/config"
-    ], (EsriMap, MapView, esriConfig) => {
+    ], (EsriMap, SceneView, esriConfig) => {
 
-      // Set API key for ArcGIS basemap tiles
       esriConfig.apiKey = config.arcgis_token;
 
-      const basemap = config.map_style || "dark-gray-vector";
-
       if (!this._deck) {
-        // Create ArcGIS map & view as the background
         const esriMap = new EsriMap({ basemap });
 
-        // The MapView targets our existing #map container
-        this._arcgisView = new MapView({
+        this._arcgisView = new SceneView({
           container: this._container,
           map: esriMap,
           center: [cfgLng, cfgLat],
           zoom: cfgZoom,
-          ui: { components: [] } // hide default ArcGIS UI widgets
+          tilt: cfgPitch,
+          ui: { components: [] }
         });
 
-        // Once ArcGIS view is ready, overlay Deck.gl on top
         this._arcgisView.when(() => {
-          // Create a transparent canvas overlay for Deck.gl inside the same container
           const deckCanvas = document.createElement('canvas');
           deckCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;';
           this._container.appendChild(deckCanvas);
@@ -1252,16 +1231,13 @@ looker.plugins.visualizations.add({
             layers: layers,
             getTooltip: getTooltip,
             glOptions: { preserveDrawingBuffer: true, willReadFrequently: true },
-            // Transparent background so ArcGIS map shows through
             style: { background: 'transparent' }
           });
 
-          // Re-enable pointer events on the Deck.gl canvas for interaction
           deckCanvas.style.pointerEvents = 'auto';
         });
 
       } else {
-        // Update existing Deck.gl layers and basemap if style changed
         this._deck.setProps({
           layers: layers,
           getTooltip: getTooltip,
@@ -1270,15 +1246,14 @@ looker.plugins.visualizations.add({
           onViewStateChange: onViewStateChange
         });
 
-        // Update ArcGIS basemap if style changed
-        if (this._arcgisView && this._arcgisView.map.basemap.id !== basemap) {
+        // Safe basemap update resolving the null crash
+        if (this._arcgisView && (!this._arcgisView.map.basemap || this._arcgisView.map.basemap.id !== basemap)) {
           this._arcgisView.map.basemap = basemap;
         }
       }
     });
   },
 
-  // --- NEW: Build TextLayer for on-map value labels ---
   _buildLabelLayer: function (idx, config, processed, queryResponse) {
     const rawM = config[`layer${idx}_measure_idx`];
     const measureStr = (rawM === undefined || rawM === null) ? String(idx - 1) : String(rawM);
@@ -1804,9 +1779,6 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // --- UTILITIES (v58) ---
-
-  // MOD: Added forceNoDecimals parameter for legend overrides
   _applyLookerFormat: function (value, formatStr, forceNoDecimals = false) {
     if (value === undefined || value === null) return '0';
     if (typeof value !== 'number') return value;
@@ -1826,7 +1798,6 @@ looker.plugins.visualizations.add({
 
     let decimals = 0;
 
-    // Only parse for decimals if we aren't forcing zero
     if (!forceNoDecimals) {
       if (formatStr.includes('.')) {
         const afterDot = formatStr.split('.')[1];
