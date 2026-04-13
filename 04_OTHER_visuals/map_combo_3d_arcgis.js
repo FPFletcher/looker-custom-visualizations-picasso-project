@@ -8,7 +8,7 @@
  * MODIFICATION 5: Forced 0 decimals for Legend Value Ranges.
  * MODIFICATION 6: Replaced Mapbox basemap with ArcGIS basemap.
  * MODIFICATION 7: Upgraded MapView to SceneView for 3D tilt sync and fixed ArcGIS basemap IDs.
- * MODIFICATION 8: Forced SceneView to 'local' viewingMode to fix globe curvature desync, and fixed 0 pitch fallback bug.
+ * MODIFICATION 8: Integrated @deck.gl/arcgis to run DeckGL natively inside ArcGIS WebGL context, fixing camera desync and GL errors.
  * ID: map_combo_3d_arcgis_cdn
  */
 
@@ -50,11 +50,14 @@ const loadDependencies = async () => {
       document.head.appendChild(link);
     }
 
+    // Load Deck.gl and its ArcGIS plugin
     await Promise.all([
       loadScript("https://unpkg.com/deck.gl@latest/dist.min.js"),
       loadScript("https://unpkg.com/topojson-client@3")
     ]);
+    await loadScript("https://unpkg.com/@deck.gl/arcgis@latest/dist.min.js");
 
+    // Load ArcGIS last
     await loadScript("https://js.arcgis.com/4.29/");
     console.log("[Viz Loader] All dependencies loaded.");
   } catch (e) {
@@ -580,12 +583,15 @@ looker.plugins.visualizations.add({
     this._viewState = null;
     this._prevConfig = {};
     this._processedData = null;
+    this._deckLayer = null;
   },
 
   destroy: function () {
-    if (this._deck) {
-      this._deck.finalize();
-      this._deck = null;
+    if (this._deckLayer) {
+      if (this._arcgisView && this._arcgisView.map) {
+          this._arcgisView.map.remove(this._deckLayer);
+      }
+      this._deckLayer = null;
     }
     if (this._arcgisView) {
       this._arcgisView.destroy();
@@ -611,7 +617,7 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
-    if (typeof deck === 'undefined' || typeof topojson === 'undefined' || typeof window.require === 'undefined') {
+    if (typeof deck === 'undefined' || typeof deck.DeckLayer === 'undefined' || typeof topojson === 'undefined' || typeof window.require === 'undefined') {
       console.log("[Viz ArcGIS] Waiting for dependencies...");
       setTimeout(() => {
         this.updateAsync(data, element, config, queryResponse, details, done);
@@ -656,7 +662,7 @@ looker.plugins.visualizations.add({
       if (isPrint) {
         console.log("[Viz Hybrid] Print/Static Mode Active.");
 
-        // Use strict check for 0 pitch
+        // Strict check to allow explicit 0 pitch
         const defaultPitch = (config.pitch === undefined || config.pitch === null || config.pitch === "") ? 45 : Number(config.pitch);
 
         const viewState = this._viewState || {
@@ -1189,20 +1195,7 @@ looker.plugins.visualizations.add({
       this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch, basemap: basemap };
     }
 
-    const onViewStateChange = ({ viewState }) => {
-      this._viewState = viewState;
-      this._deck.setProps({ viewState: this._viewState });
-      if (this._arcgisView) {
-        this._arcgisView.goTo({
-          center: [viewState.longitude, viewState.latitude],
-          zoom: viewState.zoom,
-          tilt: viewState.pitch || 0,
-          heading: viewState.bearing || 0
-        }, { animate: false }).catch(() => {});
-      }
-    };
-
-    // --- ARCGIS + DECKGL INIT ---
+    // --- ARCGIS + DECKGL NATIVE INIT ---
     esriRequire([
       "esri/Map",
       "esri/views/SceneView",
@@ -1211,7 +1204,7 @@ looker.plugins.visualizations.add({
 
       esriConfig.apiKey = config.arcgis_token;
 
-      if (!this._deck) {
+      if (!this._arcgisView) {
         const esriMap = new EsriMap({ basemap });
 
         this._arcgisView = new SceneView({
@@ -1224,39 +1217,49 @@ looker.plugins.visualizations.add({
           ui: { components: [] }
         });
 
-        this._arcgisView.when(() => {
-          const deckCanvas = document.createElement('canvas');
-          deckCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;';
-          this._container.appendChild(deckCanvas);
+        // Initialize DeckGL natively as an ArcGIS Layer instead of a floating canvas
+        this._deckLayer = new deck.DeckLayer({
+          'deck.layers': layers,
+          'deck.getTooltip': getTooltip
+        });
 
-          this._deck = new deck.Deck({
-            canvas: deckCanvas,
-            width: '100%',
-            height: '100%',
-            initialViewState: this._viewState,
-            controller: true,
-            onViewStateChange: onViewStateChange,
-            layers: layers,
-            getTooltip: getTooltip,
-            glOptions: { preserveDrawingBuffer: true, willReadFrequently: true },
-            style: { background: 'transparent' }
-          });
+        esriMap.add(this._deckLayer);
 
-          deckCanvas.style.pointerEvents = 'auto';
+        // Save viewState for potential static printing fallback
+        this._arcgisView.watch("camera", () => {
+             this._viewState = {
+                 longitude: this._arcgisView.center.longitude,
+                 latitude: this._arcgisView.center.latitude,
+                 zoom: this._arcgisView.zoom,
+                 pitch: this._arcgisView.camera.tilt,
+                 bearing: this._arcgisView.camera.heading
+             };
         });
 
       } else {
-        this._deck.setProps({
-          layers: layers,
-          getTooltip: getTooltip,
-          viewState: this._viewState,
-          controller: true,
-          onViewStateChange: onViewStateChange
+        // Safe update: Remove old DeckLayer and inject new one
+        if (this._deckLayer) {
+           this._arcgisView.map.remove(this._deckLayer);
+        }
+
+        this._deckLayer = new deck.DeckLayer({
+           'deck.layers': layers,
+           'deck.getTooltip': getTooltip
         });
+        this._arcgisView.map.add(this._deckLayer);
 
         // Safe basemap update
-        if (this._arcgisView && (!this._arcgisView.map.basemap || this._arcgisView.map.basemap.id !== basemap)) {
+        if (this._arcgisView.map.basemap && this._arcgisView.map.basemap.id !== basemap) {
           this._arcgisView.map.basemap = basemap;
+        }
+
+        // Apply Config updates
+        if (configChanged) {
+            this._arcgisView.goTo({
+              center: [cfgLng, cfgLat],
+              zoom: cfgZoom,
+              tilt: cfgPitch
+            }, { animate: false }).catch(()=>{});
         }
       }
     });
