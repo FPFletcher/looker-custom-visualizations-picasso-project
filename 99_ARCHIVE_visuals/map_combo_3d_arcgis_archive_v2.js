@@ -8,8 +8,9 @@
  * MODIFICATION 5: Forced 0 decimals for Legend Value Ranges.
  * MODIFICATION 6: Replaced Mapbox basemap with ArcGIS basemap.
  * MODIFICATION 7: Upgraded MapView to SceneView for 3D tilt sync and fixed ArcGIS basemap IDs.
- * MODIFICATION 8: Removed native @deck.gl/arcgis to bypass Looker WebGL mailbox crashes.
- * MODIFICATION 9: Restored Dual-Canvas SceneView (3D) with viewingMode: 'local' for perfect zoom scaling.
+ * MODIFICATION 8: Integrated @deck.gl/arcgis DeckLayer for native WebGL sync and forced 'local' viewing mode.
+ * MODIFICATION 9: Reverted to strict 2D MapView and dual-canvas to fix Looker iframe WebGL mailbox crashes. Forced 0 pitch.
+ * MODIFICATION 10: Disabled snapToZoom in ArcGIS MapView and used direct property assignment for zero-latency zoom sync.
  * ID: map_combo_3d_arcgis_cdn
  */
 
@@ -56,7 +57,7 @@ const loadDependencies = async () => {
       loadScript("https://unpkg.com/topojson-client@3")
     ]);
 
-    // Native integration removed to bypass WebGL isolation crashes
+    // Mod 9: Removed @deck.gl/arcgis due to Looker iframe WebGL isolation crashes.
     await loadScript("https://js.arcgis.com/4.29/");
 
     console.log("[Viz Loader] All dependencies loaded.");
@@ -446,7 +447,7 @@ looker.plugins.visualizations.add({
     center_lat: { type: "number", label: "Latitude", default: 46, section: "Plot", order: 13 },
     center_lng: { type: "number", label: "Longitude", default: 2, section: "Plot", order: 14 },
     zoom: { type: "number", label: "Zoom", default: 4, section: "Plot", order: 15 },
-    pitch: { type: "number", label: "3D Tilt (0-60)", default: 45, section: "Plot", order: 16 },
+    // Mod 9: Pitch parameter completely removed to enforce 2D stability
 
     // --- TOOLTIP ---
     tooltip_header: { type: "string", label: "─── TOOLTIP ───", display: "divider", section: "Plot", order: 20 },
@@ -847,13 +848,12 @@ looker.plugins.visualizations.add({
       const cfgLat = Number(config.center_lat) || 46;
       const cfgLng = Number(config.center_lng) || 2;
       const cfgZoom = Number(config.zoom) || 4;
-      const cfgPitch = (config.pitch === undefined || config.pitch === null || config.pitch === "") ? 45 : Number(config.pitch);
 
       const viewState = {
         longitude: cfgLng,
         latitude: cfgLat,
         zoom: cfgZoom,
-        pitch: cfgPitch,
+        pitch: 0,
         bearing: 0
       };
 
@@ -877,7 +877,7 @@ looker.plugins.visualizations.add({
       });
   },
 
-  // Mod 9: Re-enabled SceneView (3D) + viewingMode: 'local' for perfect 3D scale alignment
+  // Mod 10: MapView with disabled zoom snapping for perfect continuous zoom sync
   _render: function (processed, config, queryResponse, details, loadedIcons, esriRequire) {
     const layers = this._buildLayers(processed, config, queryResponse, loadedIcons);
     const getTooltip = this._getTooltipFn(config, queryResponse);
@@ -885,8 +885,6 @@ looker.plugins.visualizations.add({
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
-    // Strict parsing restores proper fallback for 0 values
-    const cfgPitch = (config.pitch === undefined || config.pitch === null || config.pitch === "") ? 45 : Number(config.pitch);
 
     const rawBasemap = config.map_style || "arcgis-dark-gray";
     const basemap = BASEMAP_MAPPING[rawBasemap] || rawBasemap;
@@ -895,57 +893,58 @@ looker.plugins.visualizations.add({
       this._prevConfig.lat !== cfgLat ||
       this._prevConfig.lng !== cfgLng ||
       this._prevConfig.zoom !== cfgZoom ||
-      this._prevConfig.pitch !== cfgPitch ||
       this._prevConfig.basemap !== basemap;
 
-    this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: cfgPitch, basemap: basemap };
+    this._prevConfig = { lat: cfgLat, lng: cfgLng, zoom: cfgZoom, pitch: 0, basemap: basemap };
 
-    // --- VIEW STATE ---
+    // --- VIEW STATE (Pitch explicitly locked to 0) ---
     if (!this._viewState || configChanged) {
       this._viewState = {
         longitude: cfgLng,
         latitude: cfgLat,
         zoom: cfgZoom,
-        pitch: cfgPitch,
+        pitch: 0,
         bearing: 0,
         transitionDuration: 0
       };
     }
 
     const onViewStateChange = ({ viewState }) => {
+      // Force pitch to 0 to prevent 2D/3D math clashes
+      viewState.pitch = 0;
+      viewState.bearing = 0;
+
       this._viewState = viewState;
       this._deck.setProps({ viewState: this._viewState });
 
       if (this._arcgisView) {
-        // We use goTo for SceneView because directly modifying camera scale requires heavy math conversions
-        this._arcgisView.goTo({
-          center: [viewState.longitude, viewState.latitude],
-          zoom: viewState.zoom,
-          tilt: viewState.pitch || 0,
-          heading: viewState.bearing || 0
-        }, { animate: false }).catch(() => {});
+        // Mod 10: Fast zero-latency direct assignment instead of .goTo()
+        this._arcgisView.zoom = viewState.zoom;
+        this._arcgisView.center = [viewState.longitude, viewState.latitude];
       }
     };
 
     // --- ARCGIS + DECKGL INIT ---
     esriRequire([
       "esri/Map",
-      "esri/views/SceneView", // SceneView returns 3D support
+      "esri/views/MapView",
       "esri/config"
-    ], (EsriMap, SceneView, esriConfig) => {
+    ], (EsriMap, MapView, esriConfig) => {
 
       esriConfig.apiKey = config.arcgis_token;
 
       if (!this._arcgisMap) {
         this._arcgisMap = new EsriMap({ basemap });
 
-        this._arcgisView = new SceneView({
+        this._arcgisView = new MapView({
           container: this._container,
           map: this._arcgisMap,
           center: [cfgLng, cfgLat],
           zoom: cfgZoom,
-          tilt: cfgPitch,
-          viewingMode: 'local', // Crucial to map Deck.gl flat planes directly to 3D ArcGIS coordinates
+          constraints: {
+             snapToZoom: false, // Mod 10: The magic fix for continuous zooming desync
+             rotationEnabled: false
+          },
           ui: { components: [] }
         });
 
@@ -959,7 +958,7 @@ looker.plugins.visualizations.add({
             width: '100%',
             height: '100%',
             initialViewState: this._viewState,
-            controller: true,
+            controller: true, // DeckGL handles pan/zoom events smoothly
             onViewStateChange: onViewStateChange,
             layers: layers,
             getTooltip: getTooltip,
