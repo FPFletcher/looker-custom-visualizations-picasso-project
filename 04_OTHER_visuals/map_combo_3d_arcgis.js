@@ -8,6 +8,7 @@
  * MODIFICATION 5: Forced 0 decimals for Legend Value Ranges.
  * MODIFICATION 6: Replaced Mapbox basemap with ArcGIS basemap.
  * MODIFICATION 7: Upgraded MapView to SceneView for 3D tilt sync and fixed ArcGIS basemap IDs.
+ * MODIFICATION 8: Forced SceneView to 'local' viewingMode to fix globe curvature desync, and fixed 0 pitch fallback bug.
  * ID: map_combo_3d_arcgis_cdn
  */
 
@@ -654,11 +655,15 @@ looker.plugins.visualizations.add({
 
       if (isPrint) {
         console.log("[Viz Hybrid] Print/Static Mode Active.");
+
+        // Use strict check for 0 pitch
+        const defaultPitch = (config.pitch === undefined || config.pitch === null || config.pitch === "") ? 45 : Number(config.pitch);
+
         const viewState = this._viewState || {
           longitude: Number(config.center_lng) || 2,
           latitude: Number(config.center_lat) || 46,
           zoom: Number(config.zoom) || 4,
-          pitch: Number(config.pitch) || 45,
+          pitch: defaultPitch,
           bearing: 0
         };
 
@@ -1158,7 +1163,9 @@ looker.plugins.visualizations.add({
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
-    const cfgPitch = Number(config.pitch) || 45;
+
+    // Strict parsing to allow 0 to pass through without falling back to 45
+    const cfgPitch = (config.pitch === undefined || config.pitch === null || config.pitch === "") ? 45 : Number(config.pitch);
 
     const rawBasemap = config.map_style || "arcgis-dark-gray";
     const basemap = BASEMAP_MAPPING[rawBasemap] || rawBasemap;
@@ -1213,6 +1220,7 @@ looker.plugins.visualizations.add({
           center: [cfgLng, cfgLat],
           zoom: cfgZoom,
           tilt: cfgPitch,
+          viewingMode: 'local', // Forces flat 3D projection, removing globe curvature clash
           ui: { components: [] }
         });
 
@@ -1246,7 +1254,7 @@ looker.plugins.visualizations.add({
           onViewStateChange: onViewStateChange
         });
 
-        // Safe basemap update resolving the null crash
+        // Safe basemap update
         if (this._arcgisView && (!this._arcgisView.map.basemap || this._arcgisView.map.basemap.id !== basemap)) {
           this._arcgisView.map.basemap = basemap;
         }
