@@ -10,6 +10,7 @@
  * MODIFICATION 7: Upgraded MapView to SceneView for 3D tilt sync and fixed ArcGIS basemap IDs.
  * MODIFICATION 8: Integrated @deck.gl/arcgis DeckLayer for native WebGL sync and forced 'local' viewing mode.
  * MODIFICATION 9: Reverted to strict 2D MapView and dual-canvas to fix Looker iframe WebGL mailbox crashes. Forced 0 pitch.
+ * MODIFICATION 10: Disabled snapToZoom in ArcGIS MapView and used direct property assignment for zero-latency zoom sync.
  * ID: map_combo_3d_arcgis_cdn
  */
 
@@ -852,7 +853,7 @@ looker.plugins.visualizations.add({
         longitude: cfgLng,
         latitude: cfgLat,
         zoom: cfgZoom,
-        pitch: 0, // Hardcoded 2D Pitch
+        pitch: 0,
         bearing: 0
       };
 
@@ -876,7 +877,7 @@ looker.plugins.visualizations.add({
       });
   },
 
-  // Mod 9: Reverted to Dual-Canvas 2D MapView
+  // Mod 10: MapView with disabled zoom snapping for perfect continuous zoom sync
   _render: function (processed, config, queryResponse, details, loadedIcons, esriRequire) {
     const layers = this._buildLayers(processed, config, queryResponse, loadedIcons);
     const getTooltip = this._getTooltipFn(config, queryResponse);
@@ -917,17 +918,16 @@ looker.plugins.visualizations.add({
       this._deck.setProps({ viewState: this._viewState });
 
       if (this._arcgisView) {
-        this._arcgisView.goTo({
-          center: [viewState.longitude, viewState.latitude],
-          zoom: viewState.zoom
-        }, { animate: false }).catch(() => {});
+        // Mod 10: Fast zero-latency direct assignment instead of .goTo()
+        this._arcgisView.zoom = viewState.zoom;
+        this._arcgisView.center = [viewState.longitude, viewState.latitude];
       }
     };
 
     // --- ARCGIS + DECKGL INIT ---
     esriRequire([
       "esri/Map",
-      "esri/views/MapView", // Swapped SceneView back to MapView
+      "esri/views/MapView",
       "esri/config"
     ], (EsriMap, MapView, esriConfig) => {
 
@@ -941,6 +941,10 @@ looker.plugins.visualizations.add({
           map: this._arcgisMap,
           center: [cfgLng, cfgLat],
           zoom: cfgZoom,
+          constraints: {
+             snapToZoom: false, // Mod 10: The magic fix for continuous zooming desync
+             rotationEnabled: false
+          },
           ui: { components: [] }
         });
 
@@ -954,7 +958,7 @@ looker.plugins.visualizations.add({
             width: '100%',
             height: '100%',
             initialViewState: this._viewState,
-            controller: true, // DeckGL handles pan/zoom events, preventing lag
+            controller: true, // DeckGL handles pan/zoom events smoothly
             onViewStateChange: onViewStateChange,
             layers: layers,
             getTooltip: getTooltip,
