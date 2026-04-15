@@ -1,0 +1,174 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA01",
+        "nom": "Ar Riyad"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [40.252, 26.420], [40.252, 21.994], [50.133, 21.994], [50.133, 26.420], [40.252, 26.420]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA02",
+        "nom": "Makkah"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [38.456, 23.010], [38.456, 17.435], [43.620, 17.435], [43.620, 23.010], [38.456, 23.010]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA03",
+        "nom": "Al Madinah"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [36.700, 28.023], [36.700, 23.011], [41.360, 23.011], [41.360, 28.023], [36.700, 28.023]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA04",
+        "nom": "Ash Sharqiyah"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [47.988, 31.001], [47.988, 22.004], [55.667, 22.004], [55.667, 31.001], [47.988, 31.001]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA05",
+        "nom": "Al Qassim"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [41.912, 27.077], [41.912, 24.516], [45.345, 24.516], [45.345, 27.077], [41.912, 27.077]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA06",
+        "nom": "Ha'il"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [39.853, 29.215], [39.853, 26.382], [44.760, 26.382], [44.760, 29.215], [39.853, 29.215]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA07",
+        "nom": "Tabuk"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [34.572, 32.155], [34.572, 27.524], [39.001, 27.524], [39.001, 32.155], [34.572, 32.155]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA08",
+        "nom": "Al Hudud ash Shamaliyah"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [38.989, 32.154], [38.989, 29.216], [45.541, 29.216], [45.541, 32.154], [38.989, 32.154]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA09",
+        "nom": "Jizan"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [41.565, 18.308], [41.565, 16.380], [43.778, 16.380], [43.778, 18.308], [41.565, 18.308]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA10",
+        "nom": "Najran"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [44.125, 21.994], [44.125, 17.067], [55.667, 17.067], [55.667, 21.994], [44.125, 21.994]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA11",
+        "nom": "Al Bahah"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [40.712, 20.613], [40.712, 19.740], [41.897, 19.740], [41.897, 20.613], [40.712, 20.613]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA12",
+        "nom": "Al Jawf"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [36.679, 32.154], [36.679, 28.023], [41.185, 28.023], [41.185, 32.154], [36.679, 32.154]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "code": "SA14",
+        "nom": "Asir"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [41.565, 20.614], [41.565, 17.435], [44.124, 17.435], [44.124, 20.614], [41.565, 20.614]
+        ]]
+      }
+    }
+  ]
+}
