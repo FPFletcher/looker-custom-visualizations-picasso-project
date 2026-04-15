@@ -10,6 +10,8 @@
  * MODIFICATION 7: Upgraded MapView to SceneView for 3D tilt sync and fixed ArcGIS basemap IDs.
  * MODIFICATION 8: Removed native @deck.gl/arcgis to bypass Looker WebGL mailbox crashes.
  * MODIFICATION 9: Restored Dual-Canvas SceneView (3D) with viewingMode: 'local' for perfect zoom scaling.
+ * MODIFICATION 10: Disabled snapToZoom in ArcGIS MapView and used direct property assignment for zero-latency zoom sync.
+ * MODIFICATION 11: Added null-safety fallbacks for undefined drillLinks.
  * ID: map_combo_3d_arcgis_cdn
  */
 
@@ -56,7 +58,6 @@ const loadDependencies = async () => {
       loadScript("https://unpkg.com/topojson-client@3")
     ]);
 
-    // Native integration removed to bypass WebGL isolation crashes
     await loadScript("https://js.arcgis.com/4.29/");
 
     console.log("[Viz Loader] All dependencies loaded.");
@@ -877,7 +878,6 @@ looker.plugins.visualizations.add({
       });
   },
 
-  // Mod 9: Re-enabled SceneView (3D) + viewingMode: 'local' for perfect 3D scale alignment
   _render: function (processed, config, queryResponse, details, loadedIcons, esriRequire) {
     const layers = this._buildLayers(processed, config, queryResponse, loadedIcons);
     const getTooltip = this._getTooltipFn(config, queryResponse);
@@ -885,7 +885,6 @@ looker.plugins.visualizations.add({
     const cfgLat = Number(config.center_lat) || 46;
     const cfgLng = Number(config.center_lng) || 2;
     const cfgZoom = Number(config.zoom) || 4;
-    // Strict parsing restores proper fallback for 0 values
     const cfgPitch = (config.pitch === undefined || config.pitch === null || config.pitch === "") ? 45 : Number(config.pitch);
 
     const rawBasemap = config.map_style || "arcgis-dark-gray";
@@ -917,7 +916,6 @@ looker.plugins.visualizations.add({
       this._deck.setProps({ viewState: this._viewState });
 
       if (this._arcgisView) {
-        // We use goTo for SceneView because directly modifying camera scale requires heavy math conversions
         this._arcgisView.goTo({
           center: [viewState.longitude, viewState.latitude],
           zoom: viewState.zoom,
@@ -930,7 +928,7 @@ looker.plugins.visualizations.add({
     // --- ARCGIS + DECKGL INIT ---
     esriRequire([
       "esri/Map",
-      "esri/views/SceneView", // SceneView returns 3D support
+      "esri/views/SceneView",
       "esri/config"
     ], (EsriMap, SceneView, esriConfig) => {
 
@@ -945,7 +943,7 @@ looker.plugins.visualizations.add({
           center: [cfgLng, cfgLat],
           zoom: cfgZoom,
           tilt: cfgPitch,
-          viewingMode: 'local', // Crucial to map Deck.gl flat planes directly to 3D ArcGIS coordinates
+          viewingMode: 'local',
           ui: { components: [] }
         });
 
@@ -1193,7 +1191,10 @@ looker.plugins.visualizations.add({
       return {
         values: measures.map(m => row[m.name] ? parseFloat(row[m.name].value) || 0 : 0),
         formattedValues: measures.map(m => row[m.name] ? (row[m.name].rendered || row[m.name].value) : ''),
-        drillLinks: measures.map(m => row[m.name] ? row[m.name].links : []),
+
+        // MOD 11: Safety fallback for missing .links arrays
+        drillLinks: measures.map(m => (row[m.name] && Array.isArray(row[m.name].links)) ? row[m.name].links : []),
+
         dimensionValues: dims.map(d => row[d.name] ? row[d.name].value : ''),
         pivotData: null
       };
@@ -1210,7 +1211,7 @@ looker.plugins.visualizations.add({
             pivotData[m.name][pivotKey] = {
               value: parseFloat(pivotCell.value) || 0,
               formatted: pivotCell.rendered || pivotCell.value || '0',
-              links: pivotCell.links || []
+              links: Array.isArray(pivotCell.links) ? pivotCell.links : []
             };
           } else {
             pivotData[m.name][pivotKey] = { value: 0, formatted: '0', links: [] };
@@ -1263,16 +1264,18 @@ looker.plugins.visualizations.add({
                     existing.pivotData[mName][pk] = { ...rowData.pivotData[mName][pk] };
                   } else {
                     existing.pivotData[mName][pk].value += rowData.pivotData[mName][pk].value;
-                    if (rowData.pivotData[mName][pk].links) {
+                    if (Array.isArray(rowData.pivotData[mName][pk].links)) {
                       existing.pivotData[mName][pk].links.push(...rowData.pivotData[mName][pk].links);
                     }
                   }
                 });
               });
             }
-            if (rowData.drillLinks) {
+
+            // MOD 11: Safely push valid drill arrays
+            if (Array.isArray(rowData.drillLinks)) {
               rowData.drillLinks.forEach((lArr, i) => {
-                if (lArr && lArr.length) {
+                if (Array.isArray(lArr) && lArr.length > 0) {
                   if (!existing.drillLinks[i]) existing.drillLinks[i] = [];
                   existing.drillLinks[i].push(...lArr);
                 }
@@ -1282,7 +1285,8 @@ looker.plugins.visualizations.add({
           } else {
             dataMaps[dimIdx][clean] = {
               ...rowData,
-              drillLinks: rowData.drillLinks ? rowData.drillLinks.map(l => [...l]) : [],
+              // MOD 11: Null-safe mapping spread operator
+              drillLinks: Array.isArray(rowData.drillLinks) ? rowData.drillLinks.map(l => Array.isArray(l) ? [...l] : []) : [],
               rawName: rawName
             };
           }
@@ -1611,9 +1615,9 @@ looker.plugins.visualizations.add({
       const drillLinks = props._drillLinks || props.drillLinks;
       let finalLinks = [];
 
-      if (!pivotInfo.hasPivot && drillLinks) {
+      if (!pivotInfo.hasPivot && Array.isArray(drillLinks)) {
         measureIndices.forEach(mIdx => {
-          if (drillLinks[mIdx] && drillLinks[mIdx].length > 0) {
+          if (Array.isArray(drillLinks[mIdx]) && drillLinks[mIdx].length > 0) {
             const mName = measures[mIdx] ? (measures[mIdx].label_short || measures[mIdx].label) : "Measure";
             drillLinks[mIdx].forEach(link => {
               finalLinks.push({ ...link, label: `${mName}: ${link.label}` });
@@ -1627,11 +1631,11 @@ looker.plugins.visualizations.add({
           if (!mName || !pivotData[mName]) return;
           if (showAllPivots) {
             Object.values(pivotData[mName]).forEach(pVal => {
-              if (pVal.links) finalLinks.push(...pVal.links);
+              if (Array.isArray(pVal.links)) finalLinks.push(...pVal.links);
             });
           } else {
             const pKey = pivotInfo.pivotKeys[pivotIdx];
-            if (pKey && pivotData[mName][pKey] && pivotData[mName][pKey].links) {
+            if (pKey && pivotData[mName][pKey] && Array.isArray(pivotData[mName][pKey].links)) {
               finalLinks.push(...pivotData[mName][pKey].links);
             }
           }
