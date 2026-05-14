@@ -116,7 +116,7 @@ Hierarchical visualization that displays nested data as proportionally-sized rec
 <li><b>Others Grouping:</b> Use the "Others Threshold %" setting to automatically group small values (e.g., < 0.5%) into a single grey box to clean up the visual.</li>
 </ul>
 <br>
-<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
+<a href="" /></a>
 </details>
 
 ---
@@ -156,8 +156,8 @@ Enhanced column/bar chart with advanced conditional formatting capabilities. Sup
 <li><b>Comparison Mode:</b> To enable Period-over-Period (PoP) arrows, select "Comparison Mode" in the Series tab and define the "Period Offset" (usually -1 for the previous column).</li>
 </ul>
 <br>
-<a href="https://www.youtube.com/watch?v=gNAgwwcTfhE" target="_blank">
- <img src="https://img.youtube.com/vi/gNAgwwcTfhE/maxresdefault.jpg" alt="Watch the demo video" width="480" height="360" border="10" />
+<a href="">
+ <img src="" />
 </a>
 </details>
 
@@ -194,7 +194,8 @@ Displays a primary metric with a secondary comparison value, percentage variance
 <li><b>Layout:</b> Use the "Plot" tab to align the KPI left, center, or right depending on your dashboard tile structure.</li>
 </ul>
 <br>
-<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
+<a href="">
+   <img src="" /></a>
 </details>
 
 ---
@@ -236,7 +237,8 @@ Enterprise-grade data grid designed for advanced reporting within Looker, suppor
 <li><b>Comparison Mode:</b> To enable Period-over-Period (PoP) arrows, select "Comparison Mode" in the Series tab and define the "Period Offset" (usually -1 for the previous column).</li>
 </ul>
 <br>
-<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
+<a href="https://www.veed.io/view/2b4fb719-4488-418b-af99-62c10c4a9f2c?panel=share" target="_blank">
+   <img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
 </details>
 
 ---
@@ -275,7 +277,8 @@ High-performance geospatial visualization that enables multi-layered 3D storytel
 <li><b>Custom Regions:</b> To use a custom map, set "Region Map Source" to "Custom URL" and paste a direct link to a GeoJSON/TopoJSON file (e.g., hosted on GitHub raw or a public bucket).</li>
 </ul>
 <br>
-<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
+<a href="" target="_blank">
+   <img src="" /></a>
 </details>
 
 ---
@@ -313,7 +316,7 @@ High-performance geospatial visualization that enables multi-layered 3D storytel
 <li><b>Positioning:</b> Use the X/Y coordinate sliders in the Plot tab to move the numbers and images to fit your specific background image layout.</li>
 </ul>
 <br>
-<a href="https://www.youtube.com/watch?v=8r_i01BnbcI&list=PLIivdWyY5sqJGSfzlhevENIvtK0DJpzzn" target="_blank"><img src="http://img.youtube.com/vi/8r_i01BnbcI/0.jpg" alt="Watch the demo" width="480" height="360" border="10" /></a>
+<a href="" target="_blank"><img src="" /></a>
 </details>
 
 ---
