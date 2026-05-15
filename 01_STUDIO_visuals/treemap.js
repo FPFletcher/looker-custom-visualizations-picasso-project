@@ -4,7 +4,7 @@
  * Features: Nested layout (parent groups with visible children), "Others" grouping,
  *           Value format options (numeric/percent), LookML value_format support.
  *
- * Version: 6.0 - Fixed nested layout sizing + header values
+ * Version: 6.1 - Fixed null dimension handling and text length errors
  */
 
 looker.plugins.visualizations.add({
@@ -442,14 +442,14 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this.clearErrors();
 
-    if (!data || data.length === 0) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       this._svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#999">No data to display</text>';
       done();
       return;
     }
 
-    const dimensions = queryResponse.fields.dimension_like;
-    const measures = queryResponse.fields.measure_like;
+    const dimensions = queryResponse && queryResponse.fields && queryResponse.fields.dimension_like ? queryResponse.fields.dimension_like : [];
+    const measures = queryResponse && queryResponse.fields && queryResponse.fields.measure_like ? queryResponse.fields.measure_like : [];
 
     if (dimensions.length === 0 || measures.length === 0) {
       this._svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#999">Treemap requires 1 Dimension and 1 Measure</text>';
@@ -464,7 +464,6 @@ looker.plugins.visualizations.add({
     this._measureField = measures[0];
     this._dimensions = dimensions;
 
-    // Reset drill on config changes
     const configChanged =
       this._lastOthersToggle !== config.others_toggle ||
       this._lastOthersThreshold !== config.others_threshold ||
@@ -495,20 +494,21 @@ looker.plugins.visualizations.add({
     const measures = queryResponse.fields.measure_like;
     const currentLevel = this._drillStack.length;
 
-    // Determine Active Data
     let activeData = data;
     if (!activeData) {
       activeData = this._allData;
       for (let i = 0; i < currentLevel; i++) {
         const dimName = dimensions[i].name;
         const filterVal = this._drillStack[i];
-        activeData = activeData.filter(row => row[dimName].value === filterVal);
+        activeData = activeData.filter(row => {
+          const val = row[dimName].value !== null && row[dimName].value !== undefined ? String(row[dimName].value) : "∅ Null";
+          return val === filterVal;
+        });
       }
     }
 
     const measure = measures[0].name;
 
-    // Check if we should use nested layout
     const useNestedLayout = config.nested_layout &&
                             dimensions.length >= 2 &&
                             currentLevel === 0;
@@ -545,7 +545,6 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // Build nested hierarchical data structure
   buildNestedData: function(data, dimensions, measure, config) {
     const parentDim = dimensions[0].name;
     const childDim = dimensions[1].name;
@@ -553,8 +552,11 @@ looker.plugins.visualizations.add({
     const parentGroups = {};
 
     data.forEach(row => {
-      const parentKey = row[parentDim].value;
-      const childKey = row[childDim].value;
+      const pRaw = row[parentDim].value;
+      const cRaw = row[childDim].value;
+      const parentKey = pRaw !== null && pRaw !== undefined ? String(pRaw) : "∅ Null";
+      const childKey = cRaw !== null && cRaw !== undefined ? String(cRaw) : "∅ Null";
+
       const val = row[measure] && row[measure].value !== null ? Number(row[measure].value) : 0;
       const rendered = row[measure] && row[measure].rendered ? row[measure].rendered : null;
 
@@ -642,7 +644,6 @@ looker.plugins.visualizations.add({
     return result;
   },
 
-  // Render nested treemap with FIXED sizing logic
   renderNestedTreemap: function(data, config, queryResponse) {
     const svgNS = "http://www.w3.org/2000/svg";
     this._svg.innerHTML = '';
@@ -663,14 +664,10 @@ looker.plugins.visualizations.add({
     const headerHeight = config.group_header_height || 20;
     const groupPadding = config.group_padding || 2;
 
-    // Create defs element for gradients
     const defs = document.createElementNS(svgNS, 'defs');
     this._svg.appendChild(defs);
 
-    // Get colors for parent groups
     const parentColors = this.getCategoricalColors(data.length, config);
-
-    // FIXED: Use slice-and-dice for parent layout to better handle varying sizes
     const parentRects = this.calculateNestedLayout(data, 0, 0, width, height, totalValue);
 
     parentRects.forEach((parentRect, parentIndex) => {
@@ -682,10 +679,8 @@ looker.plugins.visualizations.add({
       const pw = parentRect.width;
       const ph = parentRect.height;
 
-      // Skip if too small
       if (pw < 2 || ph < 2) return;
 
-      // Draw parent border
       const borderRect = document.createElementNS(svgNS, 'rect');
       borderRect.setAttribute('x', px);
       borderRect.setAttribute('y', py);
@@ -697,12 +692,9 @@ looker.plugins.visualizations.add({
       borderRect.setAttribute('class', 'treemap-group-rect');
       g.appendChild(borderRect);
 
-      // Calculate actual header height (don't exceed parent height)
       const actualHeaderHeight = Math.min(headerHeight, ph - 2);
 
-      // Draw header if there's room
       if (actualHeaderHeight > 0 && ph > 10) {
-        // Determine header fill color
         let headerFillColor;
         const defaultParentColor = parentColors[parentIndex % parentColors.length];
 
@@ -743,12 +735,10 @@ looker.plugins.visualizations.add({
         headerRectEl.setAttribute('class', 'treemap-group-rect');
         g.appendChild(headerRectEl);
 
-        // Draw header label and optional value
         if (pw > 30) {
           const parentPercent = ((parent.value / totalValue) * 100).toFixed(1);
           const parentFormattedValue = this.formatValue(parent.rawValue, config, null);
 
-          // Build header text
           let headerText = parent.name;
           let headerValueText = '';
 
@@ -763,20 +753,16 @@ looker.plugins.visualizations.add({
             }
           }
 
-          // Calculate available width for text
           const textPadding = 5;
           const availableWidth = pw - (textPadding * 2);
 
-          // Create label
           const headerLabel = document.createElementNS(svgNS, 'text');
           headerLabel.setAttribute('x', px + textPadding);
           headerLabel.setAttribute('y', py + actualHeaderHeight - 5);
           headerLabel.setAttribute('fill', config.group_label_color || '#FFFFFF');
           headerLabel.setAttribute('class', 'treemap-group-label');
 
-          // If showing header values, split the space
           if (config.show_header_values && headerValueText && availableWidth > 100) {
-            // Name on left, value on right
             let labelText = headerText;
             const labelWidth = availableWidth * 0.6;
             if (this.estimateTextWidth(labelText, 11) > labelWidth) {
@@ -785,7 +771,6 @@ looker.plugins.visualizations.add({
             headerLabel.textContent = labelText;
             g.appendChild(headerLabel);
 
-            // Value text on right
             const valueLabel = document.createElementNS(svgNS, 'text');
             valueLabel.setAttribute('x', px + pw - textPadding);
             valueLabel.setAttribute('y', py + actualHeaderHeight - 5);
@@ -796,7 +781,6 @@ looker.plugins.visualizations.add({
             valueLabel.textContent = headerValueText;
             g.appendChild(valueLabel);
           } else {
-            // Just name (or name + value if small)
             let labelText = headerText;
             if (this.estimateTextWidth(labelText, 11) > availableWidth) {
               labelText = this.ellipsize(labelText, availableWidth, 11);
@@ -807,17 +791,14 @@ looker.plugins.visualizations.add({
         }
       }
 
-      // Calculate child area - FIXED: proper bounds calculation
       const childX = px + groupPadding;
       const childY = py + actualHeaderHeight + groupPadding;
       const childW = Math.max(0, pw - (groupPadding * 2));
       const childH = Math.max(0, ph - actualHeaderHeight - (groupPadding * 2));
 
       if (childW > 5 && childH > 5 && parent.childrenArray && parent.childrenArray.length > 0) {
-        // Calculate child layout using squarify within the bounded area
         const childTotal = parent.childrenArray.reduce((sum, c) => sum + c.value, 0);
 
-        // FIXED: Use proper squarify with correct bounds
         const childNodes = parent.childrenArray.map(child => ({
           ...child,
           area: (child.value / childTotal) * (childW * childH),
@@ -827,7 +808,6 @@ looker.plugins.visualizations.add({
 
         const childLayout = this.squarifyWithBounds(childNodes, childX, childY, childW, childH);
 
-        // Get child colors
         let childColors;
         if (config.color_by === 'parent') {
           childColors = this.getShadeVariations(parentColors[parentIndex % parentColors.length], childLayout.length);
@@ -838,7 +818,6 @@ looker.plugins.visualizations.add({
         }
 
         childLayout.forEach((child, childIndex) => {
-          // FIXED: Ensure child stays within bounds
           const cx = Math.max(childX, Math.min(child.x, childX + childW - 1));
           const cy = Math.max(childY, Math.min(child.y, childY + childH - 1));
           const cw = Math.max(1, Math.min(child.width, childX + childW - cx));
@@ -854,7 +833,6 @@ looker.plugins.visualizations.add({
           childRectEl.setAttribute('width', cw);
           childRectEl.setAttribute('height', ch);
 
-          // Determine fill color
           let fillColor;
           if (config.color_by === 'metric' && config.use_gradient) {
             const allValues = parent.childrenArray.map(c => c.value);
@@ -876,7 +854,6 @@ looker.plugins.visualizations.add({
           childRectEl.setAttribute('stroke-width', Math.max(0.5, (config.border_width || 1) * 0.5));
           childRectEl.setAttribute('class', 'treemap-rect');
 
-          // Click handler
           childRectEl.addEventListener('click', (e) => {
             e.stopPropagation();
 
@@ -905,7 +882,6 @@ looker.plugins.visualizations.add({
             }
           });
 
-          // Tooltip
           childRectEl.addEventListener('mouseenter', () => {
             const formattedValue = this.formatValue(child.rawValue, config, child.rendered);
             const pct = child.percent.toFixed(1);
@@ -933,7 +909,6 @@ looker.plugins.visualizations.add({
 
           childG.appendChild(childRectEl);
 
-          // Add labels
           if (cw > 25 && ch > 15 && child.percent >= (config.label_threshold || 0)) {
             this.addLabelsToRect(childG, {
               x: cx, y: cy, width: cw, height: ch,
@@ -953,7 +928,6 @@ looker.plugins.visualizations.add({
     });
   },
 
-  // FIXED: Calculate parent layout with proper squarify
   calculateNestedLayout: function(data, x, y, width, height, totalValue) {
     const nodes = data.map(d => ({
       ...d,
@@ -963,12 +937,10 @@ looker.plugins.visualizations.add({
     return this.squarifyWithBounds(nodes, x, y, width, height);
   },
 
-  // FIXED: Squarify that respects bounds strictly
   squarifyWithBounds: function(nodes, x, y, width, height) {
     const results = [];
     if (nodes.length === 0 || width <= 0 || height <= 0) return results;
 
-    // Sort by area descending
     const sortedNodes = nodes.slice().sort((a, b) => b.area - a.area);
 
     let remaining = sortedNodes.slice();
@@ -978,11 +950,9 @@ looker.plugins.visualizations.add({
     let remainingH = height;
 
     while (remaining.length > 0) {
-      // Determine if we're laying out horizontally or vertically
       const isHorizontal = remainingW >= remainingH;
       const shortSide = isHorizontal ? remainingH : remainingW;
 
-      // Find optimal row
       const row = [];
       let rowArea = 0;
 
@@ -1006,13 +976,11 @@ looker.plugins.visualizations.add({
         }
       }
 
-      // Layout the row
       const rowLength = rowArea / shortSide;
       let offset = 0;
 
       row.forEach((node, i) => {
         const nodeSize = node.area / rowLength;
-
         let nodeX, nodeY, nodeW, nodeH;
 
         if (isHorizontal) {
@@ -1027,7 +995,6 @@ looker.plugins.visualizations.add({
           nodeH = rowLength;
         }
 
-        // Clamp to bounds
         nodeW = Math.max(0, Math.min(nodeW, x + width - nodeX));
         nodeH = Math.max(0, Math.min(nodeH, y + height - nodeY));
 
@@ -1042,7 +1009,6 @@ looker.plugins.visualizations.add({
         offset += nodeSize;
       });
 
-      // Update remaining area
       if (isHorizontal) {
         currentX += rowLength;
         remainingW -= rowLength;
@@ -1051,7 +1017,6 @@ looker.plugins.visualizations.add({
         remainingH -= rowLength;
       }
 
-      // Remove laid out nodes
       remaining = remaining.slice(row.length);
     }
 
@@ -1073,7 +1038,6 @@ looker.plugins.visualizations.add({
     return worst;
   },
 
-  // Standard flat treemap rendering
   renderTreemap: function(data, config, dimension, queryResponse) {
     const svgNS = "http://www.w3.org/2000/svg";
     this._svg.innerHTML = '';
@@ -1209,7 +1173,6 @@ looker.plugins.visualizations.add({
     });
   },
 
-  // Unified label adding function
   addLabelsToRect: function(g, item, config, svgNS, totalValue) {
     const labelFontSize = config.label_font_size || 12;
     const valueFontSize = config.value_font_size || 12;
@@ -1267,7 +1230,6 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // Grouping functions
   groupSmallItems: function(data, threshold) {
     const total = data.reduce((sum, d) => sum + d.value, 0);
     const visible = [];
@@ -1302,7 +1264,8 @@ looker.plugins.visualizations.add({
   groupData: function(data, dimension, measure, level, maxDepth) {
     const grouped = {};
     data.forEach(row => {
-      const key = row[dimension].value;
+      const rawKey = row[dimension].value;
+      const key = rawKey !== null && rawKey !== undefined ? String(rawKey) : "∅ Null";
       const safeKey = "k_" + key;
       if (!grouped[safeKey]) {
         grouped[safeKey] = {
@@ -1331,7 +1294,6 @@ looker.plugins.visualizations.add({
     return Object.values(grouped).filter(d => d.value > 0);
   },
 
-  // Value formatting
   getValueDisplayText: function(item, config, totalValue) {
     const displayFormat = config.value_display_format || 'value';
     const formattedValue = this.formatValue(item.rawValue, config, item.rendered);
@@ -1474,16 +1436,17 @@ looker.plugins.visualizations.add({
     return value.toFixed(0);
   },
 
-  // Utility functions
   ellipsize: function(text, maxWidth, fontSize) {
+    const safeText = text !== null && text !== undefined ? String(text) : "";
     const estimatedCharWidth = fontSize * 0.6;
     const maxChars = Math.floor(maxWidth / estimatedCharWidth);
-    if (text.length <= maxChars) return text;
-    return text.substring(0, Math.max(0, maxChars - 2)) + '..';
+    if (safeText.length <= maxChars) return safeText;
+    return safeText.substring(0, Math.max(0, maxChars - 2)) + '..';
   },
 
   estimateTextWidth: function(text, fontSize) {
-    return text.length * (fontSize * 0.6);
+    const safeText = text !== null && text !== undefined ? String(text) : "";
+    return safeText.length * (fontSize * 0.6);
   },
 
   updateBreadcrumb: function() {
@@ -1494,8 +1457,9 @@ looker.plugins.visualizations.add({
     this._breadcrumb.style.display = 'block';
     let html = '<span class="breadcrumb-item" data-level="-1">All</span>';
     this._drillStack.forEach((item, idx) => {
+      const safeItem = item !== null && item !== undefined ? String(item) : "∅ Null";
       html += '<span class="breadcrumb-separator">/</span>';
-      html += `<span class="breadcrumb-item" data-level="${idx}">${item}</span>`;
+      html += `<span class="breadcrumb-item" data-level="${idx}">${safeItem}</span>`;
     });
     this._breadcrumb.innerHTML = html;
     this._breadcrumb.querySelectorAll('.breadcrumb-item').forEach(elem => {
