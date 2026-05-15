@@ -24,7 +24,8 @@ Note: A known limitation of the Custom Visualization API is that cross-filtering
 
 **_ To import and fully own the visualization set up,** 
 1. **Fork or Clone the Repository**
-   - Fork [this repository](https://github.com/FPFletcher/looker-custom-visualizations-picasso-project) to your GitHub account, OR clone it directly:
+   - Simply use the **"Clone Public Git Repository"** option when you create a LooML Project
+   - or fork [this repository](https://github.com/FPFletcher/looker-custom-visualizations-picasso-project) to your GitHub account, OR clone it directly:
 ```bash
      git clone https://github.com/FPFletcher/looker-custom-visualizations-picasso-project.git
 ```
