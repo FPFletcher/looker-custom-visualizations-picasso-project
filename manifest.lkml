@@ -110,3 +110,24 @@ application: dashboard_tabs {
     use_form_submit: yes
   }
 }
+
+application: looker-extension-selo {
+  label: "Selo Agentic App"
+
+  # Use the deployed Cloud Run URL for testing
+  url: "https://selo-extension-web-734857282249.europe-west1.run.app"
+
+  entitlements: {
+    local_storage: yes
+    navigation: yes
+    new_window: yes
+    use_form_submit: yes
+    use_embeds: yes
+
+    # These are the methods the frontend can call on behalf of the user
+    core_api_methods: ["me", "all_lookml_models", "run_inline_query"]
+
+    # CRITICAL: Add your backend URL here so the extension can talk to it
+    external_api_urls: ["https://selo-extension-backend-734857282249.europe-west1.run.app"]
+  }
+}
