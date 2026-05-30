@@ -115,7 +115,7 @@ application: looker-extension-selo {
   label: "Selo Agentic App"
 
   # Use the deployed Cloud Run URL for testing
-  url: "https://selo-extension-web-734857282249.europe-west1.run.app/test.js"
+  url: "https://selo-extension-web-734857282249.europe-west1.run.app/bundle.js"
 
   entitlements: {
     local_storage: yes
