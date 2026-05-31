@@ -125,14 +125,40 @@ application: looker-extension-selo {
     use_embeds: yes
 
     # These are the methods the frontend can call on behalf of the user
-    core_api_methods: ["me", "all_lookml_models", "run_inline_query"]
+    core_api_methods: [
+      "me",
+      "session",
+      "all_lookml_models",
+      "query",
+      "lookml_model_explore",
+      "run_query",
+      "create_sql_query",
+      "run_sql_query",
+      "query_for_slug",
+      "search_dashboards",
+      "create_dashboard_element",
+      "connection",
+      "dashboard",
+      "all_connections",
+      "artifact",
+      "update_artifacts"
+    ]
 
     # CRITICAL: Add your backend URL here so the extension can talk to it
     external_api_urls: [
+      # 1. Backend API URL (Hash style)
+      # Used by the frontend to send chat requests and fetch data.
       "https://selo-extension-backend-pr4xpixpuq-ew.a.run.app",
+
+      # 2. Frontend Web URL
+      # Where the extension assets (bundle.js) and static files (logos) are hosted.
       "https://selo-extension-web-734857282249.europe-west1.run.app",
+
+      # 3. Backend API URL (New Project Number style)
+      # Alternative URL for the same backend service. The app attempted to use this to reach /api/chat.
       "https://selo-extension-backend-734857282249.europe-west1.run.app"
     ]
+
     #URLs 1 & 3 are both for the Backend (FastAPI). Cloud Run sometimes generates two styles of URLs (one with a random hash and one with the project number). Looker needs to whitelist both to ensure the API calls are not blocked.
     # URL 2 is for the Frontend (Next.js). Looker needs to whitelist this so the extension can load its own assets (like images or scripts) if requested via full URLs.
   }
