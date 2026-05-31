@@ -132,6 +132,7 @@ application: looker-extension-selo {
       "query",
       "lookml_model_explore",
       "run_query",
+      "create_query",
       "create_sql_query",
       "run_sql_query",
       "query_for_slug",
@@ -158,8 +159,5 @@ application: looker-extension-selo {
       # Alternative URL for the same backend service. The app attempted to use this to reach /api/chat.
       "https://selo-extension-backend-734857282249.europe-west1.run.app"
     ]
-
-    #URLs 1 & 3 are both for the Backend (FastAPI). Cloud Run sometimes generates two styles of URLs (one with a random hash and one with the project number). Looker needs to whitelist both to ensure the API calls are not blocked.
-    # URL 2 is for the Frontend (Next.js). Looker needs to whitelist this so the extension can load its own assets (like images or scripts) if requested via full URLs.
   }
 }
