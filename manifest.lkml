@@ -128,6 +128,6 @@ application: looker-extension-selo {
     core_api_methods: ["me", "all_lookml_models", "run_inline_query"]
 
     # CRITICAL: Add your backend URL here so the extension can talk to it
-    external_api_urls: ["https://selo-extension-backend-734857282249.europe-west1.run.app"]
+    external_api_urls: ["https://selo-extension-backend-pr4xpixpuq-ew.a.run.app]
   }
 }
