@@ -123,7 +123,8 @@ application: looker-extension-selo {
     new_window: yes
     use_form_submit: yes
     use_embeds: yes
-
+    new_window: yes
+    new_window_external_urls: ["https://selo-extension-backend-pr4xpixpuq-ew.a.run.app/*"]
     # These are the methods the frontend can call on behalf of the user
     core_api_methods: [
       "me",
