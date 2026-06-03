@@ -127,7 +127,7 @@ application: looker-extension-selo {
       "https://selo-extension-backend-pr4xpixpuq-ew.a.run.app/*",
       "https://selo-extension-backend-734857282249.europe-west1.run.app/*",
       "https://selo-extension-web-734857282249.europe-west1.run.app/*",
-      "https://ceworkshops.cloud.looker.com/*"
+      "https://8168ca92-acf6-485c-aba1-0dbf0987da05.looker.app/*"
     ]
     # These are the methods the frontend can call on behalf of the user
     core_api_methods: [
