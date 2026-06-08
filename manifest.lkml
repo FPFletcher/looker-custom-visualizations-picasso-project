@@ -148,6 +148,7 @@ application: looker-extension-selo {
       "dashboard",
       "all_connections",
       "artifact",
+      "search_users",
       "user_roles",
       "update_artifacts"
     ]
