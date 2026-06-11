@@ -167,7 +167,7 @@ application: looker-extension-selo {
       # Alternative URL for the same backend service. The app attempted to use this to reach /api/chat.
       "https://selo-extension-backend-734857282249.europe-west1.run.app",
 
-      "https://8168ca92-acf6-485c-aba1-0dbf0987da05.looker.app/*"
+      "https://8168ca92-acf6-485c-aba1-0dbf0987da05.looker.app"
     ]
   }
 }
